@@ -26,6 +26,17 @@
       "android": {
         "buildType": "apk",
         "credentialsSource": "remote"
+      },
+      "env": {
+        "EXPO_PUBLIC_DEFAULT_MESSAGEBOX_URL": "https://message-box-us-1.bsvb.tech",
+        "EXPO_PUBLIC_DEFAULT_CHAIN": "test",
+        "EXPO_PUBLIC_ADMIN_ORIGINATOR": "admin.com",
+        "EXPO_PUBLIC_ARC_URL": "https://arcade-v2-us-1.bsvblockchain.tech",
+        "EXPO_PUBLIC_CHAINTRACKS_URL": "https://arcade-v2-us-1.bsvblockchain.tech/chaintracks/v1",
+        "EXPO_PUBLIC_TEST_ARC_URL": "https://arcade-v2-testnet-us-1.bsvblockchain.tech",
+        "EXPO_PUBLIC_TEST_CHAINTRACKS_URL": "https://arcade-v2-testnet-us-1.bsvblockchain.tech/chaintracks/v1",
+        "EXPO_PUBLIC_TERATEST_ARC_URL": "https://arcade-v2-ttn-us-1.bsvblockchain.tech",
+        "EXPO_PUBLIC_TERATEST_CHAINTRACKS_URL": "https://arcade-v2-ttn-us-1.bsvblockchain.tech/chaintracks/v1"
       }
     },
     "production": {
@@ -36,6 +47,17 @@
       "android": {
         "buildType": "app-bundle",
         "credentialsSource": "remote"
+      },
+      "env": {
+        "EXPO_PUBLIC_DEFAULT_MESSAGEBOX_URL": "https://message-box-us-1.bsvb.tech",
+        "EXPO_PUBLIC_DEFAULT_CHAIN": "main",
+        "EXPO_PUBLIC_ADMIN_ORIGINATOR": "admin.com",
+        "EXPO_PUBLIC_ARC_URL": "https://arcade-v2-us-1.bsvblockchain.tech",
+        "EXPO_PUBLIC_CHAINTRACKS_URL": "https://arcade-v2-us-1.bsvblockchain.tech/chaintracks/v1",
+        "EXPO_PUBLIC_TEST_ARC_URL": "https://arcade-v2-testnet-us-1.bsvblockchain.tech",
+        "EXPO_PUBLIC_TEST_CHAINTRACKS_URL": "https://arcade-v2-testnet-us-1.bsvblockchain.tech/chaintracks/v1",
+        "EXPO_PUBLIC_TERATEST_ARC_URL": "https://arcade-v2-ttn-us-1.bsvblockchain.tech",
+        "EXPO_PUBLIC_TERATEST_CHAINTRACKS_URL": "https://arcade-v2-ttn-us-1.bsvblockchain.tech/chaintracks/v1"
       }
     }
   },

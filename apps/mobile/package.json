@@ -8,24 +8,45 @@
     "start": "expo start --dev-client",
     "ios": "expo run:ios",
     "android": "expo run:android",
-    "prebuild": "expo prebuild --clean"
+    "prebuild": "expo prebuild --clean",
+    "postinstall": "patch-package --patch-dir ../../patches"
   },
   "dependencies": {
+    "@bsv/message-box-client": "2.2.1",
+    "@bsv/sdk": "2.1.9",
+    "@bsv/templates": "1.9.6",
+    "@bsv/wallet-toolbox-mobile": "2.4.3",
+    "@nexus/bridge": "*",
+    "@nexus/substrate": "*",
+    "@noble/secp256k1": "^2.2.3",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/netinfo": "11.5.2",
     "expo": "^55.0.0",
     "expo-constants": "~55.0.16",
+    "expo-crypto": "~55.0.15",
+    "expo-file-system": "~55.0.24",
+    "expo-local-authentication": "~55.0.14",
+    "expo-secure-store": "~55.0.14",
+    "expo-sqlite": "~55.0.16",
     "expo-status-bar": "~55.0.6",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-native": "0.83.6",
+    "react-native-engine-native": "file:../../packages/react-native-engine-native",
+    "react-native-localpay-transport": "file:../../packages/react-native-localpay-transport",
+    "react-native-nitro-modules": "^0.35.2",
+    "react-native-quick-crypto": "^0.7.17",
     "react-native-safe-area-context": "~5.6.0",
+    "react-native-secp-native": "file:../../packages/react-native-secp-native",
+    "react-native-sse": "^1.2.1",
     "react-native-webview": "13.16.0",
-    "@nexus/bridge": "*",
-    "@nexus/substrate": "*",
-    "expo-file-system": "~55.0.24"
+    "stream-browserify": "^3.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/react": "~19.2.10",
+    "nitrogen": "^0.35.2",
+    "patch-package": "^8.0.1",
     "typescript": "~5.9.2"
   }
 }

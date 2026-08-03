@@ -23,3 +23,10 @@ apps/mobile/assets/ui/
 apps/ui/node_modules/
 apps/ui/.next/
 apps/ui/out/
+
+# Rust/native build output — the tracked source builds these; they are 1.4 GB when present
+packages/react-native-*/node_modules/
+packages/react-native-*/ios/*.xcframework/
+packages/react-native-*/android/build/
+packages/react-native-*/android/.cxx/
+native-*/target/
