@@ -17,7 +17,8 @@
     "ui:fetch": "node tools/fetch-ui.mjs",
     "ui:build": "node tools/fetch-ui.mjs --build",
     "ui:dev": "npm run dev --prefix apps/ui",
-    "typecheck": "tsc --noEmit -p apps/mobile"
+    "typecheck": "tsc --noEmit -p apps/mobile",
+    "check": "node tools/check-injection-sources.mjs"
   },
   "devDependencies": {
     "typescript": "~5.9.2"

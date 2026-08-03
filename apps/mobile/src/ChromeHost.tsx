@@ -19,12 +19,31 @@ export interface ChromeHostProps {
  * one-way (page -> native), so delivery back to the page has to be an
  * injected call, not a return value.
  */
+/**
+ * Probe for the two ways document-start injection can silently fail on RN:
+ *   1. Hermes returns `function () { [bytecode] }` from Function.prototype.toString(),
+ *      which would make the stringified client garbage.
+ *   2. `injectedJavaScriptBeforeContentLoaded` never fires at all.
+ * The first is checked here in RN; the second announces itself from inside the page.
+ */
+const PROBE_BEFORE = `window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({__probe:'before-content',hasHost:typeof window.nexusHost}));`
+
 const ChromeHost = forwardRef<WebView, ChromeHostProps>(function ChromeHost({ onMessage }, ref) {
+  const bridgeScript = buildChromeBridgeScript({ shell: 'expo', platform: Platform.OS })
+  if (__DEV__) {
+    console.log(
+      `[probe] chrome script len=${bridgeScript.length} bytecode=${/\[bytecode\]|native code/.test(bridgeScript)} head=${bridgeScript
+        .slice(0, 100)
+        .replace(/\n/g, ' ')}`
+    )
+  }
+
   return (
     <WebView
       ref={ref}
       source={{ uri: CHROME_URL }}
-      injectedJavaScriptBeforeContentLoaded={buildChromeBridgeScript({ shell: 'expo', platform: Platform.OS })}
+      injectedJavaScriptBeforeContentLoaded={PROBE_BEFORE + bridgeScript}
+      injectedJavaScript={`window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({__probe:'after-content',hasHost:typeof window.nexusHost}));true;`}
       onMessage={(event) => onMessage(event.nativeEvent.data)}
       originWhitelist={['*']}
       javaScriptEnabled

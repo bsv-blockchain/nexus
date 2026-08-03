@@ -1,6 +1,6 @@
 'use strict'
 
-const { createHostClient } = require('./client')
+const { CREATE_HOST_CLIENT_SOURCE } = require('./client')
 const { CHANNEL } = require('./protocol')
 
 /**
@@ -18,9 +18,11 @@ function buildChromeBridgeScript(opts) {
     timeoutMs: (opts && opts.timeoutMs) || 15000
   }
 
+  // Interpolating the SOURCE STRING, never a stringified function — Hermes discards
+  // function source and would hand the page a `[bytecode]` stub. See client.js.
   return `(function(){
   if (window.nexusHost) return;
-  var createHostClient = ${createHostClient.toString()};
+  ${CREATE_HOST_CLIENT_SOURCE};
   var cfg = ${JSON.stringify(cfg)};
   cfg.post = function (msg) { window.ReactNativeWebView.postMessage(JSON.stringify(msg)) };
   var client = createHostClient(cfg);

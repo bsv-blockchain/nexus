@@ -3,18 +3,19 @@
 /**
  * `window.nexus` — the provider a browsed page sees.
  *
- * HARD CONSTRAINT: `createProvider` must be entirely self-contained. Its source
- * is stringified via Function.prototype.toString() and injected into WebViews
- * (see injected.js), so it may not reference imports, closures, or anything
- * outside its own body. ES5-flavoured on purpose — it runs in whatever engine
- * the browsed page got.
+ * WHY THIS IS A STRING AND NOT A FUNCTION
  *
- * The Electron tab preload imports this same function directly instead of
- * stringifying it, so both shells ship byte-identical provider logic.
+ * Hermes discards function source, so Function.prototype.toString() returns a stub
+ * with a `[bytecode]` body and mangled parameter names — the injected provider is
+ * then garbage and `window.nexus` never appears. Measured on the iOS simulator
+ * (2026-08-03) against the sibling bridge client: 660 characters vs 3540 in Node.
+ * BSV Browser reached the same conclusion for its CWI provider.
  *
- * @param {{channel: string, post: (msg: any) => void, timeoutMs?: number, version?: string, walletEnabled?: boolean}} options
+ * So the string below is the single source of truth. Keep it ES5-flavoured, and
+ * free of backticks and `${`, since injected.js interpolates it into a template
+ * literal.
  */
-function createProvider(options) {
+const CREATE_PROVIDER_SOURCE = `function createProvider(options) {
   var channel = options.channel
   var post = options.post
   var timeoutMs = options.timeoutMs || 30000
@@ -46,21 +47,25 @@ function createProvider(options) {
   return {
     version: options.version || '0.0.0-spike',
     walletEnabled: options.walletEnabled !== false,
-    ping: function () {
-      return call('ping', null)
-    },
-    getVersion: function () {
-      return call('getVersion', null)
-    },
-    getPublicKey: function (args) {
-      return call('getPublicKey', args || {})
-    },
-    createAction: function (args) {
-      return call('createAction', args || {})
-    },
-    /** Host → page delivery hook. Not part of the public page-facing API. */
+    ping: function () { return call('ping', null) },
+    getVersion: function () { return call('getVersion', null) },
+    getPublicKey: function (args) { return call('getPublicKey', args || {}) },
+    createAction: function (args) { return call('createAction', args || {}) },
     __deliver: deliver
   }
+}`
+
+/**
+ * The Electron tab preload needs the real function. Evaluating our own source once
+ * keeps both shells on one implementation instead of two that drift. The input is
+ * this module's own constant — never anything originating in a browsed page.
+ */
+let cachedFactory = null
+function createProvider(options) {
+  if (!cachedFactory) {
+    cachedFactory = new Function(CREATE_PROVIDER_SOURCE + '; return createProvider')()
+  }
+  return cachedFactory(options)
 }
 
-module.exports = { createProvider }
+module.exports = { CREATE_PROVIDER_SOURCE, createProvider }

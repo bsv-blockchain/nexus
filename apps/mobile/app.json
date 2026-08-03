@@ -15,6 +15,9 @@
     },
     "android": {
       "package": "org.bsvblockchain.nexus"
+    },
+    "extra": {
+      "chromeUrl": "http://localhost:8099/?autotest=1"
     }
   }
 }

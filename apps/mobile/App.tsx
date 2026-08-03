@@ -1,5 +1,5 @@
 import React, { useMemo, useRef } from 'react'
-import { Platform, StyleSheet, View } from 'react-native'
+import { Dimensions, Platform, StyleSheet, View } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import Constants from 'expo-constants'
 import type WebView from 'react-native-webview'
@@ -21,6 +21,11 @@ export default function App() {
   // Mirrors Electron's app.getVersion(): one value read from the app's own
   // manifest, reused for both host.info and the substrate getVersion handler.
   const version = (Constants.expoConfig?.version as string | undefined) ?? '0.0.0-spike'
+
+  if (__DEV__) {
+    const w = Dimensions.get('window')
+    console.log(`[screen] window=${w.width}×${w.height} dp scale=${w.scale}`)
+  }
   const tabHost = useTabHost({ shell: 'expo', platform: Platform.OS, version })
 
   const router = useMemo(
@@ -52,7 +57,13 @@ export default function App() {
     <View style={styles.root}>
       <StatusBar style="auto" />
       <View style={[styles.layer, { zIndex: 0 }]}>
-        <ChromeHost ref={chromeRef} onMessage={(data) => router.handle(data)} />
+        <ChromeHost
+          ref={chromeRef}
+          onMessage={(data) => {
+            if (__DEV__ && data.includes('__probe')) console.log('[probe] from chrome: ' + data)
+            router.handle(data)
+          }}
+        />
       </View>
       {/* pointerEvents box-none: this layer's own bounds cover the full screen,
           but only the individual tab WebViews inside it (each opting in via its

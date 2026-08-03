@@ -1,6 +1,6 @@
 'use strict'
 
-const { createProvider } = require('./provider')
+const { CREATE_PROVIDER_SOURCE } = require('./provider')
 const { CHANNEL } = require('./protocol')
 
 /**
@@ -25,9 +25,11 @@ function buildSubstrateScript(opts) {
     version: o.version || '0.0.0-spike'
   }
 
+  // Interpolating the SOURCE STRING, never a stringified function — Hermes discards
+  // function source and would hand the page a `[bytecode]` stub. See provider.js.
   return `(function(){
   if (window.nexus) return;
-  var createProvider = ${createProvider.toString()};
+  ${CREATE_PROVIDER_SOURCE};
   var cfg = ${JSON.stringify(cfg)};
   cfg.post = function (msg) {
     var json = JSON.stringify(msg);

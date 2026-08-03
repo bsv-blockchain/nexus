@@ -61,7 +61,10 @@
       /* ---- main column ---- */
       #main { display: grid; grid-template-rows: auto auto 1fr 160px; min-width: 0; }
 
-      #topbar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; }
+      /* Every grid/flex child needs min-width:0 or its min-content width wins and the
+         column grows past the viewport. On a phone that made #viewport measure 651px
+         inside a 402px viewport, so the tab rect ran off-screen. */
+      #topbar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; min-width: 0; flex-wrap: wrap; }
       #topbar button, #tabstrip button {
         font-family: inherit;
         font-size: 12px;
@@ -74,7 +77,7 @@
       }
       #topbar button:disabled { opacity: 0.35; cursor: default; }
       #url {
-        flex: 1;
+        flex: 1 1 120px;
         min-width: 0;
         font: 12px/1 ui-monospace, monospace;
         color: #f4f2f8;

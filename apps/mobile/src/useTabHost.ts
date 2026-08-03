@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
+import { Dimensions } from 'react-native'
 import type WebView from 'react-native-webview'
 import { METHODS } from '@nexus/bridge'
 
@@ -153,15 +154,43 @@ export function useTabHost(config: UseTabHostConfig): UseTabHostResult {
         setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, url, loading: true } : t)))
         return null
       },
-      [METHODS.TAB_SET_BOUNDS]: ({ id, rect }: { id: string; rect: Rect }) => {
-        // Rects arrive as floats off getBoundingClientRect(); round the same
-        // way @nexus/desktop's setBounds does so both shells snap to the same
-        // pixel instead of drifting apart over repeated resizes.
-        const rounded: Rect = {
-          x: Math.round(rect.x),
-          y: Math.round(rect.y),
-          width: Math.round(rect.width),
-          height: Math.round(rect.height)
+      [METHODS.TAB_SET_BOUNDS]: ({
+        id,
+        rect,
+        viewport,
+        norm
+      }: {
+        id: string
+        rect: Rect
+        viewport?: { width: number; height: number; zoom?: number; dpr?: number; vvWidth?: number }
+        norm?: Rect
+      }) => {
+        // Normalized fractions × this screen's dp. A WebView scales the page whenever
+        // the chrome's layout does not fit the frame, so the chrome's CSS px are not
+        // dp and no constant factor recovers them. Fractions survive that; px are only
+        // the fallback for a shell/chrome pair predating `norm`.
+        const win = Dimensions.get('window')
+        const rounded: Rect = norm
+          ? {
+              x: Math.round(norm.x * win.width),
+              y: Math.round(norm.y * win.height),
+              width: Math.round(norm.width * win.width),
+              height: Math.round(norm.height * win.height)
+            }
+          : {
+              x: Math.round(rect.x),
+              y: Math.round(rect.y),
+              width: Math.round(rect.width),
+              height: Math.round(rect.height)
+            }
+        if (__DEV__) {
+          console.log(
+            `[bounds] ${id} css=${Math.round(rect.x)},${Math.round(rect.y)} ${Math.round(rect.width)}×${Math.round(
+              rect.height
+            )} vp=${viewport?.width}×${viewport?.height} zoom=${viewport?.zoom} dpr=${viewport?.dpr} vvW=${viewport?.vvWidth} → dp=${rounded.x},${rounded.y} ${rounded.width}×${
+              rounded.height
+            } (screen ${win.width}×${win.height})`
+          )
         }
         setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, rect: rounded } : t)))
         return null
