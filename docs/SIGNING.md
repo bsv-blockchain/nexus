@@ -40,12 +40,27 @@ project @account/slug exists; if you are using managed credentials to download t
 - Expo's **Free** plan lists **Unlimited** members and shows "Organization-wide app
   credential management" as included. So four seats cost nothing.
 
+## Run every `eas` command from `apps/mobile`
+
+Not the repo root. `eas` resolves both the Expo config and `eas.json` from the current
+directory, and the root has neither. Running it there fails with
+`eas.json could not be found at /Users/personal/git/nexus/eas.json` — and, worse, does so
+*after* creating the EAS project and dropping a stray `app.json` at the root containing
+only a `projectId`. That stray file will confuse Expo tooling later, so delete it if it
+reappears; the real one is `apps/mobile/app.json`.
+
+The project already exists: **`@bsvb/nexus`**, id `59d9d49d-07e1-455c-8f93-1607a2f54341`,
+recorded in `apps/mobile/app.json` under `extra.eas.projectId`. Do not run `eas init`
+again — it would offer to make a second one.
+
+`app.json` also pins `"owner": "bsvb"`, so a teammate logged into their personal Expo
+account still resolves to the org project instead of silently creating their own.
+
 ## One-time setup (credential owner)
 
 ```bash
-cd apps/mobile
-eas login                         # as the bsvb org
-eas init                          # creates the EAS project, writes extra.eas.projectId
+cd apps/mobile                    # ← required, see above
+eas login                         # as, or with access to, the bsvb org
 eas credentials --platform ios    # → Build Credentials → "All: Set up all required credentials"
 ```
 

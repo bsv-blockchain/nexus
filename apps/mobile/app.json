@@ -5,6 +5,7 @@
     "version": "0.0.0",
     "scheme": "nexus",
     "newArchEnabled": true,
+    "owner": "bsvb",
     "ios": {
       "bundleIdentifier": "org.bsvassociation.nexus",
       "infoPlist": {
@@ -17,7 +18,10 @@
       "package": "org.bsvassociation.nexus"
     },
     "extra": {
-      "chromeUrl": "http://localhost:8099/?autotest=1"
+      "chromeUrl": "http://localhost:8099/?autotest=1",
+      "eas": {
+        "projectId": "59d9d49d-07e1-455c-8f93-1607a2f54341"
+      }
     }
   }
 }
