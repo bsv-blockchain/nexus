@@ -2,7 +2,7 @@
   "name": "nexus",
   "private": true,
   "version": "0.0.0",
-  "description": "Nexus — BSV wallet + browser across mobile and desktop",
+  "description": "Nexus \u2014 BSV wallet + browser across mobile and desktop",
   "workspaces": [
     "apps/desktop",
     "apps/mobile",
@@ -18,7 +18,8 @@
     "ui:build": "node tools/fetch-ui.mjs --build",
     "ui:dev": "npm run dev --prefix apps/ui",
     "typecheck": "tsc --noEmit -p apps/mobile",
-    "check": "node tools/check-injection-sources.mjs"
+    "check": "node tools/check-injection-sources.mjs",
+    "ui:bundle": "node tools/fetch-ui.mjs --build && node tools/bundle-ui.mjs"
   },
   "devDependencies": {
     "typescript": "~5.9.2"

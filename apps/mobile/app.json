@@ -21,10 +21,13 @@
       "package": "org.bsvassociation.nexus"
     },
     "extra": {
-      "chromeUrl": "https://bsvnexus.vercel.app",
+      "chromeUrl": "bundled",
       "eas": {
         "projectId": "59d9d49d-07e1-455c-8f93-1607a2f54341"
       }
-    }
+    },
+    "plugins": [
+      "./plugins/withBundledUi"
+    ]
   }
 }

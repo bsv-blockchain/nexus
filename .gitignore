@@ -16,3 +16,6 @@ apps/mobile/.expo/
 *.ipa
 *.aab
 *.apk
+
+# Generated: 28 MB static export, rebuilt by `npm run ui:bundle`
+apps/mobile/assets/ui/

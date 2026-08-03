@@ -93,18 +93,35 @@ production needs:
 | Delivery | Used by | Trade-off |
 |---|---|---|
 | Local harness / `next dev` | development | Fast loop; requires the dev machine |
-| **Hosted (`bsvnexus.vercel.app`)** | **v0.0.1, on-device technical tests** | Testable build today, but needs network, and the deployed UI has no `window.nexusHost`, so the browse pane falls back to its iframe instead of native tabs |
-| Bundled static export | production | Offline, no third-party dependency, and the only way the native tab layer works on device — because we control the build and can apply the `nexusHost` integration |
+| Hosted (`bsvnexus.vercel.app`) | fallback, branch previews | Needs network, and a deployed UI without the integration has no `window.nexusHost`, so the browse pane falls back to its iframe |
+| **Bundled static export** | **default** | No network, ships in lockstep with the binary, and the native tab layer works because we control the build |
 
-v0.0.1 ships hosted deliberately. Bundling was attempted and blocked: `tools/fetch-ui.mjs`
-refuses to patch the demo's `next.config.ts` (it is not our repository), so there is no
-`out/` to embed. Embedding one also means resolving Next's absolute `/_next/...` asset
-paths under `file://`, or shipping a small local HTTP server inside the app. Both are
-known, tractable, and neither belongs on the critical path to a first device build.
+**Bundled is the default.** `extra.chromeUrl: "bundled"` resolves to
+`file://<app bundle>/ui/index.html` on iOS and `file:///android_asset/ui/index.html` on
+Android; `EXPO_PUBLIC_CHROME_URL` overrides for development.
 
-Consequence to keep in view: **until the chrome is bundled and patched, the native tab
-layer is unreachable on device.** Everything proving it works — G2, G3, G4, G5 — was
-measured against the harness and the Electron shell, not against the hosted demo.
+Getting there took four things, each of which failed in an instructive way first:
+
+1. **`output: "export"` needs `force-static` on route handlers.** `app/robots.ts` and
+   `app/sitemap.ts` fail the export without it.
+2. **`assetPrefix` cannot be relative.** `next/font` rejects anything that is not a leading
+   slash or absolute URL, so relative asset paths cannot be configured — only produced
+   afterwards.
+3. **Rewrite the HTML, never the JS.** `tools/bundle-ui.mjs` rewrites `/_next/` → `./_next/`
+   in emitted HTML only. Rewriting the same literal inside the webpack runtime threw
+   `InvariantError: Expected document.currentScript src to contain './_next/'` before a
+   single pixel rendered — Next derives its public path from the script's own URL and
+   asserts the prefix matches. Left alone, that derivation is exactly what makes `file://`
+   work. This is safe only because the UI is a single route.
+4. **Packaging via a build phase, not a folder reference.** `plugins/withBundledUi.js` adds
+   a Run Script phase that copies `assets/ui` into the built `.app`. A blue-folder
+   reference in the pbxproj would be regenerated away by `prebuild --clean`; a plugin-added
+   phase survives, and copies whatever is on disk at build time.
+
+Verified on the iOS simulator: `[chrome-url] file://…/Nexus.app/ui/index.html`, followed by
+`[bounds] t1 css=9,9 384×760` — the offline UI driving a native tab.
+
+The browsed *site* still needs network, which is inherent to a browser. The *app* does not.
 
 ## Mobile rules earned on device
 
