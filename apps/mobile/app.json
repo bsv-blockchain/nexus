@@ -1,11 +1,13 @@
 {
   "expo": {
-    "name": "nexus",
+    "name": "Nexus",
     "slug": "nexus",
-    "version": "0.0.0",
+    "version": "0.0.1",
     "scheme": "nexus",
     "newArchEnabled": true,
     "owner": "bsvb",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
     "ios": {
       "bundleIdentifier": "org.bsvassociation.nexus",
       "infoPlist": {
