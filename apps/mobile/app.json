@@ -6,7 +6,7 @@
     "scheme": "nexus",
     "newArchEnabled": true,
     "ios": {
-      "bundleIdentifier": "org.bsvblockchain.nexus",
+      "bundleIdentifier": "org.bsvassociation.nexus",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
@@ -14,7 +14,7 @@
       }
     },
     "android": {
-      "package": "org.bsvblockchain.nexus"
+      "package": "org.bsvassociation.nexus"
     },
     "extra": {
       "chromeUrl": "http://localhost:8099/?autotest=1"

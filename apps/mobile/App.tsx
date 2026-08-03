@@ -1,5 +1,5 @@
 import React, { useMemo, useRef } from 'react'
-import { Dimensions, Platform, StyleSheet, View } from 'react-native'
+import { Platform, StyleSheet, View } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import Constants from 'expo-constants'
 import type WebView from 'react-native-webview'
@@ -21,11 +21,6 @@ export default function App() {
   // Mirrors Electron's app.getVersion(): one value read from the app's own
   // manifest, reused for both host.info and the substrate getVersion handler.
   const version = (Constants.expoConfig?.version as string | undefined) ?? '0.0.0-spike'
-
-  if (__DEV__) {
-    const w = Dimensions.get('window')
-    console.log(`[screen] window=${w.width}×${w.height} dp scale=${w.scale}`)
-  }
   const tabHost = useTabHost({ shell: 'expo', platform: Platform.OS, version })
 
   const router = useMemo(
@@ -57,20 +52,27 @@ export default function App() {
     <View style={styles.root}>
       <StatusBar style="auto" />
       <View style={[styles.layer, { zIndex: 0 }]}>
-        <ChromeHost
-          ref={chromeRef}
-          onMessage={(data) => {
-            if (__DEV__ && data.includes('__probe')) console.log('[probe] from chrome: ' + data)
-            router.handle(data)
-          }}
-        />
+        <ChromeHost ref={chromeRef} onMessage={(data) => router.handle(data)} />
       </View>
       {/* pointerEvents box-none: this layer's own bounds cover the full screen,
           but only the individual tab WebViews inside it (each opting in via its
           own pointerEvents) should ever intercept a touch — otherwise gaps
           around/below tabs (e.g. the chrome's own address bar) would be dead
           to touch even though no tab is actually there. */}
-      <View style={[styles.layer, { zIndex: 1 }]} pointerEvents="box-none">
+      <View
+        style={[styles.layer, { zIndex: 1 }]}
+        pointerEvents="box-none"
+        onLayout={(e) => {
+          // If this layer is not at 0,0 covering the screen, every tab inherits the
+          // offset and no amount of correct rect maths will land them right.
+          const l = e.nativeEvent.layout
+          if (__DEV__) {
+            console.log(
+              `[layout] tab-layer ${Math.round(l.x)},${Math.round(l.y)} ${Math.round(l.width)}×${Math.round(l.height)}`
+            )
+          }
+        }}
+      >
         <TabLayer
           tabs={tabHost.tabs}
           registerRef={tabHost.registerRef}

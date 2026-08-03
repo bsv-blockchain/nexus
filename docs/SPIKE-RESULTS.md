@@ -8,7 +8,7 @@ failure and what it implies for the A′ decision.
 |---|---|---|---|
 | G1 Rendering | Real bsvnexus UI usable in Electron renderer + iOS-sim chrome WebView | **PASS** desktop · iOS UNMEASURED | Electron renderer running `next dev`: full chrome renders — icon rail (Profiles/Apps/Messages/Wallet/Identity/Browse/Connections), side pane, address bar, content pane. `[HMR] connected`, no fatal console errors. Screenshot captured. iOS sim: not yet run. |
 | G2 Desktop tabs | ≥3 tabs glued to measured rect; resize / maximise / restore within ±1px; instant active switch | **PASS** (macOS 2026-08-03) | 3 tabs; **47 bounds pushes, 0 with non-zero drift**, requested vs `view.getBounds()` identical through `setSize` ×3, `maximize`, `unmaximize` and every animated intermediate frame (1324×596 → 3724×1198 → 784×296). `setActive` 0–3ms, and switching away and back re-applied the stored rect. |
-| G3 Mobile tabs | ≥2 tabs positioned in rect; rotation + keyboard show/hide keep alignment | **OPEN** (iOS sim 2026-08-03) | 3 tabs created and driven from the chrome; the active tab **renders real sites** (wikipedia, then the proof page). But the native view lands at roughly y≈742dp instead of the requested y=176. Ruled out: unit mismatch (`zoom=1 dpr=3 vvW=402`, viewport = screen = 402×874, so CSS px **are** dp) and a bad rect (`106,176 286×530` fits the 402×874 screen; the chrome's own dashed box measures 175–703dp, matching). **Next probe:** `onLayout` on the tab `WebView` to read the frame RN actually applied — that separates "RN placed it wrong" from "it is placed right and something else is painting over it". |
+| G3 Mobile tabs | ≥2 tabs positioned in rect; rotation + keyboard show/hide keep alignment | **PASS** (iOS sim 2026-08-03) | 3 tabs driven from the chrome; active tab renders real sites and the proof page **exactly inside the measured rect** (`106,238 286×434`), verified by screenshot. `setActive` 3ms. Rotation/keyboard still unexercised. Getting here took two fixes — see below. |
 | G4 Document-start | `proof.html` reports `typeof window.nexus === 'object'` at first inline script | **PASS** macOS + iOS · rest UNMEASURED | macOS/Electron: `{"nexusType":"object","injectedAt":1785774918764,"firstScriptAt":1785774918765,"readyState":"loading"}` — provider existed **1ms before the page's first script**, document still parsing. **iOS simulator (iPhone 17 Pro, Xcode 26.6): green PASS headline**, via `injectedJavaScriptBeforeContentLoaded` on `react-native-webview` — screenshot captured. Android: — · Windows: — · Linux: — |
 | G5 RPC | `nexus.ping()` < 50ms; unknown method → `failure`; no cross-tab response leakage | **PASS** (macOS 2026-08-03) | Page→shell→page ping: **t1 2ms, t2 1ms, t3 0ms**. Unknown method refused: `EXPECTED FAILURE: nexusHost: unknown method tab.ping`. Isolation: each tab's pong carried its own distinct `at` (…8769 / …8772 / …8779) and each `tab.message` carried the matching id. Chrome RPC: `host.info` 3ms, `tabs.create` 2–3ms, `tabs.list` 0ms. |
 | G6 Mobile perf | Mid-tier Android: chrome scroll + rail animation ≥ 50fps sustained | UNMEASURED | Needs a physical mid-tier device |
@@ -71,6 +71,31 @@ backtick or `${` inside either source string, on a `[bytecode]`/`[native code]` 
 a built script, on a script that does not end with `true;`, and on anything that does
 not parse standalone. A backtick inside a *comment* in one of those strings already took
 down a Metro bundle once.
+
+## Two mobile fixes G3 required
+
+**1. A natively-backed view must not be absolutely positioned directly.** Under the New
+Architecture the tab `WebView` reported the correct frame through `onLayout`
+(`rn=106,176 286×530`, exactly what was requested) while painting several hundred dp
+lower. Layout and paint disagreed. The fix is to wrap it in a plain `View` that owns the
+absolute rect and let the `WebView` fill that wrapper with `flex: 1`.
+
+This one is worth remembering: `onLayout` agreeing with the request is **not** evidence
+the view is on screen where you think. Only a screenshot settled it.
+
+**2. The chrome owns its safe-area insets, not the shell.** The shell renders the chrome
+edge to edge, under the Dynamic Island and home indicator. So the chrome pads itself:
+
+```css
+body { padding: env(safe-area-inset-top) env(safe-area-inset-right)
+                env(safe-area-inset-bottom) env(safe-area-inset-left); }
+```
+
+`viewport-fit=cover` on the viewport meta is what makes `env()` report non-zero values in
+WKWebView. Desktop reports 0 on all four, so it is the same CSS on every platform — which
+is the "develop the UX once" property working as intended rather than a mobile special
+case. Visible in the numbers: the tab rect moved from `106,176 286×530` to
+`106,238 286×434` once insets applied.
 
 ## Notes
 

@@ -10,6 +10,11 @@
       * { box-sizing: border-box; }
       html, body { height: 100%; margin: 0; }
       body {
+        /* The shell renders this chrome edge to edge, under the notch/Dynamic Island and
+           the home indicator, so the chrome owns its own insets. `viewport-fit=cover` on
+           the viewport meta is what makes env() report non-zero values in WKWebView.
+           Desktop reports 0 for all four, so this is the same code on every platform. */
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
         display: grid;
         grid-template-columns: 96px 1fr;
         font: 13px/1.4 ui-sans-serif, system-ui, -apple-system, sans-serif;

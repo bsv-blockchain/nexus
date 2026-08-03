@@ -135,15 +135,12 @@ authenticated Apple ID. So:
 `--path`, `--id`, `--latest` and `--url` are mutually exclusive, and `--path` cannot be
 combined with `--platform all`.
 
-## Decision needed: bundle identifier
+## Bundle identifier — decided
 
-`apps/mobile/app.json` currently says **`org.bsvblockchain.nexus`**, but the shipped app
-uses **`org.bsvassociation.browser`**. The Apple team is "BSV Association" and the Apple
-ID is `@bsvblockchain.org`, so both readings are defensible — but a bundle identifier is
-effectively permanent once the App Store Connect record exists.
-
-Recommendation: **`org.bsvassociation.nexus`**, matching the existing app and the Apple
-team name. Change it before creating the app record, not after.
+**`org.bsvassociation.nexus`** (iOS `bundleIdentifier` and Android `package`), matching
+the shipped `org.bsvassociation.browser` and the "BSV Association" Apple team. Settled
+2026-08-03, before any App Store Connect record exists — which is the only cheap moment
+to settle it.
 
 ## Not verified
 

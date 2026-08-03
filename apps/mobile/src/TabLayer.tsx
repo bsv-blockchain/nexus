@@ -1,5 +1,5 @@
 import React, { useRef } from 'react'
-import { StyleSheet } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import WebView from 'react-native-webview'
 import { buildSubstrateScript } from '@nexus/substrate'
 import type { SubstrateCtx, TabState } from './useTabHost'
@@ -30,13 +30,13 @@ export default function TabLayer({ tabs, registerRef, onTabMessage, emit, substr
   return (
     <>
       {tabs.map((tab) => (
-        <WebView
+        // The WebView is NOT absolutely positioned itself: under the New Architecture a
+        // natively-backed view positioned that way reported the correct frame via
+        // onLayout (106,176 286×530) while painting somewhere else entirely. Wrapping it
+        // in a plain View that owns the absolute rect, with the WebView simply filling
+        // that wrapper, keeps layout and paint in agreement.
+        <View
           key={tab.id}
-          ref={(instance) => {
-            refs.current[tab.id] = instance
-            registerRef(tab.id, instance)
-          }}
-          source={{ uri: tab.url }}
           style={[
             styles.tab,
             {
@@ -44,10 +44,31 @@ export default function TabLayer({ tabs, registerRef, onTabMessage, emit, substr
               top: tab.rect.y,
               width: tab.rect.width,
               height: tab.rect.height,
-              opacity: tab.visible ? 1 : 0,
-              pointerEvents: tab.visible ? 'auto' : 'none'
+              opacity: tab.visible ? 1 : 0
             }
           ]}
+          pointerEvents={tab.visible ? 'auto' : 'none'}
+        >
+        <WebView
+          ref={(instance) => {
+            refs.current[tab.id] = instance
+            registerRef(tab.id, instance)
+          }}
+          source={{ uri: tab.url }}
+          style={styles.fill}
+          onLayout={(e) => {
+            // Gate G3: what RN ACTUALLY placed, versus what the chrome asked for.
+            // This separates "the style never took" from "it took and something else
+            // is painting over it".
+            const l = e.nativeEvent.layout
+            if (__DEV__) {
+              console.log(
+                `[layout] ${tab.id} rn=${Math.round(l.x)},${Math.round(l.y)} ${Math.round(l.width)}×${Math.round(
+                  l.height
+                )} requested=${tab.rect.x},${tab.rect.y} ${tab.rect.width}×${tab.rect.height} visible=${tab.visible}`
+              )
+            }
+          }}
           injectedJavaScriptBeforeContentLoaded={buildSubstrateScript()}
           onMessage={(event) => {
             substrateHost.handle(event.nativeEvent.data, { id: tab.id, ref: refs.current[tab.id], emit })
@@ -89,12 +110,14 @@ export default function TabLayer({ tabs, registerRef, onTabMessage, emit, substr
           javaScriptEnabled
           domStorageEnabled
         />
+        </View>
       ))}
     </>
   )
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
   tab: {
     position: 'absolute',
     zIndex: 1

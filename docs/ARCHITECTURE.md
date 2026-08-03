@@ -56,18 +56,24 @@ must host **other people's** sites with our code inside them. Only Electron
 
 Promise RPC + event subscription over one channel (`nexus.host.v1`).
 
-- `createHostClient()` is **self-contained by contract**: stringified into the
-  chrome WebView on mobile, imported directly by the Electron chrome preload.
-  One implementation, two delivery mechanisms.
+- The client is a **string constant**, `CREATE_HOST_CLIENT_SOURCE`, and that string is
+  the single source of truth. It is injected verbatim on mobile; the Electron chrome
+  preload evaluates the same constant once to get a live factory. **Never stringify a
+  function to inject it** — Hermes discards function source and hands the page a
+  `[bytecode]` stub (measured: 660 chars of garbage vs 3540 of real source). `npm run
+  check` enforces this, along with "no backticks or `${` inside the source strings".
 - `createHostRouter()` runs shell-side and dispatches to that shell's `TabHost`.
-- Rects travel in **CSS px of the chrome document**. Both shells map 1:1 —
-  RN dp on mobile (viewport is `width=device-width, initial-scale=1`), Electron
-  DIP on desktop (zoom 1). No devicePixelRatio maths anywhere.
+- `tabs.setBounds` carries the px rect **and** normalized fractions of the document
+  viewport, plus viewport size, zoom and dpr. Desktop uses px (CSS px and DIP coincide
+  at zoom 1); mobile uses the fractions, which stay correct under page zoom and
+  WebKit shrink-to-fit. Measured on iOS: viewport = screen = 402×874, `zoom=1`, so the
+  fractions resolve back to the same numbers — but the protocol no longer *assumes* it.
 
 ### `window.nexus` — browsed page ↔ shell (`@nexus/substrate`)
 
-- `createProvider()` is self-contained under the same contract: stringified for
-  `injectedJavaScriptBeforeContentLoaded` on mobile, imported by the Electron tab
+- `createProvider()` follows the same string-constant contract as the bridge client
+  (`CREATE_PROVIDER_SOURCE`): injected verbatim via
+  `injectedJavaScriptBeforeContentLoaded` on mobile, evaluated once by the Electron tab
   preload and published with `contextBridge`.
 - `createSubstrateHost()` treats every message as untrusted third-party input:
   unknown methods refused, handler throws become `failure` envelopes.
@@ -78,6 +84,18 @@ Promise RPC + event subscription over one channel (`nexus.host.v1`).
 | Electron (all desktop) | tab `preload` + `contextBridge` | Real isolated world, before page scripts by construction |
 | iOS / macOS WKWebView | `WKUserScript` at document-start | Reliable |
 | Android WebView | `onPageStarted` + `evaluateJavascript` | **Racy — no true document-start hook exists in any stack.** Same compromise BSV Browser already ships. |
+
+## Mobile rules earned on device
+
+- **Never absolutely position a natively-backed view directly.** Wrap it in a plain
+  `View` that owns the rect and let the native component fill it with `flex: 1`. An
+  absolutely-positioned `WebView` under the New Architecture reported the *correct*
+  frame from `onLayout` while painting hundreds of dp away. Corollary: `onLayout`
+  agreeing with what you asked for is not evidence the view is where you think.
+- **The chrome owns its safe-area insets, not the shell.** The shell renders it edge to
+  edge; the chrome pads with `env(safe-area-inset-*)` and sets `viewport-fit=cover`
+  (required for WKWebView to report non-zero insets). Desktop reports 0 on all four, so
+  it is one rule everywhere rather than a mobile branch.
 
 ## Known limitations, accepted
 

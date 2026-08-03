@@ -3,6 +3,12 @@
 Read `ARCHITECTURE.md` first. This file is the contract each task is built and
 judged against. Every path is relative to the repo root (`/Users/personal/git/nexus`).
 
+> **Superseded in one place.** This spec told builders that the injected provider and
+> client are functions stringified with `Function.prototype.toString()`. That is wrong on
+> Hermes and was corrected during the spike — the injected code is now a **string
+> constant** in each package. See `SPIKE-RESULTS.md` → "The Hermes finding". The rest of
+> the spec stands as written.
+
 ## Already built (do not modify)
 
 - `packages/substrate/src/{protocol,provider,injected,host,index}.js`
