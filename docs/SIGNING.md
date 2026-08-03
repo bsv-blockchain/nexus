@@ -135,7 +135,31 @@ App Store Connect app record is *not* supported via the API key — eas-cli's
 (CI)` and requires an interactively authenticated Apple ID. A build will happily succeed
 and then have nowhere to go.
 
-### Creating it (once)
+### v0.0.1 — built and verified 2026-08-03
+
+`apps/mobile/nexus-v0.0.1.ipa` (8.0 MB), produced by
+`eas build --platform ios --profile production --local` on macOS 26.6. Verified by
+unpacking the archive rather than trusting the build log:
+
+| Property | Value |
+|---|---|
+| `CFBundleIdentifier` | `org.bsvassociation.nexus` |
+| `CFBundleShortVersionString` / `CFBundleVersion` | `0.0.1` / `2` (build number from EAS remote versioning) |
+| `ITSAppUsesNonExemptEncryption` | `false` — skips the export-compliance prompt |
+| Provisioning profile | `[expo] org.bsvassociation.nexus AppStore`, **no `ProvisionedDevices`** → App Store, not ad-hoc |
+| `get-task-allow` | `false` (release signing) |
+| Team | `SV8SWTHA2H`, expires 2027-05-02 |
+| App icon | embedded |
+
+Notably, the machine that produced it **never authenticated to Apple** — credentials came
+from EAS ("All credentials are ready to build @bsvb/nexus"). That is the four-engineer
+model working in practice, not just on paper.
+
+Two non-fatal `expo-doctor` checks fail during the build: Metro config, and packages
+matching the SDK's expected versions (react-native 0.83.6 against a recommended 0.83.10).
+Neither blocks the archive.
+
+### Creating the App Store Connect record (once)
 
 Either let eas-cli do it, run interactively (**not** `--non-interactive`):
 
