@@ -11,3 +11,8 @@ android/
 apps/desktop/out/
 apps/ui/
 apps/mobile/.expo/
+
+# Local build artifacts — never commit (tens of MB each)
+*.ipa
+*.aab
+*.apk

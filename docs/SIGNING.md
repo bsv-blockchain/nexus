@@ -101,29 +101,20 @@ fields in `eas.json` — that is documented and silent. Xcode version is whateve
 engineer's `xcode-select` points at, so pin it socially or with a check-in script, or
 four machines will drift.
 
-## Blocker: macOS 26 (Tahoe) breaks `eas build --local` iOS
+## The macOS 26 (Tahoe) concern — cleared
 
-**This machine is macOS 26.6.** eas-cli builds into an ephemeral keychain that does not
-carry Apple's WWDR/Root CA trust chain, then verifies the identity with
-`security find-identity -v -s "(<teamId>)" <keychainPath>`. On macOS 26 the `-v`
-(valid-identities-only) filter rejects the imported certificate and the build fails
-claiming the certificate is missing.
+A real, unpatched bug exists in eas-cli `v21.4.0`: the ephemeral build keychain lacks
+Apple's WWDR/Root CA trust chain, and `security find-identity -v -s "(<teamId>)"` can
+then reject a perfectly good certificate. The tracking issue was auto-closed by a stale
+bot on 2026-07-13 without a fix, so "closed" did not mean "fixed", and
+`credentialsSource: "local"` would not have avoided it either.
 
-- The `-v` flag is **still present, unpatched**, in eas-cli `v21.4.0` — the current npm
-  release.
-- The tracking issue (eas-cli #3678) was **auto-closed by a stale bot on 2026-07-13
-  without a fix**, so "closed" here does not mean "fixed."
-- Setting `credentialsSource: "local"` does **not** avoid it — the same keychain code
-  path runs either way.
-
-Workaround in circulation: patch the cached `@expo/build-tools` `keychain.js` to drop
-the `-v` flag. Before committing the team to local production builds, **one engineer
-should run a real `--local` production build end to end and confirm**. Until that
-passes, the fallback is a cloud build (Free plan: 15 iOS builds/month, 1 concurrency)
-or a plain Xcode archive.
-
-This is the single highest-risk item in the plan, and it is environmental, not
-architectural.
+**It does not bite us.** A full `eas build --platform ios --profile production --local`
+succeeded on macOS 26.6 on 2026-08-03 with remote credentials. Treat this section as
+history, not a live risk — but if a teammate on a different macOS 26 point release hits
+`certificate not found` on a build that should work, this is the first thing to suspect,
+and the workaround is patching the cached `@expo/build-tools` `keychain.js` to drop the
+`-v` flag.
 
 ## Submission
 
@@ -138,14 +129,53 @@ It does not care whether the `.ipa` came from EAS Build, `--local`, or a hand-ro
 Xcode archive. With the ASC API key stored against the project, any teammate logged
 into the Expo org can submit — which retires the manual Transporter step.
 
-**The app record is the exception.** Creating a new App Store Connect app record is
-*not* supported via the API key — eas-cli's `ensureAppExists.ts` carries the literal
-comment `Does not support App Store Connect API (CI)` and requires an interactively
-authenticated Apple ID. So:
+**The app record is the exception, and it is what blocks a first upload.** Creating a new
+App Store Connect app record is *not* supported via the API key — eas-cli's
+`ensureAppExists.ts` carries the literal comment `Does not support App Store Connect API
+(CI)` and requires an interactively authenticated Apple ID. A build will happily succeed
+and then have nowhere to go.
 
-1. Create the app record once (interactive `eas submit`, or by hand in App Store Connect).
-2. Put its Apple ID number in `eas.json` as `submit.production.ios.ascAppId` — documented
-   as *"When set, results in skipping the app creation step."*
+### Creating it (once)
+
+Either let eas-cli do it, run interactively (**not** `--non-interactive`):
+
+```bash
+cd apps/mobile
+npx eas-cli submit --platform ios --path /path/to/nexus.ipa
+```
+
+It signs in with an Apple ID, creates the record, then uploads. Or create it by hand at
+appstoreconnect.apple.com → **Apps → + → New App**:
+
+| Field | Value |
+|---|---|
+| Platform | iOS |
+| Bundle ID | `org.bsvassociation.nexus` (already registered — the build's provisioning profile proves it) |
+| Name | **must be unique across the entire App Store** — "Nexus" alone is almost certainly taken |
+| Primary language | e.g. English (U.S.) |
+| SKU | any unique internal string, e.g. `nexus-ios-001` |
+| User access | Full |
+
+The App Store **name** is independent of the bundle identifier and of `expo.name`, so a
+display name like "BSV Nexus" costs nothing structurally — pick one that is actually
+free rather than fighting for "Nexus".
+
+### After it exists
+
+Copy the app's Apple ID number (App Store Connect → App Information) into `eas.json`:
+
+```json
+"submit": { "production": { "ios": { "ascAppId": "1234567890" } } }
+```
+
+Documented as *"When set, results in skipping the app creation step"* — which is what
+makes every later submission runnable non-interactively by any teammate. Until then the
+key must be absent, not a placeholder: a dummy `ascAppId` makes `eas submit` fail rather
+than fall back to creating the record.
+
+`ITSAppUsesNonExemptEncryption: false` is already set in `app.json`, so uploads skip the
+export-compliance question. Keep it accurate — if Nexus ever ships non-exempt crypto,
+that flag has to change.
 
 `--path`, `--id`, `--latest` and `--url` are mutually exclusive, and `--path` cannot be
 combined with `--platform all`.
