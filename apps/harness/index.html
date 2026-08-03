@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Nexus shell harness</title>
+    <style>
+      /* Self-contained by contract: no remote fonts, no CDN, nothing to fetch.
+         This page is loaded by both shells, sometimes over a LAN IP from a phone. */
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        display: grid;
+        grid-template-columns: 96px 1fr;
+        font: 13px/1.4 ui-sans-serif, system-ui, -apple-system, sans-serif;
+        color: #e7e4ef;
+        background: #17111f;
+        overflow: hidden;
+        -webkit-text-size-adjust: 100%;
+      }
+
+      /* ---- left icon rail: mirrors the real chrome's 96px w-24 rail ---- */
+      #rail {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 12px 8px;
+        background: #221a2f;
+        border-right: 1px solid rgba(244, 242, 248, 0.09);
+      }
+      .rail-item {
+        width: 80px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 4px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: #9d94b3;
+        font-size: 11px;
+        font-weight: 500;
+        font-family: inherit;
+        cursor: pointer;
+      }
+      .rail-item:hover { background: rgba(244, 242, 248, 0.07); color: #f4f2f8; }
+      .rail-item[aria-current='true'] { color: #f4f2f8; }
+      .rail-item[aria-current='true']::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        width: 6px;
+        height: 14px;
+        border-radius: 0 999px 999px 0;
+        background: #f4f2f8;
+      }
+      .rail-item svg { width: 22px; height: 22px; }
+
+      /* ---- main column ---- */
+      #main { display: grid; grid-template-rows: auto auto 1fr 160px; min-width: 0; }
+
+      #topbar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; }
+      #topbar button, #tabstrip button {
+        font-family: inherit;
+        font-size: 12px;
+        color: #e7e4ef;
+        background: #2b2240;
+        border: 1px solid rgba(244, 242, 248, 0.09);
+        border-radius: 8px;
+        padding: 6px 10px;
+        cursor: pointer;
+      }
+      #topbar button:disabled { opacity: 0.35; cursor: default; }
+      #url {
+        flex: 1;
+        min-width: 0;
+        font: 12px/1 ui-monospace, monospace;
+        color: #f4f2f8;
+        background: #17111f;
+        border: 1px solid rgba(244, 242, 248, 0.14);
+        border-radius: 8px;
+        padding: 8px 10px;
+      }
+      #readout {
+        font: 11px/1.5 ui-monospace, monospace;
+        color: #9d94b3;
+        white-space: pre;
+        text-align: right;
+      }
+      #readout b { color: #a8b0ff; font-weight: 600; }
+
+      #tabstrip { display: flex; gap: 6px; padding: 0 10px 8px; overflow-x: auto; }
+      .tab {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        max-width: 220px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        background: #221a2f;
+        border: 1px solid rgba(244, 242, 248, 0.09);
+        font-size: 12px;
+        color: #9d94b3;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .tab[data-active='true'] { background: #2b2240; color: #f4f2f8; border-color: #4353ff; }
+      .tab .label { overflow: hidden; text-overflow: ellipsis; }
+      .tab .close { padding: 0 2px; opacity: 0.6; }
+      .tab .close:hover { opacity: 1; }
+
+      /* ---- the tab rect: the native webview lands exactly here ---- */
+      #viewport {
+        margin: 0 10px 8px;
+        border-radius: 8px;
+        border: 1px dashed rgba(67, 83, 255, 0.6);
+        background: repeating-linear-gradient(45deg, #1c1528, #1c1528 10px, #1f1730 10px, #1f1730 20px);
+        min-height: 0;
+        display: grid;
+        place-items: center;
+      }
+      #viewport span { font: 11px/1 ui-monospace, monospace; color: #6b6580; }
+
+      /* ---- log ---- */
+      #log {
+        margin: 0;
+        padding: 8px 10px;
+        border-top: 1px solid rgba(244, 242, 248, 0.09);
+        background: #120e19;
+        font: 11px/1.5 ui-monospace, monospace;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .t { color: #6b6580; }
+      .ok { color: #7ee2a8; }
+      .warn { color: #ffcf70; }
+      .err { color: #ff8f8f; }
+      .ev { color: #a8b0ff; }
+      .rpc { color: #e7e4ef; }
+    </style>
+  </head>
+  <body>
+    <nav id="rail" aria-label="Nexus sections"></nav>
+
+    <div id="main">
+      <div id="topbar">
+        <button id="back" title="Back">◀</button>
+        <button id="fwd" title="Forward">▶</button>
+        <button id="reload" title="Reload">⟳</button>
+        <input id="url" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="https://" />
+        <button id="go">Go</button>
+        <button id="newtab" title="New tab">＋</button>
+        <button id="proof">Proof</button>
+        <button id="pingpage">Ping page</button>
+        <div id="readout">booting…</div>
+      </div>
+
+      <div id="tabstrip"></div>
+
+      <div id="viewport"><span>tab rect — native webview is positioned over this box</span></div>
+
+      <pre id="log" aria-live="polite"></pre>
+    </div>
+
+    <script>
+      ;(function () {
+        'use strict'
+
+        var T0 = Date.now()
+        var logEl = document.getElementById('log')
+        var railEl = document.getElementById('rail')
+        var stripEl = document.getElementById('tabstrip')
+        var viewportEl = document.getElementById('viewport')
+        var urlEl = document.getElementById('url')
+        var readoutEl = document.getElementById('readout')
+        var backEl = document.getElementById('back')
+        var fwdEl = document.getElementById('fwd')
+
+        var host = null
+        var tabs = [] // [{ id, url, title }]
+        var activeId = null
+        var lastRect = null
+
+        function log(cls, msg) {
+          var stamped = '[' + String(Date.now() - T0).padStart(6, ' ') + 'ms] ' + msg
+          var line = document.createElement('span')
+          line.className = cls
+          line.textContent = stamped + '\n'
+          logEl.appendChild(line)
+          logEl.scrollTop = logEl.scrollHeight
+          // Mirror to console so a shell running with NEXUS_DEBUG can harvest gate
+          // evidence from stdout instead of a human reading the pane.
+          console.log('harness: ' + stamped)
+        }
+
+        /** Wrap an RPC so every call and its round-trip lands in the log. */
+        function rpc(label, promise) {
+          var started = Date.now()
+          log('rpc', '→ ' + label)
+          return promise.then(
+            function (result) {
+              log('ok', '← ' + label + ' (' + (Date.now() - started) + 'ms) ' + JSON.stringify(result))
+              return result
+            },
+            function (err) {
+              log('err', '✗ ' + label + ' (' + (Date.now() - started) + 'ms) ' + (err && err.message ? err.message : err))
+              throw err
+            }
+          )
+        }
+
+        // ---- rail (labels match the real chrome's sections) ----
+        var RAIL = [
+          ['Messages', 'M3 8l9 6 9-6v10a2 2 0 01-2 2H5a2 2 0 01-2-2V8z M3 8l9-4 9 4'],
+          ['Wallet', 'M3 7h18v12H3z M3 11h18 M16 15h2'],
+          ['Identity', 'M12 12a4 4 0 100-8 4 4 0 000 8z M4 21a8 8 0 0116 0'],
+          ['Browse', 'M12 21a9 9 0 100-18 9 9 0 000 18z M3 12h18 M12 3a14 14 0 000 18 14 14 0 000-18']
+            ,
+          ['Connections', 'M9 15l6-6 M7 17a3 3 0 010-4l2-2 M17 7a3 3 0 010 4l-2 2'],
+          ['Profile', 'M12 13a5 5 0 100-10 5 5 0 000 10z M3 21a9 9 0 0118 0']
+        ]
+        RAIL.forEach(function (item, i) {
+          var b = document.createElement('button')
+          b.className = 'rail-item'
+          b.setAttribute('aria-current', i === 3 ? 'true' : 'false')
+          b.innerHTML =
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="' +
+            item[1] +
+            '"/></svg><span>' +
+            item[0] +
+            '</span>'
+          b.onclick = function () {
+            for (var n = 0; n < railEl.children.length; n++) railEl.children[n].setAttribute('aria-current', 'false')
+            b.setAttribute('aria-current', 'true')
+            log('t', 'rail → ' + item[0] + ' (chrome-only, no shell call)')
+          }
+          railEl.appendChild(b)
+        })
+
+        function readout() {
+          readoutEl.innerHTML =
+            'shell <b>' +
+            (host ? host.shell : '—') +
+            '</b>  platform <b>' +
+            (host ? host.platform : '—') +
+            '</b>\nactive <b>' +
+            (activeId || '—') +
+            '</b>  tabs <b>' +
+            tabs.length +
+            '</b>\nrect <b>' +
+            (lastRect ? lastRect.x + ',' + lastRect.y + ' ' + lastRect.width + '×' + lastRect.height : '—') +
+            '</b>'
+        }
+
+        function renderStrip() {
+          stripEl.textContent = ''
+          tabs.forEach(function (t) {
+            var el = document.createElement('div')
+            el.className = 'tab'
+            el.dataset.active = String(t.id === activeId)
+            var label = document.createElement('span')
+            label.className = 'label'
+            label.textContent = t.id + ' · ' + (t.title || t.url || 'new tab')
+            var close = document.createElement('span')
+            close.className = 'close'
+            close.textContent = '×'
+            close.onclick = function (e) {
+              e.stopPropagation()
+              destroyTab(t.id)
+            }
+            el.appendChild(label)
+            el.appendChild(close)
+            el.onclick = function () {
+              setActive(t.id)
+            }
+            // Middle-click closes, like every browser.
+            el.onauxclick = function (e) {
+              if (e.button === 1) {
+                e.preventDefault()
+                destroyTab(t.id)
+              }
+            }
+            stripEl.appendChild(el)
+          })
+          readout()
+        }
+
+        // ---- bounds: the single most important thing this harness proves ----
+        var boundsQueued = false
+        function pushBounds(reason) {
+          if (!host || !activeId) return
+          if (boundsQueued) return
+          boundsQueued = true
+          // Coalesce bursts (resize fires per frame) but still push every frame that changed.
+          requestAnimationFrame(function () {
+            boundsQueued = false
+            var r = viewportEl.getBoundingClientRect()
+            var rect = {
+              x: Math.round(r.left),
+              y: Math.round(r.top),
+              width: Math.round(r.width),
+              height: Math.round(r.height)
+            }
+            lastRect = rect
+            readout()
+            log('t', 'bounds id=' + activeId + ' ' + rect.x + ',' + rect.y + ' ' + rect.width + '×' + rect.height + ' (' + reason + ')')
+            host.tabs.setBounds(activeId, rect).catch(function (err) {
+              log('err', 'setBounds failed: ' + err.message)
+            })
+          })
+        }
+
+        function createTab(url) {
+          return rpc('tabs.create ' + url, host.tabs.create(url, {})).then(function (res) {
+            var id = res && res.id
+            if (!id) {
+              log('err', 'tabs.create returned no id')
+              return
+            }
+            tabs.push({ id: id, url: url, title: '' })
+            activeId = id
+            renderStrip()
+            urlEl.value = url
+            // A freshly created tab is deliberately hidden by the shell so it never
+            // flashes over the current one — the chrome must activate it explicitly.
+            return rpc('tabs.setActive ' + id, host.tabs.setActive(id)).then(function () {
+              pushBounds('created ' + id)
+              return id
+            })
+          })
+        }
+
+        function setActive(id) {
+          activeId = id
+          renderStrip()
+          var t = tabs.filter(function (x) {
+            return x.id === id
+          })[0]
+          if (t && t.url) urlEl.value = t.url
+          return rpc('tabs.setActive ' + id, host.tabs.setActive(id)).then(function () {
+            pushBounds('activated ' + id)
+          })
+        }
+
+        function destroyTab(id) {
+          rpc('tabs.destroy ' + id, host.tabs.destroy(id)).then(function () {
+            tabs = tabs.filter(function (x) {
+              return x.id !== id
+            })
+            if (activeId === id) activeId = tabs.length ? tabs[tabs.length - 1].id : null
+            renderStrip()
+            if (activeId) setActive(activeId)
+          })
+        }
+
+        function normalizeUrl(v) {
+          var s = String(v || '').trim()
+          if (!s) return ''
+          return /^[a-z][a-z0-9+.-]*:/i.test(s) ? s : 'https://' + s
+        }
+
+        // ---- controls ----
+        document.getElementById('go').onclick = navigate
+        urlEl.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') navigate()
+        })
+        function navigate() {
+          if (!host || !activeId) return log('warn', 'no active tab')
+          var url = normalizeUrl(urlEl.value)
+          if (!url) return
+          urlEl.value = url
+          rpc('tabs.navigate ' + activeId + ' ' + url, host.tabs.navigate(activeId, url))
+        }
+        backEl.onclick = function () {
+          if (host && activeId) rpc('tabs.goBack ' + activeId, host.tabs.goBack(activeId))
+        }
+        fwdEl.onclick = function () {
+          if (host && activeId) rpc('tabs.goForward ' + activeId, host.tabs.goForward(activeId))
+        }
+        document.getElementById('reload').onclick = function () {
+          if (host && activeId) rpc('tabs.reload ' + activeId, host.tabs.reload(activeId))
+        }
+        document.getElementById('newtab').onclick = function () {
+          if (host) createTab('https://example.com')
+        }
+        document.getElementById('proof').onclick = function () {
+          if (!host || !activeId) return log('warn', 'no active tab')
+          // Same-origin as this harness, so it works over LAN IP from a phone too.
+          var proofUrl = location.origin + '/proof'
+          urlEl.value = proofUrl
+          rpc('tabs.navigate ' + activeId + ' ' + proofUrl, host.tabs.navigate(activeId, proofUrl))
+        }
+        document.getElementById('pingpage').onclick = function () {
+          if (!host || !activeId) return log('warn', 'no active tab')
+          // Deliberately unknown method: proves the shell refuses rather than hangs.
+          host.call('tab.ping', { id: activeId }).then(
+            function (res) {
+              log('err', 'UNEXPECTED SUCCESS for unknown method tab.ping: ' + JSON.stringify(res))
+            },
+            function (err) {
+              log('ok', 'EXPECTED FAILURE: ' + err.message)
+            }
+          )
+        }
+
+        // ---- observers: rect changes must follow layout, not guesses ----
+        if (typeof ResizeObserver === 'function') {
+          new ResizeObserver(function () {
+            pushBounds('resize-observer')
+          }).observe(viewportEl)
+        } else {
+          log('warn', 'ResizeObserver unavailable; falling back to window resize only')
+        }
+        window.addEventListener('resize', function () {
+          pushBounds('window-resize')
+        })
+        window.addEventListener('orientationchange', function () {
+          pushBounds('orientation')
+        })
+        if (window.visualViewport) {
+          // Keyboard show/hide on mobile resizes the visual viewport, not the layout one.
+          window.visualViewport.addEventListener('resize', function () {
+            pushBounds('visual-viewport')
+          })
+        }
+
+        // ---- events from the shell ----
+        function wireEvents() {
+          var patch = function (id, fields) {
+            tabs.forEach(function (t) {
+              if (t.id === id) Object.assign(t, fields)
+            })
+          }
+          host.on('tab.nav', function (p) {
+            log('ev', 'tab.nav ' + p.id + ' → ' + p.url + ' back=' + !!p.canGoBack + ' fwd=' + !!p.canGoForward)
+            patch(p.id, { url: p.url })
+            if (p.id === activeId) {
+              urlEl.value = p.url
+              backEl.disabled = !p.canGoBack
+              fwdEl.disabled = !p.canGoForward
+            }
+            renderStrip()
+          })
+          host.on('tab.title', function (p) {
+            log('ev', 'tab.title ' + p.id + ' → ' + p.title)
+            patch(p.id, { title: p.title })
+            renderStrip()
+          })
+          host.on('tab.loading', function (p) {
+            log('ev', 'tab.loading ' + p.id + ' loading=' + p.loading + (p.progress != null ? ' progress=' + p.progress : ''))
+          })
+          host.on('tab.message', function (p) {
+            log('ev', 'tab.message ' + p.id + ' ' + p.method + ' → ' + JSON.stringify(p.result === undefined ? p.params : p.result))
+          })
+          host.on('tab.crash', function (p) {
+            log('err', 'tab.crash ' + p.id + ' ' + p.reason)
+          })
+        }
+
+        // ---- boot: wait for whichever shell we are in ----
+        function boot() {
+          host = window.nexusHost
+          log('ok', 'nexusHost present (shell=' + host.shell + ' platform=' + host.platform + ')')
+          readout()
+          wireEvents()
+          rpc('host.info', host.info()).then(function () {
+            return createTab('https://example.com')
+          }).then(function () {
+            if (/autotest/.test(location.search)) runAutotest()
+          })
+        }
+
+        /** Unattended gate run: ?autotest=1. Everything it does is a thing a user would do. */
+        function runAutotest() {
+          var wait = function (ms) {
+            return new Promise(function (r) {
+              setTimeout(r, ms)
+            })
+          }
+          log('t', '— AUTOTEST START —')
+          createTab('https://example.org')
+            .then(function () {
+              return createTab('https://www.wikipedia.org')
+            })
+            .then(function () {
+              log('t', 'AUTOTEST tabs=' + tabs.length + ' (expect 3)')
+              return rpc('tabs.list', host.tabs.list())
+            })
+            .then(function () {
+              // G5: unknown method must be refused, not swallowed or hung.
+              return host.call('tab.ping', { id: activeId }).then(
+                function (res) {
+                  log('err', 'AUTOTEST FAIL unknown method resolved: ' + JSON.stringify(res))
+                },
+                function (err) {
+                  log('ok', 'EXPECTED FAILURE: ' + err.message)
+                }
+              )
+            })
+            .then(function () {
+              // G4: drive the active tab to the document-start proof page.
+              var proofUrl = location.origin + '/proof'
+              urlEl.value = proofUrl
+              return rpc('tabs.navigate ' + activeId + ' ' + proofUrl, host.tabs.navigate(activeId, proofUrl))
+            })
+            .then(function () {
+              return wait(1500)
+            })
+            .then(function () {
+              // Switch away and back: proves hidden tabs keep their rect (warm-pool behaviour).
+              return setActive(tabs[0].id)
+            })
+            .then(function () {
+              return wait(500)
+            })
+            .then(function () {
+              return setActive(tabs[tabs.length - 1].id)
+            })
+            .then(function () {
+              log('t', '— AUTOTEST END — tabs=' + tabs.length + ' active=' + activeId)
+            })
+            .catch(function (err) {
+              log('err', 'AUTOTEST threw: ' + (err && err.message ? err.message : err))
+            })
+        }
+
+        var settled = false
+        function tryBoot() {
+          if (settled || !window.nexusHost) return false
+          settled = true
+          boot()
+          return true
+        }
+
+        window.addEventListener('nexushost:ready', tryBoot)
+        if (!tryBoot()) {
+          var deadline = Date.now() + 5000
+          var poll = setInterval(function () {
+            if (tryBoot() || Date.now() > deadline) {
+              clearInterval(poll)
+              if (!settled) {
+                settled = true
+                log('warn', 'nexusHost unavailable — no shell. Chrome-only mode; no tab calls will be made.')
+                readout()
+              }
+            }
+          }, 50)
+          log('t', 'waiting for nexusHost (event + 50ms poll, 5s deadline)…')
+        }
+      })()
+    </script>
+  </body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["ESNext", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "paths": {
+      "@nexus/substrate": ["./packages/substrate/src/index.js"],
+      "@nexus/bridge": ["./packages/bridge/src/index.js"]
+    }
+  }
+}

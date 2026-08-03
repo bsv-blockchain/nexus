@@ -1,0 +1,9 @@
+{
+  "name": "@nexus/substrate",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Wallet substrate injected into browsed pages + the host-side router. Shell-agnostic.",
+  "type": "commonjs",
+  "main": "src/index.js",
+  "files": ["src"]
+}

@@ -1,0 +1,28 @@
+{
+  "name": "nexus",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Nexus — BSV wallet + browser across mobile and desktop",
+  "workspaces": [
+    "apps/desktop",
+    "apps/mobile",
+    "packages/*"
+  ],
+  "scripts": {
+    "serve": "node tools/serve.mjs",
+    "desktop": "npm --workspace @nexus/desktop run dev",
+    "mobile": "npm --workspace @nexus/mobile run start",
+    "ios": "npm --workspace @nexus/mobile run ios",
+    "android": "npm --workspace @nexus/mobile run android",
+    "ui:fetch": "node tools/fetch-ui.mjs",
+    "ui:build": "node tools/fetch-ui.mjs --build",
+    "ui:dev": "npm run dev --prefix apps/ui",
+    "typecheck": "tsc --noEmit -p apps/mobile"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

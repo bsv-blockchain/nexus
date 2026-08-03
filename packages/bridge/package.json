@@ -1,0 +1,9 @@
+{
+  "name": "@nexus/bridge",
+  "version": "0.0.0",
+  "private": true,
+  "description": "chrome (DOM UI) ↔ shell (Expo/Electron) RPC. One window.nexusHost API, two transports.",
+  "type": "commonjs",
+  "main": "src/index.js",
+  "files": ["src"]
+}

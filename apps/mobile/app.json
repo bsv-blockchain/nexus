@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "nexus",
+    "slug": "nexus",
+    "version": "0.0.0",
+    "scheme": "nexus",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "org.bsvblockchain.nexus",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
+      }
+    },
+    "android": {
+      "package": "org.bsvblockchain.nexus"
+    }
+  }
+}
