@@ -1,0 +1,8 @@
+{
+  "name": "@nexus/wallet-core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Portable BSV wallet logic — offline payments, header verification, local-pay (AWDL/Nearby/QR), services, and shared wallet utilities. Ported from BSV Browser.",
+  "main": "src/index.ts",
+  "files": ["src"]
+}

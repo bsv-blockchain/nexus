@@ -19,7 +19,15 @@ const METHODS = {
   TAB_GO_FORWARD: 'tabs.goForward',
   TAB_RELOAD: 'tabs.reload',
   TAB_STOP: 'tabs.stop',
-  TAB_LIST: 'tabs.list'
+  TAB_LIST: 'tabs.list',
+
+  // Wallet surface. The UI reads these instead of its demo fixtures when a shell is
+  // present; see apps/ui/lib/data-mode.ts. Deliberately shaped like the fixtures the 89
+  // consuming components already expect, so screens migrate one at a time rather than in
+  // one enormous change.
+  WALLET_INFO: 'wallet.info',
+  WALLET_ACCOUNTS: 'wallet.accounts',
+  WALLET_TRANSACTIONS: 'wallet.transactions'
 }
 
 /** Shell → chrome pushes. */

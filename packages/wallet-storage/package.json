@@ -1,0 +1,7 @@
+{
+  "name": "@nexus/wallet-storage",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Local wallet storage (@bsv/wallet-toolbox-mobile StorageProvider over expo-sqlite) ported from BSV Browser. Shell-agnostic SQL logic + an expo-sqlite driver boundary — see notes for the SqlDriver seam.",
+  "main": "src/index.ts"
+}

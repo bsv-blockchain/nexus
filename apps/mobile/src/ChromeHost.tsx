@@ -34,8 +34,20 @@ const ChromeHost = forwardRef<WebView, ChromeHostProps>(function ChromeHost({ on
       originWhitelist={['*']}
       javaScriptEnabled
       domStorageEnabled
+      // Native feel. The UI also declares maximumScale/userScalable in its viewport, but a
+      // chrome that is ever served from somewhere else must not be able to opt back in:
+      // pinch-zooming the app frame is the single clearest tell that it is a web page.
+      scalesPageToFit={false}
       setBuiltInZoomControls={false}
+      setDisplayZoomControls={false}
+      bounces={false}
       overScrollMode="never"
+      // The chrome is the app frame, not a document: it should not rubber-band or show
+      // scrollbars. Individual panes inside it scroll on their own.
+      showsVerticalScrollIndicator={false}
+      showsHorizontalScrollIndicator={false}
+      contentInsetAdjustmentBehavior="never"
+      automaticallyAdjustContentInsets={false}
       style={{ flex: 1, backgroundColor: 'transparent' }}
     />
   )

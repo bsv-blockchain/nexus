@@ -111,6 +111,14 @@ const CREATE_HOST_CLIENT_SOURCE = `function createHostClient(options) {
       list: function () { return call('tabs.list', null) }
     },
     info: function () { return call('host.info', null) },
+    wallet: {
+      // Whether a wallet is actually usable right now. The UI needs to tell "no wallet
+      // configured" apart from "wallet is loading" apart from "shell has no wallet at
+      // all" — showing an empty balance for any of those would be a lie.
+      info: function () { return call('wallet.info', null) },
+      accounts: function () { return call('wallet.accounts', null) },
+      transactions: function (opts) { return call('wallet.transactions', opts || {}) }
+    },
     __deliver: deliver
   }
 }`

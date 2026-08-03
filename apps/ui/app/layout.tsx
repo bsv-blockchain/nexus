@@ -28,7 +28,13 @@ export const viewport: Viewport = {
   ],
   width: "device-width",
   initialScale: 1,
-  maximumScale: 5,
+  // This UI ships inside a native shell, where pinch-zoom is a browser affordance that
+  // breaks the illusion immediately — nothing else on the phone zooms like that. Locking
+  // the scale is what makes the WebView stop feeling like a web page.
+  maximumScale: 1,
+  userScalable: false,
+  // Draw into the notch/home-indicator area; the chrome pads itself with env(safe-area-*).
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
