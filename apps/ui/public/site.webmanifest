@@ -1,0 +1,22 @@
+{
+  "name": "Nexus",
+  "short_name": "Nexus",
+  "description": "Nexus bundles a browser, wallet, document signing, publishing and transaction tools into one BSV workspace.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#17111f",
+  "theme_color": "#4353ff",
+  "icons": [
+    {
+      "src": "/icons/nexus.png",
+      "sizes": "600x600",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/nexus.png",
+      "sizes": "600x600",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

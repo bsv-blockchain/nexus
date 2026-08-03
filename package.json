@@ -14,12 +14,11 @@
     "mobile": "npm --workspace @nexus/mobile run start",
     "ios": "npm --workspace @nexus/mobile run ios",
     "android": "npm --workspace @nexus/mobile run android",
-    "ui:fetch": "node tools/fetch-ui.mjs",
-    "ui:build": "node tools/fetch-ui.mjs --build",
+    "ui:build": "node tools/build-ui.mjs",
     "ui:dev": "npm run dev --prefix apps/ui",
     "typecheck": "tsc --noEmit -p apps/mobile",
     "check": "node tools/check-injection-sources.mjs",
-    "ui:bundle": "node tools/fetch-ui.mjs --build && node tools/bundle-ui.mjs"
+    "ui:bundle": "node tools/build-ui.mjs && node tools/bundle-ui.mjs"
   },
   "devDependencies": {
     "typescript": "~5.9.2"
