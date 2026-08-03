@@ -180,12 +180,40 @@ that flag has to change.
 `--path`, `--id`, `--latest` and `--url` are mutually exclusive, and `--path` cannot be
 combined with `--platform all`.
 
-## Bundle identifier — decided
+## Naming: Nexus is the working title, Haven is the candidate brand
 
-**`org.bsvassociation.nexus`** (iOS `bundleIdentifier` and Android `package`), matching
-the shipped `org.bsvassociation.browser` and the "BSV Association" Apple team. Settled
-2026-08-03, before any App Store Connect record exists — which is the only cheap moment
-to settle it.
+**Nexus** is internal only — repo, EAS project (`@bsvb/nexus`), bundle identifier. It is
+not user-facing. **Haven** is the intended production brand, pending trademark clearance.
+
+Current bundle identifier: **`org.bsvassociation.nexus`** (iOS `bundleIdentifier` and
+Android `package`), matching the shipped `org.bsvassociation.browser` and the "BSV
+Association" Apple team.
+
+### What is reversible, and what is not
+
+| Identifier | User-facing | Changeable after launch |
+|---|---|---|
+| Bundle ID | No — store URLs use a numeric Apple ID | **No. Frozen the moment an App Store Connect record exists** |
+| App Store display name | Yes | Yes, freely |
+| Home-screen label (`expo.name`) | Yes | Yes, freely |
+| URL scheme (`nexus://`) | Yes — third parties hardcode it | Yes, and additional schemes can be added while keeping the old one |
+| EAS project / repo name | No | Yes |
+
+**Therefore: do not create the App Store Connect record until the trademark answer
+lands**, unless TestFlight distribution is blocking. Creating that record is the single
+irreversible act in the whole naming question — it welds `org.bsvassociation.nexus` on
+permanently. Everything else can follow the brand later at no cost.
+
+If TestFlight *is* blocking and the record has to exist first, that is a survivable
+outcome: users never see a bundle identifier, and plenty of shipped apps carry one that
+predates their branding. Make it a deliberate decision rather than a side effect of
+running `eas submit`.
+
+Trademark note for whoever is running the search: a prior crypto project **Haven
+Protocol (XHV)** exists in the same goods class. It announced closure on 2024-12-12 after
+a range-proof exploit, but havenprotocol.org is still live with trademark notices and the
+token still nominally trades — "defunct but not formally abandoned" is a fact pattern
+worth flagging to counsel explicitly.
 
 ## Not verified
 
