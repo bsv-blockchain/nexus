@@ -85,6 +85,27 @@ Promise RPC + event subscription over one channel (`nexus.host.v1`).
 | iOS / macOS WKWebView | `WKUserScript` at document-start | Reliable |
 | Android WebView | `onPageStarted` + `evaluateJavascript` | **Racy — no true document-start hook exists in any stack.** Same compromise BSV Browser already ships. |
 
+## How the chrome reaches the device
+
+The shell loads the chrome from a URL. Three deliveries, in increasing order of what
+production needs:
+
+| Delivery | Used by | Trade-off |
+|---|---|---|
+| Local harness / `next dev` | development | Fast loop; requires the dev machine |
+| **Hosted (`bsvnexus.vercel.app`)** | **v0.0.1, on-device technical tests** | Testable build today, but needs network, and the deployed UI has no `window.nexusHost`, so the browse pane falls back to its iframe instead of native tabs |
+| Bundled static export | production | Offline, no third-party dependency, and the only way the native tab layer works on device — because we control the build and can apply the `nexusHost` integration |
+
+v0.0.1 ships hosted deliberately. Bundling was attempted and blocked: `tools/fetch-ui.mjs`
+refuses to patch the demo's `next.config.ts` (it is not our repository), so there is no
+`out/` to embed. Embedding one also means resolving Next's absolute `/_next/...` asset
+paths under `file://`, or shipping a small local HTTP server inside the app. Both are
+known, tractable, and neither belongs on the critical path to a first device build.
+
+Consequence to keep in view: **until the chrome is bundled and patched, the native tab
+layer is unreachable on device.** Everything proving it works — G2, G3, G4, G5 — was
+measured against the harness and the Electron shell, not against the hosted demo.
+
 ## Mobile rules earned on device
 
 - **Never absolutely position a natively-backed view directly.** Wrap it in a plain
