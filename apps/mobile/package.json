@@ -8,10 +8,10 @@
     "start": "expo start --dev-client",
     "ios": "expo run:ios",
     "android": "expo run:android",
-    "prebuild": "expo prebuild --clean",
-    "postinstall": "patch-package --patch-dir ../../patches"
+    "prebuild": "expo prebuild --clean"
   },
   "dependencies": {
+    "@bsv/btms-permission-module": "^1.1.0",
     "@bsv/message-box-client": "2.2.1",
     "@bsv/sdk": "2.1.9",
     "@bsv/templates": "1.9.6",
@@ -29,8 +29,12 @@
     "expo-secure-store": "~55.0.14",
     "expo-sqlite": "~55.0.16",
     "expo-status-bar": "~55.0.6",
+    "i18next": "^25.2.1",
+    "mobx": "^6.13.7",
+    "mobx-react-lite": "^4.1.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-i18next": "^15.5.3",
     "react-native": "0.83.6",
     "react-native-engine-native": "file:../../packages/react-native-engine-native",
     "react-native-localpay-transport": "file:../../packages/react-native-localpay-transport",

@@ -7,8 +7,8 @@
 
 import { StorageProvider } from '@bsv/wallet-toolbox-mobile'
 import { StorageExpoSQLite } from './StorageExpoSQLite'
-import type { AppChain } from '@/context/config'
-import { toWalletChain } from '@/context/config'
+import type { AppChain } from '@nexus/wallet-core/chain'
+import { toWalletChain } from '@nexus/wallet-core/chain'
 
 export interface LocalStorageConfig {
   network: AppChain

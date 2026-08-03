@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "lib": ["ESNext", "DOM"],
+    "lib": [
+      "ESNext",
+      "DOM"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
@@ -12,8 +15,27 @@
     "resolveJsonModule": true,
     "noEmit": true,
     "paths": {
-      "@nexus/substrate": ["./packages/substrate/src/index.js"],
-      "@nexus/bridge": ["./packages/bridge/src/index.js"]
+      "@nexus/substrate": [
+        "./packages/substrate/src/index.js"
+      ],
+      "@nexus/bridge": [
+        "./packages/bridge/src/index.js"
+      ],
+      "@nexus/wallet-core": [
+        "./packages/wallet-core/src/index.ts"
+      ],
+      "@nexus/wallet-core/*": [
+        "./packages/wallet-core/src/*"
+      ],
+      "@nexus/wallet-storage": [
+        "./packages/wallet-storage/src/index.ts"
+      ],
+      "@nexus/wallet-storage/*": [
+        "./packages/wallet-storage/src/*"
+      ],
+      "@nexus/substrate/browser/*": [
+        "./packages/substrate/src/browser/*"
+      ]
     }
   }
 }

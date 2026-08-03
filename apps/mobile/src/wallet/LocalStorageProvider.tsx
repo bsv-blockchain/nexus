@@ -4,7 +4,7 @@ import * as LocalAuthentication from 'expo-local-authentication'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 // BLOCKER(nexus-port): app-level i18n singleton (used only for the biometric-prompt
 // strings below) — not yet ported to apps/mobile/src; expected path guessed here.
-import i18n from '../i18n/translations'
+import i18n from './support/translations'
 
 export interface LocalStorageContextType {
   /* non-secure */

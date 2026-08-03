@@ -31,10 +31,10 @@ import {
   planRelease,
   undecidedReqStatuses,
   type PostOutcome
-} from '../../utils/offline/plan'
-import { descendantsOf, type OrderableTx } from '../../utils/offline/order'
-import { devLog } from '../../utils/logging'
-import { getOnline } from '../../utils/net/online'
+} from '@nexus/wallet-core/utils/offline/plan'
+import { descendantsOf, type OrderableTx } from '@nexus/wallet-core/utils/offline/order'
+import { devLog } from '@nexus/wallet-core/utils/logging'
+import { getOnline } from '@nexus/wallet-core/utils/net/online'
 
 export interface ProcessOfflineActionsResult {
   /** Queue rows moved to 'sent'. A foreign ancestor's broadcast is logged, not counted. */

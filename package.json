@@ -18,12 +18,21 @@
     "ui:dev": "npm run dev --prefix apps/ui",
     "typecheck": "tsc --noEmit -p apps/mobile",
     "check": "node tools/check-injection-sources.mjs",
-    "ui:bundle": "node tools/build-ui.mjs && node tools/bundle-ui.mjs"
+    "ui:bundle": "node tools/build-ui.mjs && node tools/bundle-ui.mjs",
+    "postinstall": "patch-package"
   },
   "devDependencies": {
     "typescript": "~5.9.2"
   },
   "engines": {
     "node": ">=22"
+  },
+  "dependencies": {
+    "@bsv/message-box-client": "2.2.1",
+    "@bsv/sdk": "2.1.9",
+    "@bsv/templates": "1.9.6",
+    "@bsv/wallet-toolbox-mobile": "2.4.3",
+    "i18next": "^25.2.1",
+    "mobx": "^6.13.7"
   }
 }

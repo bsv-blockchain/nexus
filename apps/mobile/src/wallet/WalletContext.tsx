@@ -38,7 +38,7 @@ const DEFAULT_SETTINGS: WalletSettings = {
 // BLOCKER(nexus-port): no native Toast surface exists in the Nexus mobile shell (the UI is
 // a single DOM WebView, not native RN screens) — expected new path is app-level, not a
 // package, but the component itself is not yet ported. See blockers list.
-import { showToast } from '../components/ui/Toast'
+import { showToast } from './support/shell-ui'
 import type { AppChain } from './config'
 import { DEFAULT_STORAGE_URL, DEFAULT_CHAIN, ADMIN_ORIGINATOR, toWalletChain } from './config'
 // BLOCKER(nexus-port): @nexus/wallet-core does not exist yet; source shared/constants.ts
@@ -50,7 +50,7 @@ import { UserContext } from './UserContext'
 import { useLocalStorage } from './LocalStorageProvider'
 // BLOCKER(nexus-port): app-level hook (queue + native-modal focus integration via
 // UserContext's isFocused/onFocusRequested) — not yet ported, not obviously a package.
-import { usePermissionQueue } from '../hooks/usePermissionQueue'
+import { usePermissionQueue } from './support/usePermissionQueue'
 import { createServices, chaintracksUrlFor } from '@nexus/wallet-core/services/walletServiceConfig'
 import { configureNewHeaderPolling } from '@nexus/wallet-core/utils/walletMonitor'
 import {
@@ -60,10 +60,7 @@ import {
   createWocBroadcastService
 } from '@nexus/wallet-core/services/arcadeBroadcastProvider'
 import { getExchangeRate } from '@nexus/wallet-core/services/exchangeRate'
-// BLOCKER(nexus-port): expo-router native screen navigation has no equivalent in Nexus —
-// the UI is a single DOM WebView (ARCHITECTURE.md). logout()'s router.dismissAll()/router.push('/')
-// below has no target shell API yet; needs a real decision, not a stub.
-import { router } from 'expo-router'
+import { navigate } from './support/shell-ui'
 import { logWithTimestamp } from '@nexus/wallet-core/utils/logging'
 import { recoverMnemonicWallet } from '@nexus/wallet-core/utils/mnemonicWallet'
 import { StorageProvider, ChaintracksServiceClient } from '@bsv/wallet-toolbox-mobile'
@@ -1637,8 +1634,10 @@ export const WalletContextProvider: React.FC<WalletContextProps> = ({ children =
       deleteMnemonic()
       deleteRecoveredKey()
 
-      router.dismissAll()
-      router.push('/')
+      // Was router.dismissAll() + router.push('/'): tear down the stack and return to the
+      // root so no authenticated view is reachable by going back. The DOM chrome performs
+      // the equivalent reset when it receives this.
+      navigate('/', { reset: true })
     })
   }, [deleteSnap, deleteMnemonic, deleteRecoveredKey])
 

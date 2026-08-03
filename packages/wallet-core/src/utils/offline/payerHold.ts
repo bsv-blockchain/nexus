@@ -52,7 +52,7 @@
  * shares nothing. What genuinely is shared — the `offline_actions` insert — is
  * reused directly via `insertOfflineAction`.
  */
-import { insertOfflineAction } from '@/storage/methods/offlineActions'
+import { insertOfflineAction } from '@nexus/wallet-storage/methods/offlineActions'
 import { TaskSendOffline } from '../monitor/TaskSendOffline'
 import type { StorageExpoSQLite } from '@/storage/StorageExpoSQLite'
 

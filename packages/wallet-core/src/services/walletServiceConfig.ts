@@ -1,5 +1,5 @@
-import type { AppChain } from '@/context/config'
-import { toWalletChain } from '@/context/config'
+import type { AppChain } from '@nexus/wallet-core/chain'
+import { toWalletChain } from '@nexus/wallet-core/chain'
 import {
   ChaintracksServiceClient,
   Services
