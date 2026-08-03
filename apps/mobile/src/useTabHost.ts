@@ -40,6 +40,12 @@ export interface UseTabHostConfig {
   platform: string
   /** Same string answers both host.info's `version` and the getVersion handler, mirroring @nexus/desktop's single `app.getVersion()`. */
   version: string
+  /**
+   * Size of the chrome WebView in dp — the window MINUS safe-area insets, not the window.
+   * Normalized rects are fractions of the chrome's viewport, so scaling them by the full
+   * window would overshoot by exactly the insets.
+   */
+  chromeSize?: { width: number; height: number }
 }
 
 export type HostMethods = Record<string, (params: any) => any>
@@ -169,7 +175,7 @@ export function useTabHost(config: UseTabHostConfig): UseTabHostResult {
         // the chrome's layout does not fit the frame, so the chrome's CSS px are not
         // dp and no constant factor recovers them. Fractions survive that; px are only
         // the fallback for a shell/chrome pair predating `norm`.
-        const win = Dimensions.get('window')
+        const win = configRef.current.chromeSize ?? Dimensions.get('window')
         const rounded: Rect = norm
           ? {
               x: Math.round(norm.x * win.width),

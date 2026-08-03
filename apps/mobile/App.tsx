@@ -1,5 +1,6 @@
 import React, { useMemo, useRef } from 'react'
-import { Platform, StyleSheet, View } from 'react-native'
+import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native'
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import Constants from 'expo-constants'
 import type WebView from 'react-native-webview'
@@ -16,12 +17,33 @@ import { useTabHost } from './src/useTabHost'
  * by construction since a native view always paints over a WebView's content.
  */
 export default function App() {
+  return (
+    <SafeAreaProvider>
+      <Shell />
+    </SafeAreaProvider>
+  )
+}
+
+function Shell() {
   const chromeRef = useRef<WebView>(null)
+  // A hosted chrome is a website: it cannot know it is running full-bleed under a notch,
+  // and we cannot patch someone else's deployment. So the shell insets it. Our own UI can
+  // later opt back into edge-to-edge by handling env(safe-area-inset-*) itself.
+  const insets = useSafeAreaInsets()
 
   // Mirrors Electron's app.getVersion(): one value read from the app's own
   // manifest, reused for both host.info and the substrate getVersion handler.
   const version = (Constants.expoConfig?.version as string | undefined) ?? '0.0.0-spike'
-  const tabHost = useTabHost({ shell: 'expo', platform: Platform.OS, version })
+  const win = useWindowDimensions()
+  const tabHost = useTabHost({
+    shell: 'expo',
+    platform: Platform.OS,
+    version,
+    chromeSize: {
+      width: win.width - insets.left - insets.right,
+      height: win.height - insets.top - insets.bottom
+    }
+  })
 
   const router = useMemo(
     () =>
@@ -50,8 +72,13 @@ export default function App() {
 
   return (
     <View style={styles.root}>
-      <StatusBar style="auto" />
-      <View style={[styles.layer, { zIndex: 0 }]}>
+      <StatusBar style="light" />
+      <View
+        style={[
+          styles.layer,
+          { zIndex: 0, paddingTop: insets.top, paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }
+        ]}
+      >
         <ChromeHost ref={chromeRef} onMessage={(data) => router.handle(data)} />
       </View>
       {/* pointerEvents box-none: this layer's own bounds cover the full screen,
@@ -59,8 +86,14 @@ export default function App() {
           own pointerEvents) should ever intercept a touch — otherwise gaps
           around/below tabs (e.g. the chrome's own address bar) would be dead
           to touch even though no tab is actually there. */}
+      {/* Inset identically to the chrome. Tab rects arrive in the chrome document's
+          coordinate space, so if the chrome starts below the notch and the tab layer
+          does not, every tab lands high by exactly inset.top. */}
       <View
-        style={[styles.layer, { zIndex: 1 }]}
+        style={[
+          styles.layer,
+          { zIndex: 1, paddingTop: insets.top, paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }
+        ]}
         pointerEvents="box-none"
         onLayout={(e) => {
           // If this layer is not at 0,0 covering the screen, every tab inherits the
@@ -86,6 +119,8 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  // The inset strips around the chrome are ours to paint. Left default they render
+  // white, which flashes against a dark UI on every launch and rotation.
+  root: { flex: 1, backgroundColor: '#1A0E31' },
   layer: { ...StyleSheet.absoluteFillObject }
 })

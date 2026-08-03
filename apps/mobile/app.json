@@ -21,7 +21,7 @@
       "package": "org.bsvassociation.nexus"
     },
     "extra": {
-      "chromeUrl": "http://localhost:8099/?autotest=1",
+      "chromeUrl": "https://bsvnexus.vercel.app",
       "eas": {
         "projectId": "59d9d49d-07e1-455c-8f93-1607a2f54341"
       }
