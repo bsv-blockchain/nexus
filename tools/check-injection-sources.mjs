@@ -56,6 +56,46 @@ for (const [name, script] of built) {
   console.log(`ok  ${name} (${script.length} chars)`)
 }
 
+// Repo-wide scan for the anti-pattern itself, not just for the two sources we already
+// know about. The BSV Browser port arrived carrying exactly this bug in
+// injectedPolyfills.ts — a real function stringified into an injected script — and the
+// earlier version of this check would not have caught it, because it only knew about
+// packages/{bridge,substrate}/src/*.js by name.
+const { readdirSync, statSync, readFileSync } = await import('node:fs')
+const { join, extname: ext } = await import('node:path')
+
+function* walk(dir) {
+  for (const entry of readdirSync(dir)) {
+    if (entry === 'node_modules' || entry === 'dist' || entry === 'out' || entry.startsWith('.')) continue
+    const p = join(dir, entry)
+    if (statSync(p).isDirectory()) yield* walk(p)
+    else yield p
+  }
+}
+
+const ROOT = new URL('..', import.meta.url).pathname
+const STRINGIFIED = /\$\{\s*([A-Za-z_$][\w$]*)\s*\.toString\(\)\s*\}/g
+
+for (const dir of ['packages', 'apps/mobile/src', 'apps/desktop/src']) {
+  let files
+  try {
+    files = [...walk(join(ROOT, dir))]
+  } catch {
+    continue // directory may not exist in every checkout
+  }
+  for (const file of files) {
+    if (!['.js', '.ts', '.tsx', '.mjs', '.cjs'].includes(ext(file))) continue
+    const src = readFileSync(file, 'utf8')
+    for (const m of src.matchAll(STRINGIFIED)) {
+      failures.push(
+        `${file.replace(ROOT, '')}: interpolates ${m[1]}.toString() into a template literal. ` +
+          'Hermes discards function source and yields a [bytecode] stub, so the injected script ' +
+          'silently becomes garbage on device. Hold the code as a string constant instead.'
+      )
+    }
+  }
+}
+
 if (failures.length) {
   console.error('\nFAILED:')
   for (const f of failures) console.error('  - ' + f)
