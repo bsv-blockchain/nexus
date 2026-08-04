@@ -29,6 +29,9 @@ import {
 } from "@/lib/data";
 import { useCommandEffects } from "@/lib/use-command-effects";
 import { useActivity } from "@/lib/wallet-live";
+import { PaySheet, type Direction } from "@/components/apps/wallet/pay-flow";
+import { Transactions } from "@/components/apps/wallet/transactions";
+import { payAvailable } from "@/lib/pay-data";
 import {
   Coins,
   Image as ImageIcon,
@@ -84,6 +87,13 @@ export function WalletApp(): ReactNode {
    * the detail is simply stale and ignored.
    */
   const [whois, setWhois] = useState<MessagePerson | null>(null);
+  /**
+   * The real rails, when a shell is there to run them. In demo mode the fixture
+   * sheets stay: they are what makes the screenshots and the App Store review
+   * build work, and they never touch a wallet.
+   */
+  const live = payAvailable();
+  const [payOpen, setPayOpen] = useState<Direction | null>(null);
   const [detail, setDetail] = useState<{
     section: WalletSection;
     tokenId?: string;
@@ -162,14 +172,22 @@ export function WalletApp(): ReactNode {
       case "collectibles":
         return <Collectibles onOpenMarket={() => openApp("market")} />;
       case "activity":
+        // Live: the wallet's own ledger, with the status mapping and per-row
+        // actions the source app had. Demo: the fixture history, unchanged.
         return (
           <div className="mx-auto w-full max-w-2xl">
-            <h2 className="mb-3 text-lg font-bold">{copy.historyTitle}</h2>
-            <Activity
-              transactions={filtered}
-              onOpen={openTxDetail}
-              empty={copy.noActivity}
-            />
+            {live ? (
+              <Transactions />
+            ) : (
+              <>
+                <h2 className="mb-3 text-lg font-bold">{copy.historyTitle}</h2>
+                <Activity
+                  transactions={filtered}
+                  onOpen={openTxDetail}
+                  empty={copy.noActivity}
+                />
+              </>
+            )}
           </div>
         );
       case "links":
@@ -195,8 +213,10 @@ export function WalletApp(): ReactNode {
         return (
           <Portfolio
             onOpenToken={openToken}
-            onSend={() => send()}
-            onReceive={() => setWalletIntent({ kind: "receive" })}
+            onSend={() => (live ? setPayOpen("pay") : send())}
+            onReceive={() =>
+              live ? setPayOpen("get") : setWalletIntent({ kind: "receive" })
+            }
             onExchange={() => setWalletIntent({ kind: "exchange" })}
           />
         );
@@ -245,6 +265,12 @@ export function WalletApp(): ReactNode {
       <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-20 sm:p-6 md:pb-6">
         {body}
       </div>
+
+      <PaySheet
+        open={payOpen !== null}
+        initialDirection={payOpen ?? "pay"}
+        onClose={() => setPayOpen(null)}
+      />
 
       <SendSheet
         open={walletIntent?.kind === "send"}

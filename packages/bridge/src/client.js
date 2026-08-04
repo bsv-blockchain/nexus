@@ -129,6 +129,46 @@ const CREATE_HOST_CLIENT_SOURCE = `function createHostClient(options) {
       // device then puts up a Face ID / passcode sheet that waits on a human.
       restore: function (mnemonic) { return call('wallet.restore', { mnemonic: mnemonic }, 300000) }
     },
+    // Payments. The rail is never chosen here — classify() infers it from how the
+    // counterparty was identified, and the chrome renders whatever comes back.
+    // Anything that broadcasts, sweeps or talks to a message box gets a long
+    // timeout: those are bounded by the chain and the network, not by us.
+    pay: {
+      classify: function (text) { return call('pay.classify', { text: text }) },
+      validateAddress: function (text) { return call('pay.validateAddress', { text: text }) },
+      copyKeys: function () { return call('pay.copyKeys', null) },
+      proofNudge: function () { return call('pay.proofNudge', null, 120000) },
+      address: {
+        receive: function (daysOffset) { return call('pay.address.receive', { daysOffset: daysOffset || 0 }, 60000) },
+        history: function (address) { return call('pay.address.history', { address: address }, 60000) },
+        sweep: function (address, daysOffset) { return call('pay.address.sweep', { address: address, daysOffset: daysOffset || 0 }, 180000) },
+        send: function (address, satoshis) { return call('pay.address.send', { address: address, satoshis: satoshis }, 180000) }
+      },
+      handle: {
+        identity: function (sats) { return call('pay.handle.identity', { sats: sats }, 60000) },
+        messageBox: function () { return call('pay.handle.messageBox', null) },
+        setMessageBox: function (url) { return call('pay.handle.setMessageBox', { url: url }) },
+        send: function (identityKey, satoshis) { return call('pay.handle.send', { identityKey: identityKey, satoshis: satoshis }, 180000) },
+        outbox: function () { return call('pay.handle.outbox', null, 30000) },
+        retry: function (id) { return call('pay.handle.retry', { id: id }, 120000) },
+        dismiss: function (id) { return call('pay.handle.dismiss', { id: id }) },
+        inbox: function (retry) { return call('pay.handle.inbox', { retry: retry || [] }, 180000) },
+        discard: function (messageId) { return call('pay.handle.discard', { messageId: messageId }, 60000) }
+      },
+      offline: {
+        status: function () { return call('pay.offline.status', null) },
+        sendNow: function () { return call('pay.offline.sendNow', null) }
+      }
+    },
+    tx: {
+      list: function (opts) { return call('tx.list', opts || {}, 60000) },
+      abort: function (reference) { return call('tx.abort', { reference: reference }, 60000) },
+      refreshProof: function (txid) { return call('tx.refreshProof', { txid: txid }, 120000) },
+      rawHex: function (txid) { return call('tx.rawHex', { txid: txid }, 30000) },
+      // Pages the entire history; on a busy wallet this is the slowest call here.
+      exportCsv: function () { return call('tx.exportCsv', null, 300000) },
+      explorerUrl: function (txid) { return call('tx.explorerUrl', { txid: txid }) }
+    },
     // True while the chrome is showing something over itself (sheet, menu, palette).
     // The shell hides its native tab layer for the duration; without this the page
     // paints straight through whatever the chrome just opened.

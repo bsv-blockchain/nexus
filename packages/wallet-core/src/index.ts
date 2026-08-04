@@ -47,6 +47,21 @@ export * from './utils/localpay/transport/select' // RN-coupled: react-native (P
 export * from './utils/localpay/transport/socket' // RN-coupled: react-native-localpay-transport
 export * from './utils/localpay/transport/types'
 
+// ── utils/pay ───────────────────────────────────────────────────────────────
+// The rails. A rail is inferred from how the counterparty was identified, never
+// chosen by the user — see ./utils/pay/rails/index.ts.
+export * from './utils/pay/rails' // pure: classification, validation, key ids
+export * from './utils/pay/rails/address'
+export * from './utils/pay/rails/handle' // needs @bsv/message-box-client
+export * from './utils/pay/rails/nearby'
+export * from './utils/pay/sweeper'
+export * from './utils/pay/watchlist'
+export * from './utils/pay/proofNudge'
+export * from './utils/parsePeerPayURI'
+
+// ── utils/peerpay ───────────────────────────────────────────────────────────
+export * from './utils/peerpay/outbox'
+
 // ── utils/headers ───────────────────────────────────────────────────────────
 export * from './utils/headers/checkpoints'
 export * from './utils/headers/fs' // RN/Expo-coupled: expo-file-system (lazy require inside expoHeaderFs())

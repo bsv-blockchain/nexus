@@ -14,6 +14,7 @@ import { UserContextProvider } from './src/wallet/UserContext'
 import { ExchangeRateContextProvider } from './src/wallet/ExchangeRateContext'
 import { WalletContextProvider } from './src/wallet/WalletContext'
 import { useWalletBridge } from './src/wallet/useWalletBridge'
+import { usePayBridge } from './src/wallet/usePayBridge'
 import { setShellUiSink } from './src/wallet/support/shell-ui'
 
 /**
@@ -80,16 +81,19 @@ function Shell() {
   // window.nexusHost, one transport, whether the chrome is asking about tabs or
   // about money.
   const walletBridge = useWalletBridge()
+  // Payments and transactions. Separate hook, same router: the rails are a large
+  // enough surface to keep apart from the wallet's own basic queries.
+  const payMethods = usePayBridge()
 
   const router = useMemo(
     () =>
       createHostRouter({
-        methods: { ...tabHost.methods, ...walletBridge.methods },
+        methods: { ...tabHost.methods, ...walletBridge.methods, ...payMethods },
         send: (envelope) => {
           chromeRef.current?.injectJavaScript('window.__nexusHostDeliver(' + JSON.stringify(envelope) + ');true;')
         }
       }),
-    [tabHost.methods, walletBridge.methods]
+    [tabHost.methods, walletBridge.methods, payMethods]
   )
 
   // Same handler set as @nexus/desktop's tabManager.mjs — `handlers` comes

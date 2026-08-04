@@ -950,16 +950,26 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
 
   const createTab = useCallback(
     (input: string) => {
+      /*
+       * The tab is built BEFORE the state update, not inside it.
+       *
+       * setActiveTabId and setHistoryByTab used to be called from inside the
+       * setTabsBySpace updater. An updater must be pure — React is free to run it
+       * more than once — so the activation could be discarded, and the new tab
+       * would be added but never focused. That is exactly what a link opened from
+       * outside the browser hit: the tab appeared in the switcher while the pane
+       * kept showing the previous one.
+       *
+       * `sortOrder` is assigned inside the updater instead, where the current tab
+       * list is actually known.
+       */
+      const tab = buildTab(input, activeSpaceId, 0);
       setTabsBySpace((current) => {
         const tabs = current[activeSpaceId] ?? [];
-        const tab = buildTab(input, activeSpaceId, tabs.length);
-        setActiveTabId(tab.id);
-        setHistoryByTab((h) => ({
-          ...h,
-          [tab.id]: { stack: [tab.url], index: 0 },
-        }));
-        return { ...current, [activeSpaceId]: [...tabs, tab] };
+        return { ...current, [activeSpaceId]: [...tabs, { ...tab, sortOrder: tabs.length }] };
       });
+      setActiveTabId(tab.id);
+      setHistoryByTab((h) => ({ ...h, [tab.id]: { stack: [tab.url], index: 0 } }));
       setRequestedApp("browser");
       setActivePage(null);
       setMainView("app");
