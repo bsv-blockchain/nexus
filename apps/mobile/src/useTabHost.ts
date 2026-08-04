@@ -58,6 +58,12 @@ export interface UseTabHostResult {
   registerRef: (id: string, ref: WebView | null) => void
   onTabMessage: (id: string, patch: Partial<Omit<TabState, 'id'>>) => void
   handlers: SubstrateHandlers
+  /**
+   * True while the chrome is showing something over itself. Native tab WebViews
+   * paint above the chrome unconditionally, so the only way a chrome sheet is
+   * fully visible is for the tab layer to stand down while it is open.
+   */
+  overlayOpen: boolean
 }
 
 // Spec: "a fixed 33-byte hex string with an obvious spike- marker". Real hex
@@ -94,6 +100,7 @@ function withMessage(method: string, fn: (params: unknown, ctx: SubstrateCtx) =>
  */
 export function useTabHost(config: UseTabHostConfig): UseTabHostResult {
   const [tabs, setTabs] = useState<TabState[]>([])
+  const [overlayOpen, setOverlayOpen] = useState(false)
   // Derived, not a second piece of state: a tab's `visible` flag is the single
   // source of truth, so activeId can never drift out of sync with it.
   const activeId = useMemo(() => tabs.find((t) => t.visible)?.id ?? null, [tabs])
@@ -221,6 +228,10 @@ export function useTabHost(config: UseTabHostConfig): UseTabHostResult {
         refs.current[id]?.stopLoading()
         return null
       },
+      [METHODS.CHROME_SET_OVERLAY]: ({ open }: { open?: boolean }) => {
+        setOverlayOpen(Boolean(open))
+        return null
+      },
       [METHODS.TAB_LIST]: () =>
         tabsRef.current.map((t) => ({
           id: t.id,
@@ -250,5 +261,5 @@ export function useTabHost(config: UseTabHostConfig): UseTabHostResult {
     []
   )
 
-  return { tabs, activeId, methods, registerRef, onTabMessage, handlers }
+  return { tabs, activeId, methods, registerRef, onTabMessage, handlers, overlayOpen }
 }

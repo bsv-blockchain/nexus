@@ -8,6 +8,7 @@ import {
   type RailEntry,
 } from "@/components/hub/hub-provider";
 import { content, getHubApp, getMockPage, type BrowserTab } from "@/lib/data";
+import { useHostOverlay } from "@/lib/wallet-data";
 import {
   AlignLeft,
   AppWindow,
@@ -1056,7 +1057,12 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
         key={slug}
         label={app.name}
         active={active}
-        onClick={() => openApp(slug)}
+        onClick={() => {
+          openApp(slug);
+          // Picking an app IS the rail's whole purpose, so it has served it. Leaving
+          // it open buries the app the user just asked for behind it.
+          onClose();
+        }}
       >
         <AppTile
           app={app}
@@ -1291,6 +1297,14 @@ export function MobileBrowser({
   useEffect(() => {
     onDimChange(sheet === "details" || sheet === "address");
   }, [sheet, onDimChange]);
+
+  /*
+   * The dim above is a CSS transform on this document — which does nothing to the
+   * browsed page, because on mobile that page is a NATIVE view stacked above this
+   * document entirely. Every one of these sheets would open underneath it. So the
+   * shell is told to take the tab layer down for as long as any sheet is open.
+   */
+  useHostOverlay(sheet !== "none");
 
   const close = (): void => setSheet("none");
 

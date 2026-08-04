@@ -4,15 +4,13 @@ import { TokenMark, formatUnits } from "@/components/apps/wallet/token-mark";
 import { content } from "@/lib/data";
 import {
   changeTone,
-  holdings,
   percent,
-  portfolioChange24h,
-  portfolioUsd,
   sparkPath,
   sparkline,
   usd,
   type Holding,
 } from "@/lib/wallet";
+import { usePortfolio } from "@/lib/wallet-live";
 import { ArrowDownLeft, ArrowUpRight, Repeat } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -67,9 +65,11 @@ export function Portfolio({
   onExchange: () => void;
 }): ReactNode {
   const copy = content.wallet;
-  const rows = holdings();
-  const total = portfolioUsd();
-  const change = portfolioChange24h();
+  const { rows, total, change, loading, error, mode } = usePortfolio();
+  // Sparklines and 24h percentages are fixture properties. A live balance has
+  // neither, and a flat line next to "0.00%" reads as a real quote rather than as
+  // missing data.
+  const showTrend = mode === "demo";
 
   return (
     <div className="mx-auto w-full max-w-2xl">
@@ -78,14 +78,23 @@ export function Portfolio({
           {copy.totalValue}
         </p>
         <p className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-          {usd(total)}
+          {loading ? "—" : usd(total)}
         </p>
-        <p className={`mt-1 text-sm font-semibold ${changeTone(change)}`}>
-          {percent(change)}{" "}
-          <span className="font-normal text-muted-foreground">
-            {copy.change24h}
-          </span>
-        </p>
+        {/* A real wallet cannot answer "how much did this move today", and printing
+            0.00% would be an answer rather than an absence of one. */}
+        {change !== null ? (
+          <p className={`mt-1 text-sm font-semibold ${changeTone(change)}`}>
+            {percent(change)}{" "}
+            <span className="font-normal text-muted-foreground">
+              {copy.change24h}
+            </span>
+          </p>
+        ) : null}
+        {error ? (
+          <p role="alert" className="mt-1 text-sm font-medium text-negative">
+            {error}
+          </p>
+        ) : null}
 
         <div className="mt-5 grid grid-cols-3 gap-2">
           {[
@@ -133,16 +142,18 @@ export function Portfolio({
                     {holding.token.symbol}
                   </span>
                 </span>
-                <Spark holding={holding} />
+                {showTrend && <Spark holding={holding} />}
                 <span className="shrink-0 text-right">
                   <span className="block text-sm font-semibold">
                     {usd(holding.usd)}
                   </span>
-                  <span
-                    className={`block text-xs font-medium ${changeTone(holding.token.change24h)}`}
-                  >
-                    {percent(holding.token.change24h)}
-                  </span>
+                  {showTrend && (
+                    <span
+                      className={`block text-xs font-medium ${changeTone(holding.token.change24h)}`}
+                    >
+                      {percent(holding.token.change24h)}
+                    </span>
+                  )}
                 </span>
               </button>
             </li>

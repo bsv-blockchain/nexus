@@ -27,7 +27,16 @@ const METHODS = {
   // one enormous change.
   WALLET_INFO: 'wallet.info',
   WALLET_ACCOUNTS: 'wallet.accounts',
-  WALLET_TRANSACTIONS: 'wallet.transactions'
+  WALLET_TRANSACTIONS: 'wallet.transactions',
+  // Onboarding. Restoring from a recovery phrase is how a wallet comes into being
+  // here; the chrome collects the words and the shell owns every key operation.
+  WALLET_RESTORE: 'wallet.restore',
+
+  // Overlay arbitration. Native tab WebViews always paint above the chrome (a native
+  // view sits above a WebView's content regardless of z-index), so a chrome sheet or
+  // menu would be half-hidden behind the page. The chrome tells the shell when it is
+  // covering itself, and the shell takes the tab layer down for the duration.
+  CHROME_SET_OVERLAY: 'chrome.setOverlay'
 }
 
 /** Shell → chrome pushes. */
@@ -42,7 +51,14 @@ const EVENTS = {
   // could show a toast or push a screen directly; in Nexus the UI is a DOM document, so
   // those become events it reacts to. See apps/mobile/src/wallet/support/shell-ui.ts.
   UI_TOAST: 'ui.toast',
-  UI_NAVIGATE: 'ui.navigate'
+  UI_NAVIGATE: 'ui.navigate',
+
+  /**
+   * The wallet became ready, started building, or went away. Without this the chrome
+   * would have to poll: wallet.info is answered once per mount, and a wallet that
+   * finishes building thirty seconds into a cold start would never be noticed.
+   */
+  WALLET_STATE: 'wallet.state'
 }
 
 function isRequest(msg) {

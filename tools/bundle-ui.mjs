@@ -37,33 +37,49 @@ function* walk(dir) {
 // Rewrite only the reference forms Next actually emits. A blanket s|/_next/|./_next/|
 // would also corrupt source maps, JSON payloads and any string that merely contains the
 // sequence, so each pattern is anchored to the character that precedes it.
-const REWRITES = [
-  [/(["'`])\/_next\//g, '$1./_next/'],
-  [/(\(\s*)\/_next\//g, '$1./_next/'],
+/**
+ * Static assets under public/. These appear as bare strings in the JS bundles too —
+ * an app's `iconSrc`, a member's avatar — and a WebView resolves "/icons/x.svg"
+ * against the FILESYSTEM ROOT under file://, so every one of them 404s. Left
+ * unrewritten the app store and the icon rail render nothing but broken images.
+ *
+ * Safe to apply to JS because the leading quote anchors each match to a complete
+ * string literal, and a relative URL in an `img src` resolves against the document —
+ * which is the directory these files are actually in.
+ */
+const ASSET_REWRITES = [
   [/(["'`])\/(images|icons|avatars|tokens|media|members|ordinals|collectibles|ecosystems)\//g, '$1./$2/'],
   // Root-level files the metadata layer emits. Harmless in a WebView if broken, but a
   // 404 per launch is noise in the logs when something real goes wrong later.
   [/(["'`])\/(site\.webmanifest|favicon\.ico)/g, '$1./$2']
 ]
 
-// HTML ONLY, deliberately. Rewriting the JS breaks Next: its runtime derives the public
-// path from document.currentScript.src and asserts that src contains the configured
-// prefix. Rewriting the literal to "./_next/" made it demand that an absolute file:// URL
-// contain "./_next/", which threw InvariantError before the app rendered a single pixel.
-// Left alone, the assertion passes and Next resolves chunks against the script's own URL —
-// which is precisely the behaviour that makes file:// work.
-const REWRITABLE = new Set(['.html'])
+/**
+ * `/_next/` is HTML ONLY, deliberately. Rewriting it in the JS breaks Next: its
+ * runtime derives the public path from document.currentScript.src and asserts that
+ * src contains the configured prefix. Rewriting the literal to "./_next/" made it
+ * demand that an absolute file:// URL contain "./_next/", which threw InvariantError
+ * before the app rendered a single pixel. Left alone, the assertion passes and Next
+ * resolves chunks against the script's own URL — which is what makes file:// work.
+ */
+const CHUNK_REWRITES = [
+  [/(["'`])\/_next\//g, '$1./_next/'],
+  [/(\(\s*)\/_next\//g, '$1./_next/']
+]
+
+const REWRITES_FOR = { '.html': [...CHUNK_REWRITES, ...ASSET_REWRITES], '.js': ASSET_REWRITES }
 let filesChanged = 0
 let edits = 0
 
 for (const file of walk(OUT)) {
-  if (!REWRITABLE.has(extname(file))) continue
+  const rewrites = REWRITES_FOR[extname(file)]
+  if (!rewrites) continue
   const before = readFileSync(file, 'utf8')
   let after = before
-  for (const [pattern, replacement] of REWRITES) after = after.replace(pattern, replacement)
+  for (const [pattern, replacement] of rewrites) after = after.replace(pattern, replacement)
   if (after === before) continue
   filesChanged++
-  edits += after.split('./_next/').length - before.split('./_next/').length
+  edits += after.split('"./').length - before.split('"./').length
   if (!CHECK) writeFileSync(file, after)
 }
 

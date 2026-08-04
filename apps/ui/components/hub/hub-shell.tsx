@@ -12,6 +12,7 @@ import { MobileSheet } from "@/components/hub/mobile-sheet";
 import { ShareModal } from "@/components/hub/share-modal";
 import { SpacesPanel } from "@/components/hub/spaces-panel";
 import { CustomThemeProvider } from "@/components/hub/theme-provider";
+import { WalletGate } from "@/components/hub/wallet-gate";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState, type ReactNode } from "react";
 
@@ -109,6 +110,7 @@ function Shell(): ReactNode {
       <CommandPalette />
       <ShareModal />
       <AppPermissionSheet />
+      <WalletGate />
     </div>
   );
 }

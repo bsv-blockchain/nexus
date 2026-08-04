@@ -28,6 +28,7 @@ import {
   type MessagePerson,
 } from "@/lib/data";
 import { useCommandEffects } from "@/lib/use-command-effects";
+import { useActivity } from "@/lib/wallet-live";
 import {
   Coins,
   Image as ImageIcon,
@@ -105,10 +106,16 @@ export function WalletApp(): ReactNode {
       ...(personId ? { personId } : {}),
     });
 
-  const transactions = [
-    ...fromCommands.filter((tx) => tx.accountId === account.id),
-    ...getWalletTransactions(account.id),
-  ];
+  // Demo: locally-recorded payments in front of the fixture history. Live: the
+  // wallet's own ledger, and nothing invented alongside it.
+  const activity = useActivity(getWalletTransactions(account.id));
+  const transactions =
+    activity.mode === "demo"
+      ? [
+          ...fromCommands.filter((tx) => tx.accountId === account.id),
+          ...activity.transactions,
+        ]
+      : activity.transactions;
   const filtered = transactions.filter((tx) => {
     if (walletFilter === "all") return true;
     if (walletFilter === "pending") return tx.status === "pending";

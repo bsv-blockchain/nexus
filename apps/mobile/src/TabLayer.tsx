@@ -1,7 +1,9 @@
-import React, { useRef } from 'react'
+import React, { memo, useMemo, useRef } from 'react'
 import { StyleSheet, View } from 'react-native'
 import WebView from 'react-native-webview'
 import { buildSubstrateScript } from '@nexus/substrate'
+import { buildCWIProviderScript } from '@nexus/substrate/src/browser/cwiProvider'
+import { originatorForUrl, type CwiInvocation } from '@nexus/substrate/src/browser/cwiHost'
 import type { SubstrateCtx, TabState } from './useTabHost'
 
 export interface TabLayerProps {
@@ -10,6 +12,10 @@ export interface TabLayerProps {
   onTabMessage: (id: string, patch: Partial<Omit<TabState, 'id'>>) => void
   emit: (name: string, payload: unknown) => void
   substrateHost: { handle: (raw: string, ctx: SubstrateCtx) => void | Promise<void> }
+  /** BRC-100 dispatcher; returns true when the message was a `window.CWI` call. */
+  handleCwi: (msg: CwiInvocation, ctx: { origin: string; inject: (js: string) => void }) => Promise<boolean>
+  /** Chrome is covering itself — stand down so its sheet is not painted through. */
+  suppressed?: boolean
 }
 
 /**
@@ -19,13 +25,26 @@ export interface TabLayerProps {
  * already shipped in BSV Browser (instant tab switch, no reload, no blank
  * flash), reused here rather than re-litigated.
  */
-export default function TabLayer({ tabs, registerRef, onTabMessage, emit, substrateHost }: TabLayerProps) {
+function TabLayer({
+  tabs,
+  registerRef,
+  onTabMessage,
+  emit,
+  substrateHost,
+  handleCwi,
+  suppressed = false
+}: TabLayerProps) {
   // A *second* ref map, distinct from useTabHost's internal one (that one only
   // serves chrome-initiated commands via `registerRef`). This one lets a
   // tab's own onMessage handler hand its own WebView instance to the
   // substrate host's `send`, which has to inject the response into that exact
   // tab and has no other way to reach it.
   const refs = useRef<Record<string, WebView | null>>({})
+
+  // Both providers, built once: `window.nexus` (our own shell protocol) and
+  // `window.CWI` (BRC-100, what every existing BSV dApp and @bsv/sdk WalletClient
+  // actually looks for). A page gets both; they do not overlap.
+  const injectedProviders = useMemo(() => buildSubstrateScript() + '\n' + buildCWIProviderScript(), [])
 
   return (
     <>
@@ -44,10 +63,13 @@ export default function TabLayer({ tabs, registerRef, onTabMessage, emit, substr
               top: tab.rect.y,
               width: tab.rect.width,
               height: tab.rect.height,
-              opacity: tab.visible ? 1 : 0
+              // Opacity, not unmounting: the tab keeps running and comes back
+              // instantly when the overlay closes. Same warm-pool rule as a
+              // background tab, just driven by the chrome instead of the user.
+              opacity: tab.visible && !suppressed ? 1 : 0
             }
           ]}
-          pointerEvents={tab.visible ? 'auto' : 'none'}
+          pointerEvents={tab.visible && !suppressed ? 'auto' : 'none'}
         >
         <WebView
           ref={(instance) => {
@@ -69,9 +91,30 @@ export default function TabLayer({ tabs, registerRef, onTabMessage, emit, substr
               )
             }
           }}
-          injectedJavaScriptBeforeContentLoaded={buildSubstrateScript()}
+          injectedJavaScriptBeforeContentLoaded={injectedProviders}
           onMessage={(event) => {
-            substrateHost.handle(event.nativeEvent.data, { id: tab.id, ref: refs.current[tab.id], emit })
+            const raw = event.nativeEvent.data
+            // Background tabs stay mounted and their pages keep running. Only the
+            // visible tab may drive the wallet — otherwise a backgrounded page could
+            // raise a spending prompt the user has no context for. Its call simply
+            // waits until the user comes back to it. (BSV Browser's rule, kept.)
+            if (tab.visible) {
+              let msg: CwiInvocation | null = null
+              try {
+                msg = JSON.parse(raw)
+              } catch {
+                msg = null // not JSON; a page may postMessage anything
+              }
+              if (msg && msg.type === 'CWI') {
+                const ref = refs.current[tab.id]
+                void handleCwi(msg, {
+                  origin: originatorForUrl(tab.url),
+                  inject: (js) => ref?.injectJavaScript(js)
+                })
+                return
+              }
+            }
+            substrateHost.handle(raw, { id: tab.id, ref: refs.current[tab.id], emit })
           }}
           onNavigationStateChange={(navState) => {
             onTabMessage(tab.id, {
@@ -115,6 +158,13 @@ export default function TabLayer({ tabs, registerRef, onTabMessage, emit, substr
     </>
   )
 }
+
+/**
+ * Memoized: the shell now re-renders whenever the wallet's lifecycle ticks, and
+ * without this every one of those would reconcile the whole tab layer — the same
+ * render-storm shape BSV Browser had to chase out of its browser tree.
+ */
+export default memo(TabLayer)
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },

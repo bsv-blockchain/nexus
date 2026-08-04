@@ -13,6 +13,7 @@ import LocalStorageProvider from './src/wallet/LocalStorageProvider'
 import { UserContextProvider } from './src/wallet/UserContext'
 import { ExchangeRateContextProvider } from './src/wallet/ExchangeRateContext'
 import { WalletContextProvider } from './src/wallet/WalletContext'
+import { useWalletBridge } from './src/wallet/useWalletBridge'
 import { setShellUiSink } from './src/wallet/support/shell-ui'
 
 /**
@@ -75,15 +76,20 @@ function Shell() {
     }
   })
 
+  // The wallet's own surface, on the same router as the tab methods: one
+  // window.nexusHost, one transport, whether the chrome is asking about tabs or
+  // about money.
+  const walletBridge = useWalletBridge()
+
   const router = useMemo(
     () =>
       createHostRouter({
-        methods: tabHost.methods,
+        methods: { ...tabHost.methods, ...walletBridge.methods },
         send: (envelope) => {
           chromeRef.current?.injectJavaScript('window.__nexusHostDeliver(' + JSON.stringify(envelope) + ');true;')
         }
       }),
-    [tabHost.methods]
+    [tabHost.methods, walletBridge.methods]
   )
 
   // Same handler set as @nexus/desktop's tabManager.mjs — `handlers` comes
@@ -99,6 +105,13 @@ function Shell() {
       }),
     [tabHost.handlers]
   )
+
+  // Push wallet lifecycle rather than making the chrome poll for it. The chrome's
+  // onboarding gate is the visible consequence: it asks once at mount, and a wallet
+  // that finishes building later has no other way to tell it to get out of the way.
+  useEffect(() => {
+    router.emit('wallet.state', walletBridge.state)
+  }, [router, walletBridge.state])
 
   useEffect(() => {
     setShellUiSink({
@@ -150,6 +163,8 @@ function Shell() {
           onTabMessage={tabHost.onTabMessage}
           emit={router.emit}
           substrateHost={substrateHost}
+          handleCwi={walletBridge.handleCwi}
+          suppressed={tabHost.overlayOpen}
         />
       </View>
     </View>

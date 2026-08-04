@@ -78,9 +78,28 @@ export function txToken(tx: WalletTransaction): Token | undefined {
   return getToken(tx.tokenId ?? "bsv");
 }
 
+/**
+ * The device's live USD-per-BSV, when there is one.
+ *
+ * The fixtures carry their own BSV price, and in live mode it is simply wrong — the
+ * portfolio total was reading the device's rate while every transaction row read the
+ * fixture's, so the same balance appeared at two different dollar values on two
+ * screens. One rate, set once by the live data layer, keeps them agreeing.
+ */
+let liveUsdPerBsv: number | null = null;
+
+export function setLiveBsvRate(usdPerBsv: number | null): void {
+  liveUsdPerBsv = usdPerBsv && usdPerBsv > 0 ? usdPerBsv : null;
+}
+
+export function usdPerUnitOf(token: Token): number {
+  if (token.id === "bsv" && liveUsdPerBsv !== null) return liveUsdPerBsv;
+  return token.usdPerUnit;
+}
+
 export function txUsd(tx: WalletTransaction): number {
   const token = txToken(tx);
-  return token ? txUnits(tx) * token.usdPerUnit : 0;
+  return token ? txUnits(tx) * usdPerUnitOf(token) : 0;
 }
 
 const DAY_MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];

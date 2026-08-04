@@ -29,13 +29,18 @@ const CREATE_HOST_CLIENT_SOURCE = `function createHostClient(options) {
   var listeners = Object.create(null)
   var seq = 0
 
-  function call(method, params) {
+  function call(method, params, overrideTimeoutMs) {
     return new Promise(function (resolve, reject) {
       var id = 'h' + ++seq + '-' + Math.random().toString(36).slice(2)
+      // Most calls are cheap reads and a short timeout is a useful liveness check.
+      // A few are not: anything that derives keys or waits on a biometric prompt is
+      // bounded by the user, not by us, and holding it to the default reports a
+      // failure for an operation that is still running and will succeed.
+      var ms = overrideTimeoutMs || timeoutMs
       var timer = setTimeout(function () {
         delete pending[id]
-        reject(new Error('nexusHost: ' + method + ' timed out after ' + timeoutMs + 'ms'))
-      }, timeoutMs)
+        reject(new Error('nexusHost: ' + method + ' timed out after ' + ms + 'ms'))
+      }, ms)
       pending[id] = { resolve: resolve, reject: reject, timer: timer }
       post({ channel: channel, kind: 'request', id: id, method: method, params: params === undefined ? null : params })
     })
@@ -117,8 +122,17 @@ const CREATE_HOST_CLIENT_SOURCE = `function createHostClient(options) {
       // all" — showing an empty balance for any of those would be a lie.
       info: function () { return call('wallet.info', null) },
       accounts: function () { return call('wallet.accounts', null) },
-      transactions: function (opts) { return call('wallet.transactions', opts || {}) }
+      transactions: function (opts) { return call('wallet.transactions', opts || {}) },
+      // The phrase crosses this boundary once and is never stored by the chrome —
+      // the shell hands it straight to key derivation and the device keychain.
+      // Five minutes: BIP-39 → BIP-32 derivation is seconds of pure JS, and the
+      // device then puts up a Face ID / passcode sheet that waits on a human.
+      restore: function (mnemonic) { return call('wallet.restore', { mnemonic: mnemonic }, 300000) }
     },
+    // True while the chrome is showing something over itself (sheet, menu, palette).
+    // The shell hides its native tab layer for the duration; without this the page
+    // paints straight through whatever the chrome just opened.
+    setOverlay: function (open) { return call('chrome.setOverlay', { open: !!open }) },
     __deliver: deliver
   }
 }`
