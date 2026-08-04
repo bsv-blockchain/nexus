@@ -158,6 +158,12 @@ const CREATE_HOST_CLIENT_SOURCE = `function createHostClient(options) {
       offline: {
         status: function () { return call('pay.offline.status', null) },
         sendNow: function () { return call('pay.offline.sendNow', null) }
+      },
+      nearby: {
+        // Ten minutes. Every other timeout here bounds a network round trip; this
+        // one bounds two people standing together holding phones, and a rejection
+        // mid-exchange would abandon a payment that is still in flight.
+        open: function (role) { return call('pay.nearby.open', { role: role }, 600000) }
       }
     },
     tx: {
@@ -168,6 +174,21 @@ const CREATE_HOST_CLIENT_SOURCE = `function createHostClient(options) {
       // Pages the entire history; on a busy wallet this is the slowest call here.
       exportCsv: function () { return call('tx.exportCsv', null, 300000) },
       explorerUrl: function (txid) { return call('tx.explorerUrl', { txid: txid }) }
+    },
+    // Native surfaces. Each of these puts a real native screen in front of the
+    // chrome and resolves when the user finishes with it, so the timeout is long:
+    // it is bounded by a person, not by the network.
+    scan: {
+      // Returns { text, target } — target is the classified rail when the scan was
+      // one, so a caller wanting an address does not have to re-parse the string.
+      // Resolves { cancelled: true } if the user backs out.
+      qr: function (opts) { return call('scan.qr', opts || {}, 600000) }
+    },
+    share: {
+      text: function (text, title) { return call('share.text', { text: text, title: title }, 300000) },
+      file: function (filename, contents, mimeType) {
+        return call('share.file', { filename: filename, contents: contents, mimeType: mimeType }, 300000)
+      }
     },
     // True while the chrome is showing something over itself (sheet, menu, palette).
     // The shell hides its native tab layer for the duration; without this the page

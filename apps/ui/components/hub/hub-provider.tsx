@@ -971,6 +971,10 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       setActiveTabId(tab.id);
       setHistoryByTab((h) => ({ ...h, [tab.id]: { stack: [tab.url], index: 0 } }));
       setRequestedApp("browser");
+      // Same as openTab: without this the address bar still names whichever app
+      // was open when the tab was created, so reloading the chrome lands back
+      // in that app rather than in the browser the new tab belongs to.
+      writeAppToUrl("browser");
       setActivePage(null);
       setMainView("app");
       setMobileSheetOpen(false);
@@ -980,56 +984,77 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   );
 
   // Open a link in a specific profile's Browse and focus it (Profiles manager).
-  const openLinkInBrowser = useCallback((spaceId: string, url: string) => {
-    setActiveSpaceId(spaceId);
-    setTabsBySpace((current) => {
-      const tabs = current[spaceId] ?? [];
+  const openLinkInBrowser = useCallback(
+    (spaceId: string, url: string) => {
+      /*
+       * Reuse-or-build is decided out here, then written.
+       *
+       * Deciding it inside the setTabsBySpace updater meant the focus and
+       * history writes happened inside it too. Updaters have to be pure — React
+       * may run them twice — so those writes could be discarded and the link
+       * would land in a tab nothing ever focused, or a rerun would mint a
+       * second tab id for the same URL.
+       */
+      const tabs = tabsBySpace[spaceId] ?? [];
       const existing = tabs.find((tab) => tab.url === url);
       if (existing) {
         setActiveTabId(existing.id);
-        return current;
+      } else {
+        const tab = buildTab(url, spaceId, tabs.length);
+        setTabsBySpace((current) => ({
+          ...current,
+          [spaceId]: [...(current[spaceId] ?? []), tab],
+        }));
+        setHistoryByTab((h) => ({
+          ...h,
+          [tab.id]: { stack: [tab.url], index: 0 },
+        }));
+        setActiveTabId(tab.id);
       }
-      const tab = buildTab(url, spaceId, tabs.length);
-      setActiveTabId(tab.id);
-      setHistoryByTab((h) => ({
-        ...h,
-        [tab.id]: { stack: [tab.url], index: 0 },
-      }));
-      return { ...current, [spaceId]: [...tabs, tab] };
-    });
-    setRequestedApp("browser");
-    setActivePage(null);
-    setMainView("app");
-  }, []);
+      setActiveSpaceId(spaceId);
+      setRequestedApp("browser");
+      setActivePage(null);
+      setMainView("app");
+    },
+    [tabsBySpace],
+  );
 
-  const closeTab = useCallback((tabId: string) => {
-    setTabsBySpace((current) => {
-      const next: Record<string, BrowserTab[]> = {};
-      for (const [spaceId, tabs] of Object.entries(current)) {
-        next[spaceId] = tabs.filter((tab) => tab.id !== tabId);
-      }
-      setActiveTabId((activeId) => {
-        if (activeId !== tabId) return activeId;
+  const closeTab = useCallback(
+    (tabId: string) => {
+      // The replacement is chosen from the list as it stands, before either
+      // write. Choosing it inside the setTabsBySpace updater made that updater
+      // impure, so a rerun could drop the focus change and leave the chrome
+      // pointing at a tab that had just been removed.
+      if (activeTabId === tabId) {
         // Closing the active tab activates its space's first remaining tab.
+        const owner = Object.values(tabsBySpace).find((tabs) =>
+          tabs.some((tab) => tab.id === tabId),
+        );
+        setActiveTabId(owner?.find((tab) => tab.id !== tabId)?.id ?? null);
+      }
+      setTabsBySpace((current) => {
+        const next: Record<string, BrowserTab[]> = {};
         for (const [spaceId, tabs] of Object.entries(current)) {
-          if (tabs.some((tab) => tab.id === tabId)) {
-            return next[spaceId]?.[0]?.id ?? null;
-          }
+          next[spaceId] = tabs.filter((tab) => tab.id !== tabId);
         }
-        return null;
+        return next;
       });
-      return next;
-    });
-  }, []);
+    },
+    [tabsBySpace, activeTabId],
+  );
 
-  const clearTabs = useCallback((spaceId: string) => {
-    setTabsBySpace((current) => {
-      setActiveTabId((activeId) =>
-        current[spaceId]?.some((tab) => tab.id === activeId) ? null : activeId,
+  const clearTabs = useCallback(
+    (spaceId: string) => {
+      // Same shape as closeTab: work out whether the focused tab is among the
+      // ones about to go, so neither write sits inside the other's updater.
+      const clearingActive = (tabsBySpace[spaceId] ?? []).some(
+        (tab) => tab.id === activeTabId,
       );
-      return { ...current, [spaceId]: [] };
-    });
-  }, []);
+      if (clearingActive) setActiveTabId(null);
+      setTabsBySpace((current) => ({ ...current, [spaceId]: [] }));
+    },
+    [tabsBySpace, activeTabId],
+  );
 
   // Replaces the active tab's content and pushes onto its history stack.
   const navigateActiveTab = useCallback(
@@ -1066,28 +1091,33 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   const stepHistory = useCallback(
     (delta: number) => {
       if (!activeTabId) return;
+      // Resolve the destination from the history in hand. The tab rewrite below
+      // used to live inside the setHistoryByTab updater, where React was free
+      // to run it twice or throw it away — a Back press that moved the index
+      // but not the page.
+      const entry = historyByTab[activeTabId];
+      if (!entry) return;
+      const target = entry.index + delta;
+      if (target < 0 || target >= entry.stack.length) return;
+      const url = entry.stack[target]!;
+      setTabsBySpace((current) => {
+        const next: Record<string, BrowserTab[]> = {};
+        for (const [spaceId, tabs] of Object.entries(current)) {
+          next[spaceId] = tabs.map((tab) => {
+            if (tab.id !== activeTabId) return tab;
+            const fresh = buildTab(url, spaceId, tab.sortOrder);
+            return { ...fresh, id: tab.id, createdAt: tab.createdAt };
+          });
+        }
+        return next;
+      });
       setHistoryByTab((h) => {
-        const entry = h[activeTabId];
-        if (!entry) return h;
-        const target = entry.index + delta;
-        if (target < 0 || target >= entry.stack.length) return h;
-        const url = entry.stack[target]!;
-        setTabsBySpace((current) => {
-          const next: Record<string, BrowserTab[]> = {};
-          for (const [spaceId, tabs] of Object.entries(current)) {
-            next[spaceId] = tabs.map((tab) => {
-              if (tab.id !== activeTabId) return tab;
-              const fresh = buildTab(url, spaceId, tab.sortOrder);
-              return { ...fresh, id: tab.id, createdAt: tab.createdAt };
-            });
-          }
-          return next;
-        });
-        return { ...h, [activeTabId]: { ...entry, index: target } };
+        const live = h[activeTabId];
+        return live ? { ...h, [activeTabId]: { ...live, index: target } } : h;
       });
       setRequestedApp("browser");
     },
-    [activeTabId],
+    [activeTabId, historyByTab],
   );
 
   const goBack = useCallback(() => stepHistory(-1), [stepHistory]);
@@ -1271,24 +1301,30 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     );
   }, []);
 
-  const deleteSpace = useCallback((id: string) => {
-    setSpaces((current) => {
-      if (current.length <= 1) return current; // never delete the last space
-      const remaining = current.filter((space) => space.id !== id);
-      setActiveSpaceId((activeId) =>
-        activeId === id ? (remaining[0]?.id ?? activeId) : activeId,
-      );
-      return remaining;
-    });
-    setSpaceItemsBySpace((current) => {
-      const { [id]: _removed, ...rest } = current;
-      return rest;
-    });
-    setTabsBySpace((current) => {
-      const { [id]: _removed, ...rest } = current;
-      return rest;
-    });
-  }, []);
+  const deleteSpace = useCallback(
+    (id: string) => {
+      if (spaces.length <= 1) return; // never delete the last space
+      const remaining = spaces.filter((space) => space.id !== id);
+      if (remaining.length === spaces.length) return; // unknown id: nothing to drop
+      // Both writes happen out here. Picking the fallback profile from inside
+      // the setSpaces updater made it impure, and a discarded rerun left the
+      // hub pointing at a profile that no longer existed — every panel keyed by
+      // activeSpaceId then reads an empty bucket.
+      if (activeSpaceId === id) {
+        setActiveSpaceId(remaining[0]?.id ?? activeSpaceId);
+      }
+      setSpaces(remaining);
+      setSpaceItemsBySpace((current) => {
+        const { [id]: _removed, ...rest } = current;
+        return rest;
+      });
+      setTabsBySpace((current) => {
+        const { [id]: _removed, ...rest } = current;
+        return rest;
+      });
+    },
+    [spaces, activeSpaceId],
+  );
 
   const addSpaceFolder = useCallback((spaceId: string) => {
     setSpaceItemsBySpace((current) => {

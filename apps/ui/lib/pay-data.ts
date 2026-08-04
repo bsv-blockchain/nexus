@@ -119,6 +119,19 @@ interface PayHost {
       status: () => Promise<OfflineStatus>;
       sendNow: () => Promise<{ ok: boolean }>;
     };
+    /**
+     * The local-payments rail, as a native screen. It does not return a value to
+     * render — it returns what happened, because the whole exchange took place
+     * outside this document. `queued` is deliberately distinct from `received`:
+     * the frame is durably stored and cannot be lost, but the money is not in
+     * the wallet yet.
+     */
+    nearby: {
+      open: (role: "payer" | "payee") => Promise<{
+        outcome: "paid" | "received" | "queued" | "cancelled";
+        satoshis?: number;
+      }>;
+    };
   };
   tx?: {
     list: (opts?: { offset?: number; limit?: number }) => Promise<TxPage>;
@@ -127,6 +140,24 @@ interface PayHost {
     rawHex: (txid: string) => Promise<{ hex: string }>;
     exportCsv: () => Promise<{ count: number; filename: string; csv: string }>;
     explorerUrl: (txid: string) => Promise<{ url: string }>;
+  };
+  /**
+   * The OS share sheet. Only shells that have one answer these — the surface is
+   * declared by the bridge client everywhere, so absence shows up as a rejected
+   * call, not a missing property. Callers need a fallback, not a capability check.
+   */
+  share?: {
+    text: (text: string, title?: string) => Promise<{ shared: boolean }>;
+    file: (filename: string, contents: string, mimeType?: string) => Promise<{ shared: boolean }>;
+  };
+  /**
+   * The camera. Only shells with one answer; `target` carries classifyScan's
+   * verdict so a caller wanting an address does not re-parse the string.
+   */
+  scan?: {
+    qr: (opts?: { accept?: RailId[]; hint?: string; multi?: boolean }) => Promise<
+      { text: string; target: PayTarget | null } | { cancelled: true }
+    >;
   };
   tabs?: { create: (url: string, opts?: unknown) => Promise<{ id: string }>; setActive: (id: string) => Promise<unknown> };
   on?: (event: string, cb: (payload: unknown) => void) => () => void;
@@ -148,6 +179,27 @@ export function txHost(): NonNullable<PayHost["tx"]> {
   const t = host()?.tx;
   if (!t) throw new Error("transactions are not available in this shell");
   return t;
+}
+
+/**
+ * The share sheet, or a refusal.
+ *
+ * Deliberately the same throw-on-absence shape as the two above even though a
+ * shell without a share sheet is expected rather than broken: whether the sheet
+ * is missing, refused or unavailable on the device, the caller finds out by the
+ * call failing, so there is only one path to handle instead of two.
+ */
+export function shareHost(): NonNullable<PayHost["share"]> {
+  const s = host()?.share;
+  if (!s) throw new Error("sharing is not available in this shell");
+  return s;
+}
+
+/** The camera, or a refusal. Same shape as the others: absence surfaces as a failed call. */
+export function scanHost(): NonNullable<PayHost["scan"]> {
+  const s = host()?.scan;
+  if (!s) throw new Error("this device has no camera surface");
+  return s;
 }
 
 /** Whether there is a shell to pay through at all. Demo mode has no rails. */

@@ -23,19 +23,20 @@
 
 import { Sheet } from "@/components/apps/messages/sheet";
 import {
-  openInTab,
   payHost,
+  scanHost,
+  shareHost,
   useAsync,
   useOnline,
   usePoll,
   type InboxRow,
+  type RailId,
   type OfflineStatus,
   type OutboxEntry,
   type ProcessedTx,
 } from "@/lib/pay-data";
 import { SATS_PER_BSV } from "@/lib/wallet";
 import {
-  ArrowDownLeft,
   ArrowUpRight,
   Check,
   ChevronDown,
@@ -50,7 +51,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import QRCode from "qrcode";
 
 export type Direction = "pay" | "get";
@@ -63,32 +64,44 @@ interface CellSpec {
   icon: typeof ScanLine;
 }
 
-/** The grid. Same six cells, same order, same copy intent as the source screen. */
+/**
+ * The grid, in BSV Browser's own words.
+ *
+ * These strings are its `pay_cell_*` values verbatim (context/i18n/translations.tsx).
+ * They are not placeholders to improve on: "Someone remote" names the counterparty
+ * rather than the transport, which is the whole point of a screen where the user
+ * never picks a rail. An earlier draft here invented "A Nexus contact" and "Another
+ * wallet", which named our product and our plumbing instead of their situation.
+ */
 const CELLS: Record<Direction, CellSpec[]> = {
   pay: [
-    { cell: "pay-nearby", title: "Someone nearby", subtitle: "Scan their code — works with no signal", icon: ScanLine },
-    { cell: "pay-handle", title: "A Nexus contact", subtitle: "Delivered to their message box", icon: User },
-    { cell: "pay-address", title: "Another wallet", subtitle: "A plain BSV address", icon: Wallet },
+    { cell: "pay-nearby", title: "Someone nearby", subtitle: "Scan their code", icon: ScanLine },
+    { cell: "pay-handle", title: "Someone remote", subtitle: "Pick a handle — they need this app", icon: User },
+    { cell: "pay-address", title: "To an address", subtitle: "Paste or scan an address", icon: Wallet },
   ],
   get: [
-    { cell: "get-nearby", title: "Someone nearby", subtitle: "Show a code — works with no signal", icon: QrCode },
-    { cell: "get-handle", title: "A Nexus contact", subtitle: "Share your handle", icon: User },
-    { cell: "get-address", title: "Another wallet", subtitle: "Show a BSV address", icon: Wallet },
+    { cell: "get-nearby", title: "Someone nearby", subtitle: "Show your payment code", icon: QrCode },
+    { cell: "get-handle", title: "Someone remote", subtitle: "Share your handle", icon: User },
+    { cell: "get-address", title: "To an address", subtitle: "Show an address", icon: Wallet },
   ],
 };
 
 const CELL_TITLES: Record<Cell, string> = {
-  "pay-nearby": "Pay someone nearby",
-  "pay-handle": "Pay a contact",
-  "pay-address": "Pay a wallet",
-  "get-nearby": "Get paid nearby",
-  "get-handle": "Get paid by a contact",
-  "get-address": "Get paid to an address",
+  "pay-nearby": "Someone nearby",
+  "pay-handle": "Someone remote",
+  "pay-address": "To an address",
+  "get-nearby": "Someone nearby",
+  "get-handle": "Someone remote",
+  "get-address": "To an address",
 };
 
-/** The one line that must never be implicit. */
-const ADDRESS_CONSEQUENCE =
-  "This sends coins straight to the address. There is nobody to notify and nothing to undo — check it before you pay.";
+/**
+ * The one line that must never be implicit — `pay_conseq_address`.
+ *
+ * Four words, and better than the paragraph that was here: it says the thing that
+ * is actually different about this rail, which is that nobody gets told.
+ */
+const ADDRESS_CONSEQUENCE = "Sent — they are not notified.";
 
 const HISTORY_POLL_MS = 5000;
 
@@ -336,7 +349,7 @@ function AddressReceive(): ReactNode {
       setBaseline(tally(rows));
       // An arrival gets the full moment. Nothing found is not an event.
       if (importedSatoshis > 0) setReceived({ amount: importedSatoshis, count: 1 });
-      else toast.info("Nothing waiting on that address");
+      else toast.info("No pending payments");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : String(e));
     } finally {
@@ -348,19 +361,19 @@ function AddressReceive(): ReactNode {
 
   if (state.loading && !address) {
     return (
-      <p className="py-10 text-center text-sm text-muted-foreground">Generating an address…</p>
+      <p className="py-10 text-center text-sm text-muted-foreground">Generating address...</p>
     );
   }
   if (!address) {
-    return <p className="py-10 text-center text-sm text-negative">{state.error ?? "Could not generate an address"}</p>;
+    return <p className="py-10 text-center text-sm text-negative">{state.error ?? "Unable to generate address"}</p>;
   }
 
   return (
     <div className="space-y-4">
       <Qr value={address} />
-      <CopyChip text={address} label="Copy address" />
+      <CopyChip text={address} label="Copy" />
       <p className="text-center text-xs text-muted-foreground">
-        Watching this address. Anything sent to it is credited automatically.
+        Money sent here is added to your wallet automatically.
       </p>
 
       {processed.length > 0 ? (
@@ -392,7 +405,7 @@ function AddressReceive(): ReactNode {
         className="focus-ring flex items-center gap-1 text-xs text-muted-foreground"
       >
         {showRecovery ? <ChevronDown className="size-3.5" aria-hidden="true" /> : <ChevronRight className="size-3.5" aria-hidden="true" />}
-        Look at an earlier day
+        Reach an earlier day
       </button>
 
       {showRecovery ? (
@@ -424,7 +437,7 @@ function AddressReceive(): ReactNode {
             disabled={sweeping}
             className="focus-ring w-full rounded-lg border border-border py-2 text-xs font-semibold text-accent disabled:opacity-50"
           >
-            {sweeping ? "Sweeping…" : "Sweep this address now"}
+            {sweeping ? "Sweeping…" : "Check this address now"}
           </button>
         </div>
       ) : null}
@@ -489,6 +502,11 @@ function AddressSend(): ReactNode {
     <div className="space-y-4">
       <div>
         <FieldLabel>Recipient address</FieldLabel>
+        <div
+          className={`focus-ring flex items-center gap-1 rounded-xl border bg-surface px-3 py-2.5 ${
+            error ? "border-negative" : "border-border"
+          }`}
+        >
         <input
           value={address}
           onChange={(e) => void onAddress(e.target.value.trim())}
@@ -497,10 +515,10 @@ function AddressSend(): ReactNode {
           autoCorrect="off"
           spellCheck={false}
           aria-label="Recipient BSV address"
-          className={`focus-ring w-full rounded-xl border bg-surface px-3 py-2.5 font-mono text-sm outline-none ${
-            error ? "border-negative" : "border-border"
-          }`}
+          className="w-full bg-transparent font-mono text-sm outline-none"
         />
+        <ScanButton accept={["address"]} hint="Point the camera at a BSV address QR code" onText={(t) => void onAddress(t)} />
+        </div>
         {error ? <p className="mt-1 text-xs text-negative">{error}</p> : null}
       </div>
 
@@ -553,8 +571,24 @@ function HandleReceive(): ReactNode {
   return (
     <div className="space-y-4">
       {link ? <Qr value={link} /> : null}
-      <CopyChip text={key} label="Copy your handle" />
-      {link ? <CopyChip text={link} label="Copy payment link" /> : null}
+      <CopyChip text={key} label="Copy" />
+      {link ? (
+        <button
+          type="button"
+          onClick={() =>
+            void shareHost()
+              .text(link, "My payment link")
+              .catch(() =>
+                // No native sheet on this shell. The link is the point, so it
+                // still has to land somewhere the user can paste it from.
+                navigator.clipboard.writeText(link).then(() => toast.success("Copied")),
+              )
+          }
+          className="focus-ring w-full rounded-xl bg-surface p-3 text-xs font-semibold transition-colors hover:bg-surface-hover"
+        >
+          Share link
+        </button>
+      ) : null}
       <p className="text-center text-xs text-muted-foreground">
         Payments sent to your handle are credited automatically.
       </p>
@@ -571,7 +605,7 @@ function HandleReceive(): ReactNode {
       {stuck.length > 0 ? (
         <div className="space-y-2">
           <p className="text-xs font-semibold text-negative">
-            {stuck.length} payment{stuck.length === 1 ? "" : "s"} could not be credited
+            {stuck.length === 1 ? "Couldn\u2019t be added" : `${stuck.length} couldn\u2019t be added`}
           </p>
           {stuck.map((row) => (
             <div key={row.messageId} className="rounded-xl border border-negative/40 bg-negative/10 p-3 text-xs">
@@ -643,6 +677,7 @@ function HandleSend(): ReactNode {
     <div className="space-y-4">
       <div>
         <FieldLabel>Their handle</FieldLabel>
+        <div className="focus-ring flex items-center gap-1 rounded-xl border border-border bg-surface px-3 py-2.5">
         <input
           value={recipient}
           onChange={(e) => setRecipient(e.target.value.trim())}
@@ -651,8 +686,14 @@ function HandleSend(): ReactNode {
           autoCorrect="off"
           spellCheck={false}
           aria-label="Recipient identity key"
-          className="focus-ring w-full rounded-xl border border-border bg-surface px-3 py-2.5 font-mono text-sm outline-none"
+          className="w-full bg-transparent font-mono text-sm outline-none"
         />
+        <ScanButton
+          accept={["handle"]}
+          hint="Point the camera at their handle or payment link"
+          onText={(t) => setRecipient(t.trim())}
+        />
+        </div>
       </div>
 
       <AmountField value={amount} onChange={setAmount} />
@@ -705,20 +746,78 @@ function HandleSend(): ReactNode {
 // ── Nearby ──────────────────────────────────────────────────────────────────
 
 /**
- * The nearby rail needs a camera and the device's own BLE/AWDL transports, none
- * of which this document can reach. Rather than ship a cell that looks live and
- * silently cannot pay, it says so — the machinery is present in the shell
- * (@nexus/wallet-core/utils/localpay) and still needs a native surface to drive it.
+ * The nearby rail runs entirely in a native screen.
+ *
+ * It needs a camera and the device's own local radios, neither of which a
+ * document in a WebView can reach, so this cell does not render the flow — it
+ * asks the shell to present it and waits for what happened. The exchange itself,
+ * including its own scanning, is BSV Browser's flow ported into
+ * apps/mobile/src/native/NearbyFlow.tsx.
  */
-function NearbyUnavailable(): ReactNode {
+function NearbyCell({ role, onDone }: { role: "payer" | "payee"; onDone: () => void }): ReactNode {
+  const [error, setError] = useState<string | null>(null);
+  const started = useRef(false);
+
+  useEffect(() => {
+    // Once per mount. The shell refuses a second native screen while one is up,
+    // and React would otherwise re-present on every render.
+    if (started.current) return;
+    started.current = true;
+    void payHost()
+      .nearby.open(role)
+      .then((result) => {
+        if (result.outcome === "paid") toast.success(`Paid ${sats(result.satoshis ?? 0)}`);
+        else if (result.outcome === "received") toast.success(`Received ${sats(result.satoshis ?? 0)}`);
+        // Queued is not an arrival. The frame is safe and cannot be lost, but the
+        // money is not spendable yet, so it gets the neutral note the native
+        // screen already showed rather than a second, greener claim.
+        else if (result.outcome === "queued") toast.info("Saved — it will be added to your wallet automatically.");
+        onDone();
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+  }, [role, onDone]);
+
   return (
     <div className="py-10 text-center">
-      <p className="text-sm font-semibold">Not wired up yet</p>
-      <p className="mx-auto mt-2 max-w-xs text-xs text-muted-foreground">
-        Paying someone nearby needs the camera and this device&rsquo;s local radios. The transport is built, but it
-        has to be driven from a native screen rather than from here.
-      </p>
+      {error ? (
+        <>
+          <p className="text-sm font-semibold text-negative">{error}</p>
+          <button type="button" onClick={onDone} className="focus-ring mt-3 text-xs font-semibold text-accent">
+            Back
+          </button>
+        </>
+      ) : (
+        <p className="text-sm text-muted-foreground">Opening the camera…</p>
+      )}
     </div>
+  );
+}
+
+/**
+ * Scan a code into a field.
+ *
+ * `accept` is what the caller can actually use; anything else the camera sees is
+ * ignored and scanning continues, which is what lets an animated multi-frame code
+ * be read without every intermediate frame counting as a failure.
+ */
+function ScanButton({ accept, hint, onText }: { accept: RailId[]; hint: string; onText: (text: string) => void }): ReactNode {
+  return (
+    <button
+      type="button"
+      aria-label="Scan a QR code"
+      onClick={() =>
+        void scanHost()
+          .qr({ accept, hint })
+          .then((result) => {
+            if ("cancelled" in result) return;
+            onText(result.text);
+          })
+          .catch((e: unknown) => toast.error(e instanceof Error ? e.message : String(e)))
+      }
+      className="focus-ring shrink-0 rounded-lg p-2 text-accent"
+    >
+      <ScanLine className="size-4" aria-hidden="true" />
+    </button>
   );
 }
 
@@ -761,8 +860,9 @@ export function PaySheet({
   const body = (): ReactNode => {
     switch (cell) {
       case "pay-nearby":
+        return <NearbyCell role="payer" onDone={() => setCell(null)} />;
       case "get-nearby":
-        return <NearbyUnavailable />;
+        return <NearbyCell role="payee" onDone={() => setCell(null)} />;
       case "pay-handle":
         return <HandleSend />;
       case "get-handle":
@@ -817,7 +917,7 @@ export function PaySheet({
                       <span className="min-w-0">
                         <span className="block text-sm font-semibold">{title}</span>
                         <span className="block truncate text-xs text-muted-foreground">
-                          {disabled ? "Needs a connection" : subtitle}
+                          {disabled ? "Needs internet" : subtitle}
                         </span>
                       </span>
                       <ChevronRight className="ml-auto size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -853,4 +953,3 @@ export function PaySheet({
 /** Re-exported so the wallet screen can open the sheet straight into a direction. */
 export const PAY_DIRECTIONS: Record<"send" | "receive", Direction> = { send: "pay", receive: "get" };
 
-export { ArrowDownLeft, openInTab };

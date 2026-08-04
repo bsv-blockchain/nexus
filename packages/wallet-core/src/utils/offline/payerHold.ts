@@ -54,7 +54,7 @@
  */
 import { insertOfflineAction } from '@nexus/wallet-storage/src/methods/offlineActions'
 import { TaskSendOffline } from '../monitor/TaskSendOffline'
-import type { StorageExpoSQLite } from '@/storage/StorageExpoSQLite'
+import type { StorageExpoSQLite } from '@nexus/wallet-storage'
 
 export async function holdSentPaymentOffline(args: {
   storage: StorageExpoSQLite

@@ -14,7 +14,13 @@
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
         },
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Nexus uses the camera to scan payment codes and addresses.",
+        "NSFaceIDUsageDescription": "Nexus uses Face ID to protect your wallet's recovery phrase.",
+        "NSBonjourServices": [
+          "_bsvpay._tcp"
+        ],
+        "NSLocalNetworkUsageDescription": "Nexus uses the local network to send and receive payments directly between nearby devices."
       }
     },
     "android": {

@@ -1,4 +1,4 @@
-import { useCallback, useContext, useMemo, useRef } from 'react'
+import { createElement, useCallback, useContext, useMemo, useRef } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { PeerPayClient, type IncomingPayment } from '@bsv/message-box-client'
 
@@ -43,6 +43,8 @@ import {
 import { TaskSendOffline } from '@nexus/wallet-core/src/utils/monitor/TaskSendOffline'
 import { findOfflineActions } from '@nexus/wallet-storage/src/methods/offlineActions'
 
+import NearbyFlow, { type NearbySettled } from '../native/NearbyFlow'
+import { useNativeModal } from '../native/NativeModalHost'
 import { WalletContext } from './WalletContext'
 
 /**
@@ -70,8 +72,30 @@ export interface InboxRow {
   error: string
 }
 
+/**
+ * How a nearby session ended, as the chrome sees it.
+ *
+ * `cancelled` is the honest answer for every non-settling exit, including the
+ * `already_paid` terminal: that payment was queued by an earlier delivery, so
+ * nothing moved during this session and reporting an arrival would have the
+ * chrome celebrate one payment twice. The queue processor credits it either way.
+ */
+export interface NearbyResult {
+  /**
+   * `queued` is its own answer and must not be folded into `received`: the frame
+   * is durably stored and cannot be lost, but the money is not in the wallet and
+   * is not spendable yet. The background queue credits it later.
+   */
+  outcome: 'paid' | 'received' | 'queued' | 'cancelled'
+  satoshis?: number
+}
+
 export function usePayBridge(): Record<string, (params: any) => any> {
   const wallet = useContext(WalletContext)
+  // The nearby flow is a camera and two radios — none of which a document in a
+  // WebView can reach — so this one method answers with a native screen instead
+  // of a value. See NativeModalHost.
+  const { present } = useNativeModal()
 
   // Read through a ref for the same reason useWalletBridge does: this table is
   // handed to the host router once, and closing over the context value would pin
@@ -293,6 +317,39 @@ export function usePayBridge(): Record<string, (params: any) => any> {
         return { ok: true }
       },
 
+      // ── Nearby rail ───────────────────────────────────────────────────────
+      /**
+       * Hand the whole in-person exchange to a native screen and wait for it.
+       *
+       * Unlike every other method here this one is not a wrapper around a
+       * wallet-core call: the flow it opens is a multi-minute conversation with
+       * another device — mint, advertise, listen, scan, settle — and its money
+       * safety lives in the ordering of those steps, not in any single result.
+       * Splitting it into bridge calls would put a WebView message boundary in
+       * the middle of that ordering, so the screen owns it end to end and the
+       * chrome learns one thing: what happened.
+       *
+       * Resolving is deliberately deferred to `onExit`, not `onSettled`. The
+       * success screen and the payee's receipt are part of the payment — the one
+       * moment both people are looking at the phone — and resolving here unmounts
+       * the modal, so settling early would snatch the receipt away mid-celebration.
+       */
+      'pay.nearby.open': async (params: { role?: unknown } | null): Promise<NearbyResult> => {
+        const role = params?.role === 'payee' ? 'payee' : 'payer'
+        return present<NearbyResult>((resolve) => {
+          // Latched rather than resolved on the spot, and read back on exit.
+          let settled: NearbySettled | null = null
+          return createElement(NearbyFlow, {
+            role,
+            onSettled: (result: NearbySettled) => {
+              settled = result
+            },
+            onExit: () =>
+              resolve(settled ? { outcome: settled.outcome, satoshis: settled.satoshis } : { outcome: 'cancelled' })
+          })
+        })
+      },
+
       // ── The offline queue ─────────────────────────────────────────────────
       // Advisory, never load-bearing: a read failure here must not break the
       // screen, so it reports an empty queue rather than throwing.
@@ -426,6 +483,6 @@ export function usePayBridge(): Record<string, (params: any) => any> {
         return { url: `${base}/tx/${String(txid)}` }
       }
     }),
-    [messageBoxUrl, peerPay, requireStorage, requireWallet]
+    [messageBoxUrl, peerPay, present, requireStorage, requireWallet]
   )
 }

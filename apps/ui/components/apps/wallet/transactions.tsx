@@ -17,7 +17,7 @@
  */
 
 import { useHub } from "@/components/hub/hub-provider";
-import { txHost, useAsync, type OfflineRow, type WalletActionRow } from "@/lib/pay-data";
+import { shareHost, txHost, useAsync, type OfflineRow, type WalletActionRow } from "@/lib/pay-data";
 import { Copy, Download, ExternalLink, Loader2, RefreshCw, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
@@ -144,11 +144,19 @@ export function Transactions(): ReactNode {
         toast.info("No transactions to export");
         return;
       }
-      // The source app handed the file to the OS share sheet. That module is not
-      // in this build, so the CSV goes to the clipboard and the user is told what
-      // they have — better than a download the WebView would silently drop.
-      await navigator.clipboard.writeText(csv);
-      toast.success(`${count} transactions copied as ${filename}`);
+      try {
+        const { shared } = await shareHost().file(filename, csv, "text/csv");
+        // Backing out of the sheet is a decision, not a failure — the user
+        // changed their mind and there is nothing left to tell them.
+        if (shared) toast.success(`${count} transactions exported as ${filename}`);
+      } catch {
+        // Only a shell with a native share sheet answers share.file; on the rest
+        // the call comes back as an unknown method. The clipboard is the one sink
+        // every shell has, so the export still lands somewhere instead of failing
+        // on a surface the user cannot do anything about.
+        await navigator.clipboard.writeText(csv);
+        toast.success(`${count} transactions copied as ${filename}`);
+      }
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : String(e));
     } finally {

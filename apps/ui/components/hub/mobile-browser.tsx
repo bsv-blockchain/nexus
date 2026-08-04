@@ -57,6 +57,9 @@ import { normalizeUrl } from "@/lib/tabs";
 
 const spring = { type: "spring", damping: 32, stiffness: 340 } as const;
 
+/** Pointer travel that turns a tap on the tab switcher into a scrub, in px. */
+const TAP_SLOP = 8;
+
 function hostOf(url: string): string {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
@@ -578,7 +581,12 @@ function SwitcherCard({
   const page = getMockPage(tab.url);
 
   return (
+    // The id is carried on the DOM node because the gesture surface stacked
+    // over the deck hit-tests taps against these cards: it has no way to know
+    // from React state which card the finger actually landed on, since every
+    // card's painted position comes from a live transform.
     <motion.div
+      data-tab-id={tab.id}
       style={{ x, scale, opacity, rotateY, zIndex }}
       className="absolute h-[62dvh] w-[76%] max-w-sm origin-center"
     >
@@ -643,6 +651,14 @@ function TabSwitcher({
   // Fewer tabs fan out wide; many tabs pack in closer.
   const spacing = Math.max(120, Math.min(240, 720 / Math.max(tabs.length, 1)));
   const activeTitle = tabs[center]?.title ?? "";
+  // The deck, not the gesture surface: the surface is elastically translated
+  // mid-drag, so only this element gives stable screen coordinates.
+  const deckRef = useRef<HTMLDivElement>(null);
+  // Whether the current pointer gesture has travelled far enough to be a
+  // scrub. motion/react does not swallow the click that follows a drag, so
+  // without this the tap handler fires on top of onDragEnd and one scrub both
+  // moves the deck and picks a tab.
+  const scrubbed = useRef(false);
 
   const clamp = (i: number): number =>
     Math.max(0, Math.min(tabs.length - 1, i));
@@ -673,7 +689,11 @@ function TabSwitcher({
       </div>
 
       {/* Cover-flow deck */}
-      <div className="relative min-h-0 flex-1" style={{ perspective: 1200 }}>
+      <div
+        ref={deckRef}
+        className="relative min-h-0 flex-1"
+        style={{ perspective: 1200 }}
+      >
         <div className="absolute inset-0 flex items-center justify-center">
           {tabs.map((tab, i) => (
             <SwitcherCard
@@ -694,22 +714,57 @@ function TabSwitcher({
             </p>
           </div>
         )}
-        {/* Drag + tap surface */}
+        {/*
+         * Drag + tap surface.
+         *
+         * It stacks ABOVE the cards, not beneath them. SwitcherCard sets a
+         * z-index up to 100 and this deck is the stacking context (perspective
+         * makes it one), so with this element at `auto` every card painted over
+         * it and the 62dvh middle of the screen received no pointer events at
+         * all: taps were swallowed and only the thin strips above and below the
+         * cards could be dragged. One element owning the whole gesture is why
+         * the tap below has to hit-test the cards by hand.
+         */}
         {tabs.length > 0 && (
           <motion.div
-            className="absolute inset-0"
+            className="absolute inset-0 z-[200]"
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.9}
-            onDrag={(_, info) => drag.set(info.offset.x)}
+            onPointerDown={() => {
+              scrubbed.current = false;
+            }}
+            onDrag={(_, info) => {
+              if (Math.abs(info.offset.x) > TAP_SLOP) scrubbed.current = true;
+              drag.set(info.offset.x);
+            }}
             onDragEnd={(_, info) => {
               const delta = Math.round(-info.offset.x / spacing);
               setCenter((c) => clamp(c + delta));
               drag.set(0);
             }}
             onClick={(event) => {
-              const third = event.currentTarget.clientWidth / 3;
-              const x = event.nativeEvent.offsetX;
+              if (scrubbed.current) return;
+              // Ask the DOM which card is under the finger rather than deriving
+              // it from `center`: the cards are transformed, so where they are
+              // painted is the only truthful answer, and it is what makes a tap
+              // on a visible off-centre card open that card.
+              const card = document
+                .elementsFromPoint(event.clientX, event.clientY)
+                .map((el) => el.closest("[data-tab-id]"))
+                .find((el): el is HTMLElement => el instanceof HTMLElement);
+              if (card?.dataset.tabId) {
+                onPick(card.dataset.tabId);
+                return;
+              }
+              // Background either side of the deck steps it along. Measured
+              // with clientX against the deck's own box — offsetX is relative to
+              // this surface, which is still elastically translated when the
+              // tap lands, so its thirds are not the screen's thirds.
+              const rect = deckRef.current?.getBoundingClientRect();
+              if (!rect) return;
+              const x = event.clientX - rect.left;
+              const third = rect.width / 3;
               if (x < third) setCenter((c) => clamp(c - 1));
               else if (x > third * 2) setCenter((c) => clamp(c + 1));
               else {

@@ -32,6 +32,17 @@ const METHODS = {
   // here; the chrome collects the words and the shell owns every key operation.
   WALLET_RESTORE: 'wallet.restore',
 
+  /**
+   * Native surfaces. Three things the chrome cannot do itself — read a camera,
+   * drive the local radios, open a share sheet — so it asks the shell to put a
+   * native screen in front of it and hand back the result. See
+   * apps/mobile/src/native/NativeModalHost.tsx.
+   */
+  SCAN_QR: 'scan.qr',
+  PAY_NEARBY_OPEN: 'pay.nearby.open',
+  SHARE_TEXT: 'share.text',
+  SHARE_FILE: 'share.file',
+
   // Overlay arbitration. Native tab WebViews always paint above the chrome (a native
   // view sits above a WebView's content regardless of z-index), so a chrome sheet or
   // menu would be half-hidden behind the page. The chrome tells the shell when it is

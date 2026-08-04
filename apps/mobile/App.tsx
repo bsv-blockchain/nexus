@@ -15,6 +15,9 @@ import { ExchangeRateContextProvider } from './src/wallet/ExchangeRateContext'
 import { WalletContextProvider } from './src/wallet/WalletContext'
 import { useWalletBridge } from './src/wallet/useWalletBridge'
 import { usePayBridge } from './src/wallet/usePayBridge'
+import NativeModalHost, { useNativeModal } from './src/native/NativeModalHost'
+import { useScanBridge } from './src/native/useScanBridge'
+import { useShareBridge } from './src/native/useShareBridge'
 import { setShellUiSink } from './src/wallet/support/shell-ui'
 
 /**
@@ -47,7 +50,12 @@ export default function App() {
         <UserContextProvider appName="Nexus" appVersion="0.0.1" nativeHandlers={nativeHandlers}>
           <ExchangeRateContextProvider>
             <WalletContextProvider>
-              <Shell />
+              {/* Above Shell, because Shell's bridge hooks call useNativeModal() —
+                  and inside WalletContextProvider, because the screens it presents
+                  (the nearby flow especially) need the wallet. */}
+              <NativeModalHost>
+                <Shell />
+              </NativeModalHost>
             </WalletContextProvider>
           </ExchangeRateContextProvider>
         </UserContextProvider>
@@ -84,16 +92,24 @@ function Shell() {
   // Payments and transactions. Separate hook, same router: the rails are a large
   // enough surface to keep apart from the wallet's own basic queries.
   const payMethods = usePayBridge()
+  // Camera and share sheet. Separate hooks for the same reason: they are native
+  // screens, not wallet queries, and only the shell can present them.
+  const scanMethods = useScanBridge()
+  const shareMethods = useShareBridge()
+  // A native screen covers the chrome, so the tab layer must stand down for it
+  // exactly as it does for the chrome's own overlays — otherwise a browsed page
+  // paints straight through the camera.
+  const { isPresenting } = useNativeModal()
 
   const router = useMemo(
     () =>
       createHostRouter({
-        methods: { ...tabHost.methods, ...walletBridge.methods, ...payMethods },
+        methods: { ...tabHost.methods, ...walletBridge.methods, ...payMethods, ...scanMethods, ...shareMethods },
         send: (envelope) => {
           chromeRef.current?.injectJavaScript('window.__nexusHostDeliver(' + JSON.stringify(envelope) + ');true;')
         }
       }),
-    [tabHost.methods, walletBridge.methods, payMethods]
+    [tabHost.methods, walletBridge.methods, payMethods, scanMethods, shareMethods]
   )
 
   // Same handler set as @nexus/desktop's tabManager.mjs — `handlers` comes
@@ -168,7 +184,7 @@ function Shell() {
           emit={router.emit}
           substrateHost={substrateHost}
           handleCwi={walletBridge.handleCwi}
-          suppressed={tabHost.overlayOpen}
+          suppressed={tabHost.overlayOpen || isPresenting}
         />
       </View>
     </View>
