@@ -13,6 +13,11 @@ const client = createHostClient({
   channel: CHANNEL,
   shell: 'electron',
   platform: process.platform,
+  // Only what main.mjs actually registers. This shell has tabs and nothing else —
+  // no wallet, no payment rails, no camera, no share sheet. Declaring the truth is
+  // what lets the chrome hide those surfaces instead of rendering a wallet whose
+  // every button answers "unknown method". Grow this list as the methods land.
+  capabilities: ['tabs'],
   post: (msg) => ipcRenderer.send('nexus:host:out', msg)
 })
 

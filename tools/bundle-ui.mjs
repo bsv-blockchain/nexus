@@ -17,7 +17,10 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const OUT = join(ROOT, 'apps/ui/out')
-const DEST = join(ROOT, 'apps/mobile/assets/ui')
+// Both shells get their own copy of the same rewritten export. The rewrite is what
+// makes it loadable without a server (see REWRITES below), and Electron loading it
+// over file:// needs exactly the same treatment a WebView does.
+const DESTS = [join(ROOT, 'apps/mobile/assets/ui'), join(ROOT, 'apps/desktop/ui')]
 const CHECK = process.argv.includes('--check')
 
 if (!existsSync(join(OUT, 'index.html'))) {
@@ -103,8 +106,11 @@ if (remaining.length) {
 
 if (CHECK) process.exit(0)
 
-rmSync(DEST, { recursive: true, force: true })
-cpSync(OUT, DEST, { recursive: true })
+for (const dest of DESTS) {
+  rmSync(dest, { recursive: true, force: true })
+  cpSync(OUT, dest, { recursive: true })
+}
+const DEST = DESTS[0]
 
 let bytes = 0
 let count = 0
@@ -112,4 +118,4 @@ for (const f of walk(DEST)) {
   bytes += statSync(f).size
   count++
 }
-console.log(`\ncopied ${count} files (${(bytes / 1024 / 1024).toFixed(1)} MB) → ${DEST.replace(ROOT + '/', '')}`)
+console.log(`\ncopied ${count} files (${(bytes / 1024 / 1024).toFixed(1)} MB) → ${DESTS.map(d => d.replace(ROOT + '/', '')).join(', ')}`)

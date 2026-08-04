@@ -94,6 +94,8 @@ export interface TxPage {
 // ── Host access ─────────────────────────────────────────────────────────────
 
 interface PayHost {
+  /** Declared by the shell at injection; see packages/bridge/src/client.js. */
+  has?: (capability: string) => boolean;
   pay?: {
     classify: (text: string) => Promise<PayTarget | null>;
     validateAddress: (text: string) => Promise<{ normalized: string; valid: boolean }>;
@@ -168,16 +170,28 @@ function host(): PayHost | null {
   return (window as unknown as { nexusHost?: PayHost }).nexusHost ?? null;
 }
 
+/**
+ * Whether the shell hosting us implements a thing.
+ *
+ * Never test for the presence of a namespace: the bridge client builds `pay`, `tx`,
+ * `scan` and `share` on every shell, because the chrome is meant to code against one
+ * API. Presence therefore tells you nothing, and a chrome that trusts it renders
+ * payment surfaces on a shell that cannot pay.
+ */
+export function can(capability: string): boolean {
+  return Boolean(host()?.has?.(capability));
+}
+
 /** The shell's payment surface, or a refusal naming what is missing. */
 export function payHost(): NonNullable<PayHost["pay"]> {
   const p = host()?.pay;
-  if (!p) throw new Error("payments are not available in this shell");
+  if (!p || !can("pay")) throw new Error("payments are not available in this shell");
   return p;
 }
 
 export function txHost(): NonNullable<PayHost["tx"]> {
   const t = host()?.tx;
-  if (!t) throw new Error("transactions are not available in this shell");
+  if (!t || !can("tx")) throw new Error("transactions are not available in this shell");
   return t;
 }
 
@@ -191,20 +205,20 @@ export function txHost(): NonNullable<PayHost["tx"]> {
  */
 export function shareHost(): NonNullable<PayHost["share"]> {
   const s = host()?.share;
-  if (!s) throw new Error("sharing is not available in this shell");
+  if (!s || !can("share")) throw new Error("sharing is not available in this shell");
   return s;
 }
 
 /** The camera, or a refusal. Same shape as the others: absence surfaces as a failed call. */
 export function scanHost(): NonNullable<PayHost["scan"]> {
   const s = host()?.scan;
-  if (!s) throw new Error("this device has no camera surface");
+  if (!s || !can("scan")) throw new Error("this device has no camera surface");
   return s;
 }
 
 /** Whether there is a shell to pay through at all. Demo mode has no rails. */
 export function payAvailable(): boolean {
-  return resolveDataMode() === "live" && !!host()?.pay;
+  return resolveDataMode() === "live" && can("pay");
 }
 
 /** Open a URL in a real browser tab — how a transaction reaches its explorer. */

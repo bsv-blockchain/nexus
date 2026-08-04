@@ -47,8 +47,17 @@ export function resolveDataMode(): DataMode {
     return forced
   }
 
-  const hasShell = Boolean((window as unknown as { nexusHost?: unknown }).nexusHost)
-  if (hasShell) return 'live'
+  /*
+   * A shell is not the same thing as a wallet.
+   *
+   * This used to flip to live the instant `window.nexusHost` existed, which is true
+   * on the Electron shell too — and that shell has no wallet at all. The result was
+   * a portfolio reading $0.00 with "unknown method wallet.accounts" printed under
+   * it, because wallet-data deliberately refuses to fall back to fixtures. Ask what
+   * the shell can actually do.
+   */
+  const host = (window as unknown as { nexusHost?: { has?: (n: string) => boolean } }).nexusHost
+  if (host?.has?.('wallet')) return 'live'
   return DEMO_DATA_COMPILED_IN ? 'demo' : 'live'
 }
 

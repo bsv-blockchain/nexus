@@ -16,8 +16,9 @@ apps/mobile/.expo/
 *.aab
 *.apk
 
-# Generated: 28 MB static export, rebuilt by `npm run ui:bundle`
+# Generated: 28 MB static export, rebuilt by `npm run ui:bundle`. One copy per shell.
 apps/mobile/assets/ui/
+apps/desktop/ui/
 
 # apps/ui IS our source and is tracked. Only its build products are not.
 apps/ui/node_modules/

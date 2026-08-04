@@ -8,13 +8,16 @@ const { CHANNEL } = require('./protocol')
  * WebView on mobile. On desktop the Electron chrome preload publishes the same
  * client through contextBridge instead.
  *
- * @param {{shell?: string, platform: string, timeoutMs?: number}} opts
+ * @param {{shell?: string, platform: string, capabilities?: string[], timeoutMs?: number}} opts
  */
 function buildChromeBridgeScript(opts) {
   const cfg = {
     channel: CHANNEL,
     shell: (opts && opts.shell) || 'expo',
     platform: opts.platform,
+    // What this shell implements. See client.js — the chrome cannot infer it from
+    // the API surface, because the surface is identical on every shell.
+    capabilities: (opts && opts.capabilities) || [],
     timeoutMs: (opts && opts.timeoutMs) || 15000
   }
 

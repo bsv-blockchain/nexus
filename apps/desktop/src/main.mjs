@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import path from 'node:path'
 import { writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import bridgePkg from '@nexus/bridge'
 import { createTabManager } from './tabManager.mjs'
@@ -11,7 +12,22 @@ import { createTabManager } from './tabManager.mjs'
 const { METHODS, createHostRouter } = bridgePkg
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const CHROME_URL = process.env.NEXUS_CHROME_URL ?? 'http://localhost:8099'
+/**
+ * Where the chrome comes from.
+ *
+ * Default is the copy bundled beside this file by `npm run ui:bundle`, so a packaged
+ * app has no network dependency and ships the UI it was tested with — the same rule
+ * apps/mobile/src/config.ts follows. It used to default to http://localhost:8099,
+ * which is tools/serve.mjs answering with the SPIKE HARNESS: the product chrome had
+ * never actually been loaded in Electron.
+ */
+const BUNDLED_CHROME = app.isPackaged
+  // Packaged: __dirname is INSIDE app.asar, and the 28 MB export is deliberately
+  // kept out of the archive (electron-builder `extraResources`) so it can be read
+  // as ordinary files. That puts it beside the asar, not within it.
+  ? path.join(process.resourcesPath, 'ui', 'index.html')
+  : path.join(__dirname, '..', 'ui', 'index.html')
+const CHROME_URL = process.env.NEXUS_CHROME_URL ?? null
 
 let win = null
 let tabManager = null
@@ -85,7 +101,19 @@ function createWindow() {
     })
   }
 
-  win.loadURL(CHROME_URL)
+  if (CHROME_URL) win.loadURL(CHROME_URL)
+  else if (existsSync(BUNDLED_CHROME)) win.loadFile(BUNDLED_CHROME)
+  else {
+    // Fail loudly. A blank window is indistinguishable from a hung one, and the fix
+    // is a single command.
+    win.loadURL(
+      'data:text/html,' +
+        encodeURIComponent(
+          '<body style="font:14px system-ui;padding:2rem;background:#1A0E31;color:#fff">' +
+            '<h2>No chrome bundled</h2><p>Run <code>npm run ui:bundle</code>, then start again.</p></body>'
+        )
+    )
+  }
 
   // Gate G2 needs window-geometry changes the chrome cannot trigger itself. Drive them
   // from here so the run is reproducible rather than a hand-resized window.

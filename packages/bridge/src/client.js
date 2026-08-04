@@ -75,6 +75,21 @@ const CREATE_HOST_CLIENT_SOURCE = `function createHostClient(options) {
   return {
     shell: options.shell,
     platform: options.platform,
+    /*
+     * What this shell can actually DO, declared at injection time.
+     *
+     * The namespaces below are built unconditionally, because the chrome codes
+     * against one API whichever shell hosts it. That makes presence useless as a
+     * test: window.nexusHost.pay exists on a shell with no wallet, so a chrome
+     * that probes for it renders a wallet whose every button answers
+     * "unknown method". Ask this instead.
+     *
+     * Synchronous on purpose. A host.info round trip would mean the first render
+     * happens before the answer arrives, which is exactly when the chrome decides
+     * whether to show a balance.
+     */
+    capabilities: options.capabilities || [],
+    has: function (name) { return (options.capabilities || []).indexOf(name) !== -1 },
     call: call,
     on: on,
     tabs: {

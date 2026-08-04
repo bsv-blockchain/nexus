@@ -23,7 +23,13 @@ const ChromeHost = forwardRef<WebView, ChromeHostProps>(function ChromeHost({ on
   // Built from @nexus/bridge's source STRING, never a stringified function — Hermes
   // discards function source and would hand the page a `[bytecode]` stub. `npm run check`
   // guards this; it is not something to re-verify by hand.
-  const bridgeScript = buildChromeBridgeScript({ shell: 'expo', platform: Platform.OS })
+  // Everything this shell answers. The Electron shell declares a shorter list, and
+  // the chrome renders to whichever it is handed rather than assuming.
+  const bridgeScript = buildChromeBridgeScript({
+    shell: 'expo',
+    platform: Platform.OS,
+    capabilities: ['tabs', 'wallet', 'pay', 'tx', 'scan', 'share', 'nearby', 'overlay']
+  })
 
   return (
     <WebView

@@ -1,18 +1,92 @@
 {
   "name": "@nexus/desktop",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
-  "description": "Nexus desktop shell — Electron, WebContentsView per tab.",
+  "description": "Nexus desktop shell \u2014 Electron, WebContentsView per tab.",
   "type": "module",
   "main": "src/main.mjs",
   "scripts": {
-    "dev": "electron ."
+    "dev": "electron .",
+    "pack:mac": "electron-builder --mac --dir",
+    "pack:win": "electron-builder --win --dir",
+    "pack:linux": "electron-builder --linux --dir",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux"
   },
   "dependencies": {
     "@nexus/bridge": "*",
     "@nexus/substrate": "*"
   },
   "devDependencies": {
-    "electron": "^43.2.0"
-  }
+    "electron": "43.2.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "org.bsvassociation.nexus",
+    "productName": "Nexus",
+    "directories": {
+      "output": "out",
+      "buildResources": "build"
+    },
+    "asar": true,
+    "files": [
+      "src/**/*",
+      "package.json",
+      "node_modules/**/*",
+      "!**/*.map"
+    ],
+    "extraResources": [
+      {
+        "from": "ui",
+        "to": "ui"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "default",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Network",
+      "maintainer": "BSV Association",
+      "executableName": "nexus"
+    },
+    "electronVersion": "43.2.0"
+  },
+  "author": "BSV Association"
 }

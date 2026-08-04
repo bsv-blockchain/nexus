@@ -1,0 +1,78 @@
+# What EAS uploads.
+#
+# READ THIS BEFORE EDITING. The moment this file exists, eas-cli STOPS reading
+# every .gitignore in the repo — root and nested alike — and uses only these
+# rules. So this file has to restate all of them, and any rule that is forgotten
+# here silently ships something that should not be shipped, or (far worse) is
+# silently DROPPED from the archive while the build still succeeds.
+#
+# That is not hypothetical. BSV Browser lost its entire Android Nearby module from
+# every EAS archive for three days (2026-07-29 → 07-31) because its .easignore had
+# gone stale against .gitignore. The build was green the whole time.
+#
+# The file exists because three things this build CANNOT work without are
+# deliberately gitignored, being large generated artifacts:
+#
+#   apps/mobile/assets/ui/                       28 MB  — the chrome itself.
+#     app.json sets chromeUrl:"bundled" with no network fallback, and the
+#     "Bundle Nexus UI" run script exits 1 when it is absent.
+#   packages/react-native-secp-native/ios/*.xcframework    120 MB
+#   packages/react-native-engine-native/ios/*.xcframework  140 MB
+#     SecpNative.podspec:11 and EngineNative.podspec:17 RAISE when these are
+#     missing, so pod install dies rather than degrading.
+#
+# Everything below mirrors the .gitignore rules verbatim EXCEPT those three.
+#
+# To verify after any edit:
+#   git ls-files --exclude-from .easignore --ignored --cached
+# It should list ONLY the three paths above. Anything else in that output is a
+# file you are about to strip from a build.
+
+node_modules/
+.expo/
+dist/
+build/
+web-build/
+*.log
+.DS_Store
+.env.local
+apps/desktop/out/
+# Desktop's copy of the chrome. The mobile copy above IS uploaded; this one is not
+# used by any EAS build and would double the tarball.
+apps/desktop/ui/
+apps/mobile/.expo/
+
+# Generated native projects. Path-anchored, exactly as in .gitignore — an
+# unanchored `android/` here would also match
+# packages/react-native-localpay-transport/android, which is REAL SOURCE and is
+# the whole nearby rail on that platform. That is the three-day bug, precisely.
+/apps/mobile/ios/
+/apps/mobile/android/
+
+# Local build artifacts — never upload (tens of MB each)
+*.ipa
+*.aab
+*.apk
+
+# apps/ui IS our source and is uploaded. Only its build products are not.
+apps/ui/node_modules/
+apps/ui/.next/
+apps/ui/out/
+
+# Rust/native build output. Note what is NOT here: ios/*.xcframework, which
+# .gitignore excludes and this build requires.
+packages/react-native-*/node_modules/
+packages/react-native-*/android/build/
+packages/react-native-*/android/.cxx/
+native-*/target/
+native-secp-poc/sdk-2.1.6/
+native-secp-poc/packages/SecpNativeFFI/SecpNative.xcframework/
+native-engine-ffi/packages/EngineNativeFFI/EngineNative.xcframework/
+
+# NOT excluded: the native-*/ Rust sources themselves. Dropping them looks free —
+# the xcframeworks are prebuilt and ship above, so nothing compiles Rust during an
+# EAS build — but the podspecs' self-heal fallback (scripts/sync-xcframework.sh)
+# reads out of native-secp-poc/ and native-engine-ffi/, and a tarball where that
+# fallback cannot run is one where a missing framework becomes unrecoverable
+# instead of merely slow. They are ~35 small tracked files; the 1.4 GB is all in
+# target/, excluded above.
