@@ -44,29 +44,29 @@ import { DEFAULT_STORAGE_URL, DEFAULT_CHAIN, ADMIN_ORIGINATOR, toWalletChain } f
 // BLOCKER(nexus-port): @nexus/wallet-core does not exist yet; source shared/constants.ts
 // also mixes unrelated browser-UI exports (Bookmark type, Platform-conditional values) with
 // these 3 wallet constants, so it needs splitting on the way in, not a 1:1 file move.
-import { DEFAULT_AUTO_APPROVE_THRESHOLD, AUTO_APPROVE_COOLDOWN_MS, AUTO_APPROVE_STORAGE_KEY } from '@nexus/wallet-core/constants'
+import { DEFAULT_AUTO_APPROVE_THRESHOLD, AUTO_APPROVE_COOLDOWN_MS, AUTO_APPROVE_STORAGE_KEY } from '@nexus/wallet-core/src/constants'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { UserContext } from './UserContext'
 import { useLocalStorage } from './LocalStorageProvider'
 // BLOCKER(nexus-port): app-level hook (queue + native-modal focus integration via
 // UserContext's isFocused/onFocusRequested) — not yet ported, not obviously a package.
 import { usePermissionQueue } from './support/usePermissionQueue'
-import { createServices, chaintracksUrlFor } from '@nexus/wallet-core/services/walletServiceConfig'
-import { configureNewHeaderPolling } from '@nexus/wallet-core/utils/walletMonitor'
+import { createServices, chaintracksUrlFor } from '@nexus/wallet-core/src/services/walletServiceConfig'
+import { configureNewHeaderPolling } from '@nexus/wallet-core/src/utils/walletMonitor'
 import {
   createArcadeBroadcastService,
   createTaalBroadcastService,
   createGorillaPoolBroadcastService,
   createWocBroadcastService
-} from '@nexus/wallet-core/services/arcadeBroadcastProvider'
-import { getExchangeRate } from '@nexus/wallet-core/services/exchangeRate'
+} from '@nexus/wallet-core/src/services/arcadeBroadcastProvider'
+import { getExchangeRate } from '@nexus/wallet-core/src/services/exchangeRate'
 import { navigate } from './support/shell-ui'
-import { logWithTimestamp } from '@nexus/wallet-core/utils/logging'
-import { recoverMnemonicWallet } from '@nexus/wallet-core/utils/mnemonicWallet'
+import { logWithTimestamp } from '@nexus/wallet-core/src/utils/logging'
+import { recoverMnemonicWallet } from '@nexus/wallet-core/src/utils/mnemonicWallet'
 import { StorageProvider, ChaintracksServiceClient } from '@bsv/wallet-toolbox-mobile'
 import { StorageExpoSQLite } from '@nexus/wallet-storage'
 import * as SQLite from 'expo-sqlite'
-import { getRegisteredDbs, registerDb, selectLatestDb } from '@nexus/wallet-core/utils/walletDbRegistry'
+import { getRegisteredDbs, registerDb, selectLatestDb } from '@nexus/wallet-core/src/utils/walletDbRegistry'
 import { createBtmsModule } from '@bsv/btms-permission-module'
 import { AppState, AppStateStatus, InteractionManager } from 'react-native'
 import RNEventSource from 'react-native-sse'
@@ -80,25 +80,25 @@ class QuietEventSource extends (RNEventSource as any) {
     super(url, { ...options, debug: false })
   }
 }
-import { getOnline, subscribeOnline } from '@nexus/wallet-core/utils/net/online'
-import { processPending } from '@nexus/wallet-core/utils/localpay/pending'
-import { TaskSendOffline } from '@nexus/wallet-core/utils/monitor/TaskSendOffline'
-import { processOfflineActions } from '@nexus/wallet-storage/methods/processOfflineActions'
-import { wocConfigFor } from '@nexus/wallet-core/utils/pay/rails/address'
-import { SWEEP_INTERVAL_MS, runSweep, shouldSweepNow, sweptTotal } from '@nexus/wallet-core/utils/pay/sweeper'
-import { formatAmount } from '@nexus/wallet-core/utils/amountFormatHelpers'
+import { getOnline, subscribeOnline } from '@nexus/wallet-core/src/utils/net/online'
+import { processPending } from '@nexus/wallet-core/src/utils/localpay/pending'
+import { TaskSendOffline } from '@nexus/wallet-core/src/utils/monitor/TaskSendOffline'
+import { processOfflineActions } from '@nexus/wallet-storage/src/methods/processOfflineActions'
+import { wocConfigFor } from '@nexus/wallet-core/src/utils/pay/rails/address'
+import { SWEEP_INTERVAL_MS, runSweep, shouldSweepNow, sweptTotal } from '@nexus/wallet-core/src/utils/pay/sweeper'
+import { formatAmount } from '@nexus/wallet-core/src/utils/amountFormatHelpers'
 import { useTranslation } from 'react-i18next'
-import { HEADER_CHECKPOINTS } from '@nexus/wallet-core/utils/headers/checkpoints'
+import { HEADER_CHECKPOINTS } from '@nexus/wallet-core/src/utils/headers/checkpoints'
 // BLOCKER(nexus-port): expoHeaderFs() require()s expo-file-system lazily (source comment:
 // jest can't transpile its untranspiled-TS main entry) — genuinely RN/Expo-coupled despite
 // living under utils/headers, unlike its siblings here. Confirm @nexus/wallet-core is meant
 // to hold Expo-coupled code, or this one file needs to stay app-side.
-import { expoHeaderFs } from '@nexus/wallet-core/utils/headers/fs'
-import { HeaderStore } from '@nexus/wallet-core/utils/headers/headerStore'
-import { OfflineFirstChaintracks } from '@nexus/wallet-core/utils/headers/OfflineFirstChaintracks'
-import { prewarmOwnRoots } from '@nexus/wallet-core/utils/headers/prewarm'
-import { syncHeaders } from '@nexus/wallet-core/utils/headers/syncHeaders'
-import type { HeaderSource } from '@nexus/wallet-core/utils/headers/syncHeaders'
+import { expoHeaderFs } from '@nexus/wallet-core/src/utils/headers/fs'
+import { HeaderStore } from '@nexus/wallet-core/src/utils/headers/headerStore'
+import { OfflineFirstChaintracks } from '@nexus/wallet-core/src/utils/headers/OfflineFirstChaintracks'
+import { prewarmOwnRoots } from '@nexus/wallet-core/src/utils/headers/prewarm'
+import { syncHeaders } from '@nexus/wallet-core/src/utils/headers/syncHeaders'
+import type { HeaderSource } from '@nexus/wallet-core/src/utils/headers/syncHeaders'
 
 // Global, origin-agnostic rate limit for auto-approved spending.
 // In-memory only — resets on app restart (intentional: more secure).

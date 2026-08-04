@@ -7,8 +7,8 @@ import type { WalletProtocol } from '@bsv/sdk'
 // connections, persisted via AsyncStorage) is pure wallet-domain state with no UI coupling,
 // so it looks like a wallet-core candidate, but confirm before relying on this path — mobx
 // is not currently a dependency of apps/mobile.
-import connectionStore from '@nexus/wallet-core/stores/ConnectionStore'
-import type { Connection } from '@nexus/wallet-core/stores/ConnectionStore'
+import connectionStore from '@nexus/wallet-core/src/stores/ConnectionStore'
+import type { Connection } from '@nexus/wallet-core/src/stores/ConnectionStore'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 

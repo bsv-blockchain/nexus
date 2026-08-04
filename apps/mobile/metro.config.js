@@ -30,4 +30,33 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, 'node_modules')
 ]
 
+// --- Node-stdlib shims, carried over from BSV Browser -------------------------------
+// @bsv/sdk reaches for node:crypto. Routing it to react-native-quick-crypto is not just a
+// polyfill: it is what makes SHA256/PBKDF2/AES-GCM run natively rather than in JS, which
+// the wallet's performance depends on.
+config.resolver.extraNodeModules = {
+  crypto: require.resolve('react-native-quick-crypto'),
+  stream: require.resolve('stream-browserify'),
+  buffer: require.resolve('buffer'),
+  ...config.resolver.extraNodeModules
+}
+
+const emptyShim = path.resolve(projectRoot, 'metro-shims/empty.js')
+const quickCryptoMain = require.resolve('react-native-quick-crypto')
+
+const upstream = config.resolver.resolveRequest
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === 'node:crypto') return { type: 'sourceFile', filePath: quickCryptoMain }
+  // node:buffer / node:process are reached for but unused on this path; an empty module is
+  // safer than letting the bundler fail on a dependency the wallet never actually calls.
+  if (moduleName === 'node:buffer' || moduleName === 'node:process') {
+    return { type: 'sourceFile', filePath: emptyShim }
+  }
+  if (typeof upstream === 'function') return upstream(context, moduleName, platform)
+  return context.resolveRequest(context, moduleName, platform)
+}
+
+// expo-sqlite ships a wasm build used on web.
+config.resolver.assetExts.push('wasm')
+
 module.exports = config

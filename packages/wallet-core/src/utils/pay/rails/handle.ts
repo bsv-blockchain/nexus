@@ -9,7 +9,7 @@
  * makes a crash recoverable.
  */
 import type { IncomingPayment, PaymentToken, PeerPayClient } from '@bsv/message-box-client'
-import { markOutboxSent, saveOutboxEntry, updateOutboxEntry, type OutboxEntry } from '@nexus/wallet-core/utils/peerpay/outbox'
+import { markOutboxSent, saveOutboxEntry, updateOutboxEntry, type OutboxEntry } from '@nexus/wallet-core/src/utils/peerpay/outbox'
 
 export const MESSAGE_BOX_URL_KEY = 'message_box_url'
 export const DEFAULT_MESSAGE_BOX_URL = 'https://messagebox.babbage.systems'

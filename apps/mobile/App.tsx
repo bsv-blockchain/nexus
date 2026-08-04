@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react'
+import React, { useEffect, useMemo, useRef } from 'react'
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
@@ -9,6 +9,11 @@ import { createSubstrateHost } from '@nexus/substrate'
 import ChromeHost from './src/ChromeHost'
 import TabLayer from './src/TabLayer'
 import { useTabHost } from './src/useTabHost'
+import LocalStorageProvider from './src/wallet/LocalStorageProvider'
+import { UserContextProvider } from './src/wallet/UserContext'
+import { ExchangeRateContextProvider } from './src/wallet/ExchangeRateContext'
+import { WalletContextProvider } from './src/wallet/WalletContext'
+import { setShellUiSink } from './src/wallet/support/shell-ui'
 
 /**
  * Full-screen shell. ChromeHost (the real DOM UI) sits at zIndex 0; TabLayer's
@@ -16,10 +21,35 @@ import { useTabHost } from './src/useTabHost'
  * ARCHITECTURE.md's "native tab layers sit above the chrome" limitation, true
  * by construction since a native view always paints over a WebView's content.
  */
+/**
+ * The wallet expects a React Native UI around it — a toast host, a screen stack, focus and
+ * download handlers. Nexus has none of those: the UI is a DOM document in a WebView. The
+ * handlers below are the shell's answer, and Shell installs the toast/navigate sink so the
+ * wallet's calls become bridge events the chrome reacts to.
+ */
+const nativeHandlers = {
+  // The chrome WebView is always the foreground surface in this shell; there is no second
+  // native window that could take focus away from it.
+  isFocused: async () => true,
+  onFocusRequested: async () => {},
+  onFocusRelinquished: async () => {},
+  // Downloads are not wired yet. Returning false is honest — claiming success would lose
+  // a user's file silently.
+  onDownloadFile: async () => false
+}
+
 export default function App() {
   return (
     <SafeAreaProvider>
-      <Shell />
+      <LocalStorageProvider>
+        <UserContextProvider appName="Nexus" appVersion="0.0.1" nativeHandlers={nativeHandlers}>
+          <ExchangeRateContextProvider>
+            <WalletContextProvider>
+              <Shell />
+            </WalletContextProvider>
+          </ExchangeRateContextProvider>
+        </UserContextProvider>
+      </LocalStorageProvider>
     </SafeAreaProvider>
   )
 }
@@ -69,6 +99,14 @@ function Shell() {
       }),
     [tabHost.handlers]
   )
+
+  useEffect(() => {
+    setShellUiSink({
+      toast: (message, kind) => router.emit('ui.toast', { message, kind }),
+      navigate: (path, options) => router.emit('ui.navigate', { path, ...options })
+    })
+    return () => setShellUiSink(null)
+  }, [router])
 
   return (
     <View style={styles.root}>

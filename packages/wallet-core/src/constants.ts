@@ -1,5 +1,5 @@
 import { Platform } from 'react-native'
-import { Bookmark } from '@nexus/wallet-core/types-browser'
+import { Bookmark } from '@nexus/wallet-core/src/types-browser'
 
 export const kNEW_TAB_URL = 'about:blank'
 export const DEFAULT_HOMEPAGE_URL = 'https://mobile.bsvb.tech/landing.html'

@@ -35,6 +35,12 @@
       ],
       "@nexus/substrate/browser/*": [
         "./packages/substrate/src/browser/*"
+      ],
+      "@nexus/wallet-core/src/*": [
+        "./packages/wallet-core/src/*"
+      ],
+      "@nexus/wallet-storage/src/*": [
+        "./packages/wallet-storage/src/*"
       ]
     }
   }

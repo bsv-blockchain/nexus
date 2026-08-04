@@ -20,8 +20,8 @@ import {
   type InternalizeOutput,
   type WalletProtocol
 } from '@bsv/sdk'
-import type { AppChain } from '@nexus/wallet-core/chain'
-import { isValidBsvAddress } from '@nexus/wallet-core/utils/pay/rails'
+import type { AppChain } from '@nexus/wallet-core/src/chain'
+import { isValidBsvAddress } from '@nexus/wallet-core/src/utils/pay/rails'
 
 export const BRC29_PROTOCOL_ID: WalletProtocol = [2, '3241645161d8']
 

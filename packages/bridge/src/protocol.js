@@ -36,7 +36,13 @@ const EVENTS = {
   TAB_TITLE: 'tab.title',
   TAB_LOADING: 'tab.loading',
   TAB_MESSAGE: 'tab.message',
-  TAB_CRASH: 'tab.crash'
+  TAB_CRASH: 'tab.crash',
+
+  // Shell → chrome UI requests. The wallet was written against a React Native UI that
+  // could show a toast or push a screen directly; in Nexus the UI is a DOM document, so
+  // those become events it reacts to. See apps/mobile/src/wallet/support/shell-ui.ts.
+  UI_TOAST: 'ui.toast',
+  UI_NAVIGATE: 'ui.navigate'
 }
 
 function isRequest(msg) {

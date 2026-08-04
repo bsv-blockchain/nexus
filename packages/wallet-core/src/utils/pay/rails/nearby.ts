@@ -10,7 +10,7 @@
  * If you find yourself wanting to add a function here, add it to the caller
  * instead.
  */
-export { decodeSession, encodeSession, mintSession, type Session } from '@nexus/wallet-core/utils/localpay/session'
+export { decodeSession, encodeSession, mintSession, type Session } from '@nexus/wallet-core/src/utils/localpay/session'
 export {
   FRAME_BLOCK_BYTES,
   SEAL_VERSION,
@@ -20,7 +20,7 @@ export {
   sealFrame,
   unsealFrame,
   type PaymentFrame
-} from '@nexus/wallet-core/utils/localpay/codec'
+} from '@nexus/wallet-core/src/utils/localpay/codec'
 /**
  * The animated-QR transport is `@bsv/air-gap` (BRC-141), not app code. It was
  * grown here first and upstreamed; the published library adds what a local
@@ -43,23 +43,23 @@ export {
   processPending,
   savePending,
   type PendingPayment
-} from '@nexus/wallet-core/utils/localpay/pending'
-export { buildPaymentFrame, finalizeDelivery } from '@nexus/wallet-core/utils/localpay/build'
+} from '@nexus/wallet-core/src/utils/localpay/pending'
+export { buildPaymentFrame, finalizeDelivery } from '@nexus/wallet-core/src/utils/localpay/build'
 export {
   FrameVerifyError,
   verifyFramePayment,
   type DerivingWallet,
   type FrameVerifyKind
-} from '@nexus/wallet-core/utils/localpay/verify'
-export { holdSentPaymentOffline } from '@nexus/wallet-core/utils/offline/payerHold'
-export { awdlTransport } from '@nexus/wallet-core/utils/localpay/transport/awdl'
-export { nearbyTransport } from '@nexus/wallet-core/utils/localpay/transport/nearby'
+} from '@nexus/wallet-core/src/utils/localpay/verify'
+export { holdSentPaymentOffline } from '@nexus/wallet-core/src/utils/offline/payerHold'
+export { awdlTransport } from '@nexus/wallet-core/src/utils/localpay/transport/awdl'
+export { nearbyTransport } from '@nexus/wallet-core/src/utils/localpay/transport/nearby'
 export {
   localSupportsAwdl,
   localSupportsNearby,
   selectTransport,
   type TransportKind
-} from '@nexus/wallet-core/utils/localpay/transport/select'
-export { requestNearbyPermissions } from '@nexus/wallet-core/utils/localpay/transport/nearbyPermissions'
-export { isDeclineReason, type Ack, type ConfirmDelivery, type DeclineReason } from '@nexus/wallet-core/utils/localpay/transport/types'
-export { CAP_NEARBY } from '@nexus/wallet-core/utils/localpay/session'
+} from '@nexus/wallet-core/src/utils/localpay/transport/select'
+export { requestNearbyPermissions } from '@nexus/wallet-core/src/utils/localpay/transport/nearbyPermissions'
+export { isDeclineReason, type Ack, type ConfirmDelivery, type DeclineReason } from '@nexus/wallet-core/src/utils/localpay/transport/types'
+export { CAP_NEARBY } from '@nexus/wallet-core/src/utils/localpay/session'

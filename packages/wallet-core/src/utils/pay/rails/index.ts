@@ -7,8 +7,8 @@
  * classification a payment depends on is testable in isolation.
  */
 import { PublicKey, Utils } from '@bsv/sdk'
-import { decodeSession, type Session } from '@nexus/wallet-core/utils/localpay/session'
-import { validatePeerPayURI } from '@nexus/wallet-core/utils/parsePeerPayURI'
+import { decodeSession, type Session } from '@nexus/wallet-core/src/utils/localpay/session'
+import { validatePeerPayURI } from '@nexus/wallet-core/src/utils/parsePeerPayURI'
 
 export type RailId = 'nearby' | 'handle' | 'address'
 
