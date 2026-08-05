@@ -39,18 +39,31 @@ function getHost(): NexusHost | null {
 
 /** A site rendered by the shell's native webview, glued to this element's rect. */
 /**
- * On mobile the chrome's pill bar and tab bar are `fixed` and float OVER the browse pane,
- * which is full-bleed by design. A native webview paints above the WebView holding this
- * document, so a full-bleed rect hides those controls completely — the app looks like
- * nothing but the browsed site.
+ * On mobile the chrome's browse bar is `fixed` and floats OVER the browse pane, which is
+ * full-bleed by design. A native webview paints ABOVE the WebView holding this document,
+ * so whatever the tab rect covers is not dimmed — it is gone. An iframe can sit under
+ * translucent chrome; a native layer cannot.
  *
- * An iframe can sit under translucent chrome; a native layer cannot. So on narrow layouts
- * the rect is inset past the bars. Wide layouts have a real content pane and need no
- * inset. Values are deliberately slightly generous: overlapping the controls is a broken
- * app, a few pixels of extra margin is not.
+ * So the rect stops exactly where that bar starts, and the bar is MEASURED rather than
+ * assumed: it carries `data-nexus-browse-bar`, its height varies with the device's
+ * safe-area inset, and a hardcoded guess is wrong on every device it was not tuned on.
+ * The constant below is only the fallback for the frame before the bar has mounted.
+ *
+ * Nothing is reserved at the top. The shell already insets this whole document below the
+ * notch (apps/mobile/App.tsx), and browse mode has no fixed top bar — so the page starts
+ * immediately under the status bar and runs to the browse bar: as edge-to-edge as it can
+ * be without hiding chrome the user needs.
  */
 const MOBILE_BREAKPOINT = 768;
-const MOBILE_CHROME_INSET = { top: 72, bottom: 100 };
+const BROWSE_BAR_FALLBACK = 100;
+
+/** Height of the floating browse bar, or the fallback when it has not mounted yet. */
+function browseBarHeight(): number {
+  if (window.innerWidth >= MOBILE_BREAKPOINT) return 0;
+  const bar = document.querySelector("[data-nexus-browse-bar]");
+  const h = bar?.getBoundingClientRect().height ?? 0;
+  return h > 0 ? Math.ceil(h) : BROWSE_BAR_FALLBACK;
+}
 
 function NativeSiteFrame({ url }: { url: string }): ReactNode {
   const boxRef = useRef<HTMLDivElement>(null);
@@ -67,14 +80,12 @@ function NativeSiteFrame({ url }: { url: string }): ReactNode {
       const id = tabIdRef.current;
       if (!el || !id) return;
       const r = el.getBoundingClientRect();
-      const narrow = window.innerWidth < MOBILE_BREAKPOINT;
-      const top = narrow ? MOBILE_CHROME_INSET.top : 0;
-      const bottom = narrow ? MOBILE_CHROME_INSET.bottom : 0;
+      const bottom = browseBarHeight();
       void host.tabs.setBounds(id, {
         x: Math.round(r.left),
-        y: Math.round(r.top + top),
+        y: Math.round(r.top),
         width: Math.round(r.width),
-        height: Math.round(Math.max(0, r.height - top - bottom)),
+        height: Math.round(Math.max(0, r.height - bottom)),
       });
     };
 
@@ -93,12 +104,20 @@ function NativeSiteFrame({ url }: { url: string }): ReactNode {
 
     const ro = new ResizeObserver(pushBounds);
     if (boxRef.current) ro.observe(boxRef.current);
+    // The browse bar mounts and animates independently of this pane, so the first
+    // measurement can land before it exists and latch the fallback height. Observe it
+    // once it appears — and re-push on the next frame, which covers the case where it
+    // mounted between this effect and the tab actually being created.
+    const bar = document.querySelector("[data-nexus-browse-bar]");
+    if (bar) ro.observe(bar);
+    const raf = requestAnimationFrame(pushBounds);
     window.addEventListener("resize", pushBounds);
     // Capture phase: any ancestor scrolling moves this pane without resizing it.
     window.addEventListener("scroll", pushBounds, true);
 
     return () => {
       disposed = true;
+      cancelAnimationFrame(raf);
       ro.disconnect();
       window.removeEventListener("resize", pushBounds);
       window.removeEventListener("scroll", pushBounds, true);

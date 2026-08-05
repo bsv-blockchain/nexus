@@ -145,6 +145,10 @@ function BottomBar({
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: 40, opacity: 0 }}
       transition={spring}
+      // The browse pane measures this bar to decide where the native webview stops.
+      // A native layer paints ABOVE this document, so anything it overlaps is gone,
+      // not merely dimmed — the tab rect has to end exactly where this bar begins.
+      data-nexus-browse-bar=""
       className="pointer-events-none fixed inset-x-0 bottom-0 z-40 grid grid-cols-3 items-center border-t border-black/5 bg-white/70 px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl md:hidden dark:border-white/10 dark:bg-neutral-900/60"
     >
       <button
