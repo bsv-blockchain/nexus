@@ -526,7 +526,9 @@ export function IconRail(): ReactNode {
         className={`flex w-full shrink-0 items-center pt-3 ${
           railCollapsed
             ? "flex-col-reverse gap-1 px-2"
-            : "justify-between px-4"
+            : // px-2, not px-4: the expanded rail is 96px, and two 28px buttons plus
+              // the version label need every one of the 80px this leaves.
+              "justify-between gap-1 px-2"
         }`}
       >
         <button

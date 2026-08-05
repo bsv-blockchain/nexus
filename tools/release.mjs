@@ -43,7 +43,10 @@ function sh(cmd, argv, opts = {}) {
     console.log(`[dry-run] ${line}`)
     return ''
   }
-  return execFileSync(cmd, argv, { cwd: ROOT, encoding: 'utf8', ...opts }).trim()
+  // execFileSync returns null (not '') when stdout is not piped — .trim() on that
+  // took the whole script down at preflight.
+  const out = execFileSync(cmd, argv, { cwd: ROOT, encoding: 'utf8', ...opts })
+  return typeof out === 'string' ? out.trim() : ''
 }
 
 function fail(msg) {
@@ -69,37 +72,58 @@ if (local !== remote) {
   fail('main is not in sync with origin/main — pull/push first, the tag must land on a commit origin has')
 }
 
-// versions consistent before anything moves
-sh('node', ['tools/version.mjs', '--check'], { stdio: 'inherit' })
+// versions consistent before anything moves (drift details arrive on stderr,
+// which execFileSync passes through by default)
+sh('node', ['tools/version.mjs', '--check'])
 
 // ── 2. optional re-stamp ──────────────────────────────────────────────────────
 const explicit = value('--version')
 const bump = flag('--major') ? 'major' : flag('--minor') ? 'minor' : null
 if (explicit && bump) fail('--version and --major/--minor are mutually exclusive')
+if (explicit && !/^\d+\.\d+\.\d+$/.test(explicit)) {
+  // Validated here, not only inside version.mjs --set: dry-run skips the --set call,
+  // and a dry run that says "About to release vbanana" predicts nothing.
+  fail(`--version wants x.y.z, got "${explicit}"`)
+}
+
+/**
+ * Refuse a taken version BEFORE anything is written. Two different checks on
+ * purpose: origin owning the tag means this version has shipped; only the local
+ * repo owning it means a previous run died between tagging and pushing, and the
+ * remedy is cleanup, not burning the version number.
+ */
+function assertTagFree(candidate) {
+  if (DRY) return
+  if (sh('git', ['ls-remote', '--tags', 'origin', `refs/tags/${candidate}`]) !== '') {
+    fail(`${candidate} already exists on origin — that version has shipped; pick the next one`)
+  }
+  try {
+    sh('git', ['rev-parse', '--verify', `refs/tags/${candidate}`], { stdio: 'pipe' })
+    fail(`${candidate} exists locally but not on origin — a previous run died mid-release.\n  Clean up with: git tag -d ${candidate}   (and git reset --hard origin/main if it also committed)`)
+  } catch (e) {
+    if (e.status === undefined) throw e
+    // unresolvable ref — good, the tag is free
+  }
+}
+
+// What version WOULD this run release? Compute before mutating anything.
+const current = sh('node', ['tools/version.mjs'])
+const plannedVersion = explicit ?? (bump ? bumped(current, bump) : current)
+function bumped(v, kind) {
+  const [maj, min] = v.split('.').map(Number)
+  return kind === 'major' ? `${maj + 1}.0.0` : `${maj}.${min + 1}.0`
+}
+assertTagFree(`v${plannedVersion}`)
 
 if (explicit) sh('node', ['tools/version.mjs', '--set', explicit], { mutates: true })
 if (bump) sh('node', ['tools/version.mjs', '--bump', bump], { mutates: true })
 
-const version = DRY && (explicit || bump)
-  ? (explicit ?? '«bumped»')
-  : sh('node', ['tools/version.mjs'])
+const version = DRY ? plannedVersion : sh('node', ['tools/version.mjs'])
 const tag = `v${version}`
 
 if ((explicit || bump) && !DRY) {
   sh('git', ['add', '-A'], { mutates: true })
   sh('git', ['commit', '-m', `release: ${tag}`], { mutates: true })
-}
-
-// The tag must not already exist anywhere. Locally is a mistake; on origin it means
-// this version already shipped.
-if (!DRY) {
-  try {
-    sh('git', ['rev-parse', '--verify', `refs/tags/${tag}`], { stdio: 'pipe' })
-    fail(`${tag} already exists — this version has been released; bump first`)
-  } catch (e) {
-    if (e.status === undefined) throw e
-    // unresolvable ref — good, the tag is free
-  }
 }
 
 // ── confirm ───────────────────────────────────────────────────────────────────
@@ -115,7 +139,13 @@ if (!flag('--yes') && !DRY) {
 
 // ── 3. tag and push ───────────────────────────────────────────────────────────
 sh('git', ['tag', '-a', tag, '-m', `Nexus ${tag}`], { mutates: true })
-sh('git', ['push', 'origin', 'main'], { mutates: true })
+try {
+  sh('git', ['push', 'origin', 'main'], { mutates: true })
+} catch {
+  // Almost always a merge that landed after preflight (the confirm prompt is an
+  // unbounded window). Nothing has been published: the tag is local-only.
+  fail(`push of main was rejected — someone merged since preflight.\n  Nothing was released. Recover with:\n    git tag -d ${tag}\n    git pull --rebase origin main\n  then run the release again.`)
+}
 sh('git', ['push', 'origin', tag], { mutates: true })
 console.log(`✓ ${tag} pushed — release workflows are running`)
 
@@ -127,5 +157,18 @@ sh('node', ['tools/version.mjs', '--bump', 'patch'], { mutates: true })
 const next = DRY ? '«next»' : sh('node', ['tools/version.mjs'])
 sh('git', ['add', '-A'], { mutates: true })
 sh('git', ['commit', '-m', `chore: begin v${next} development`], { mutates: true })
-sh('git', ['push', 'origin', 'main'], { mutates: true })
+try {
+  sh('git', ['push', 'origin', 'main'], { mutates: true })
+} catch {
+  // The release itself is out (tag pushed, CI running); only the roll-forward is
+  // stranded. Retry once over whatever just landed — the bump commit touches only
+  // version fields, so a rebase is near-certain to apply cleanly.
+  console.log('roll-forward push rejected — rebasing over the new main and retrying once')
+  sh('git', ['pull', '--rebase', 'origin', 'main'], { mutates: true })
+  try {
+    sh('git', ['push', 'origin', 'main'], { mutates: true })
+  } catch {
+    fail(`${tag} IS released, but the roll to v${next} did not reach origin.\n  Finish by hand: resolve the rebase if needed, then git push origin main.\n  Until that lands, main still carries the RELEASED version number.`)
+  }
+}
 console.log(`✓ development continues on v${next}`)

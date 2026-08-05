@@ -42,7 +42,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - run: node tools/version.mjs --check --tag "$GITHUB_REF_NAME"
+      # workflow_dispatch is for RE-RUNNING a tag's release: dispatch it on the tag
+      # ref. From a branch there is no version to release — refuse loudly.
+      - run: |
+          if [[ "$GITHUB_REF" != refs/tags/v* ]]; then
+            echo "::error::this workflow releases tags — dispatch it on a vX.Y.Z tag, not '$GITHUB_REF_NAME'"
+            exit 1
+          fi
+          node tools/version.mjs --check --tag "$GITHUB_REF_NAME"
 
   build:
     needs: verify-version
@@ -288,40 +295,39 @@ jobs:
         with:
           path: artifacts
 
-      # One DRAFT release per version, rebuilt from scratch each run. Three rules,
-      # each earned the hard way in review:
-      #   1. A PUBLISHED release owning this tag is untouchable — gh resolves tags to
-      #      the published release first, so uploading would silently replace live,
-      #      human-approved assets. Fail and demand a version bump instead.
-      #   2. Drafts do not create git tags, so `gh release create --draft` happily
-      #      mints duplicates; stale drafts are deleted before creating the new one
-      #      (bsv-desktop does the same).
-      #   3. No `|| true` around create — a real API failure must fail the job here,
-      #      not resurface later as a baffling "release not found" from the upload.
+      # Shared draft-release protocol with release-mobile.yml — BOTH sides must
+      # follow it, or one side's artifacts get destroyed. (The first cut of this job
+      # deleted "stale" drafts wholesale; review traced the race — the mobile APK
+      # often lands before a 3-platform build + notarization finishes, and deleting
+      # the draft deletes its assets.)
+      #   1. never touch a PUBLISHED release (releases are immutable)
+      #   2. never DELETE a draft that might hold the other workflow's assets
+      #   3. view → create-if-absent → dedupe keeping the OLDEST draft, so a
+      #      same-moment create race converges on one survivor before uploads
+      #   4. upload with --clobber (reruns refresh their own assets in place)
       # Publishing the draft is deliberately left to a person.
       - name: create draft release and upload assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="$GITHUB_REF_NAME"
-          VERSION="${TAG#v}"
 
           if gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null | grep -q false; then
             echo "::error::$TAG is already published — releases are immutable, cut a new version"
             exit 1
           fi
 
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --draft --title "Nexus ${TAG}" --notes "Nexus ${TAG} — built from ${GITHUB_SHA}" || true
           gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
-            --jq ".[] | select(.draft and .tag_name == \"$TAG\") | .id" |
+            --jq "[.[] | select(.draft and .tag_name == \"$TAG\")] | sort_by(.created_at) | .[1:] | .[].id" |
             while read -r id; do
-              echo "deleting stale draft $id"
+              echo "removing duplicate draft $id (created after the survivor)"
               gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/$id"
             done
 
-          gh release create "$TAG" --draft --title "Nexus ${TAG}" --notes "Nexus ${TAG} — built from ${GITHUB_SHA}"
-
           for file in artifacts/*/*; do
             if [ -f "$file" ]; then
-              gh release upload "$TAG" "$file"
+              gh release upload "$TAG" "$file" --clobber
             fi
           done

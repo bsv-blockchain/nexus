@@ -1,6 +1,7 @@
 "use client";
 
 import { AppTile } from "@/components/hub/app-icon";
+import { ShellVersion } from "@/components/hub/shell-version";
 import { AppCollections } from "@/components/hub/app-collections";
 import { AppStore } from "@/components/hub/app-store";
 import { DownloadsPanel } from "@/components/hub/downloads-panel";
@@ -179,6 +180,11 @@ function MobileSheetContent(): ReactNode {
             </button>
             <div className="px-1 pt-1">
               <ThemeToggleWithLabel />
+            </div>
+            {/* Phones never see the desktop rail, and this number is what a bug
+                report needs — so it lives here too. */}
+            <div className="flex justify-center px-1 pb-1 pt-2">
+              <ShellVersion />
             </div>
           </div>
         )}

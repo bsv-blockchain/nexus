@@ -1,19 +1,33 @@
-# Mobile release: store uploads and a sideloadable APK — on version tags ONLY,
+# Mobile release: store builds and a sideloadable APK — on version tags ONLY,
 # the same trigger as release-desktop.yml. Cutting a release is `npm run release`.
 #
-# Two independent legs:
+# Three legs:
 #
-#   stores   `eas build --profile production --auto-submit` on EAS's builders, both
-#            platforms. Credentials live on EAS (eas.json: credentialsSource remote),
-#            versions are stamped by tools/release.mjs before the tag, and store
-#            build numbers auto-increment on EAS (appVersionSource: remote +
-#            autoIncrement) — CI holds nothing but EXPO_TOKEN. --no-wait: the run
-#            confirms submission, not the build; EAS's own dashboard owns the rest.
+#   stores-android   production AAB on EAS's builders. NOT auto-submitted: no Google
+#                    service account is configured on EAS yet, and eas-cli hard-errors
+#                    in --non-interactive without one. The AAB waits on the EAS
+#                    dashboard for a manual Play upload — add
+#                    submit.production.android (serviceAccountKeyPath + track) to
+#                    eas.json and --auto-submit here once the key lands.
 #
-#   apk      an installable Android APK for testers who sideload, built on the EAS
-#            builders too (same toolchain as the store build), downloaded and
-#            attached to the tag's draft GitHub release next to the desktop
-#            artifacts. This one DOES wait — the artifact is the point.
+#   stores-ios       production IPA on EAS's builders. NOT auto-submitted either:
+#                    non-interactive iOS submission requires ios.ascAppId in
+#                    eas.json's submit profile, which is not configured — with `{}`
+#                    eas-cli refuses rather than resolving the app id. Set ascAppId
+#                    and add --auto-submit to switch to hands-off store delivery.
+#                    Runs on macOS because the two Rust xcframeworks
+#                    (SecpNative/EngineNative) are gitignored build products that
+#                    exist only on dev machines — CI must rebuild them from the
+#                    tracked Rust sources before the EAS archive is taken, or pod
+#                    install dies on the EAS builder every time.
+#
+#   apk              signed installable APK (preview profile) for testers who
+#                    sideload, attached to the tag's draft GitHub release beside the
+#                    desktop artifacts. Android needs no xcframeworks — its native
+#                    modules compile from tracked source on the EAS builder.
+#
+# No `--no-wait` anywhere: a queued-then-failed EAS build must fail THIS run, not
+# silently evaporate behind a green checkmark.
 name: release-mobile
 
 on:
@@ -31,9 +45,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - run: node tools/version.mjs --check --tag "$GITHUB_REF_NAME"
+      # workflow_dispatch is for RE-RUNNING a tag's release: dispatch it on the tag
+      # ref. Dispatched from a branch, GITHUB_REF_NAME is the branch name and no
+      # release semantics exist — refuse loudly instead of failing weirdly later.
+      - run: |
+          if [[ "$GITHUB_REF" != refs/tags/v* ]]; then
+            echo "::error::this workflow releases tags — dispatch it on a vX.Y.Z tag, not '$GITHUB_REF_NAME'"
+            exit 1
+          fi
+          node tools/version.mjs --check --tag "$GITHUB_REF_NAME"
 
-  stores:
+  stores-android:
     needs: verify-version
     runs-on: ubuntu-latest
     steps:
@@ -58,9 +80,53 @@ jobs:
       - name: bundle the chrome
         run: npm run ui:bundle
 
-      - name: build and submit to both stores
+      - name: build store AAB (Android)
         working-directory: apps/mobile
-        run: eas build --platform all --profile production --non-interactive --no-wait --auto-submit
+        run: eas build --platform android --profile production --non-interactive
+
+  stores-ios:
+    needs: verify-version
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: setup node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      - name: setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: setup Rust (iOS targets)
+        run: |
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+
+      # The EAS archive is taken from the working tree; these binaries are gitignored,
+      # so they must exist on disk BEFORE `eas build`. Build scripts and Rust sources
+      # are tracked; the sync scripts copy the results into the RN packages, which is
+      # exactly what happens on a dev machine.
+      - name: build native xcframeworks
+        run: |
+          (cd native-secp-poc && scripts/build-secp-xcframework.sh)
+          (cd native-engine-ffi && scripts/build-engine-xcframework.sh)
+          packages/react-native-secp-native/scripts/sync-xcframework.sh
+          packages/react-native-engine-native/scripts/sync-xcframework.sh
+
+      - name: install dependencies
+        run: |
+          npm ci
+          npm ci --prefix apps/ui
+
+      - name: bundle the chrome
+        run: npm run ui:bundle
+
+      - name: build store IPA (iOS)
+        working-directory: apps/mobile
+        run: eas build --platform ios --profile production --non-interactive
 
   apk:
     needs: verify-version
@@ -89,19 +155,22 @@ jobs:
       - name: bundle the chrome
         run: npm run ui:bundle
 
-      # preview profile: buildType apk, remote credentials — a real signed APK,
-      # not a debug build. This wait is the long pole of the whole release
-      # (EAS queue + build), which is why it runs parallel to `stores`.
       - name: build APK
         working-directory: apps/mobile
         run: |
-          eas build --platform android --profile preview --non-interactive --json --wait > build.json
+          eas build --platform android --profile preview --non-interactive --json > build.json
           URL=$(node -p "JSON.parse(require('fs').readFileSync('build.json','utf8'))[0].artifacts.buildUrl")
           curl -fL "$URL" -o "Nexus-${GITHUB_REF_NAME}.apk"
 
-      # Same draft-release discipline as release-desktop.yml: never touch a
-      # published release, upload to the tag's draft. The desktop workflow may have
-      # already created it — create only if absent.
+      # Shared draft-release protocol with release-desktop.yml — BOTH sides must
+      # follow it, or one side's artifacts get destroyed:
+      #   1. never touch a PUBLISHED release (releases are immutable)
+      #   2. never DELETE a draft (the other workflow may have already uploaded
+      #      assets to it)
+      #   3. view → create-if-absent → dedupe keeping the OLDEST draft, so a
+      #      same-moment create race converges on one survivor before either side
+      #      uploads
+      #   4. upload with --clobber (reruns refresh their own assets in place)
       - name: attach APK to the draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -112,5 +181,11 @@ jobs:
             exit 1
           fi
           gh release view "$TAG" >/dev/null 2>&1 || \
-            gh release create "$TAG" --draft --title "Nexus ${TAG}" --notes "Nexus ${TAG} — built from ${GITHUB_SHA}"
+            gh release create "$TAG" --draft --title "Nexus ${TAG}" --notes "Nexus ${TAG} — built from ${GITHUB_SHA}" || true
+          gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
+            --jq "[.[] | select(.draft and .tag_name == \"$TAG\")] | sort_by(.created_at) | .[1:] | .[].id" |
+            while read -r id; do
+              echo "removing duplicate draft $id (created after the survivor)"
+              gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/$id"
+            done
           gh release upload "$TAG" "apps/mobile/Nexus-${GITHUB_REF_NAME}.apk" --clobber

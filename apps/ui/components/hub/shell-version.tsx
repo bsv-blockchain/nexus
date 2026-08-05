@@ -21,22 +21,34 @@ export function ShellVersion({ className = "" }: { className?: string }) {
   const [info, setInfo] = useState<HostInfo | null>(null);
 
   useEffect(() => {
-    const host = (window as unknown as {
-      nexusHost?: { info?: () => Promise<HostInfo> };
-    }).nexusHost;
-    if (!host?.info) return;
     let alive = true;
-    host
-      .info()
-      .then((i) => {
-        if (alive) setInfo(i);
-      })
-      .catch(() => {
-        // A shell that cannot answer host.info has bigger problems than a missing
-        // version label; stay blank rather than show something wrong.
-      });
+    const ask = () => {
+      const host = (window as unknown as {
+        nexusHost?: { info?: () => Promise<HostInfo> };
+      }).nexusHost;
+      if (!host?.info) return false;
+      host
+        .info()
+        .then((i) => {
+          if (alive) setInfo(i);
+        })
+        .catch(() => {
+          // A shell that cannot answer host.info has bigger problems than a missing
+          // version label; stay blank rather than show something wrong.
+        });
+      return true;
+    };
+    // Check-then-subscribe, in that order: Android's WebView injects the host
+    // client asynchronously (the documented react-native-webview onPageStarted
+    // race), so nexusHost can appear AFTER this mount. Both shells fire
+    // nexushost:ready for exactly this case; a mount-only check would leave the
+    // label permanently blank whenever injection loses the race.
+    if (ask()) return () => { alive = false; };
+    const onReady = () => void ask();
+    window.addEventListener("nexushost:ready", onReady, { once: true });
     return () => {
       alive = false;
+      window.removeEventListener("nexushost:ready", onReady);
     };
   }, []);
 
@@ -44,7 +56,7 @@ export function ShellVersion({ className = "" }: { className?: string }) {
 
   return (
     <span
-      className={`select-text text-[10px] tabular-nums text-muted-foreground/70 ${className}`}
+      className={`min-w-0 truncate select-text text-[10px] tabular-nums text-muted-foreground/70 ${className}`}
       title={`Nexus v${info.version} — ${info.shell ?? "?"}/${info.platform ?? "?"}`}
     >
       v{info.version}

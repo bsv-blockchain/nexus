@@ -2,13 +2,15 @@
   "name": "@nexus/mobile",
   "version": "0.1.0",
   "private": true,
-  "description": "Nexus mobile shell — Expo/React Native, one WebView for the chrome plus one per tab.",
+  "description": "Nexus mobile shell \u2014 Expo/React Native, one WebView for the chrome plus one per tab.",
   "main": "index.js",
   "scripts": {
     "start": "expo start --dev-client",
     "ios": "expo run:ios",
     "android": "expo run:android",
-    "prebuild": "expo prebuild --clean"
+    "prebuild": "expo prebuild --clean",
+    "build:ios:dev": "eas build --platform ios --profile development --local",
+    "build:android:dev": "eas build --platform android --profile development --local"
   },
   "dependencies": {
     "@bsv/air-gap": "^0.1.1",

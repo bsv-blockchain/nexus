@@ -37,7 +37,29 @@ const FILES = [
   { path: 'apps/desktop/package.json', get: (d) => d.version, set: (d, v) => { d.version = v } },
   { path: 'apps/mobile/package.json', get: (d) => d.version, set: (d, v) => { d.version = v } },
   { path: 'apps/mobile/app.json', get: (d) => d.expo.version, set: (d, v) => { d.expo.version = v } },
-  { path: 'apps/ui/package.json', get: (d) => d.version, set: (d, v) => { d.version = v } }
+  { path: 'apps/ui/package.json', get: (d) => d.version, set: (d, v) => { d.version = v } },
+  // The lockfiles too, or `npm ci` on the tagged commit dies before the first build
+  // step: npm refuses to install when a workspace's package.json version disagrees
+  // with what the lock recorded. Verified live — stamping only the manifests left
+  // root/desktop/mobile at their old numbers in package-lock.json.
+  {
+    path: 'package-lock.json',
+    get: (d) => d.version,
+    set: (d, v) => {
+      d.version = v
+      for (const key of ['', 'apps/desktop', 'apps/mobile']) {
+        if (d.packages?.[key]) d.packages[key].version = v
+      }
+    }
+  },
+  {
+    path: 'apps/ui/package-lock.json',
+    get: (d) => d.version,
+    set: (d, v) => {
+      d.version = v
+      if (d.packages?.['']) d.packages[''].version = v
+    }
+  }
 ]
 
 const SEMVER = /^\d+\.\d+\.\d+$/
@@ -89,6 +111,10 @@ if (bump) {
   if (distinct.length !== 1) {
     console.error('refusing to bump: files disagree —')
     for (const v of versions) console.error(`  ${v.path}: ${v.version}`)
+    process.exit(1)
+  }
+  if (!SEMVER.test(distinct[0])) {
+    console.error(`current version "${distinct[0]}" is not x.y.z — bumping it would write NaN into every file`)
     process.exit(1)
   }
   const [maj, min, pat] = distinct[0].split('.').map(Number)
