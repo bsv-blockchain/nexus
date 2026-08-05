@@ -23,20 +23,42 @@ a build handed to a tester can never claim to be a released version.
 
 ## Cutting a release
 
+`main` is protected — changes land through pull requests, and most of the team
+cannot bypass that. `release.mjs` never pushes `main` directly; it only pushes
+**tags** (not branch pushes, so protection doesn't apply) and opens **PRs** for
+the two commits that do need to land on `main`.
+
 ```bash
-npm run release                 # release the current version
-npm run release -- --minor      # re-stamp as next minor first
-npm run release -- --major      # re-stamp as next major first
+npm run release                 # release the CURRENT version
+npm run release -- --minor      # open a PR re-stamping the next minor — see below
+npm run release -- --major      # open a PR re-stamping the next major
+npm run release -- --version 2.0.0   # open a PR re-stamping to an exact version
 npm run release -- --dry-run    # print every step, do nothing
 ```
 
-The script:
+**Plain release** (no flags — the common case, since development already runs as
+the version about to ship):
 
 1. refuses to run unless you are on `main`, clean, and in sync with `origin/main`
-2. re-stamps if asked (`release: vX.Y.Z` commit)
-3. tags `vX.Y.Z`, pushes `main` + the tag
-4. immediately rolls every metadata file to `X.Y.(Z+1)` and pushes
-   (`chore: begin vX.Y.(Z+1) development`)
+2. refuses if the tag already exists — on origin (shipped, pick the next version)
+   or only locally (a previous run died mid-release; `git tag -d vX.Y.Z` and retry)
+3. tags `vX.Y.Z` and pushes the **tag** — this is what fires CI
+4. opens a PR rolling every metadata file to `X.Y.(Z+1)` and enables auto-merge
+   (`chore: begin vX.Y.(Z+1) development`) — **merge it promptly**: until it lands,
+   `main` still carries the just-released version number
+
+**Re-stamp first** (`--minor` / `--major` / `--version`): the tag has to point at a
+commit that already carries the new number, and getting a commit onto `main` means
+a PR. So these flags open the re-stamp PR and **stop**:
+
+1. opens a PR (`release: vX.Y.Z`) and enables auto-merge
+2. merge it
+3. run `npm run release` again with no flags — the re-stamped version is now
+   current, so this is a plain release
+
+If your repo has auto-merge disabled, both PR types just wait for a human to
+approve and merge — that's the branch protection working as intended, not the
+script failing.
 
 The tag then drives CI:
 
