@@ -8,9 +8,11 @@
     "start": "expo start --dev-client",
     "ios": "expo run:ios",
     "android": "expo run:android",
-    "prebuild": "expo prebuild --clean",
+    "prebuild": "LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 expo prebuild --clean",
     "build:ios:dev": "eas build --platform ios --profile development --local",
-    "build:android:dev": "eas build --platform android --profile development --local"
+    "build:android:dev": "eas build --platform android --profile development --local",
+    "build:android:prod": "eas build --platform android --profile production --local",
+    "build:ios:prod": "eas build --platform ios --profile production --local"
   },
   "dependencies": {
     "@bsv/air-gap": "^0.1.1",

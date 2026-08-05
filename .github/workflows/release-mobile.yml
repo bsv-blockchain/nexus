@@ -3,12 +3,13 @@
 #
 # Three legs:
 #
-#   stores-android   production AAB on EAS's builders. NOT auto-submitted: no Google
-#                    service account is configured on EAS yet, and eas-cli hard-errors
-#                    in --non-interactive without one. The AAB waits on the EAS
-#                    dashboard for a manual Play upload — add
-#                    submit.production.android (serviceAccountKeyPath + track) to
-#                    eas.json and --auto-submit here once the key lands.
+#   stores-android   production AAB on EAS's builders, auto-submitted to Play's
+#                    INTERNAL testing track (eas.json submit.production.android).
+#                    Two preconditions are now met and both were required: a Google
+#                    service account on EAS, and one manual AAB upload — Google will
+#                    not let a service account create a new package's first release.
+#                    Promotion from internal testing to production stays a Play
+#                    Console act.
 #
 #   stores-ios       production IPA on EAS's builders, auto-submitted to TestFlight.
 #                    eas.json now carries submit.production.ios.ascAppId
@@ -79,9 +80,9 @@ jobs:
       - name: bundle the chrome
         run: npm run ui:bundle
 
-      - name: build store AAB (Android)
+      - name: build and submit to Play internal testing (Android)
         working-directory: apps/mobile
-        run: eas build --platform android --profile production --non-interactive
+        run: eas build --platform android --profile production --non-interactive --auto-submit
 
   stores-ios:
     needs: verify-version

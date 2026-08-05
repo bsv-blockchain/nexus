@@ -28,7 +28,9 @@
     "build:linux": "npm run ui:bundle && npm --workspace @nexus/desktop run pack:linux",
     "build:ios": "node tools/version.mjs --check-native && npm run ui:bundle && npm --prefix apps/mobile run build:ios:dev",
     "build:android": "node tools/version.mjs --check-native && npm run ui:bundle && npm --prefix apps/mobile run build:android:dev",
-    "prebuild": "npm --prefix apps/mobile run prebuild"
+    "prebuild": "npm --prefix apps/mobile run prebuild",
+    "build:android:prod": "node tools/version.mjs --check-native && npm run ui:bundle && npm --prefix apps/mobile run build:android:prod",
+    "build:ios:prod": "node tools/version.mjs --check-native && npm run ui:bundle && npm --prefix apps/mobile run build:ios:prod"
   },
   "devDependencies": {
     "patch-package": "^8.0.1",
