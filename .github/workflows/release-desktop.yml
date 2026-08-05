@@ -1,5 +1,8 @@
 # Desktop release: build, sign, and publish the Electron shell for macOS, Windows
-# and Linux on every merge to main.
+# and Linux — on version tags ONLY. Merges to main build nothing and publish
+# nothing; cutting a release is `npm run release` (tools/release.mjs), which stamps
+# every metadata file, tags vX.Y.Z, and pushes. The tag is the sole trigger, so a
+# release is always a deliberate, versioned act.
 #
 # The certificate and signing process deliberately MIRRORS bsv-desktop's release.yml
 # (bsv-blockchain/bsv-desktop), including the secret names, so the org's existing
@@ -15,15 +18,15 @@
 #            against the KeyLocker certificate and verified.
 #   Linux    GPG: detach-signed AppImage plus a signed SHA256SUMS manifest.
 #
-# Publishing model: every run refreshes a DRAFT GitHub release named after
-# apps/desktop/package.json's version. Making a draft public stays a human act.
+# Publishing model: every run refreshes a DRAFT GitHub release for the tag.
+# Making a draft public stays a human act.
 name: release-desktop
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*.*.*'
 
 # Serialize runs but never cancel: killing a run mid-notarization wastes an Apple
 # submission, and killing it mid-upload strands a partial draft that looks complete.
@@ -33,7 +36,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The tag names a version; every metadata file must agree with it, or five
+  # platforms would ship artifacts that disagree about what they are.
+  verify-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: node tools/version.mjs --check --tag "$GITHUB_REF_NAME"
+
   build:
+    needs: verify-version
     permissions:
       contents: write
     strategy:
@@ -291,11 +303,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION=$(node -p "require('./apps/desktop/package.json').version")
-          TAG="desktop-v${VERSION}"
+          TAG="$GITHUB_REF_NAME"
+          VERSION="${TAG#v}"
 
           if gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null | grep -q false; then
-            echo "::error::$TAG is already published — bump apps/desktop/package.json's version"
+            echo "::error::$TAG is already published — releases are immutable, cut a new version"
             exit 1
           fi
 
@@ -306,7 +318,7 @@ jobs:
               gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/$id"
             done
 
-          gh release create "$TAG" --draft --title "Nexus Desktop v${VERSION}" --notes "Nexus Desktop v${VERSION} — built from ${GITHUB_SHA}"
+          gh release create "$TAG" --draft --title "Nexus ${TAG}" --notes "Nexus ${TAG} — built from ${GITHUB_SHA}"
 
           for file in artifacts/*/*; do
             if [ -f "$file" ]; then

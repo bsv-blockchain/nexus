@@ -1,0 +1,116 @@
+# Mobile release: store uploads and a sideloadable APK — on version tags ONLY,
+# the same trigger as release-desktop.yml. Cutting a release is `npm run release`.
+#
+# Two independent legs:
+#
+#   stores   `eas build --profile production --auto-submit` on EAS's builders, both
+#            platforms. Credentials live on EAS (eas.json: credentialsSource remote),
+#            versions are stamped by tools/release.mjs before the tag, and store
+#            build numbers auto-increment on EAS (appVersionSource: remote +
+#            autoIncrement) — CI holds nothing but EXPO_TOKEN. --no-wait: the run
+#            confirms submission, not the build; EAS's own dashboard owns the rest.
+#
+#   apk      an installable Android APK for testers who sideload, built on the EAS
+#            builders too (same toolchain as the store build), downloaded and
+#            attached to the tag's draft GitHub release next to the desktop
+#            artifacts. This one DOES wait — the artifact is the point.
+name: release-mobile
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*'
+
+concurrency:
+  group: release-mobile-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: node tools/version.mjs --check --tag "$GITHUB_REF_NAME"
+
+  stores:
+    needs: verify-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: setup node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      - name: setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: install dependencies
+        run: |
+          npm ci
+          npm ci --prefix apps/ui
+
+      - name: bundle the chrome
+        run: npm run ui:bundle
+
+      - name: build and submit to both stores
+        working-directory: apps/mobile
+        run: eas build --platform all --profile production --non-interactive --no-wait --auto-submit
+
+  apk:
+    needs: verify-version
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: setup node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      - name: setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: install dependencies
+        run: |
+          npm ci
+          npm ci --prefix apps/ui
+
+      - name: bundle the chrome
+        run: npm run ui:bundle
+
+      # preview profile: buildType apk, remote credentials — a real signed APK,
+      # not a debug build. This wait is the long pole of the whole release
+      # (EAS queue + build), which is why it runs parallel to `stores`.
+      - name: build APK
+        working-directory: apps/mobile
+        run: |
+          eas build --platform android --profile preview --non-interactive --json --wait > build.json
+          URL=$(node -p "JSON.parse(require('fs').readFileSync('build.json','utf8'))[0].artifacts.buildUrl")
+          curl -fL "$URL" -o "Nexus-${GITHUB_REF_NAME}.apk"
+
+      # Same draft-release discipline as release-desktop.yml: never touch a
+      # published release, upload to the tag's draft. The desktop workflow may have
+      # already created it — create only if absent.
+      - name: attach APK to the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="$GITHUB_REF_NAME"
+          if gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null | grep -q false; then
+            echo "::error::$TAG is already published — releases are immutable, cut a new version"
+            exit 1
+          fi
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --draft --title "Nexus ${TAG}" --notes "Nexus ${TAG} — built from ${GITHUB_SHA}"
+          gh release upload "$TAG" "apps/mobile/Nexus-${GITHUB_REF_NAME}.apk" --clobber

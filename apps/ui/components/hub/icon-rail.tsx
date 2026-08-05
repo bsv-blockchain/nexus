@@ -1,6 +1,7 @@
 "use client";
 
 import { AppTile } from "@/components/hub/app-icon";
+import { ShellVersion } from "@/components/hub/shell-version";
 import { GroupSettingsDialog } from "@/components/hub/group-settings-dialog";
 import {
   useHub,
@@ -540,6 +541,7 @@ export function IconRail(): ReactNode {
             <PanelLeftClose className="size-4" aria-hidden="true" />
           )}
         </button>
+        {!railCollapsed && <ShellVersion />}
         <button
           type="button"
           aria-label="Share Nexus"

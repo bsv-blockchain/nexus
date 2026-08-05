@@ -1,8 +1,8 @@
 {
   "name": "@nexus/desktop",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
-  "description": "Nexus desktop shell \u2014 Electron, WebContentsView per tab.",
+  "description": "Nexus desktop shell — Electron, WebContentsView per tab.",
   "type": "module",
   "main": "dist-electron/main.cjs",
   "scripts": {
