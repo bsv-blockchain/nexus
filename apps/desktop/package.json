@@ -4,15 +4,17 @@
   "private": true,
   "description": "Nexus desktop shell \u2014 Electron, WebContentsView per tab.",
   "type": "module",
-  "main": "src/main.mjs",
+  "main": "dist-electron/main.cjs",
   "scripts": {
-    "dev": "electron .",
-    "pack:mac": "electron-builder --mac --dir",
-    "pack:win": "electron-builder --win --dir",
-    "pack:linux": "electron-builder --linux --dir",
-    "dist:mac": "electron-builder --mac",
-    "dist:win": "electron-builder --win",
-    "dist:linux": "electron-builder --linux"
+    "build": "node build-main.mjs",
+    "dev": "node build-main.mjs && electron .",
+    "watch": "node build-main.mjs --watch",
+    "pack:mac": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --dir",
+    "pack:win": "npm run build && electron-builder --win --dir --x64",
+    "pack:linux": "npm run build && electron-builder --linux --dir --x64",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
     "@nexus/bridge": "*",
@@ -20,7 +22,8 @@
   },
   "devDependencies": {
     "electron": "43.2.0",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.1"
   },
   "build": {
     "appId": "org.bsvassociation.nexus",
@@ -31,9 +34,8 @@
     },
     "asar": true,
     "files": [
-      "src/**/*",
+      "dist-electron/**/*",
       "package.json",
-      "node_modules/**/*",
       "!**/*.map"
     ],
     "extraResources": [

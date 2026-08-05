@@ -236,20 +236,42 @@ function createTabManager({ win, emit }) {
     }
   }
 
+  /**
+   * True while the chrome has a sheet, gate or menu open.
+   *
+   * A WebContentsView is a native sibling of the chrome's renderer and always paints
+   * ABOVE it — no z-index in the DOM can reach over one. So a chrome overlay is
+   * invisible until every tab view is hidden, which is what this flag forces. Mobile
+   * has the identical problem and the identical answer (apps/mobile/src/useTabHost.ts).
+   *
+   * The chrome refcounts before it calls, because a gate and a sheet can both be open;
+   * here it is one boolean, deliberately, so the shell holds no state that could
+   * disagree with the chrome's.
+   */
+  let overlayOpen = false
+
+  /** The one place that decides whether a given tab may be on screen. */
+  function applyVisibility() {
+    for (const [tabId, tab] of tabs) {
+      const visible = !overlayOpen && tabId === activeId
+      tab.view.setVisible(visible)
+      // Re-apply the last known rect whenever a tab becomes visible: a tab hidden
+      // during a resize may hold a stale bounds from before it was hidden, since only
+      // the visible tab is guaranteed to have received every setBounds push while
+      // backgrounded.
+      if (visible && tab.rect) tab.view.setBounds(tab.rect)
+    }
+  }
+
   function setActive(id) {
     if (!tabs.has(id)) return
-    for (const [tabId, tab] of tabs) {
-      if (tabId === id) {
-        tab.view.setVisible(true)
-        // Re-apply the last known rect on activation: a tab hidden during a resize
-        // may hold a stale bounds from before it was hidden, since only the visible
-        // tab is guaranteed to have received every setBounds push while backgrounded.
-        if (tab.rect) tab.view.setBounds(tab.rect)
-      } else {
-        tab.view.setVisible(false)
-      }
-    }
     activeId = id
+    applyVisibility()
+  }
+
+  function setOverlay(open) {
+    overlayOpen = Boolean(open)
+    applyVisibility()
   }
 
   function goBack(id) {
@@ -291,7 +313,7 @@ function createTabManager({ win, emit }) {
     return tabs.size
   }
 
-  return { create, destroy, navigate, setBounds, setActive, goBack, goForward, reload, stop, list, count }
+  return { create, destroy, navigate, setBounds, setActive, setOverlay, goBack, goForward, reload, stop, list, count }
 }
 
 export { createTabManager }

@@ -53,6 +53,11 @@ try {
   if (__DEV__) console.warn('[engine-native] install failed — pure-JS tx path', e)
 }
 
+// Connectivity, before anything can ask. wallet-core's net/online defaults to
+// "assume online" precisely so a missing probe degrades to optimism rather than to a
+// wallet that thinks it is offline; installing it here removes the guess.
+import './src/wallet/netinfoProbe'
+
 import { registerRootComponent } from 'expo'
 
 // `require`, not `import`: ES imports are hoisted above the install() calls above,

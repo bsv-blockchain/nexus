@@ -1,10 +1,11 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import path from 'node:path'
 import { writeFile } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { existsSync, appendFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import bridgePkg from '@nexus/bridge'
 import { createTabManager } from './tabManager.mjs'
+import { createWalletHost } from './wallet/host.mjs'
 
 // @nexus/bridge is CommonJS; destructure off the default import rather than using
 // named ESM imports so this doesn't depend on cjs-module-lexer correctly tracing the
@@ -12,6 +13,24 @@ import { createTabManager } from './tabManager.mjs'
 const { METHODS, createHostRouter } = bridgePkg
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+/**
+ * Boot tracing for a PACKAGED app.
+ *
+ * A packaged .app does not give us main's stdout the way `electron .` does, so a
+ * startup that produces no window and no output is unreadable from a terminal. With
+ * NEXUS_BOOT_LOG set, every milestone is appended to that file instead.
+ */
+const BOOT_LOG = process.env.NEXUS_BOOT_LOG ?? null
+function boot(stage) {
+  if (!BOOT_LOG) return
+  try {
+    appendFileSync(BOOT_LOG, `${Date.now()} ${stage}\n`)
+  } catch {
+    // Tracing must never be the thing that breaks startup.
+  }
+}
+boot('module-evaluated')
 /**
  * Where the chrome comes from.
  *
@@ -29,11 +48,20 @@ const BUNDLED_CHROME = app.isPackaged
   : path.join(__dirname, '..', 'ui', 'index.html')
 const CHROME_URL = process.env.NEXUS_CHROME_URL ?? null
 
+// Electron derives userData from the package name, and this package is called
+// "@nexus/desktop" — which put the wallet databases, the cache and the cookies in
+// "~/Library/Application Support/@nexus/desktop". Same class of mistake as the Linux
+// binary that shipped as "@nexusdesktop". Set before whenReady, or the paths are
+// already resolved by the time it takes effect.
+app.setName('Nexus')
+
 let win = null
 let tabManager = null
 let router = null
+let walletHost = null
 
 function createWindow() {
+  boot('createWindow')
   win = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -50,6 +78,16 @@ function createWindow() {
   // before the router exists to receive their output.
   tabManager = createTabManager({ win, emit: (name, payload) => router.emit(name, payload) })
 
+  // The wallet lives HERE, in main — never in the renderer. That renderer is a
+  // browser chrome that also hosts arbitrary third-party pages in sibling
+  // WebContentsViews, so key material must not share a process with it. See
+  // src/wallet/buildWallet.ts for the full reasoning and how it differs from
+  // bsv-desktop, which builds its wallet in the renderer.
+  walletHost = createWalletHost({
+    userDataDir: app.getPath('userData'),
+    onStateChange: (state) => router?.emit('wallet.state', state)
+  })
+
   router = createHostRouter({
     methods: {
       [METHODS.HOST_INFO]: () => ({
@@ -58,11 +96,14 @@ function createWindow() {
         version: app.getVersion(),
         tabCount: tabManager.count()
       }),
+      ...walletHost.methods,
       [METHODS.TAB_CREATE]: ({ url, options }) => tabManager.create(url, options),
       [METHODS.TAB_DESTROY]: ({ id }) => tabManager.destroy(id),
       [METHODS.TAB_NAVIGATE]: ({ id, url }) => tabManager.navigate(id, url),
       [METHODS.TAB_SET_BOUNDS]: ({ id, rect }) => tabManager.setBounds(id, rect),
       [METHODS.TAB_SET_ACTIVE]: ({ id }) => tabManager.setActive(id),
+      // Hides the tab views so a chrome sheet can be seen; see tabManager.setOverlay.
+      [METHODS.CHROME_SET_OVERLAY]: ({ open }) => tabManager.setOverlay(open),
       [METHODS.TAB_GO_BACK]: ({ id }) => tabManager.goBack(id),
       [METHODS.TAB_GO_FORWARD]: ({ id }) => tabManager.goForward(id),
       [METHODS.TAB_RELOAD]: ({ id }) => tabManager.reload(id),
@@ -72,7 +113,13 @@ function createWindow() {
     send: (envelope) => win.webContents.send('nexus:host:in', envelope)
   })
 
+  boot('router-ready')
   ipcMain.on('nexus:host:out', (_event, msg) => router.handle(msg))
+
+  // Not awaited: the chrome should paint immediately and learn about the wallet
+  // through wallet.state, exactly as it does on mobile where key derivation takes
+  // tens of seconds.
+  void walletHost.resume()
 
   // Forward the harness's own log to stdout so gate evidence can be collected without
   // a human watching the window. Electron 36+ passes a single details object here;
@@ -82,6 +129,32 @@ function createWindow() {
       const d = args[0]
       const message = d && typeof d === 'object' && 'message' in d ? d.message : args[1]
       console.log(`[chrome] ${message}`)
+    })
+  }
+
+  /**
+   * Evaluate a script file inside the chrome after it loads, and log the result.
+   *
+   * The desktop shell has no simulator to poke at, so without this the only way to
+   * check that a bridge method reaches the real UI is to have a human click. The file
+   * is read from disk at load time and is expected to evaluate to a promise or value;
+   * whatever it resolves to is JSON-logged.
+   *
+   * Dev harness only — nothing reads NEXUS_EVAL in a packaged app, and it stays out of
+   * the shipped scripts.
+   */
+  if (process.env.NEXUS_EVAL) {
+    win.webContents.once('did-finish-load', () => {
+      setTimeout(async () => {
+        try {
+          const { readFile } = await import('node:fs/promises')
+          const src = await readFile(process.env.NEXUS_EVAL, 'utf8')
+          const out = await win.webContents.executeJavaScript(src, true)
+          console.log(`[eval] ${JSON.stringify(out)}`)
+        } catch (err) {
+          console.log(`[eval] failed: ${err.message}`)
+        }
+      }, 2000)
     })
   }
 
@@ -100,6 +173,12 @@ function createWindow() {
       }, 4000)
     })
   }
+
+  win.webContents.on('did-finish-load', () => boot(`did-finish-load ${win.webContents.getURL()}`))
+  win.webContents.on('did-fail-load', (_e, code, desc, url) => boot(`did-fail-load ${code} ${desc} ${url}`))
+  win.webContents.on('preload-error', (_e, file, err) => boot(`preload-error ${file} ${err && err.message}`))
+  win.webContents.on('render-process-gone', (_e, d) => boot(`chrome-renderer-gone ${d && d.reason}`))
+  boot(`chrome source: url=${CHROME_URL} bundled=${BUNDLED_CHROME} exists=${existsSync(BUNDLED_CHROME)}`)
 
   if (CHROME_URL) win.loadURL(CHROME_URL)
   else if (existsSync(BUNDLED_CHROME)) win.loadFile(BUNDLED_CHROME)
@@ -137,7 +216,25 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(createWindow)
+// A throw inside createWindow used to be an unhandled rejection: the process stayed
+// alive with no window and no message, which in a packaged app is indistinguishable
+// from a hang. Report it and exit non-zero instead.
+process.on('uncaughtException', (err) => {
+  boot('uncaught: ' + (err && (err.stack || err.message)))
+  console.error('[fatal] uncaught:', err && (err.stack || err.message))
+})
+
+boot('awaiting-ready')
+app.whenReady().then(() => {
+  boot('app-ready')
+  try {
+    createWindow()
+  } catch (err) {
+    boot('createWindow threw: ' + (err && (err.stack || err.message)))
+    console.error('[fatal] createWindow:', err && (err.stack || err.message))
+    app.exit(1)
+  }
+})
 
 // Spec calls out darwin as the exception: mac apps conventionally stay resident
 // with no windows open (dock icon remains), every other desktop platform quits.

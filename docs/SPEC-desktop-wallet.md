@@ -136,3 +136,47 @@ address rail. `scan` and `nearby` stay off — no camera path, no local radios.
   later refinement.
 - Windows/Linux runtime verification. Neither machine exists here; those artifacts
   remain built-not-run until someone has the hardware.
+
+## Packaging the macOS app (and why local packs are unsigned)
+
+`npm run pack:mac` deliberately sets `CSC_IDENTITY_AUTO_DISCOVERY=false`.
+
+An **unnotarized Developer ID** build does not run on this macOS (Darwin 25.6):
+the browser process starts normally — module evaluated, `app.whenReady` fires, the
+window is created, the router answers, `loadFile` is called — and then the renderer
+never commits any navigation. No `did-finish-load`, no `did-fail-load`, no
+`preload-error`, no `render-process-gone`. `sample` shows the renderer's main thread
+blocked in `mach_msg` during its own startup, before it ever checks in with the
+browser; the browser process is healthy and idle in its run loop.
+
+What it is NOT — each of these was tested and ruled out:
+
+| Suspect | Test | Result |
+| --- | --- | --- |
+| Hardened runtime | `hardenedRuntime: false`, still signed | still hangs |
+| Entitlements | canonical `allow-jit`-only file | still hangs |
+| Missing `disable-library-validation` | added it | still hangs |
+| The preload bundle | `preload: undefined` | still hangs |
+| `sandbox: false` | `sandbox: true` | still hangs |
+| ASAR integrity | fuse `EnableEmbeddedAsarIntegrityValidation` | already disabled — inert |
+| The chrome export | `NEXUS_CHROME_URL=data:text/html,<h1>hi</h1>` | still hangs |
+| Our own code | same commit, `CSC_IDENTITY_AUTO_DISCOVERY=false` | **works** |
+
+The single variable is the signature: `spctl -a -vvv` reports
+`rejected / source=Unnotarized Developer ID`. Ad-hoc-signed and unsigned builds of the
+same bits launch and render.
+
+So: `pack:*` is for running the app locally and is unsigned; `dist:*` keeps the
+Developer ID identity and hardened runtime, and a `dist:mac` artifact **must be
+notarized before anyone tries to launch it** — an unnotarized one looks like a hang,
+not like a rejection, so it is easy to misdiagnose as an app bug.
+
+## Debugging a packaged app
+
+A packaged `.app` does not give main's stdout to the terminal the way `electron .`
+does, which is why the failure above produced no output at all. Two env vars exist for
+this and are inert unless set:
+
+- `NEXUS_BOOT_LOG=<path>` — appends startup milestones and load events to a file.
+- `NEXUS_EVAL=<path.js>` — evaluates a script in the chrome after load and logs the
+  result, so a bridge method can be exercised without a human clicking.
