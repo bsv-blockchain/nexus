@@ -3,13 +3,22 @@
 #
 # Three legs:
 #
-#   stores-android   production AAB on EAS's builders, auto-submitted to Play's
-#                    INTERNAL testing track (eas.json submit.production.android).
-#                    Two preconditions are now met and both were required: a Google
-#                    service account on EAS, and one manual AAB upload — Google will
-#                    not let a service account create a new package's first release.
-#                    Promotion from internal testing to production stays a Play
-#                    Console act.
+#   aab              production AAB on EAS's builders, attached to the tag's draft
+#                    GitHub release. Upload it to Play yourself.
+#
+#                    It used to carry --auto-submit, which needs a Google service
+#                    account: a robot account whose JSON key lets EAS push to Play
+#                    with no human present. v0.1.0 died on exactly that —
+#                    "Google Service Account Keys cannot be set up in
+#                    --non-interactive mode" — and we chose not to create one. The
+#                    cost is one drag-and-drop per release into Play Console →
+#                    Internal testing → Create new release; the saving is one fewer
+#                    credential with standing upload rights to the store.
+#
+#                    If that trade stops being worth it, restore --auto-submit and
+#                    assign the key under expo.dev → credentials → Android → Google
+#                    Service Account Key for Play Store Submissions. Nothing else
+#                    here has to change.
 #
 #   stores-ios       production IPA on EAS's builders, auto-submitted to TestFlight.
 #                    eas.json now carries submit.production.ios.ascAppId
@@ -55,8 +64,10 @@ jobs:
           fi
           node tools/version.mjs --check --tag "$GITHUB_REF_NAME"
 
-  stores-android:
+  aab:
     needs: verify-version
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -80,9 +91,34 @@ jobs:
       - name: bundle the chrome
         run: npm run ui:bundle
 
-      - name: build and submit to Play internal testing (Android)
+      - name: build AAB
         working-directory: apps/mobile
-        run: eas build --platform android --profile production --non-interactive --auto-submit
+        run: |
+          eas build --platform android --profile production --non-interactive --json > build.json
+          URL=$(node -p "JSON.parse(require('fs').readFileSync('build.json','utf8'))[0].artifacts.buildUrl")
+          curl -fL "$URL" -o "Nexus-${GITHUB_REF_NAME}.aab"
+
+      # Same draft-release protocol as the apk job and release-desktop.yml — see the
+      # comment there. Three writers now share it; keep-OLDEST is what makes that safe.
+      - name: attach AAB to the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="$GITHUB_REF_NAME"
+          if gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null | grep -q false; then
+            echo "::error::$TAG is already published — releases are immutable, cut a new version"
+            exit 1
+          fi
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --draft --title "Nexus ${TAG}" --notes "Nexus ${TAG} — built from ${GITHUB_SHA}" || true
+          gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
+            --jq "[.[] | select(.draft and .tag_name == \"$TAG\")] | sort_by(.created_at) | .[1:] | .[].id" |
+            while read -r id; do
+              echo "removing duplicate draft $id (created after the survivor)"
+              gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/$id"
+            done
+          gh release upload "$TAG" "apps/mobile/Nexus-${GITHUB_REF_NAME}.aab" --clobber
+          echo "::notice::AAB attached. Upload it at Play Console → Internal testing → Create new release."
 
   stores-ios:
     needs: verify-version
@@ -124,8 +160,17 @@ jobs:
       - name: bundle the chrome
         run: npm run ui:bundle
 
+      # EXPO_APPLE_TEAM_ID: without it the build step's optional pre-flight cannot
+      # ask which team, and logs "Input is required, but stdin is not readable.
+      # Failed to display prompt: Apple Team ID" then "Skipping Provisioning Profile
+      # validation on Apple Servers because we aren't authenticated". v0.1.0 shipped
+      # anyway — the submit step authenticates separately and succeeded — but the
+      # validation that would catch a bad profile before a 20-minute build was
+      # silently skipped.
       - name: build and submit to TestFlight (iOS)
         working-directory: apps/mobile
+        env:
+          EXPO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: eas build --platform ios --profile production --non-interactive --auto-submit
 
   apk:

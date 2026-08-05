@@ -90,13 +90,30 @@ The tag then drives CI:
   installer (DigiCert), GPG-signed Linux AppImage/deb → attached to a **draft**
   GitHub release `vX.Y.Z`
 - **release-mobile.yml** — production builds for both stores on EAS (credentials
-  and build numbers live there), auto-submitted: iOS to TestFlight, Android to Play's
-  **internal testing** track. Promotion to production, and App Store release, stay
-  human acts on the respective consoles. A signed sideloadable APK is attached to the
-  same draft GitHub release.
+  and build numbers live there). **iOS auto-submits to TestFlight.** **Android
+  does not**: the AAB is attached to the same draft GitHub release, and you upload
+  it at Play Console → Internal testing → Create new release. A signed sideloadable
+  APK is attached alongside it.
 
-Publishing the draft GitHub release stays a human act. Store review flows are
-watched on the EAS/App Store/Play dashboards, not in Actions.
+  Android is manual by choice. Auto-submitting needs a Google *service account* — a
+  robot account whose JSON key holds standing upload rights to the store — and we
+  decided one drag-and-drop per release was the better trade. To change that, put
+  `--auto-submit` back on the `aab` job and assign the key at expo.dev →
+  credentials → Android → Google Service Account Key for Play Store Submissions;
+  `eas.json` already carries `submit.production.android.track: internal` for it.
+
+Publishing the draft GitHub release stays a human act. So does promotion out of
+internal testing / TestFlight. Store review flows are watched on the EAS, App Store
+and Play dashboards, not in Actions.
+
+## What a release asks of you
+
+| | |
+|---|---|
+| merge the roll-forward PR | every release |
+| upload the AAB to Play | every release |
+| publish the draft GitHub release | every release |
+| promote out of internal testing / TestFlight | when you want testers on it |
 
 ## Version plumbing
 
