@@ -44,6 +44,7 @@ import {
 } from "./spaces";
 import { chainTransactions } from "./transactions";
 import { walletAccounts, walletTransactions } from "./wallet";
+import { DEMO_SURFACES, shipsApp, shippedApps } from "../surfaces";
 import type {
   AppCollection,
   BrowserTab,
@@ -111,28 +112,41 @@ export function getDefaultRepositories(): AppRepository[] {
   return defaultRepositories;
 }
 
-/* hub_apps */
+/*
+ * hub_apps
+ *
+ * Filtered through shippedApps() rather than returned raw. Every list the user can
+ * reach — launcher, icon rail, app store, the ?app= URL — resolves through these
+ * accessors, so narrowing here narrows all of them at once. In a demo build the
+ * filter is the identity function. See lib/surfaces.ts for what "shipped" means.
+ */
 export function getHubApps(): HubApp[] {
-  return hubApps;
+  return shippedApps(hubApps);
 }
 export function getHubApp(slug: HubApp["slug"]): HubApp | undefined {
-  return hubApps.find((app) => app.slug === slug);
+  return getHubApps().find((app) => app.slug === slug);
 }
 export function getDefaultInstalledAppSlugs(): HubApp["slug"][] {
-  return hubApps.filter((app) => app.defaultInstalled).map((app) => app.slug);
+  return getHubApps()
+    .filter((app) => app.defaultInstalled)
+    .map((app) => app.slug);
 }
 /** Always-on apps that can't be removed (identity, pay & receive). */
 export function getEssentialAppSlugs(): HubApp["slug"][] {
-  return hubApps.filter((app) => app.essential).map((app) => app.slug);
+  return getHubApps()
+    .filter((app) => app.essential)
+    .map((app) => app.slug);
 }
 /** Apps in the "Web" system category (browse, web3 connect). */
 export function getSystemAppSlugs(): HubApp["slug"][] {
-  return hubApps
+  return getHubApps()
     .filter((app) => app.category === "system")
     .map((app) => app.slug);
 }
 export function isEssentialApp(slug: HubApp["slug"]): boolean {
-  return hubApps.some((app) => app.slug === slug && app.essential === true);
+  return getHubApps().some(
+    (app) => app.slug === slug && app.essential === true,
+  );
 }
 
 /* identity */
@@ -149,8 +163,8 @@ export function getAppCollections(): AppCollection[] {
 }
 /** App slugs a collection installs — "all" expands to every app. */
 export function getCollectionAppSlugs(id: CollectionId): HubApp["slug"][] {
-  if (id === "all") return hubApps.map((app) => app.slug);
-  return appCollections.find((c) => c.id === id)?.apps ?? [];
+  if (id === "all") return getHubApps().map((app) => app.slug);
+  return (appCollections.find((c) => c.id === id)?.apps ?? []).filter(shipsApp);
 }
 
 /* connections (Connect app) + output_baskets (Baskets app) */
@@ -175,7 +189,16 @@ export function getSpaceItems(spaceId: string): SpaceItem[] {
     .filter((item) => item.spaceId === spaceId)
     .sort((a, b) => a.sortOrder - b.sortOrder);
 }
+/**
+ * Tabs a space opens with.
+ *
+ * Seeded ones are staging for screenshots — a fresh install has never visited
+ * fractional.farm — so a shipping build starts on an empty space instead. The
+ * bookmarks in spaceItems are left alone: those are real destinations, and a
+ * browser shipping with no way to reach anything is worse than one with two.
+ */
 export function getBrowserTabs(spaceId: string): BrowserTab[] {
+  if (!DEMO_SURFACES) return [];
   return browserTabs
     .filter((tab) => tab.spaceId === spaceId)
     .sort((a, b) => a.sortOrder - b.sortOrder);
@@ -201,7 +224,16 @@ function profilePageFor(person: MessagePerson): MockPage | undefined {
   };
 }
 
+/**
+ * Seeded page content, rendered in place of the real site.
+ *
+ * The whole point of it is that a browser with no native tab layer — the web
+ * preview — still has something to show. A shipping build always has that layer,
+ * so returning nothing here sends every URL where it belongs and guarantees no
+ * user is ever shown a written-in-advance version of a real page.
+ */
 export function getMockPage(url: string): MockPage | undefined {
+  if (!DEMO_SURFACES) return undefined;
   const seeded = mockPages.find((page) => page.url === url);
   if (seeded) return seeded;
   const person = messagePeople.find((p) => p.profileUrl === url);

@@ -9,11 +9,19 @@
  * Two independent controls, because they answer different questions:
  *
  *   resolveDataMode()        which source THIS SESSION reads from
- *   DEMO_DATA_COMPILED_IN    whether the fixtures are in the BUNDLE at all
+ *   DEMO_DATA_COMPILED_IN    whether this BUILD carries the demo surfaces
  *
- * The second is what "switch it off before we go live" means: with
- * NEXT_PUBLIC_DEMO_DATA=0 the guard below is statically false, so bundlers drop the
- * fixture imports entirely and no invented balance can ever reach a real user's screen.
+ * The second is what "switch it off before we go live" means. It is the same
+ * NEXT_PUBLIC_DEMO_DATA that lib/surfaces.ts reads, and it decides reachability, not
+ * bundle contents: with it off the wallet refuses to fall back to fixtures and the
+ * demo apps are gone from the catalog, so no invented balance can reach a screen.
+ *
+ * It does NOT tree-shake lib/data away — an earlier version of this comment claimed
+ * it did, which was wrong. Ninety-nine modules import "@/lib/data" at the top level,
+ * including the chrome itself for spaces, ecosystems and the token list, so the rows
+ * stay in the JS whatever this is set to. Pruning them for real means untangling the
+ * chrome's own dependency on seeded data, which is a project rather than a flag. The
+ * imagery, which is where the weight actually is, is pruned by tools/bundle-ui.mjs.
  */
 export type DataMode = 'demo' | 'live'
 

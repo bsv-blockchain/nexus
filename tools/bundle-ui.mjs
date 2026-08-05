@@ -106,9 +106,60 @@ if (remaining.length) {
 
 if (CHECK) process.exit(0)
 
+/*
+ * Imagery that exists only for the demo surfaces.
+ *
+ * 27 MB of apps/ui/public is ordinal art, member portraits, avatars and stock photos
+ * for the thirteen prototype apps — plus the PWA icons and OG card, which only the
+ * web preview ever serves. Every byte of it was being copied into all five shipped
+ * binaries. A shipping build has no app that can reference any of it, so it goes.
+ *
+ * Directory names match the ASSET_REWRITES list above, which is the other place that
+ * knows what public/ contains; keep the two in step.
+ */
+const DEMO_ASSET_DIRS = ['collectibles', 'media', 'avatars', 'ordinals', 'members', 'img']
+const DEMO_ASSET_FILES = [
+  // The OG card and PWA icons are served by the web preview and nothing else — a
+  // native app has its own launcher icon and is never linked to in a feed.
+  'og-image.png',
+  'icon-192.png',
+  'icon-512.png',
+  'icon-maskable.png',
+  'apple-touch-icon.png',
+  // Referenced by nothing in any build. public/images/ as a whole is NOT prunable:
+  // getting-started-page.tsx is chrome, not a demo app, and reads one photo from it.
+  'images/consumer.webp',
+  'images/creative.webp',
+  'images/dev.webp',
+  'christian-regg-FNaFLvbLFuk-unsplash.jpg',
+]
+
+function prune(dest) {
+  let freed = 0
+  const drop = (p) => {
+    if (!existsSync(p)) return
+    for (const f of statSync(p).isDirectory() ? walk(p) : [p]) freed += statSync(f).size
+    rmSync(p, { recursive: true, force: true })
+  }
+  for (const dir of DEMO_ASSET_DIRS) drop(join(dest, dir))
+  for (const file of DEMO_ASSET_FILES) drop(join(dest, file))
+  return freed
+}
+
+// Written by build-ui.mjs, which is the process that actually knew. Absent means the
+// export predates this and its provenance is unknown — treat it as a demo build and
+// prune nothing, so a stale export never silently ships a half-stripped payload.
+const buildInfo = existsSync(join(OUT, 'build.json'))
+  ? JSON.parse(readFileSync(join(OUT, 'build.json'), 'utf8'))
+  : { demo: true }
+
 for (const dest of DESTS) {
   rmSync(dest, { recursive: true, force: true })
   cpSync(OUT, dest, { recursive: true })
+  if (!buildInfo.demo) {
+    const freed = prune(dest)
+    console.log(`pruned ${(freed / 1024 / 1024).toFixed(1)} MB of demo assets from ${dest.replace(ROOT + '/', '')}`)
+  }
 }
 const DEST = DESTS[0]
 

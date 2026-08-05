@@ -32,6 +32,7 @@ import { useActivity } from "@/lib/wallet-live";
 import { PaySheet, type Direction } from "@/components/apps/wallet/pay-flow";
 import { Transactions } from "@/components/apps/wallet/transactions";
 import { payAvailable } from "@/lib/pay-data";
+import { DEMO_SURFACES } from "@/lib/surfaces";
 import {
   Coins,
   Image as ImageIcon,
@@ -43,8 +44,15 @@ import {
 import { toast } from "sonner";
 import { useState, type ReactNode } from "react";
 
-/** Canvas sections. The sidebar renders these on desktop, tabs on mobile. */
-export const WALLET_SECTIONS: {
+/**
+ * Canvas sections. The sidebar renders these on desktop, tabs on mobile.
+ *
+ * Cash and Activity read the wallet; the other four read lib/data — invented
+ * collectibles, payment links, contacts and split bills — so a shipping build
+ * drops them rather than offer a tab that can only ever show someone else's
+ * made-up history. See lib/surfaces.ts.
+ */
+const ALL_WALLET_SECTIONS: {
   id: WalletSection;
   label: string;
   icon: typeof Coins;
@@ -56,6 +64,12 @@ export const WALLET_SECTIONS: {
   { id: "contacts", label: "Contacts", icon: Users },
   { id: "splits", label: "Splits", icon: Scissors },
 ];
+
+const LIVE_SECTIONS: ReadonlySet<WalletSection> = new Set(["cash", "activity"]);
+
+export const WALLET_SECTIONS = DEMO_SURFACES
+  ? ALL_WALLET_SECTIONS
+  : ALL_WALLET_SECTIONS.filter((section) => LIVE_SECTIONS.has(section.id));
 
 /**
  * Pay & Receive.
@@ -70,13 +84,19 @@ export const WALLET_SECTIONS: {
  */
 export function WalletApp(): ReactNode {
   const {
-    walletSection,
+    walletSection: requestedSection,
     setWalletSection,
     walletFilter,
     walletIntent,
     setWalletIntent,
     openApp,
   } = useHub();
+  // A section this build does not ship is not an error: hub state persists across
+  // upgrades and deep links carry it, so a dropped tab falls back to Cash rather
+  // than rendering a body no sidebar entry can navigate away from.
+  const walletSection = WALLET_SECTIONS.some((s) => s.id === requestedSection)
+    ? requestedSection
+    : "cash";
   const account = getWalletAccount();
   const { walletTransactions: fromCommands } = useCommandEffects();
   const copy = content.wallet;
