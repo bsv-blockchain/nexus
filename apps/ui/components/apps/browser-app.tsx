@@ -49,17 +49,16 @@ function getHost(): NexusHost | null {
  * safe-area inset, and a hardcoded guess is wrong on every device it was not tuned on.
  * The constant below is only the fallback for the frame before the bar has mounted.
  *
- * Nothing is reserved at the top. The shell already insets this whole document below the
- * notch (apps/mobile/App.tsx), and browse mode has no fixed top bar — so the page starts
- * immediately under the status bar and runs to the browse bar: as edge-to-edge as it can
- * be without hiding chrome the user needs.
+ * Nothing is reserved at the top: the shell already insets this whole document below the
+ * notch, so chrome-y 0 is the first safe pixel. Exactly one layer may own the safe area,
+ * and it is the shell — see apps/mobile/App.tsx, where the tab layer is offset by
+ * POSITION so its coordinate space and this document's share an origin.
  */
 const MOBILE_BREAKPOINT = 768;
 const BROWSE_BAR_FALLBACK = 100;
 
 /** Height of the floating browse bar, or the fallback when it has not mounted yet. */
 function browseBarHeight(): number {
-  if (window.innerWidth >= MOBILE_BREAKPOINT) return 0;
   const bar = document.querySelector("[data-nexus-browse-bar]");
   const h = bar?.getBoundingClientRect().height ?? 0;
   return h > 0 ? Math.ceil(h) : BROWSE_BAR_FALLBACK;
@@ -80,12 +79,31 @@ function NativeSiteFrame({ url }: { url: string }): ReactNode {
       const id = tabIdRef.current;
       if (!el || !id) return;
       const r = el.getBoundingClientRect();
-      const bottom = browseBarHeight();
+      const narrow = window.innerWidth < MOBILE_BREAKPOINT;
+      if (narrow) {
+        // Full-bleed, deliberately ignoring this element's own rect. The pane sits
+        // inside the shell's shared p-2 content container, which is right for every
+        // other app and wrong for a browser — a phone should show the page edge to
+        // edge. Overriding the rect here keeps that decision local to browsing
+        // instead of unpadding a container the whole UI shares.
+        //
+        // The document already starts below the notch (the shell insets it), so the
+        // only thing to avoid is the floating bar at the bottom.
+        void host.tabs.setBounds(id, {
+          x: 0,
+          y: 0,
+          width: Math.round(window.innerWidth),
+          height: Math.round(Math.max(0, window.innerHeight - browseBarHeight())),
+        });
+        return;
+      }
+      // Wide layouts give the browse pane a real content region: its rect is already
+      // correct, and the floating bar does not exist there.
       void host.tabs.setBounds(id, {
         x: Math.round(r.left),
         y: Math.round(r.top),
         width: Math.round(r.width),
-        height: Math.round(Math.max(0, r.height - bottom)),
+        height: Math.round(r.height),
       });
     };
 

@@ -157,13 +157,23 @@ function Shell() {
           own pointerEvents) should ever intercept a touch — otherwise gaps
           around/below tabs (e.g. the chrome's own address bar) would be dead
           to touch even though no tab is actually there. */}
-      {/* Inset identically to the chrome. Tab rects arrive in the chrome document's
-          coordinate space, so if the chrome starts below the notch and the tab layer
-          does not, every tab lands high by exactly inset.top. */}
+      {/* Inset identically to the chrome, but with POSITION, not padding. Tab rects
+          arrive in the chrome document's coordinate space, so the two spaces must share
+          an origin — and padding does not move an absolutely-positioned child, which is
+          exactly what every tab is. With padding here the chrome's viewport measured
+          402x778 while this layer's frame was 0,0 402x874, so a tab at chrome-y 9
+          rendered at screen-y 9: under the notch, high by inset.top. Offsetting the
+          frame itself makes the child coordinates line up by construction. */}
       <View
         style={[
           styles.layer,
-          { zIndex: 1, paddingTop: insets.top, paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }
+          {
+            zIndex: 1,
+            top: insets.top,
+            bottom: insets.bottom,
+            left: insets.left,
+            right: insets.right
+          }
         ]}
         pointerEvents="box-none"
         onLayout={(e) => {
