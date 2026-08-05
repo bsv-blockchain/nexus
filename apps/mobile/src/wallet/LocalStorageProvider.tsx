@@ -92,10 +92,30 @@ export default function LocalStorageProvider({ children }: { children: React.Rea
 
   /* ------------------------------- non-secure ------------------------------ */
 
+  /*
+   * The snapshot lives in the KEYCHAIN, not AsyncStorage.
+   *
+   * It sat under the "non-secure" heading because the name suggests session state,
+   * but SimpleWalletManager.saveSnapshot emits
+   *
+   *     [ snapshotKey (32 bytes, PLAINTEXT) || encrypt(primaryKey, snapshotKey) ]
+   *
+   * so the decryption key travels in front of its own ciphertext and the bytes are
+   * equivalent to the primary key in the clear. The toolbox's own doc comment says
+   * the snapshot "contains the primary key". AsyncStorage is unencrypted, so this
+   * was a root key in a readable file on every device.
+   *
+   * Deliberately NOT behind ensureAuth: this is read during the cold-start build,
+   * around the mnemonic read that already prompts, and adding a second gate would
+   * mean two prompts to open the app. The keychain's own at-rest protection —
+   * AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY, matching the mnemonic — is the point here.
+   */
   const setSnap = useCallback(async (snap: number[]): Promise<void> => {
     try {
       const snapAsJSON = typeof snap === 'string' ? snap : JSON.stringify(snap)
-      await AsyncStorage.setItem(SNAP_KEY, snapAsJSON)
+      await SecureStore.setItemAsync(SNAP_KEY, snapAsJSON, {
+        keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY
+      })
     } catch (err) {
       console.warn('[setSnap]', err)
     }
@@ -103,7 +123,21 @@ export default function LocalStorageProvider({ children }: { children: React.Rea
 
   const getSnap = useCallback(async (): Promise<number[] | null> => {
     try {
-      const raw = await AsyncStorage.getItem(SNAP_KEY)
+      let raw = await SecureStore.getItemAsync(SNAP_KEY)
+      if (raw === null) {
+        // A device written by an earlier build still has it in AsyncStorage. Move
+        // it rather than ignoring it: leaving the plaintext copy behind would keep
+        // the key readable, and dropping it would force a re-authentication for no
+        // reason.
+        const legacy = await AsyncStorage.getItem(SNAP_KEY)
+        if (legacy !== null) {
+          await SecureStore.setItemAsync(SNAP_KEY, legacy, {
+            keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY
+          })
+          await AsyncStorage.removeItem(SNAP_KEY)
+          raw = legacy
+        }
+      }
       return raw ? (JSON.parse(raw) as number[]) : null
     } catch (err) {
       console.warn('[getSnap]', err)

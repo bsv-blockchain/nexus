@@ -37,6 +37,7 @@ const FILE_NAME = 'secure-store.json'
 // Byte-for-byte the mobile key names, so a future export/import between shells
 // does not have to translate them.
 const MNEMONIC_KEY = 'mnemonic'
+const SNAPSHOT_KEY = 'snap'
 const PASSWORD_KEY = 'password'
 const RECOVERED_KEY = 'recoveredKey'
 // Lives in the plain key/value store, exactly as on mobile: it is a boolean about
@@ -256,6 +257,20 @@ export const deletePassword = () => deleteSecret(PASSWORD_KEY)
 /* ----------------------------- recovered key ----------------------------- */
 
 /** @returns {Promise<boolean>} */
+/**
+ * The SimpleWalletManager snapshot.
+ *
+ * A secret, despite the name and despite mobile keeping it in AsyncStorage today.
+ * saveSnapshot emits [ snapshotKey (32 bytes, PLAINTEXT) || encrypt(primaryKey,
+ * snapshotKey) ] — the decryption key travels in front of its own ciphertext, so
+ * the bytes are equivalent to the primary key in the clear.
+ */
+export const setSnapshot = (snapshot) => setSecret(SNAPSHOT_KEY, snapshot)
+
+export const getSnapshot = () => getSecret(SNAPSHOT_KEY)
+
+export const deleteSnapshot = () => deleteSecret(SNAPSHOT_KEY)
+
 export const setRecoveredKey = (wif) => setSecret(RECOVERED_KEY, wif)
 /** @returns {Promise<string | null>} */
 export const getRecoveredKey = () => getSecret(RECOVERED_KEY)

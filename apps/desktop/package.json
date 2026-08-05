@@ -46,16 +46,26 @@
       "category": "public.app-category.productivity",
       "target": [
         {
-          "target": "default",
+          "target": "dmg",
           "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
             "arm64"
           ]
         }
       ],
+      "icon": "build/icon.icns",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist"
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "artifactName": "${productName}-${version}-${arch}-mac.${ext}"
     },
     "win": {
       "target": [
@@ -65,28 +75,25 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "icon": "build/icon.ico",
+      "verifyUpdateCodeSignature": false,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "linux": {
       "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "deb",
-          "arch": [
-            "x64"
-          ]
-        }
+        "AppImage",
+        "deb"
       ],
       "category": "Network",
+      "icon": "build/icon.png",
       "maintainer": "BSV Association",
       "executableName": "nexus"
     },
-    "electronVersion": "43.2.0"
+    "electronVersion": "43.2.0",
+    "dmg": {
+      "writeUpdateInfo": true
+    }
   },
   "author": "BSV Association"
 }

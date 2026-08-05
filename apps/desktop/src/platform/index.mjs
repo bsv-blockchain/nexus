@@ -25,23 +25,50 @@ const SNAP_KEY = 'snap'
  * apps/mobile/src/wallet/LocalStorageProvider.tsx, minus React.
  *
  * Same object shape means the wallet factory can take one `localStorage` argument
- * and neither shell has to special-case the other. The snap is deliberately in
- * the plain key/value store, as on mobile: a SimpleWalletManager snapshot is
- * already encrypted-at-rest by the toolbox and is not a secret in its own right.
+ * and neither shell has to special-case the other.
+ *
+ * THE SNAP IS A SECRET. An earlier version of this file put it in the plain
+ * key/value store and justified it by claiming the toolbox encrypts a snapshot at
+ * rest. It does not, in any useful sense. Read
+ * SimpleWalletManager.saveSnapshot: the format is
+ *
+ *     [ snapshotKey (32 bytes, PLAINTEXT) || encrypt(primaryKey, snapshotKey) ]
+ *
+ * — the decryption key is prepended to its own ciphertext, so anyone holding the
+ * bytes recovers the primary key immediately. The toolbox's own doc comment says
+ * the snapshot "contains the primary key". It therefore goes in the keychain
+ * beside the mnemonic, and bsv-desktop reached the same conclusion: its vault's
+ * allow-list names 'snap' first, next to primaryKeyHex and mnemonic12.
  */
 export function createLocalStorage() {
   return {
     /* non-secure */
     setSnap: async (snap) => {
       try {
-        await keyValue.setItem(SNAP_KEY, typeof snap === 'string' ? snap : JSON.stringify(snap))
+        // Keychain, not the JSON file — see the header. Unlike the other secrets
+        // this one swallows its failure to match the mobile contract, so a refusal
+        // costs a re-authentication next launch rather than breaking the build.
+        const stored = await secureStore.setSnapshot(
+          typeof snap === 'string' ? snap : JSON.stringify(snap)
+        )
+        if (!stored) console.warn('[setSnap] not stored: no OS keychain available')
       } catch (err) {
         console.warn('[setSnap]', err)
       }
     },
     getSnap: async () => {
       try {
-        const raw = await keyValue.getItem(SNAP_KEY)
+        // Reads the keychain, then falls back to the old plaintext location so a
+        // machine written by an earlier build still starts — and re-seals it.
+        let raw = await secureStore.getSnapshot()
+        if (raw === null) {
+          const legacy = await keyValue.getItem(SNAP_KEY)
+          if (legacy !== null) {
+            await secureStore.setSnapshot(legacy)
+            await keyValue.removeItem(SNAP_KEY)
+            raw = legacy
+          }
+        }
         return raw ? JSON.parse(raw) : null
       } catch (err) {
         console.warn('[getSnap]', err)

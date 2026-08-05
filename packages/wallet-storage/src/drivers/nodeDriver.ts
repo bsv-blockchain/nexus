@@ -115,6 +115,13 @@ function toNodeBinds(params?: SqlBindValue[]): (string | number | null | Uint8Ar
 /** Settings every connection to this database needs, root or transaction. */
 function configure(db: DatabaseSync): DatabaseSync {
   db.exec(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS}`)
+  // WAL so a reader is never blocked by the writer. Irrelevant while one process
+  // holds the only connection — which is the situation this driver is designed
+  // for — but the moment anything else opens the file (a forked Monitor, a
+  // debugging session, a backup) the default rollback journal makes every reader
+  // wait for the writer, and with a synchronous driver that wait is a stall.
+  // Cheap now; a mysterious hang later.
+  db.exec('PRAGMA journal_mode = WAL')
   return db
 }
 
