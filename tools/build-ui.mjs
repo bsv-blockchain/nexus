@@ -25,7 +25,12 @@ if (!existsSync(join(UI, 'package.json'))) {
 
 function run(cmd, args, cwd) {
   console.log(`$ ${cmd} ${args.join(' ')}`)
-  execFileSync(cmd, args, { cwd, stdio: 'inherit' })
+  // On Windows there is no npm.exe — only npm.cmd — and a shell-less spawn tries
+  // just .com/.exe, so execFileSync('npm', ...) dies with ENOENT (and 'npm.cmd'
+  // without a shell throws EINVAL under Node's batch-file hardening). The shell is
+  // required there; the args here are static, so shell quoting is not a concern.
+  const win = process.platform === 'win32'
+  execFileSync(win ? 'npm.cmd' : cmd, args, { cwd, stdio: 'inherit', shell: win })
 }
 
 if (!existsSync(join(UI, 'node_modules'))) run('npm', ['install'], UI)

@@ -1,0 +1,315 @@
+# Desktop release: build, sign, and publish the Electron shell for macOS, Windows
+# and Linux on every merge to main.
+#
+# The certificate and signing process deliberately MIRRORS bsv-desktop's release.yml
+# (bsv-blockchain/bsv-desktop), including the secret names, so the org's existing
+# secrets work here unchanged:
+#
+#   macOS    Developer ID p12 imported into a throwaway keychain; electron-builder
+#            signs, and notarizes automatically because APPLE_ID /
+#            APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID are present in the env.
+#            Notarization is required for distribution: Gatekeeper blocks a
+#            downloaded, unnotarized Developer ID app on the recipient's machine.
+#   Windows  DigiCert KeyLocker (Software Trust Manager). The app is built with
+#            signing disabled, then the final installers are signed with signtool
+#            against the KeyLocker certificate and verified.
+#   Linux    GPG: detach-signed AppImage plus a signed SHA256SUMS manifest.
+#
+# Publishing model: every run refreshes a DRAFT GitHub release named after
+# apps/desktop/package.json's version. Making a draft public stays a human act.
+name: release-desktop
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+# Serialize runs but never cancel: killing a run mid-notarization wastes an Apple
+# submission, and killing it mid-upload strands a partial draft that looks complete.
+# A superseded run just finishes and its draft is deleted by the next one.
+concurrency:
+  group: release-desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+          - platform: ubuntu-22.04
+          - platform: windows-2022
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y librsvg2-dev
+
+      # Pin a concrete Node major (not lts/*): the alias lookup hits the
+      # node-versions manifest and has failed releases before (bsv-desktop v2.7.1).
+      # 24 matches the Node inside Electron 43 and build-main.mjs's target.
+      - name: setup node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      # Two installs, deliberately: apps/ui is NOT a workspace member (it pins its
+      # own React), so the root install does not cover it. `npm ci` in apps/ui also
+      # stops tools/build-ui.mjs from running its fallback `npm install` against a
+      # lockfile-less resolution mid-build.
+      - name: install dependencies
+        run: |
+          npm ci
+          npm ci --prefix apps/ui
+
+      # Build the chrome once and copy the rewritten export into apps/desktop/ui —
+      # the same 28 MB the shell loads in dev, so CI ships exactly what was tested.
+      - name: bundle the chrome
+        run: npm run ui:bundle
+
+      - name: bundle the Electron main process
+        run: npm run build --workspace @nexus/desktop
+
+      # ── macOS ──────────────────────────────────────────────────────────────
+      - name: import Apple Developer Certificate
+        if: matrix.platform == 'macos-latest'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_DEVELOPER_ID_CERT }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_CERT_PASS }}
+          KEYCHAIN_PASSWORD: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+        run: |
+          echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          # 21600, not 3600: the keychain sits idle through both arches' notarytool
+          # waits, and a >1h Apple queue stall would auto-lock it between the x64 and
+          # arm64 signing passes.
+          security set-keychain-settings -t 21600 -u build.keychain
+          # create-keychain does NOT add the keychain to the user search list, and
+          # electron-builder discovers identities with a bare `security find-identity`,
+          # which consults the search list — not the default keychain.
+          security list-keychains -d user -s build.keychain login.keychain
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+      # Fails the job when the imported cert is missing or the wrong type — a bare
+      # find-identity exits 0 even on "0 valid identities found".
+      - name: verify certificate
+        if: matrix.platform == 'macos-latest'
+        run: |
+          security find-identity -v -p codesigning build.keychain | grep "Developer ID Application: BSV"
+
+      - name: build, sign and notarize (macOS)
+        if: matrix.platform == 'macos-latest'
+        env:
+          # electron-builder finds the identity in the keychain on its own
+          # (CSC_IDENTITY_AUTO_DISCOVERY defaults to true) and generates notarize
+          # options from these three variables. Remove one and it silently ships an
+          # unnotarized artifact, so keep all three or none.
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASS }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Sign against the imported keychain explicitly rather than trusting
+          # search-list discovery alone.
+          CSC_KEYCHAIN: build.keychain
+        working-directory: apps/desktop
+        # forceCodeSigning turns "skipped macOS application code signing" from a
+        # warning into a failure. Without it, a rotated secret ships an unsigned,
+        # unnotarized dmg on a green build. CI-only: local `pack:mac` stays free to
+        # build unsigned.
+        run: npx electron-builder --mac --publish never -c.forceCodeSigning=true
+
+      # Notarization can also silently skip (it only warns when its env is absent),
+      # so prove the artifact rather than trust the log: signature chain, Gatekeeper
+      # assessment, and the stapled ticket.
+      - name: verify signature and notarization (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          find apps/desktop/out -maxdepth 2 -name "*.app" -type d | while read -r APP; do
+            echo "--- $APP ---"
+            codesign --verify --deep --strict "$APP"
+            spctl -a -vv -t exec "$APP"
+            xcrun stapler validate "$APP"
+          done
+
+      - name: upload macOS artifacts
+        if: matrix.platform == 'macos-latest'
+        uses: actions/upload-artifact@v6
+        with:
+          name: macos-artifacts
+          path: |
+            apps/desktop/out/*.dmg
+            apps/desktop/out/*.zip
+
+      # ── Linux ──────────────────────────────────────────────────────────────
+      - name: build (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        working-directory: apps/desktop
+        run: npx electron-builder --linux --publish never
+
+      - name: import GPG key
+        if: matrix.platform == 'ubuntu-22.04'
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.APP_IMAGE_GPG_KEY }}
+        run: echo "$GPG_PRIVATE_KEY" | gpg --import
+
+      - name: sign AppImage and SHA256SUMS
+        if: matrix.platform == 'ubuntu-22.04'
+        working-directory: apps/desktop/out
+        # nullglob + explicit lists, and hard failures: with plain globs an unmatched
+        # pattern is passed literally, sha256sum's error hides behind 2>/dev/null, and
+        # the one artifact whose whole purpose is integrity gets signed while partial
+        # or empty.
+        run: |
+          shopt -s nullglob
+          appimages=( *.AppImage )
+          if [ ${#appimages[@]} -eq 0 ]; then
+            echo "::error::no AppImage produced"
+            exit 1
+          fi
+          for a in "${appimages[@]}"; do
+            gpg --detach-sign --armor "$a"
+          done
+          files=( *.AppImage *.deb )
+          sha256sum "${files[@]}" > SHA256SUMS
+          gpg --detach-sign --armor SHA256SUMS
+
+      - name: upload Linux artifacts
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: actions/upload-artifact@v6
+        with:
+          name: linux-artifacts
+          path: |
+            apps/desktop/out/*.AppImage
+            apps/desktop/out/*.AppImage.asc
+            apps/desktop/out/*.deb
+            apps/desktop/out/SHA256SUMS
+            apps/desktop/out/SHA256SUMS.asc
+
+      # ── Windows ────────────────────────────────────────────────────────────
+      - name: decode DigiCert client certificate
+        if: matrix.platform == 'windows-2022'
+        shell: bash
+        run: |
+          echo "${{ secrets.DIGICERT_CLIENT_AUTH_CERT }}" | base64 --decode > /d/sm_client_cert.p12
+          echo "SM_HOST=${{ secrets.DIGICERT_HOST }}" >> "$GITHUB_ENV"
+          echo "SM_API_KEY=${{ secrets.DIGICERT_KEY_LOCKER_API_KEY }}" >> "$GITHUB_ENV"
+          echo "SM_CLIENT_CERT_FILE=D:\\sm_client_cert.p12" >> "$GITHUB_ENV"
+          echo "SM_CLIENT_CERT_PASSWORD=${{ secrets.DIGICERT_CLIENT_AUTH_PASS }}" >> "$GITHUB_ENV"
+
+      - name: setup DigiCert Software Trust Manager
+        if: matrix.platform == 'windows-2022'
+        uses: digicert/code-signing-software-trust-action@v1
+        env:
+          SM_HOST: ${{ env.SM_HOST }}
+          SM_API_KEY: ${{ env.SM_API_KEY }}
+          SM_CLIENT_CERT_FILE: ${{ env.SM_CLIENT_CERT_FILE }}
+          SM_CLIENT_CERT_PASSWORD: ${{ env.SM_CLIENT_CERT_PASSWORD }}
+
+      - name: sync certificate to Windows store
+        if: matrix.platform == 'windows-2022'
+        shell: cmd
+        run: smctl windows certsync
+
+      - name: build (Windows)
+        if: matrix.platform == 'windows-2022'
+        # Built unsigned — electron-builder attempts Windows signing only when a
+        # certificate is configured (win.signtoolOptions / CSC_LINK), and none is.
+        # (The reference sets CSC_IDENTITY_AUTO_DISCOVERY=false here, but that flag
+        # is consulted by the macOS signer only; it is dropped rather than cargo-culted.)
+        # The installer is then signed below, against the KeyLocker cert — the same
+        # post-build split bsv-desktop ships with. Known, inherited limitation of that
+        # split: the binaries INSIDE the installer (Nexus.exe, the uninstaller,
+        # elevate.exe) remain unsigned; fixing that means signing during packaging via
+        # win.signtoolOptions, a deliberate divergence to take up separately.
+        working-directory: apps/desktop
+        run: npx electron-builder --win --x64 --publish never
+
+      - name: sign and verify Windows installers
+        if: matrix.platform == 'windows-2022'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $signtool) { throw "signtool.exe not found." }
+
+          $targets = Get-ChildItem -Path "apps/desktop/out" -Include *.exe -Depth 0 | Select-Object -ExpandProperty FullName
+          if (-not $targets) { throw "No .exe files found under apps/desktop/out" }
+
+          foreach ($file in $targets) {
+            Write-Host "--- Signing: $file ---"
+            & $signtool sign /tr http://timestamp.digicert.com /td SHA256 /fd SHA256 /sha1 "${{ secrets.DIGICERT_CODE_SIGNING_SHA1_HASH }}" "$file"
+            if ($LASTEXITCODE -ne 0) { throw "Signing failed for $file" }
+
+            Write-Host "--- Verifying: $file ---"
+            & $signtool verify /pa "$file"
+            if ($LASTEXITCODE -ne 0) { throw "Verification failed for $file" }
+          }
+
+      - name: upload Windows artifacts
+        if: matrix.platform == 'windows-2022'
+        uses: actions/upload-artifact@v6
+        with:
+          name: windows-artifacts
+          path: apps/desktop/out/*.exe
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: download all artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+
+      # One DRAFT release per version, rebuilt from scratch each run. Three rules,
+      # each earned the hard way in review:
+      #   1. A PUBLISHED release owning this tag is untouchable — gh resolves tags to
+      #      the published release first, so uploading would silently replace live,
+      #      human-approved assets. Fail and demand a version bump instead.
+      #   2. Drafts do not create git tags, so `gh release create --draft` happily
+      #      mints duplicates; stale drafts are deleted before creating the new one
+      #      (bsv-desktop does the same).
+      #   3. No `|| true` around create — a real API failure must fail the job here,
+      #      not resurface later as a baffling "release not found" from the upload.
+      # Publishing the draft is deliberately left to a person.
+      - name: create draft release and upload assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./apps/desktop/package.json').version")
+          TAG="desktop-v${VERSION}"
+
+          if gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null | grep -q false; then
+            echo "::error::$TAG is already published — bump apps/desktop/package.json's version"
+            exit 1
+          fi
+
+          gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
+            --jq ".[] | select(.draft and .tag_name == \"$TAG\") | .id" |
+            while read -r id; do
+              echo "deleting stale draft $id"
+              gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/$id"
+            done
+
+          gh release create "$TAG" --draft --title "Nexus Desktop v${VERSION}" --notes "Nexus Desktop v${VERSION} — built from ${GITHUB_SHA}"
+
+          for file in artifacts/*/*; do
+            if [ -f "$file" ]; then
+              gh release upload "$TAG" "$file"
+            fi
+          done
