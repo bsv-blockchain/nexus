@@ -2,7 +2,7 @@
   "name": "@nexus/mobile",
   "version": "0.1.0",
   "private": true,
-  "description": "Nexus mobile shell \u2014 Expo/React Native, one WebView for the chrome plus one per tab.",
+  "description": "Nexus mobile shell — Expo/React Native, one WebView for the chrome plus one per tab.",
   "main": "index.js",
   "scripts": {
     "start": "expo start --dev-client",
@@ -31,6 +31,7 @@
     "expo-camera": "~55.0.19",
     "expo-constants": "~55.0.16",
     "expo-crypto": "~55.0.15",
+    "expo-dev-client": "~55.0.37",
     "expo-file-system": "~55.0.24",
     "expo-haptics": "~55.0.14",
     "expo-local-authentication": "~55.0.14",
