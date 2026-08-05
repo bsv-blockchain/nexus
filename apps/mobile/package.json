@@ -2,7 +2,7 @@
   "name": "@nexus/mobile",
   "version": "0.1.0",
   "private": true,
-  "description": "Nexus mobile shell — Expo/React Native, one WebView for the chrome plus one per tab.",
+  "description": "Nexus mobile shell \u2014 Expo/React Native, one WebView for the chrome plus one per tab.",
   "main": "index.js",
   "scripts": {
     "start": "expo start --dev-client",

@@ -11,6 +11,8 @@
  *   node tools/version.mjs                  print the version, fail if files disagree
  *   node tools/version.mjs --check          same, exit code only (CI)
  *   node tools/version.mjs --check --tag v1.2.3   also fail unless version == 1.2.3
+ *   node tools/version.mjs --check-native   also FAIL if a local ios/ or android/
+ *                                           prebuild would ship a different version
  *   node tools/version.mjs --set 1.2.3      write 1.2.3 everywhere
  *   node tools/version.mjs --bump patch     roll x.y.z → x.y.(z+1) everywhere
  *
@@ -18,7 +20,7 @@
  * appVersionSource=remote with autoIncrement, so EAS owns iOS buildNumber and
  * Android versionCode. This file owns the human-visible version only.
  */
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs'
 import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -131,6 +133,64 @@ if (bump) {
   process.exit(0)
 }
 
+/**
+ * What the LOCAL native projects would ship, if they exist.
+ *
+ * apps/mobile/ios and apps/mobile/android are gitignored prebuild output. When one
+ * is present, Expo and EAS use the NATIVE values and ignore app.json outright — EAS
+ * says so out loud ("Specified value for ios.bundleIdentifier in app.json is ignored
+ * because an ios directory was detected"). A stale directory therefore silently
+ * defeats every file this script stamps.
+ *
+ * That is not hypothetical: a local iOS build shipped CFBundleVersion 1 /
+ * CFBundleShortVersionString 0.0.1 from a months-old prebuild while app.json said
+ * 0.1.0, and App Store Connect rejected it — "The bundle version must be higher than
+ * the previously uploaded version: '1'".
+ *
+ * Cloud builds are immune (.easignore excludes both directories, so EAS prebuilds
+ * fresh), which is exactly why this can rot unnoticed until someone builds locally.
+ */
+function nativeVersions() {
+  const found = []
+
+  const plists = ['ios']
+    .map((d) => join(ROOT, 'apps/mobile', d))
+    .filter((d) => existsSync(d))
+    .flatMap((d) =>
+      readdirSync(d)
+        .map((entry) => join(d, entry, 'Info.plist'))
+        .filter((p) => existsSync(p))
+    )
+  for (const p of plists) {
+    const text = readFileSync(p, 'utf8')
+    const m = text.match(/<key>CFBundleShortVersionString<\/key>\s*<string>([^<]*)<\/string>/)
+    // Templates that drive the value from the Xcode project write $(MARKETING_VERSION);
+    // there is nothing to compare in that case.
+    if (m && !m[1].startsWith('$(')) found.push({ path: p.replace(ROOT + '/', ''), version: m[1] })
+  }
+
+  const gradle = join(ROOT, 'apps/mobile/android/app/build.gradle')
+  if (existsSync(gradle)) {
+    const m = readFileSync(gradle, 'utf8').match(/versionName\s+"([^"]+)"/)
+    if (m) found.push({ path: 'apps/mobile/android/app/build.gradle', version: m[1] })
+  }
+
+  return found
+}
+
+/** Report native drift. Returns true when something disagrees with `version`. */
+function reportNativeDrift(version, { fatal }) {
+  const drifted = nativeVersions().filter((n) => n.version !== version)
+  if (drifted.length === 0) return false
+  const label = fatal ? 'error' : 'warning'
+  console.error(`${label}: local native projects would ship a different version —`)
+  for (const d of drifted) console.error(`  ${d.path}: ${d.version}  (app.json says ${version})`)
+  console.error('  These directories are gitignored prebuild output and override app.json.')
+  console.error('  Regenerate them:  npx expo prebuild --clean  (from apps/mobile)')
+  console.error('  Cloud builds are unaffected — .easignore keeps them out of the archive.')
+  return true
+}
+
 // Default and --check: report, and FAIL on drift. Drift is never acceptable —
 // two platforms reporting different versions for the same code defeats the whole
 // point of syncing them.
@@ -147,5 +207,13 @@ if (tag) {
     console.error(`tag ${tag} does not match version ${distinct[0]}`)
     process.exit(1)
   }
+}
+
+// --check-native is the gate the LOCAL build scripts use: a local build is exactly
+// the case where a stale prebuild directory decides what ships, so drift is fatal.
+// Plain --check only warns, because a developer's local native folder has no
+// bearing on what a tag releases (CI prebuilds fresh) and must not block a release.
+if (reportNativeDrift(distinct[0], { fatal: flag('--check-native') }) && flag('--check-native')) {
+  process.exit(1)
 }
 if (!flag('--check')) console.log(distinct[0])

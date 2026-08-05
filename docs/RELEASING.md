@@ -21,6 +21,30 @@ npm run ios / android   # Expo dev client
 Dev builds carry the NEXT patch version (the roll happens right after each tag), so
 a build handed to a tester can never claim to be a released version.
 
+### Local mobile builds and the prebuild trap
+
+`apps/mobile/ios` and `apps/mobile/android` are gitignored prebuild output. **When
+either exists, Expo and EAS read the native values and ignore `app.json`** — so a
+stale directory silently overrides every file `tools/version.mjs` stamps.
+
+This has already cost one App Store submission: a local IPA shipped
+`CFBundleVersion 1` / version `0.0.1` from a months-old prebuild while `app.json`
+said `0.1.0`, and App Store Connect rejected it with *"The bundle version must be
+higher than the previously uploaded version: '1'"*.
+
+`npm run build:ios` / `build:android` now refuse to run when the native projects
+disagree with `app.json`. When that fires:
+
+```bash
+npm run prebuild        # expo prebuild --clean, in apps/mobile
+```
+
+Cloud builds — everything CI does — were never affected: `.easignore` keeps both
+directories out of the archive, so EAS prebuilds fresh from `app.json` every time.
+Store build numbers (`CFBundleVersion` / `versionCode`) come from EAS's remote
+counter with `autoIncrement`, which only works on cloud builds for the same reason.
+**Prefer cloud builds for anything you intend to submit.**
+
 ## Cutting a release
 
 `main` is protected — changes land through pull requests, and most of the team
