@@ -9,22 +9,26 @@ import { StorageProvider } from '@bsv/wallet-toolbox-mobile'
 import { StorageExpoSQLite } from './StorageExpoSQLite'
 import type { AppChain } from '@nexus/wallet-core/src/chain'
 import { toWalletChain } from '@nexus/wallet-core/src/chain'
+import type { OpenSqlDriver } from './SqlDriver'
 
 export interface LocalStorageConfig {
   network: AppChain
   identityKey: string
   storageName?: string
+  /** Supplied by the shell — see `SqlDriver`; this package opens no database itself. */
+  openDriver: OpenSqlDriver
 }
 
 /**
  * Initialize local storage for the wallet
  */
 export async function initializeLocalStorage(config: LocalStorageConfig): Promise<StorageExpoSQLite> {
-  const { network, identityKey, storageName = 'bsv-wallet' } = config
+  const { network, identityKey, storageName = 'bsv-wallet', openDriver } = config
 
   // Create storage instance
   const storage = new StorageExpoSQLite({
-    ...StorageProvider.createStorageBaseOptions(toWalletChain(network))
+    ...StorageProvider.createStorageBaseOptions(toWalletChain(network)),
+    openDriver
   })
 
   // Initialize database

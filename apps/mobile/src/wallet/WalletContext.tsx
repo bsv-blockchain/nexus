@@ -65,6 +65,7 @@ import { logWithTimestamp } from '@nexus/wallet-core/src/utils/logging'
 import { recoverMnemonicWallet } from '@nexus/wallet-core/src/utils/mnemonicWallet'
 import { StorageProvider, ChaintracksServiceClient } from '@bsv/wallet-toolbox-mobile'
 import { StorageExpoSQLite } from '@nexus/wallet-storage'
+import { openExpoDriver } from '@nexus/wallet-storage/src/drivers/expoDriver'
 import * as SQLite from 'expo-sqlite'
 import { getRegisteredDbs, registerDb, selectLatestDb } from '@nexus/wallet-core/src/utils/walletDbRegistry'
 import { createBtmsModule } from '@bsv/btms-permission-module'
@@ -838,7 +839,10 @@ export const WalletContextProvider: React.FC<WalletContextProps> = ({ children =
             ...StorageProvider.createStorageBaseOptions(walletChain),
             feeModel: { model: 'sat/kb', value: 100 },
             identityKey,
-            databaseName: selectedDb
+            databaseName: selectedDb,
+            // The shell owns the engine now; this is the same
+            // `SQLite.openDatabaseAsync(name)` migrate() used to call inline.
+            openDriver: openExpoDriver
           })
           phoneStorage.setServices(services)
           await phoneStorage.migrate('bsv-wallet', identityKey)

@@ -1,5 +1,4 @@
-import * as SQLite from 'expo-sqlite'
-import type { SQLiteDatabase } from 'expo-sqlite'
+import type { OpenSqlDriver, SqlDriver } from './SqlDriver'
 import { createTables, ensureOfflineActionsColumns } from './schema/createTables'
 import { devLog } from '@nexus/wallet-core/src/utils/logging'
 import { StorageProvider } from '@bsv/wallet-toolbox-mobile'
@@ -64,21 +63,35 @@ import { TaskSendOffline } from '@nexus/wallet-core/src/utils/monitor/TaskSendOf
 export interface StorageExpoSQLiteOptions extends StorageProviderOptions {
   databaseName?: string
   identityKey?: string
+  /**
+   * How this host opens a database. Required, and deliberately not defaulted to
+   * expo: a default would put a static `expo-sqlite` import back into this file
+   * and the Electron main process could not load it at all.
+   */
+  openDriver: OpenSqlDriver
 }
 
 /**
- * SQLite storage provider for BSV wallet using expo-sqlite.
+ * SQLite storage provider for BSV wallet.
  * Extends StorageProvider to inherit business logic (createAction, internalizeAction, etc.)
  * while implementing only the abstract CRUD methods.
+ *
+ * NOTE: the class name is now wrong. Nothing here is Expo-specific — the
+ * database arrives as a `SqlDriver` the host supplies, and the same class backs
+ * expo-sqlite on mobile and `node:sqlite` on desktop. It keeps the name because
+ * it is referenced across the wallet, the mobile app and two packages; renaming
+ * is a separate and noisier change than a driver seam should carry.
  */
 export class StorageExpoSQLite extends StorageProvider {
   dbName: string
-  db?: SQLiteDatabase
+  db?: SqlDriver
+  private readonly openDriver: OpenSqlDriver
 
   constructor(options: StorageExpoSQLiteOptions) {
     super(options)
     const keySuffix = (options.identityKey || 'default').slice(-8)
     this.dbName = options.databaseName || `wallet-${keySuffix}-${this.chain}net.db`
+    this.openDriver = options.openDriver
   }
 
   // ============================================================================
@@ -86,7 +99,7 @@ export class StorageExpoSQLite extends StorageProvider {
   // ============================================================================
 
   async migrate(storageName: string, storageIdentityKey: string): Promise<string> {
-    this.db = await SQLite.openDatabaseAsync(this.dbName)
+    this.db = await this.openDriver(this.dbName)
     await createTables(this.db)
     await ensureOfflineActionsColumns(this.db)
 
@@ -151,15 +164,15 @@ export class StorageExpoSQLite extends StorageProvider {
     const db = this.getDB()
     const token: TrxToken = { _inTrx: true } as any
 
-    // withExclusiveTransactionAsync opens a dedicated connection for the
-    // transaction so no other async queries can interleave with BEGIN/COMMIT.
-    // All queries executed inside scope() must go through that connection, so
-    // we temporarily replace this.db with the exclusive txn object and restore
-    // it when the scope completes (or throws).
+    // withExclusiveTransactionAsync hands back a driver scoped to the
+    // transaction, and every query inside scope() must go through it — on expo
+    // because it is a dedicated connection, on node because it is how the
+    // driver tells a nested transaction from a concurrent one. So we swap it
+    // into this.db for the duration and restore on completion (or throw).
     let result!: T
     await db.withExclusiveTransactionAsync(async txn => {
       const savedDb = this.db
-      this.db = txn as any
+      this.db = txn
       try {
         result = await scope(token)
       } finally {
@@ -184,7 +197,7 @@ export class StorageExpoSQLite extends StorageProvider {
     return this._settings.dbtype as string
   }
 
-  private getDB(): SQLiteDatabase {
+  private getDB(): SqlDriver {
     if (!this.db) throw new Error('Database not initialized. Call migrate() first.')
     this.whenLastAccess = new Date()
     return this.db
@@ -1355,7 +1368,7 @@ export class StorageExpoSQLite extends StorageProvider {
    * named, deliberate access point for that use so call sites read as
    * intentional rather than reaching into an implementation-shaped field.
    */
-  get sqliteDb(): SQLiteDatabase | undefined {
+  get sqliteDb(): SqlDriver | undefined {
     return this.db
   }
 

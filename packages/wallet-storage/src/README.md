@@ -1,6 +1,8 @@
-# BSV Wallet Storage - Expo SQLite
+# BSV Wallet Storage - SQLite
 
-Local storage implementation for BSV wallet data on mobile platforms using expo-sqlite. This implementation is based on the `@bsv/wallet-toolbox` `StorageIdb` and `StorageKnex` implementations, adapted for React Native with Expo.
+Local storage implementation for BSV wallet data, based on the `@bsv/wallet-toolbox` `StorageIdb` and `StorageKnex` implementations.
+
+The database arrives through the `SqlDriver` interface (`../SqlDriver.ts`) rather than being imported, so the same SQL runs on `expo-sqlite` in the mobile app and Node's built-in `node:sqlite` in the Electron main process. Adapters live in `../drivers/`; the host passes one in as `openDriver`. The class is still called `StorageExpoSQLite` because it is referenced widely — the name is now wrong, and renaming it is a separate change.
 
 ## Features
 
@@ -24,12 +26,14 @@ npm install expo-sqlite
 ### Basic Setup
 
 ```typescript
-import { StorageExpoSQLite } from './storage'
+import { StorageExpoSQLite } from '@nexus/wallet-storage'
+import { openExpoDriver } from '@nexus/wallet-storage/src/drivers/expoDriver'
 
 // Create storage instance
 const storage = new StorageExpoSQLite({
   chain: 'main', // or 'test'
-  databaseName: 'my-wallet.db' // optional, defaults to 'wallet-toolbox-{chain}net.db'
+  databaseName: 'my-wallet.db', // optional, defaults to 'wallet-toolbox-{chain}net.db'
+  openDriver: openExpoDriver // desktop passes a node:sqlite driver instead
 })
 
 // Initialize database

@@ -1,11 +1,11 @@
-import type { SQLiteDatabase } from 'expo-sqlite'
+import type { SqlDriver } from '../SqlDriver'
 import type { BindValue } from '../methods/offlineActions'
 
 /**
  * SQL statements to create all wallet storage tables
  * Schema aligned with @bsv/wallet-toolbox-mobile Table type definitions
  */
-export async function createTables(db: SQLiteDatabase): Promise<void> {
+export async function createTables(db: SqlDriver): Promise<void> {
   // Users table
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS users (
