@@ -137,39 +137,38 @@ address rail. `scan` and `nearby` stay off — no camera path, no local radios.
 - Windows/Linux runtime verification. Neither machine exists here; those artifacts
   remain built-not-run until someone has the hardware.
 
-## Packaging the macOS app (and why local packs are unsigned)
+## The "signed builds hang" incident — corrected diagnosis
 
-`npm run pack:mac` deliberately sets `CSC_IDENTITY_AUTO_DISCOVERY=false`.
+A Developer ID-signed local build appeared to never start its renderer: window
+created, router answering, `loadFile` called, then nothing — no `did-finish-load`,
+no `did-fail-load`, no `preload-error`. An eliminations table was built (hardened
+runtime, entitlements, library validation, preload, sandbox, asar integrity, the
+chrome export — all ruled out; unsigned same-commit builds worked) and the wrong
+conclusion was drawn: "unnotarized Developer ID builds do not launch."
 
-An **unnotarized Developer ID** build does not run on this macOS (Darwin 25.6):
-the browser process starts normally — module evaluated, `app.whenReady` fires, the
-window is created, the router answers, `loadFile` is called — and then the renderer
-never commits any navigation. No `did-finish-load`, no `did-fail-load`, no
-`preload-error`, no `render-process-gone`. `sample` shows the renderer's main thread
-blocked in `mach_msg` during its own startup, before it ever checks in with the
-browser; the browser process is healthy and idle in its run loop.
+The real cause, found once screen recording was granted and the dialog became
+visible: **a macOS Keychain prompt**. `resume()` opens with `safeStorage`, which is
+synchronous keychain access on the main thread. The "Nexus Safe Storage" keychain
+item had been created by a differently-signed build, so macOS parked the call behind
+a modal *"Nexus wants to use your confidential information"* password prompt — in
+front of a white window that could not paint, because the thread that would paint it
+was the one waiting. Unsigned builds "worked" because they could not match the item's
+ACL the same way and fell through to the restore gate instead.
 
-What it is NOT — each of these was tested and ruled out:
+Why every row of the eliminations table still hung: `resume()` ran unconditionally at
+router-ready in all of them. The one framing mistake was testing headless —
+`screencapture` was failing with "could not create image from display" (no screen
+recording permission), so a modal dialog was indistinguishable from a hang.
 
-| Suspect | Test | Result |
-| --- | --- | --- |
-| Hardened runtime | `hardenedRuntime: false`, still signed | still hangs |
-| Entitlements | canonical `allow-jit`-only file | still hangs |
-| Missing `disable-library-validation` | added it | still hangs |
-| The preload bundle | `preload: undefined` | still hangs |
-| `sandbox: false` | `sandbox: true` | still hangs |
-| ASAR integrity | fuse `EnableEmbeddedAsarIntegrityValidation` | already disabled — inert |
-| The chrome export | `NEXUS_CHROME_URL=data:text/html,<h1>hi</h1>` | still hangs |
-| Our own code | same commit, `CSC_IDENTITY_AUTO_DISCOVERY=false` | **works** |
+Consequences, all applied:
 
-The single variable is the signature: `spctl -a -vvv` reports
-`rejected / source=Unnotarized Developer ID`. Ad-hoc-signed and unsigned builds of the
-same bits launch and render.
-
-So: `pack:*` is for running the app locally and is unsigned; `dist:*` keeps the
-Developer ID identity and hardened runtime, and a `dist:mac` artifact **must be
-notarized before anyone tries to launch it** — an unnotarized one looks like a hang,
-not like a rejection, so it is easy to misdiagnose as an app bug.
+- `resume()` now fires on `did-finish-load`, so the chrome paints before any
+  keychain access and a prompt appears over a real UI.
+- Local signed builds are fine after one "Always Allow" — the Developer ID signature
+  is stable across rebuilds. Ad-hoc/unsigned rebuilds churn signatures and re-prompt,
+  which is the worse local experience.
+- Notarization is still required for DISTRIBUTION (Gatekeeper blocks downloaded
+  unnotarized apps on other machines) — it was just never the cause of this.
 
 ## Debugging a packaged app
 

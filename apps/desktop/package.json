@@ -9,7 +9,7 @@
     "build": "node build-main.mjs",
     "dev": "node build-main.mjs && electron .",
     "watch": "node build-main.mjs --watch",
-    "pack:mac": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --dir",
+    "pack:mac": "npm run build && electron-builder --mac --dir",
     "pack:win": "npm run build && electron-builder --win --dir --x64",
     "pack:linux": "npm run build && electron-builder --linux --dir --x64",
     "dist:mac": "npm run build && electron-builder --mac",

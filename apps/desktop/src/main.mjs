@@ -1,8 +1,8 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, net, protocol } from 'electron'
 import path from 'node:path'
 import { writeFile } from 'node:fs/promises'
 import { existsSync, appendFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import bridgePkg from '@nexus/bridge'
 import { createTabManager } from './tabManager.mjs'
 import { createWalletHost } from './wallet/host.mjs'
@@ -116,10 +116,17 @@ function createWindow() {
   boot('router-ready')
   ipcMain.on('nexus:host:out', (_event, msg) => router.handle(msg))
 
-  // Not awaited: the chrome should paint immediately and learn about the wallet
-  // through wallet.state, exactly as it does on mobile where key derivation takes
-  // tens of seconds.
-  void walletHost.resume()
+  // AFTER first paint, not before. resume() starts with safeStorage, which is
+  // SYNCHRONOUS keychain access on this thread — and on a build whose code signature
+  // the keychain item does not yet trust, macOS parks that call behind a modal
+  // password prompt. Fired at router-ready, that prompt sat in front of a white
+  // window that could not paint, which is exactly the "signed builds hang" this shell
+  // was misdiagnosed with (docs/SPEC-desktop-wallet.md). The chrome paints, shows the
+  // gate, and learns the outcome through wallet.state — same flow as mobile, where
+  // key derivation takes tens of seconds.
+  win.webContents.once('did-finish-load', () => {
+    void walletHost.resume()
+  })
 
   // Forward the harness's own log to stdout so gate evidence can be collected without
   // a human watching the window. Electron 36+ passes a single details object here;
@@ -225,8 +232,34 @@ process.on('uncaughtException', (err) => {
 })
 
 boot('awaiting-ready')
+/**
+ * Root-anchored chrome assets, rescued.
+ *
+ * The bundled export rewrites the STATIC references to be relative (tools/
+ * bundle-ui.mjs), but Next's runtime also BUILDS URLs at run time — webpack's lazy-
+ * chunk loader concatenates its configured public path, the literal "/_next/". Under
+ * file:// that resolves against the filesystem root, and the first lazily-loaded
+ * chunk dies with ChunkLoadError ("file:///_next/static/chunks/…"). The exact same
+ * list of root-anchored prefixes bundle-ui rewrites in strings is therefore mapped
+ * here at the protocol layer, where it catches the constructed URLs too.
+ */
+const UI_ROOT_PREFIXES = /^\/(?:_next|images|icons|avatars|tokens|media|members|ordinals|collectibles|ecosystems)\//
+
+function serveChromeAssets() {
+  const uiDir = path.dirname(BUNDLED_CHROME)
+  protocol.handle('file', (request) => {
+    const pathname = decodeURIComponent(new URL(request.url).pathname)
+    const target = UI_ROOT_PREFIXES.test(pathname)
+      ? pathToFileURL(path.join(uiDir, pathname)).toString()
+      : request.url
+    // bypassCustomProtocolHandlers, or this handler recurses into itself.
+    return net.fetch(target, { bypassCustomProtocolHandlers: true })
+  })
+}
+
 app.whenReady().then(() => {
   boot('app-ready')
+  serveChromeAssets()
   try {
     createWindow()
   } catch (err) {
