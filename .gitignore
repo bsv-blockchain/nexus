@@ -2,6 +2,13 @@ node_modules/
 .expo/
 dist/
 build/
+# ...except the Electron build RESOURCES, which are source, not output: the app
+# icons and the macOS entitlements plist. The blanket rule above silently kept all
+# four out of git, so every local build worked (the files are on disk) and CI could
+# not sign at all — "build/entitlements.mac.plist: cannot read entitlement data",
+# and a default Electron icon on every platform. Every other build/ in this repo is
+# real output and is covered by a more specific rule below.
+!apps/desktop/build/
 web-build/
 /apps/mobile/ios/
 /apps/mobile/android/

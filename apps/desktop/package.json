@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Nexus desktop shell — Electron, WebContentsView per tab.",
+  "homepage": "https://github.com/bsv-blockchain/nexus",
   "type": "module",
   "main": "dist-electron/main.cjs",
   "scripts": {
@@ -90,7 +91,8 @@
       "category": "Network",
       "icon": "build/icon.png",
       "maintainer": "BSV Association",
-      "executableName": "nexus"
+      "executableName": "nexus",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "electronVersion": "43.2.0",
     "dmg": {
