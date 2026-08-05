@@ -76,3 +76,9 @@ native-engine-ffi/packages/EngineNativeFFI/EngineNative.xcframework/
 # fallback cannot run is one where a missing framework becomes unrecoverable
 # instead of merely slow. They are ~35 small tracked files; the 1.4 GB is all in
 # target/, excluded above.
+
+# Signing material stays out of EAS archives too — the keystore lives in EAS's
+# credential store, not in the build tarball.
+credentials.json
+*.jks
+*.keystore

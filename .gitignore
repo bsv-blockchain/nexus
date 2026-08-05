@@ -35,3 +35,9 @@ packages/react-native-*/ios/*.xcframework/
 packages/react-native-*/android/build/
 packages/react-native-*/android/.cxx/
 native-*/target/
+
+# Signing material must never enter git: the Android upload keystore and the
+# credentials.json that eas credentials reads passwords from.
+credentials.json
+*.jks
+*.keystore
