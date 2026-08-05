@@ -35,6 +35,7 @@ import {
   FileText,
   Inbox,
   KeyRound,
+  PanelLeftClose,
   PenTool,
   Plus,
   Search,
@@ -80,10 +81,25 @@ function Header({ slug }: { slug: AppSlug }): ReactNode {
     messagesUnreadOnly,
     setMessagesUnreadOnly,
     openNewConversation,
+    toggleRail,
   } = useHub();
   if (!app) return null;
   return (
     <div className="flex items-center gap-2 px-1.5 pt-0.5 pb-3">
+      {/* Closing the pane belongs beside what the pane is called, rather than
+          in the rail's footer where it sat next to controls that have nothing
+          to do with it. Re-opening is the rail's job, since this button goes
+          with the panel it closes. */}
+      <Tooltip label={content.hub.collapsePanel}>
+        <button
+          type="button"
+          onClick={toggleRail}
+          aria-label={content.hub.collapsePanel}
+          className="focus-ring -ml-0.5 shrink-0 rounded-md p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+        >
+          <PanelLeftClose className="size-4" aria-hidden="true" />
+        </button>
+      </Tooltip>
       {/* No app tile: the rail already shows which app is open, in the same
           mark, a few pixels to the left. Twice is not clearer. */}
       <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">

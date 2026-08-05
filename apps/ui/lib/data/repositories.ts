@@ -18,8 +18,8 @@ export interface AppRepository {
 export const defaultRepositories: AppRepository[] = [
   {
     id: "repo-1sat",
-    name: "bOpen apps",
-    url: "https://ordinals.gorillapool.io/registry",
+    name: "Open Protocol Labs",
+    url: "https://openprotocollabs.com/registry",
     official: false,
     enabled: true,
   },
@@ -39,8 +39,17 @@ export const defaultRepositories: AppRepository[] = [
   },
 ];
 
-/** Known repos offered in the "add from a list" picker (not enabled yet). */
+/**
+ * Known repos offered in the "add from a list" picker, and from the URL field
+ * itself (not enabled yet).
+ *
+ * Third-party every one of them: none is vetted by Nexus or the BSV
+ * Association, which is why adding one goes through a confirmation rather than
+ * a toggle. They are offered at all so that somebody who has never seen a
+ * registry URL has something to try instead of a blank box.
+ */
 export const suggestedRepositories: { name: string; url: string }[] = [
   { name: "Project Babbage", url: "https://apps.metanet.io/registry" },
   { name: "Catallaxy Capital", url: "https://market.handcash.io/registry" },
+  { name: "1Sat Market", url: "https://ordinals.gorillapool.io/registry" },
 ];

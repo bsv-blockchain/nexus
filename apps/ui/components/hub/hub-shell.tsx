@@ -11,6 +11,7 @@ import { MobileBrowser } from "@/components/hub/mobile-browser";
 import { MobileSheet } from "@/components/hub/mobile-sheet";
 import { ShareModal } from "@/components/hub/share-modal";
 import { SpacesPanel } from "@/components/hub/spaces-panel";
+import { SettingsSidebar } from "@/components/apps/settings-app";
 import { CustomThemeProvider } from "@/components/hub/theme-provider";
 import { WalletGate } from "@/components/hub/wallet-gate";
 import { AnimatePresence, motion } from "motion/react";
@@ -19,7 +20,10 @@ import { useEffect, useState, type ReactNode } from "react";
 const slideEase = [0.4, 0, 0.2, 1] as const;
 
 function LibraryPanel(): ReactNode {
-  const { libraryTab } = useHub();
+  const { libraryTab, mainView } = useHub();
+  // Settings takes the panel as well as the canvas: the categories are the only
+  // way to move around it, so they have to be where every other app's list is.
+  if (mainView === "settings") return <SettingsSidebar />;
   if (libraryTab === "apps") return <AppCollections />;
   // Profiles <-> Downloads crossfade: the outgoing pane staggers out, then the
   // incoming pane staggers in (and the reverse when closing Downloads).

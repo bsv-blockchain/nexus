@@ -2,6 +2,7 @@
 
 import { Handle } from "@/components/apps/messages/ecosystem-tag";
 import { MemberAvatar } from "@/components/apps/messages/member-avatar";
+import { OnceSeal } from "@/components/apps/messages/once-seal";
 import { useOpenProfile } from "@/components/apps/messages/profile-view";
 import {
   content,
@@ -29,8 +30,12 @@ import {
   CircleQuestionMark,
   Clock,
   Coins,
+  EyeOff,
   FileSignature,
+  Flame,
   HeartCrack,
+  Lock,
+  LockOpen,
   HeartHandshake,
   Inbox,
   KeyRound,
@@ -58,6 +63,7 @@ const ICONS: Record<CommandVerb | CustomVerb, ReactNode> = {
   refund: <Undo2 className="size-4" />,
   send: <PackageOpen className="size-4" />,
   escrow: <Handshake className="size-4" />,
+  once: <EyeOff className="size-4" />,
   cancel: <CircleSlash className="size-4" />,
   standing: <ListChecks className="size-4" />,
   watch: <Eye className="size-4" />,
@@ -77,20 +83,36 @@ const ICONS: Record<CommandVerb | CustomVerb, ReactNode> = {
 
 function StatusPill({ status }: { status: CommandCardData["status"] }): ReactNode {
   const copy = content.messages.card.status;
+  /* `sealed` is accent rather than positive: something is waiting, and calling
+     that a success would read as delivered-and-done when the whole point is
+     that it has not been opened yet. `revealed`, `burned` and `expired` are all
+     muted, because a spent or destroyed secret is an empty envelope rather than
+     an achievement — and a green tick on "Expired" was reading as one. */
   const tone =
     status === "failed"
       ? "bg-negative/15 text-negative"
       : status === "partial"
         ? "bg-warning/15 text-warning"
-        : status === "pending"
-          ? "bg-surface text-muted-foreground"
-          : "bg-positive/15 text-positive";
+        : status === "sealed"
+          ? "bg-accent/15 text-accent"
+          : status === "pending" ||
+              status === "revealed" ||
+              status === "burned" ||
+              status === "expired"
+            ? "bg-surface text-muted-foreground"
+            : "bg-positive/15 text-positive";
   const icon =
     status === "failed" ? (
       <X className="size-3" />
     ) : status === "partial" ? (
       <TriangleAlert className="size-3" />
-    ) : status === "pending" ? (
+    ) : status === "sealed" ? (
+      <Lock className="size-3" />
+    ) : status === "revealed" ? (
+      <LockOpen className="size-3" />
+    ) : status === "burned" ? (
+      <Flame className="size-3" />
+    ) : status === "pending" || status === "expired" ? (
       <Clock className="size-3" />
     ) : (
       <Check className="size-3" />
@@ -130,10 +152,17 @@ function PersonChip({ person }: { person: MessagePerson }): ReactNode {
 export function CommandCardBody({
   card,
   bare = false,
+  mine = false,
 }: {
   card: CommandCardData;
   /** drop the frame, for when the caller supplies one (and appends actions) */
   bare?: boolean;
+  /**
+   * The card sits on the user's own message. Only `/once` needs it, and it
+   * needs it for a reason the card cannot infer: a secret is openable by its
+   * recipient and by nobody else, including whoever sealed it.
+   */
+  mine?: boolean;
 }): ReactNode {
   const copy = content.messages.card;
   const people = (card.recipientIds ?? [])
@@ -197,7 +226,11 @@ export function CommandCardBody({
             {people.length > 0 && !card.legs && (
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-[11px] text-muted-foreground">
-                  {card.verb === "request" ? copy.from : copy.to}
+                  {card.verb === "request"
+                    ? copy.from
+                    : card.verb === "once"
+                      ? copy.sealedFor
+                      : copy.to}
                 </span>
                 {people.map((person) => (
                   <PersonChip key={person.id} person={person} />
@@ -269,6 +302,13 @@ export function CommandCardBody({
               </p>
             )}
             {card.memo && <p className="text-sm text-pretty">{card.memo}</p>}
+
+            {/* The seal comes after the note deliberately. The note is the half
+                that survives, and it is the last thing worth reading before an
+                irreversible click. */}
+            {card.verb === "once" && card.secretId && (
+              <OnceSeal card={card} mine={mine} />
+            )}
             {card.note && (
               <p className="flex items-start gap-1.5 text-[11px] text-pretty text-muted-foreground">
                 <TriangleAlert

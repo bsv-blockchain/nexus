@@ -85,6 +85,13 @@ import type {
 
 export * from "./types";
 export { media, mediaItems, type MediaKey } from "./media";
+export {
+  currentRelease,
+  getRelease,
+  releases,
+  type Release,
+  type ReleaseFeature,
+} from "./releases";
 export type { AppRepository } from "./repositories";
 export { suggestedRepositories } from "./repositories";
 export { content } from "./content";

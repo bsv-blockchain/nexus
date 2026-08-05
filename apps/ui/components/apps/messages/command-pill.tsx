@@ -3,6 +3,7 @@
 import { CommandCardBody } from "@/components/apps/messages/command-card";
 import { FloatingPanel, useDismissOnOutside } from "@/components/apps/messages/floating-panel";
 import { MemberAvatar } from "@/components/apps/messages/member-avatar";
+import { SealTally, SecretMask } from "@/components/apps/messages/once-seal";
 import { commandToast, type ToastSubject } from "@/components/apps/messages/command-toast";
 import { useProfileActions } from "@/components/apps/messages/profile-hovercard";
 import { useOpenProfile } from "@/components/apps/messages/profile-view";
@@ -28,6 +29,7 @@ import {
   Ban,
   CircleSlash,
   HandCoins,
+  Paperclip,
   PenLine,
   Receipt,
   Repeat,
@@ -124,6 +126,48 @@ function PillContent({
   // amount last in `/split` too, which the pill used to contradict.
   const args = [...handles, amount];
 
+  /*
+   * `/once` reads as `/once @handle… ●●●●● note`, in the payload's own slot.
+   *
+   * The mask is what the sender typed, rendered as the line the reader is
+   * allowed to see — which makes the pill itself the state of the secret. Filled
+   * and hopping while it is still there, hollow once it has been opened, struck
+   * through if it was burned or lapsed unopened, and nobody has to open the card
+   * to know which. The status is derived where the message renders, so the pill,
+   * the badge and the seal cannot disagree.
+   */
+  if (card.verb === "once") {
+    args.push(
+      <SecretMask
+        key="seal"
+        state={
+          card.status === "revealed"
+            ? "opened"
+            : card.status === "withdrawn" ||
+                card.status === "burned" ||
+                card.status === "expired"
+              ? "void"
+              : "sealed"
+        }
+      />,
+      <SealTally key="tally" secretId={card.secretId} />,
+    );
+    /* A sealed document is a different errand from a sealed password, and the
+       reader decides whether to go and find their machine from the pill. The
+       count survives the opening because it describes the envelope. */
+    if (card.sealedFiles) {
+      args.push(
+        <span
+          key="files"
+          className="inline-flex items-center gap-0.5 align-middle font-medium"
+        >
+          <Paperclip className="size-3" aria-hidden="true" />
+          {card.sealedFiles}
+        </span>,
+      );
+    }
+  }
+
   const extras: ReactNode[] = [];
   // `/trolltoll [recipient] <amount>|off` — lifting a toll takes the literal
   // `off` rather than an amount, so without it the pill read as a bare verb.
@@ -169,7 +213,10 @@ function PillContent({
    * it still shows, clamped, because otherwise the pill would lose the only part
    * that says what the payment was for.
    */
-  if (card.memo && !inline) {
+  /* `/once` is the exception, and it is the reason the note exists as its own
+     argument: the dots say nothing about what was sealed, so a mask with no
+     label beside it is a pill a reader cannot act on. Same clamp either way. */
+  if (card.memo && (!inline || card.verb === "once")) {
     const memo =
       card.memo.length > 64 ? `${card.memo.slice(0, 64).trimEnd()}…` : card.memo;
     extras.push(
@@ -197,10 +244,12 @@ function PillContent({
         <span className="font-medium opacity-70">{copy.status.pending}</span>
       )}
       {/* A withdrawn request has to say so where the "Pending" badge was.
-          Dropping the badge would read as paid rather than as withdrawn. */}
-      {card.status === "withdrawn" && (
+          Dropping the badge would read as paid rather than as withdrawn. A
+          burned seal is the same problem: the struck-through mask alone says
+          "empty" without saying nobody ever got it. */}
+      {(card.status === "withdrawn" || card.status === "burned") && (
         <span className="font-medium line-through opacity-70">
-          {copy.status.withdrawn}
+          {card.status === "burned" ? copy.status.burned : copy.status.withdrawn}
         </span>
       )}
     </>
@@ -557,7 +606,7 @@ export function CommandPill({
           label={`/${card.verb} — ${content.messages.card.details}`}
         >
           <span className="block overflow-hidden rounded-2xl border border-border bg-surface-raised text-foreground shadow-2xl">
-            <CommandCardBody card={card} bare />
+            <CommandCardBody card={card} bare mine={mine} />
             <PillActions
               card={card}
               onRan={() => setOpen(false)}

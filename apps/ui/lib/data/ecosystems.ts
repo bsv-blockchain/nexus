@@ -56,6 +56,15 @@ export const ecosystems: Ecosystem[] = [
     iconPlate: "#0f1021",
   },
   {
+    id: "yours",
+    name: "Yours",
+    description:
+      "An open-source wallet that lives in the browser, holding ordinals and tokens alongside ordinary payments.",
+    alias: "yours",
+    domain: "yours.org",
+    icon: "/ecosystems/yours.png",
+  },
+  {
     id: "handcash",
     name: "HandCash",
     description:

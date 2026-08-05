@@ -16,4 +16,6 @@ export const themeConfig = {
 export const storageKeys = {
   installedApps: "nexus.installed-apps",
   repositories: "nexus.app-repositories",
+  /** what Messages anchors, globally and per conversation */
+  chainPolicy: "nexus.chain-policy",
 } as const;

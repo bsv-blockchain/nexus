@@ -1,5 +1,10 @@
 "use client";
 
+import { ChainPolicyButton } from "@/components/apps/messages/chain-policy";
+import {
+  ReleaseDetail,
+  ReleaseList,
+} from "@/components/hub/release-notes";
 import { ConversationSettings } from "@/components/apps/messages/conversation-settings";
 import { NewConversation } from "@/components/apps/messages/new-conversation";
 import { ProfileActionsProvider } from "@/components/apps/messages/profile-hovercard";
@@ -58,6 +63,38 @@ export function DetailPane(): ReactNode {
 
   if (detailPane?.kind === "new") {
     return <NewConversation open onClose={closeDetailPane} />;
+  }
+
+  if (detailPane?.kind === "releases" || detailPane?.kind === "release") {
+    /* One pane for both, so stepping from the list into a release and back does
+       not animate the whole panel out and in again. */
+    const version = detailPane.kind === "release" ? detailPane.id : null;
+    return (
+      <SidePane
+        open
+        title={
+          version
+            ? `${content.releases.whatsNewIn} v${version}`
+            : content.releases.title
+        }
+        onClose={closeDetailPane}
+        {...(version
+          ? {
+              actions: (
+                <button
+                  type="button"
+                  onClick={() => openDetailPane({ kind: "releases", id: "" })}
+                  className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground rounded-md px-2 py-1 text-[11px] font-semibold"
+                >
+                  {content.releases.past}
+                </button>
+              ),
+            }
+          : {})}
+      >
+        {version ? <ReleaseDetail version={version} /> : <ReleaseList />}
+      </SidePane>
+    );
   }
 
   if (detailPane?.kind === "vouches") {
@@ -131,6 +168,10 @@ export function DetailPane(): ReactNode {
         open
         title={content.messages.editConversation}
         onClose={closeDetailPane}
+        /* Conversation-level, so it belongs to the conversation's own settings
+           rather than to the list's bar — which is the default it falls back
+           to when this one is left alone. */
+        actions={<ChainPolicyButton conversationId={detailPane.id} />}
       >
         <ConversationSettings
           thread={thread}

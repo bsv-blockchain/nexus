@@ -7,7 +7,7 @@ import {
   type AppRepository,
 } from "@/lib/data";
 import { storageKeys } from "@/lib/config";
-import { Check, Plus, Settings, Trash2, X } from "lucide-react";
+import { Check, Plus, Settings, ShieldAlert, Trash2, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   useEffect,
@@ -93,6 +93,114 @@ interface Anchor {
   vh: number;
 }
 
+/** A repository the user has asked for but not yet agreed to. */
+interface PendingRepo {
+  name: string;
+  url: string;
+}
+
+/**
+ * The warning in front of adding a store.
+ *
+ * A repository decides which code the hub is willing to offer you, so this is
+ * closer to a permission than a preference — and the moment to say that nobody
+ * has reviewed it is before it is added, not in a toast afterwards. Presented
+ * the same way as the panel that opened it: a popover on a pointer, a bottom
+ * sheet on a phone.
+ */
+function ConfirmUnvetted({
+  target,
+  isDesktop,
+  position,
+  onCancel,
+  onConfirm,
+}: {
+  target: PendingRepo;
+  isDesktop: boolean;
+  position: { left: number; bottom: number } | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}): ReactNode {
+  const copy = content.repositories;
+  const base =
+    "z-80 flex flex-col overflow-hidden bg-surface-raised text-foreground shadow-2xl ring-1 ring-border";
+  return (
+    <>
+      <motion.button
+        type="button"
+        aria-label={copy.confirmCancel}
+        onClick={onCancel}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-75 bg-black/40"
+      />
+      <motion.div
+        role="alertdialog"
+        aria-label={copy.confirmTitle}
+        initial={isDesktop ? { opacity: 0, scale: 0.96, y: 6 } : { y: "100%" }}
+        animate={isDesktop ? { opacity: 1, scale: 1, y: 0 } : { y: 0 }}
+        exit={isDesktop ? { opacity: 0, scale: 0.96, y: 6 } : { y: "100%" }}
+        transition={{ type: "spring", damping: 30, stiffness: 340 }}
+        {...(isDesktop && position
+          ? { style: { left: position.left, bottom: position.bottom } }
+          : {})}
+        className={
+          isDesktop
+            ? `fixed w-[336px] rounded-2xl ${base}`
+            : `fixed inset-x-0 bottom-0 rounded-t-3xl ${base}`
+        }
+      >
+        {!isDesktop && (
+          <div className="flex justify-center pt-3" aria-hidden="true">
+            <span className="bg-muted-foreground/30 h-1 w-9 rounded-full" />
+          </div>
+        )}
+        <div className="space-y-2 px-4 pt-4 pb-3">
+          <h2 className="flex items-start gap-2 text-sm font-semibold">
+            <ShieldAlert
+              className="text-warning mt-px size-4 shrink-0"
+              aria-hidden="true"
+            />
+            {copy.confirmTitle}
+          </h2>
+          {/* The URL, because it is the whole of what is being trusted. */}
+          <div className="bg-surface rounded-lg px-2.5 py-2">
+            <p className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+              {copy.confirmSource}
+            </p>
+            <p className="truncate text-sm font-medium">
+              {target.name || hostLabel(target.url)}
+            </p>
+            <p className="text-muted-foreground truncate font-mono text-[11px]">
+              {target.url}
+            </p>
+          </div>
+          <p className="text-muted-foreground text-xs text-pretty">
+            {copy.confirmBody}
+          </p>
+        </div>
+        <div className="border-border flex items-center gap-2 border-t p-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="focus-ring border-border hover:bg-surface-hover flex-1 rounded-lg border px-3 py-2 text-sm font-semibold"
+          >
+            {copy.confirmCancel}
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="focus-ring bg-accent text-accent-foreground flex-1 rounded-lg px-3 py-2 text-sm font-bold hover:opacity-90"
+          >
+            {copy.confirmAdd}
+          </button>
+        </div>
+      </motion.div>
+    </>
+  );
+}
+
 function RepositoriesSheet({
   anchor,
   onClose,
@@ -106,6 +214,17 @@ function RepositoriesSheet({
   const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [commonSource, setCommonSource] = useState(false);
+  /** Open while the URL field has focus, so a blank box is never a dead end. */
+  const [picking, setPicking] = useState(false);
+  /**
+   * The suggestion whose URL is currently in the field, so its name survives.
+   *
+   * Without this a store chosen by name is filed under its hostname, and the row
+   * ends up printing the same string twice. Dropped the moment the URL is edited:
+   * a name that no longer matches the address is worse than no name.
+   */
+  const [picked, setPicked] = useState<PendingRepo | null>(null);
+  const [pending, setPending] = useState<PendingRepo | null>(null);
 
   useEffect(() => {
     writeRepositories(repos);
@@ -125,7 +244,16 @@ function RepositoriesSheet({
     );
   const remove = (id: string): void =>
     setRepos((current) => current.filter((r) => r.id !== id));
-  const add = (name: string, rawUrl: string): void => {
+  /*
+   * Every path to adding a repository goes through the same confirmation.
+   *
+   * Validation first, so the warning is never shown for a URL that was going to
+   * be rejected anyway — and the suggested chips route through here too. A
+   * curated-looking name is not vetting, and leaving them a shortcut past the
+   * warning would make the warning a formality about typing rather than about
+   * trust.
+   */
+  const requestAdd = (name: string, rawUrl: string): void => {
     const clean = normalizeUrl(rawUrl);
     if (!clean) {
       setError(copy.invalidUrl);
@@ -136,6 +264,13 @@ function RepositoriesSheet({
       return;
     }
     setError(null);
+    setPicking(false);
+    setPending({ name, url: clean });
+  };
+
+  const commitAdd = (): void => {
+    if (!pending) return;
+    const { name, url: clean } = pending;
     setRepos((current) => [
       ...current,
       {
@@ -146,6 +281,8 @@ function RepositoriesSheet({
         enabled: true,
       },
     ]);
+    setPending(null);
+    setPicked(null);
     setUrl("");
   };
 
@@ -316,7 +453,7 @@ function RepositoriesSheet({
                   <button
                     key={s.url}
                     type="button"
-                    onClick={() => add(s.name, s.url)}
+                    onClick={() => requestAdd(s.name, s.url)}
                     className="focus-ring flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
                   >
                     <Plus className="size-3" aria-hidden="true" />
@@ -332,38 +469,120 @@ function RepositoriesSheet({
 
         {!commonSource && (
         <form
-          className="border-t border-border p-3"
+          className="border-border relative border-t p-3"
           onSubmit={(event) => {
             event.preventDefault();
-            add("", url);
+            requestAdd(picked?.url === url ? picked.name : "", url);
           }}
         >
-          <div className="flex items-center gap-2">
+          {/*
+            Something to try, offered where the typing happens.
+
+            An empty URL field assumes the reader already knows a registry
+            address, and almost nobody does — so focusing it lists the
+            third-party stores not yet added. Selecting one fills the field
+            rather than adding it, which keeps the confirmation as the single
+            place a repository is actually agreed to.
+          */}
+          <AnimatePresence>
+            {picking && suggestions.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 4 }}
+                transition={{ duration: 0.14 }}
+                className="border-border bg-surface-raised absolute inset-x-3 bottom-full z-10 mb-2 overflow-hidden rounded-xl border shadow-2xl"
+              >
+                <p className="text-muted-foreground border-border/60 border-b px-3 py-1.5 text-[10px] font-semibold tracking-wide uppercase">
+                  {copy.pickSuggested}
+                </p>
+                <ul>
+                  {suggestions.map((s) => (
+                    <li key={s.url}>
+                      <button
+                        type="button"
+                        /* The field must keep focus, or the blur below closes
+                           this list before the click lands on it. */
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          setUrl(s.url);
+                          setPicked({ name: s.name, url: s.url });
+                          setError(null);
+                          setPicking(false);
+                        }}
+                        className="focus-ring hover:bg-surface-hover block w-full px-3 py-1.5 text-left"
+                      >
+                        <span className="block truncate text-xs font-medium">
+                          {s.name}
+                        </span>
+                        <span className="text-muted-foreground block truncate font-mono text-[10px]">
+                          {hostLabel(s.url)}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-muted-foreground border-border/60 border-t px-3 py-1.5 text-[10px] text-pretty">
+                  {copy.pickHint}
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div
+            className="flex items-center gap-2"
+            /* Closes when focus leaves the field *and* the list, so tabbing
+               through the suggestions does not dismiss them. */
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                setPicking(false);
+              }
+            }}
+          >
             <input
               value={url}
               onChange={(event) => {
                 setUrl(event.target.value);
+                if (picked && picked.url !== event.target.value) setPicked(null);
                 if (error) setError(null);
+              }}
+              onFocus={() => setPicking(true)}
+              onClick={() => setPicking(true)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape" && picking) {
+                  event.stopPropagation();
+                  setPicking(false);
+                }
               }}
               inputMode="url"
               placeholder={copy.urlPlaceholder}
               aria-label={copy.urlPlaceholder}
               aria-invalid={error !== null}
-              className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-ring"
+              className="border-border bg-surface focus:border-ring min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm outline-none"
             />
             <button
               type="submit"
-              className="focus-ring shrink-0 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-accent-foreground hover:opacity-90"
+              className="focus-ring bg-accent text-accent-foreground shrink-0 rounded-lg px-3 py-2 text-sm font-semibold hover:opacity-90"
             >
               {copy.add}
             </button>
           </div>
-          {error && (
-            <p className="mt-1.5 text-[11px] text-negative">{error}</p>
-          )}
+          {error && <p className="text-negative mt-1.5 text-[11px]">{error}</p>}
         </form>
         )}
       </motion.div>
+
+      <AnimatePresence>
+        {pending && (
+          <ConfirmUnvetted
+            target={pending}
+            isDesktop={isDesktop}
+            position={desktopPos}
+            onCancel={() => setPending(null)}
+            onConfirm={commitAdd}
+          />
+        )}
+      </AnimatePresence>
     </>
   );
 }

@@ -15,6 +15,12 @@ import { StandingCard } from "@/components/apps/messages/standing-card";
 import { ProfileHovercard } from "@/components/apps/messages/profile-hovercard";
 import { MemberAvatar } from "@/components/apps/messages/member-avatar";
 import { MessageStatusIcon } from "@/components/apps/messages/message-status-icon";
+import { MessageImageSheet } from "@/components/apps/messages/message-image";
+import {
+  MessageMenu,
+  type MenuPoint,
+} from "@/components/apps/messages/message-menu";
+import { sealView } from "@/components/apps/messages/once-seal";
 import { useHub, type AppSlug } from "@/components/hub/hub-provider";
 import { Tooltip } from "@/components/hub/tooltip";
 import { MediaAttachment } from "@/components/apps/messages/media-attachment";
@@ -35,7 +41,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useSyncExternalStore, type ReactNode } from "react";
+import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
 /** Marker in a message's text where its command pill is rendered. */
 const COMMAND_SLOT = "{command}";
@@ -144,10 +150,13 @@ export function MessageBubble({
   onDismiss,
   onOpenMedia,
   onPostCommand,
+  focused = false,
 }: {
   message: ChatMessage;
   sender?: MessagePerson | undefined;
   showSender?: boolean;
+  /** briefly ringed, after being jumped to from the saved list */
+  focused?: boolean;
   /** bind the next command to this message (`/tip`, `/sign`, `/receipt`) */
   onReply?: () => void;
   /** remove this message as a moderator, where the reader is one */
@@ -161,6 +170,13 @@ export function MessageBubble({
 }): ReactNode {
   const mine = message.senderId === "me";
   const withSender = showSender && !mine && Boolean(sender);
+  const [menu, setMenu] = useState<MenuPoint | null>(null);
+  const [imageOpen, setImageOpen] = useState(false);
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelPress = (): void => {
+    if (pressTimer.current) clearTimeout(pressTimer.current);
+    pressTimer.current = null;
+  };
 
   /*
    * A withdrawn request stops reading as owed.
@@ -170,23 +186,44 @@ export function MessageBubble({
    * about that message, so it is applied where the message is rendered rather
    * than by rewriting the transcript.
    */
-  const withdrawn = useSyncExternalStore(
+  const effects = useSyncExternalStore(
     subscribeEffects,
     getEffects,
     getEffectsServerSnapshot,
-  ).withdrawnRequests.includes(message.id);
+  );
+  const withdrawn = effects.withdrawnRequests.includes(message.id);
+  /*
+   * A one-time secret that has been opened, burned or left to lapse stops
+   * reading as available.
+   *
+   * Same reasoning as the withdrawn request: it is state about the message
+   * rather than a change to what was said, so it is applied where the message
+   * renders. Deriving it once here means the pill's mask, the card's status
+   * badge and the seal all agree without any of them consulting the store
+   * separately and disagreeing about the answer.
+   */
+  const secretId = message.command?.secretId;
+  const sealStatus = secretId
+    ? sealView(
+        effects.secrets.filter((entry) => entry.secretId === secretId),
+        new Date().toISOString(),
+      ).status
+    : undefined;
   const whoisSubject =
     message.command?.verb === "whois"
       ? getMessagePerson(message.command.recipientIds?.[0] ?? "")
       : undefined;
-  const card =
-    message.command && withdrawn
+  const card = !message.command
+    ? undefined
+    : withdrawn
       ? {
           ...message.command,
           status: "withdrawn" as const,
           note: content.messages.standing.withdrawnNote,
         }
-      : message.command;
+      : sealStatus
+        ? { ...message.command, status: sealStatus }
+        : message.command;
 
   // The `/standing` reply, like `/help`: the client answering its own user.
   if (message.standing) {
@@ -205,7 +242,35 @@ export function MessageBubble({
 
   return (
     <div
-      className={`group flex items-end gap-2 ${mine ? "justify-end" : "justify-start"}`}
+      /* Addressable, so the saved list can send a reader straight here. The id
+         is on every message rather than only on focused ones: whether a message
+         is a scroll target is not known until somebody saves it. */
+      id={`msg-${message.id}`}
+      className={`group flex scroll-mt-6 items-end gap-2 rounded-xl transition-shadow ${
+        mine ? "justify-end" : "justify-start"
+      } ${focused ? "ring-accent/70 ring-2 ring-offset-2 ring-offset-transparent" : ""}`}
+      /*
+       * Right-click on a pointer, long-press on a touch screen.
+       *
+       * The handlers sit on the whole row rather than on the bubble so the
+       * gesture works on the avatar and the timestamp too — a context menu that
+       * only responds to part of the thing it describes reads as broken.
+       * `preventDefault` on the native menu is the point of the feature, and the
+       * long-press timer is cancelled by any move so a scroll never opens it.
+       */
+      onContextMenu={(event) => {
+        event.preventDefault();
+        setMenu({ x: event.clientX, y: event.clientY });
+      }}
+      onTouchStart={(event) => {
+        const touch = event.touches[0];
+        if (!touch) return;
+        const { clientX: x, clientY: y } = touch;
+        pressTimer.current = setTimeout(() => setMenu({ x, y }), 450);
+      }}
+      onTouchMove={cancelPress}
+      onTouchEnd={cancelPress}
+      onTouchCancel={cancelPress}
     >
       {withSender && sender && (
         <ProfileHovercard
@@ -333,6 +398,28 @@ export function MessageBubble({
           )}
         </div>
       </div>
+
+      {menu && (
+        <MessageMenu
+          message={message}
+          {...(sender ? { sender } : {})}
+          point={menu}
+          onClose={() => setMenu(null)}
+          onRenderImage={() => setImageOpen(true)}
+        />
+      )}
+
+      {/* Mounted only once asked for: the still paints on a canvas and loads an
+          avatar, and doing that for every message in the transcript would be
+          work nobody requested. */}
+      {imageOpen && (
+        <MessageImageSheet
+          message={message}
+          {...(sender ? { sender } : {})}
+          open
+          onClose={() => setImageOpen(false)}
+        />
+      )}
     </div>
   );
 }

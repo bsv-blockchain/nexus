@@ -5,7 +5,12 @@ import { CollectibleArt } from "@/components/apps/wallet/collectible-art";
 import { Handle } from "@/components/apps/messages/ecosystem-tag";
 import { MemberAvatar } from "@/components/apps/messages/member-avatar";
 import { Sheet } from "@/components/apps/messages/sheet";
-import { content, type ChatMessage, type MessagePerson } from "@/lib/data";
+import {
+  content,
+  type ChatMessage,
+  type MediaItem,
+  type MessagePerson,
+} from "@/lib/data";
 import { originLabel, splitLegs, type ParsedCommand } from "@/lib/commands";
 import { delegationsFor } from "@/lib/command-effects";
 import { TokenAmount } from "@/components/apps/wallet/token-mark";
@@ -16,7 +21,10 @@ import {
   AlertTriangle,
   Ban,
   Coins,
+  Eye,
+  EyeOff,
   Info,
+  Paperclip,
   ShieldAlert,
   TriangleAlert,
 } from "lucide-react";
@@ -33,7 +41,7 @@ function Line({
 }): ReactNode {
   return (
     <div className="flex items-baseline justify-between gap-4 py-1.5">
-      <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
+      <dt className="text-muted-foreground shrink-0 text-xs">{label}</dt>
       <dd
         className={`min-w-0 text-right text-sm ${strong ? "font-bold" : "font-medium"}`}
       >
@@ -55,7 +63,7 @@ function Recipient({ person }: { person: MessagePerson }): ReactNode {
         <Handle
           person={person}
           size={10}
-          className="max-w-full truncate text-[11px] text-muted-foreground"
+          className="text-muted-foreground max-w-full truncate text-[11px]"
         />
       </span>
     </span>
@@ -75,18 +83,30 @@ export function CommandSheet({
   command,
   boundMessage,
   boundSender,
+  attachments = [],
   onCancel,
   onConfirm,
 }: {
   command: ParsedCommand | null;
   boundMessage?: ChatMessage | undefined;
   boundSender?: MessagePerson | undefined;
+  /** files staged on the draft, which `/once` seals rather than sends */
+  attachments?: MediaItem[];
   onCancel: () => void;
   onConfirm: (command: ParsedCommand) => void;
 }): ReactNode {
   const copy = content.messages.confirm;
   const [wildcardConfirmed, setWildcardConfirmed] = useState(false);
   const [chosenSerial, setChosenSerial] = useState<string | null>(null);
+  /*
+   * The `/once` payload is masked here too, and shown on request.
+   *
+   * The check that matters in this sheet is the handle: sealing to the wrong key
+   * cannot be undone and cannot be resent. The secret itself was typed seconds
+   * ago, so showing it by default buys almost nothing and puts a credential on
+   * screen in a room that may have other people in it.
+   */
+  const [peek, setPeek] = useState(false);
 
   if (!command) {
     return (
@@ -116,8 +136,12 @@ export function CommandSheet({
   const serial = command.serial ?? chosenSerial ?? revokeCandidates[0]?.serial;
   const toll = command.recipients[0]?.person?.tollSats ?? 0;
   const showToll = (verb === "pay" || verb === "message") && toll > 0;
+  /* A /pay naming several handles divides like a /split, so the sheet shows
+     the same per-recipient breakdown — the figure a payer needs to check is
+     what each one gets, not what they typed. */
   const legs =
-    verb === "split" && command.amount
+    (verb === "split" || (verb === "pay" && command.recipients.length > 1)) &&
+    command.amount
       ? splitLegs(command.amount.sats, command.recipients.length)
       : [];
 
@@ -140,7 +164,7 @@ export function CommandSheet({
           <button
             type="button"
             onClick={onCancel}
-            className="focus-ring flex-1 rounded-full border border-border px-4 py-2.5 text-sm font-semibold hover:bg-surface-hover"
+            className="focus-ring border-border hover:bg-surface-hover flex-1 rounded-full border px-4 py-2.5 text-sm font-semibold"
           >
             {blocked || reserved || unsupported ? copy.close : copy.cancel}
           </button>
@@ -149,12 +173,10 @@ export function CommandSheet({
               type="button"
               onClick={() =>
                 onConfirm(
-                  verb === "revoke" && serial
-                    ? { ...command, serial }
-                    : command,
+                  verb === "revoke" && serial ? { ...command, serial } : command
                 )
               }
-              className="focus-ring flex-1 rounded-full bg-accent px-4 py-2.5 text-sm font-bold text-accent-foreground transition-opacity hover:opacity-90"
+              className="focus-ring bg-accent text-accent-foreground flex-1 rounded-full px-4 py-2.5 text-sm font-bold transition-opacity hover:opacity-90"
             >
               {copy.confirmVerb[verb as keyof typeof copy.confirmVerb] ??
                 copy.confirm}
@@ -165,21 +187,22 @@ export function CommandSheet({
     >
       <div className="px-5 pt-4 pb-5">
         <div className="flex items-center gap-2">
-          <code className="rounded-md bg-surface px-2 py-1 font-mono text-sm font-bold">
+          <code className="bg-surface rounded-md px-2 py-1 font-mono text-sm font-bold">
             {title}
           </code>
           {spec && !reserved && (
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-muted-foreground text-[11px]">
               {originLabel(spec)}
             </span>
           )}
         </div>
-        <p className="mt-2 text-sm text-pretty text-muted-foreground">
+        <p className="text-muted-foreground mt-2 text-sm text-pretty">
           {unsupported
             ? copy.unsupported
             : reserved
               ? copy.reserved
-              : (copy.effect[verb as keyof typeof copy.effect] ?? spec?.summary)}
+              : (copy.effect[verb as keyof typeof copy.effect] ??
+                spec?.summary)}
         </p>
 
         {/* Blocking problems first — nothing below them can be actioned. */}
@@ -188,16 +211,16 @@ export function CommandSheet({
             {command.errors.map((error) => (
               <li
                 key={error}
-                className="flex items-start gap-2 rounded-lg bg-negative/10 p-2.5 text-xs text-pretty"
+                className="bg-negative/10 flex items-start gap-2 rounded-lg p-2.5 text-xs text-pretty"
               >
                 {reserved || unsupported ? (
                   <Ban
-                    className="mt-px size-4 shrink-0 text-muted-foreground"
+                    className="text-muted-foreground mt-px size-4 shrink-0"
                     aria-hidden="true"
                   />
                 ) : (
                   <ShieldAlert
-                    className="mt-px size-4 shrink-0 text-negative"
+                    className="text-negative mt-px size-4 shrink-0"
                     aria-hidden="true"
                   />
                 )}
@@ -215,7 +238,7 @@ export function CommandSheet({
           the box, which is exactly the check people skip.
         */}
         {!blocked && command.asset && (
-          <div className="mt-4 flex items-center gap-3 rounded-xl border border-border p-2.5">
+          <div className="border-border mt-4 flex items-center gap-3 rounded-xl border p-2.5">
             <span className="relative shrink-0">
               <CollectibleArt
                 src={command.asset.imageUrl}
@@ -229,7 +252,7 @@ export function CommandSheet({
               <span className="block truncate text-sm font-semibold">
                 {command.asset.name}
               </span>
-              <span className="block truncate text-[11px] text-muted-foreground">
+              <span className="text-muted-foreground block truncate text-[11px]">
                 {command.asset.org ?? content.messages.transfer.asset}
               </span>
             </span>
@@ -237,22 +260,23 @@ export function CommandSheet({
         )}
 
         {!blocked && !reserved && !unsupported && (
-          <dl className="mt-4 divide-y divide-border border-t border-border">
-            {command.recipients.length === 1 && command.recipients[0]?.person && (
-              <Line
-                label={
-                  command.recipients[0].implicit
-                    ? copy.recipientImplied
-                    : copy.recipient
-                }
-              >
-                <Recipient person={command.recipients[0].person} />
-              </Line>
-            )}
+          <dl className="divide-border border-border mt-4 divide-y border-t">
+            {command.recipients.length === 1 &&
+              command.recipients[0]?.person && (
+                <Line
+                  label={
+                    command.recipients[0].implicit
+                      ? copy.recipientImplied
+                      : copy.recipient
+                  }
+                >
+                  <Recipient person={command.recipients[0].person} />
+                </Line>
+              )}
 
             {command.recipients.length > 1 && (
               <div className="py-2">
-                <dt className="mb-1.5 text-xs text-muted-foreground">
+                <dt className="text-muted-foreground mb-1.5 text-xs">
                   {copy.recipients} ({command.recipients.length})
                 </dt>
                 <dd className="space-y-1.5">
@@ -269,7 +293,7 @@ export function CommandSheet({
                           </span>
                         )}
                       </div>
-                    ) : null,
+                    ) : null
                   )}
                 </dd>
               </div>
@@ -277,10 +301,10 @@ export function CommandSheet({
 
             {boundMessage && (
               <div className="py-2">
-                <dt className="mb-1 text-xs text-muted-foreground">
+                <dt className="text-muted-foreground mb-1 text-xs">
                   {verb === "sign" ? copy.signing : copy.boundTo}
                 </dt>
-                <dd className="rounded-lg bg-surface p-2.5 text-xs text-pretty">
+                <dd className="bg-surface rounded-lg p-2.5 text-xs text-pretty">
                   {boundSender && (
                     <span className="mb-1 block font-semibold">
                       {boundSender.name}
@@ -306,7 +330,7 @@ export function CommandSheet({
                 <Line label={copy.estimatedValue}>
                   {formatFiat(
                     command.amount.token.units *
-                      (getToken(command.amount.token.id)?.usdPerUnit ?? 0),
+                      (getToken(command.amount.token.id)?.usdPerUnit ?? 0)
                   )}
                 </Line>
               </>
@@ -322,9 +346,9 @@ export function CommandSheet({
                   <Line label={copy.typedAs}>
                     {formatFiat(
                       command.amount.fiat.amount,
-                      command.amount.fiat.currency,
+                      command.amount.fiat.currency
                     )}
-                    <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">
+                    <span className="text-muted-foreground ml-1.5 text-[11px] font-normal">
                       @ ${MOCK_USD_PER_BSV}/BSV
                     </span>
                   </Line>
@@ -354,12 +378,73 @@ export function CommandSheet({
                 <code className="font-mono text-xs">{command.scope}</code>
               </Line>
             )}
-            {command.reach && (
-              <Line label={copy.reach}>{command.reach}</Line>
-            )}
+            {command.reach && <Line label={copy.reach}>{command.reach}</Line>}
             {verb === "renounce" && (
               <Line label={copy.visibility}>
                 {command.public ? copy.visibilityPublic : copy.visibilityAnon}
+              </Line>
+            )}
+            {/*
+              What is going into the seal, named.
+
+              The one confirmation where the file list is a safety feature rather
+              than a nicety: sealing the wrong document to the right handle cannot
+              be resent, only burned, and by then they may have opened it. The
+              handle is checked above; this is the other half of the check.
+            */}
+            {verb === "once" && attachments.length > 0 && (
+              <div className="py-2">
+                <dt className="text-muted-foreground mb-1.5 text-xs">
+                  {copy.sealing}
+                </dt>
+                <dd className="space-y-1">
+                  {attachments.map((item) => (
+                    <div
+                      key={item.src}
+                      className="bg-surface flex items-center gap-2 rounded-lg p-1.5"
+                    >
+                      <Paperclip
+                        className="text-muted-foreground size-3 shrink-0"
+                        aria-hidden="true"
+                      />
+                      <span className="min-w-0 flex-1 truncate text-xs font-medium">
+                        {item.fileName ?? item.alt ?? item.src.split("/").pop()}
+                      </span>
+                      {item.fileSize && (
+                        <span className="text-muted-foreground shrink-0 text-[10px]">
+                          {item.fileSize}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </dd>
+              </div>
+            )}
+            {command.secret && (
+              <Line label={copy.secret}>
+                <button
+                  type="button"
+                  onClick={() => setPeek((value) => !value)}
+                  aria-pressed={peek}
+                  aria-label={peek ? copy.secretHide : copy.secretShow}
+                  title={peek ? copy.secretHide : copy.secretShow}
+                  className="focus-ring hover:bg-surface-hover inline-flex max-w-full items-center gap-1.5 rounded px-1 py-0.5"
+                >
+                  <span className="min-w-0 truncate font-mono">
+                    {peek ? command.secret : content.messages.once.sealedMask}
+                  </span>
+                  {peek ? (
+                    <EyeOff
+                      className="text-muted-foreground size-3.5 shrink-0"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <Eye
+                      className="text-muted-foreground size-3.5 shrink-0"
+                      aria-hidden="true"
+                    />
+                  )}
+                </button>
               </Line>
             )}
             {command.off && <Line label={copy.toll}>{copy.lifted}</Line>}
@@ -373,7 +458,7 @@ export function CommandSheet({
 
         {needsPick && (
           <fieldset className="mt-4">
-            <legend className="mb-2 text-xs text-muted-foreground">
+            <legend className="text-muted-foreground mb-2 text-xs">
               {revokeCandidates.length} {copy.certificatesIssued}
             </legend>
             <div className="space-y-1.5">
@@ -399,7 +484,7 @@ export function CommandSheet({
                       aria-hidden="true"
                     >
                       {active && (
-                        <span className="size-2 rounded-full bg-accent" />
+                        <span className="bg-accent size-2 rounded-full" />
                       )}
                     </span>
                     <span className="min-w-0 flex-1">
@@ -407,13 +492,13 @@ export function CommandSheet({
                         <code className="font-mono text-xs font-bold">
                           {certificate.serial}
                         </code>
-                        <span className="shrink-0 text-[11px] text-muted-foreground">
+                        <span className="text-muted-foreground shrink-0 text-[11px]">
                           {certificate.expiry
                             ? `${copy.expires} ${certificate.expiry}`
                             : copy.noExpiry}
                         </span>
                       </span>
-                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                      <span className="text-muted-foreground mt-0.5 block truncate text-xs">
                         {certificate.scope}
                         {certificate.perActionCapSats !== null
                           ? ` · ${formatSats(certificate.perActionCapSats)} ${copy.perAction}`
@@ -446,7 +531,7 @@ export function CommandSheet({
               </Caveat>
             )}
             {verb === "split" && (
-              <Caveat icon={<TriangleAlert className="size-4 text-warning" />}>
+              <Caveat icon={<TriangleAlert className="text-warning size-4" />}>
                 {copy.caveats.split}
               </Caveat>
             )}
@@ -458,12 +543,12 @@ export function CommandSheet({
               </Caveat>
             )}
             {verb === "attest" && (
-              <Caveat icon={<TriangleAlert className="size-4 text-warning" />}>
+              <Caveat icon={<TriangleAlert className="text-warning size-4" />}>
                 {copy.caveats.attest}
               </Caveat>
             )}
             {verb === "renounce" && (
-              <Caveat icon={<TriangleAlert className="size-4 text-warning" />}>
+              <Caveat icon={<TriangleAlert className="text-warning size-4" />}>
                 {copy.caveats.renounce}
               </Caveat>
             )}
@@ -478,7 +563,7 @@ export function CommandSheet({
               </Caveat>
             )}
             {(verb === "delegate" || verb === "handoff") && (
-              <Caveat icon={<TriangleAlert className="size-4 text-warning" />}>
+              <Caveat icon={<TriangleAlert className="text-warning size-4" />}>
                 {copy.caveats.perActionCap}
               </Caveat>
             )}
@@ -492,6 +577,18 @@ export function CommandSheet({
                 {copy.caveats.receipt}
               </Caveat>
             )}
+            {verb === "once" && (
+              <>
+                <Caveat
+                  icon={<TriangleAlert className="text-warning size-4" />}
+                >
+                  {copy.caveats.once}
+                </Caveat>
+                <Caveat icon={<Eye className="size-4" />}>
+                  {copy.caveats.onceRead}
+                </Caveat>
+              </>
+            )}
           </div>
         )}
 
@@ -501,7 +598,7 @@ export function CommandSheet({
             type="button"
             onClick={() => setWildcardConfirmed((value) => !value)}
             aria-pressed={wildcardConfirmed}
-            className="focus-ring mt-4 flex w-full items-start gap-2.5 rounded-lg border border-warning/40 bg-warning/10 p-3 text-left"
+            className="focus-ring border-warning/40 bg-warning/10 mt-4 flex w-full items-start gap-2.5 rounded-lg border p-3 text-left"
           >
             <span
               className={`mt-px flex size-4 shrink-0 items-center justify-center rounded border ${
@@ -529,7 +626,7 @@ function Caveat({
   children: ReactNode;
 }): ReactNode {
   return (
-    <p className="flex items-start gap-2 rounded-lg bg-surface p-2.5 text-xs text-pretty text-muted-foreground">
+    <p className="bg-surface text-muted-foreground flex items-start gap-2 rounded-lg p-2.5 text-xs text-pretty">
       <span className="mt-px shrink-0" aria-hidden="true">
         {icon}
       </span>

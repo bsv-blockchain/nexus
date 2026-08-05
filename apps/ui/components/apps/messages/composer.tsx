@@ -51,6 +51,7 @@ const POPOVER_ID = "composer-autocomplete";
 export function Composer({
   placeholder,
   onSend,
+  beforeSend,
   onAttach,
   onAttachFile,
   attachments = [],
@@ -62,6 +63,12 @@ export function Composer({
 }: {
   placeholder: string;
   onSend: (text: string) => void;
+  /**
+   * Last word before a plain message is sent. Return false to hold it back and
+   * leave the draft untouched — used where the conversation wants an explicit
+   * agreement first, and only for chat: a command has its own confirmation.
+   */
+  beforeSend?: (text: string) => boolean;
   onAttach: () => void;
   /** open the file picker, as distinct from pictures and clips */
   onAttachFile?: () => void;
@@ -117,8 +124,17 @@ export function Composer({
   const options = token?.kind === "mention" ? mentions : commands;
   const open = Boolean(token) && options.length > 0;
 
-  // What is still to be typed, shown as a ghost continuation after the caret.
-  const hint = remainingSyntax(draft, { implicitRecipient });
+  /*
+   * What is still to be typed, shown as a ghost continuation after the caret.
+   *
+   * Staged files change the hint, because for `/once` they change the grammar:
+   * the files are the payload, so the secret becomes an optional quoted extra
+   * rather than the required first argument.
+   */
+  const hint = remainingSyntax(draft, {
+    implicitRecipient,
+    hasAttachment: attachments.length > 0,
+  });
 
   const update = (value: string, nextCaret: number): void => {
     setDraft(value);
@@ -155,7 +171,17 @@ export function Composer({
     if (text.startsWith("/") && !text.startsWith("//")) {
       onCommand(text);
     } else {
-      onSend(text.startsWith("//") ? text.slice(1) : text);
+      const body = text.startsWith("//") ? text.slice(1) : text;
+      /*
+       * The thread may want to ask something before this goes anywhere.
+       *
+       * It answers false and the draft is left exactly as typed — which is the
+       * whole reason this is a veto rather than the thread clearing up
+       * afterwards: somebody who cancels a confirmation has not agreed to lose
+       * what they wrote.
+       */
+      if (beforeSend && !beforeSend(body)) return;
+      onSend(body);
     }
     setDraft("");
     setCaret(0);

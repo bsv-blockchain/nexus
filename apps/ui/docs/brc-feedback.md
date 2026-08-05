@@ -733,6 +733,149 @@ sale at the floor price. That is the honest consequence of refusing to keep a li
 sometimes the right trade, and Security Considerations says so rather than letting a room
 discover it when somebody buys in.
 
+### 3.33 GAP — a secret has no way to travel, and a transcript is the wrong place to keep one
+
+Every payload in §5 is meant to be readable later. That is what a transcript is for, and it is
+why §5.14 signs content and §5.1 puts a memo inside the encrypted envelope rather than the
+metadata. A credential is the exact opposite requirement: it must arrive, be read once, and
+then stop existing. Nothing in the grammar could say that, so people do what they do in every
+other chat app — paste the key into the thread and ask the other side to delete it, which
+neither of them can verify and neither of them does.
+
+`/once` is in as §5.22: `/once <recipient…> <secret> [duration] [note]`, and it carries the
+draft's attachments inside the seal. Sixteen things came out of building it, and most of them
+are constraints rather than choices.
+
+**Most secrets worth sealing are files.** A keystore, a signed annex, a recording of the call
+where the wording was agreed. A verb that could only carry a word would have missed its own best
+case and left people doing the thing it was built to stop — posting the document into the room
+and asking for it to be deleted afterwards. So staged attachments go into the payload rather than
+into the message, and the seal can carry text, files, or both: the keystore and the passphrase
+that opens it belong in one envelope, and splitting them would put half of it in the transcript
+forever.
+
+**An attachment changes the grammar, and §2.3 has no way to say so.** With files staged the
+payload *is* the files, so the secret becomes optional — and then the first token is ambiguous.
+`/once @a the contract is signed` would otherwise seal the word "the". Our rule: a quoted token
+is always the secret, an unquoted one is the secret only when nothing is attached. That is the
+second job quoting does here, and it is worth the spec adopting rather than leaving each client
+to guess. §5.14 already set the precedent that a verb means something different with an
+attachment; it just never admitted the argument list could shift. A client that shifts it MUST
+show which reading it took — we change the ghost hint to `["secret"]` the moment a file is
+staged, and the confirmation names both halves.
+
+**The files have to leave the draft, and the spec should say so outright.** This is the easiest
+severe bug in the whole feature: attachments the user chose to seal are still staged after the
+command runs, and go out in the clear with whatever they type next — into the transcript, which
+is exactly what sealing them was against. Consuming them is not tidying up, it is the feature.
+
+**The confirmation must name the files.** Same reasoning §5.20 gives for showing a collectible's
+artwork: sealing the wrong document to the right handle cannot be resent, only burned, and by
+then they may have opened it. The handle is one half of that check and the file list is the other.
+
+**The count belongs on the envelope; the names do not.** How many documents is a property of the
+envelope, so it sits on the card, shows in the pill, and survives the opening — "a document was
+sealed here and collected at 14:32" is the part of the record worth keeping. A sealed contract is
+a different errand from a sealed password, and a reader decides whether to go and find their
+machine from the pill. The names and the bytes are never in the transcript.
+
+**With files, a save affordance stops being a nicety.** The earlier point about offering a copy
+button becomes non-negotiable once the payload is a document: everywhere else in a client a file
+can be fetched again from the thread it was posted in, and this is the one place it cannot. An
+affordance that only pretends to save it is the difference between a demo and a data-loss bug.
+
+**Two free-text arguments is a shape the grammar does not have.** §2.3 makes free text the
+last argument, running to end of line, and there is exactly one of it. `/once` needs two: the
+secret, which must not persist, and a note saying what the secret is *for*, which must. A mask
+with no label beside it is a pill the reader cannot act on — five dots tell you nothing about
+whether to go and find your terminal. So the secret is a single token, or a quoted run for a
+passphrase with spaces in it, and the note is the trailing free text as usual. Recommendation:
+§2.3 should admit a quoted argument generally rather than leave `/once` to invent one. We
+confined quoting to this one slot rather than making the tokeniser quote-aware, because a
+quote-aware split changes what every other verb does with a memo containing an apostrophe, and
+"don't" is far more common in a memo than a passphrase is.
+
+**The mask must not encode the length.** Ours is five glyphs whatever the payload. A mask that
+grows with the secret says whether you are looking at a four-digit PIN or a 64-character key,
+which is most of what sealing it was supposed to hide, and it does so to everyone in the room
+rather than only to the recipient.
+
+**Three glyph states, not one.** `●●●●●` sealed, `○○○○○` opened, and `○○○○○` struck through for
+one that was burned or lapsed without anybody reading it. One mask cannot distinguish "there is
+something here for you" from "there was", and both sides need that difference for opposite
+reasons: the recipient is asking whether the secret is still theirs to take, the sender whether
+it has been taken. The third state is separate from the second because "nobody got this" and
+"somebody got this" are the two answers a sender is actually choosing between. This makes the
+pill itself the state of the secret, with no card to open.
+
+We also animate the sealed mask — the five dots hop in sequence, rest, and go again. It is the
+one thing the mask cannot say in words, which is that there is still something live behind it,
+and the reveal knocks the fill out of each dot in the same order. Not a spec matter, but worth
+noting that the transition is where the motion earns its place: a state change this irreversible
+should not happen silently.
+
+**Several addressees, a copy each.** `/once @a @b @c <secret>` seals one secret to three keys and
+each of them opens their own, once. One shared "revealed" flag would mean the first to look
+spends everybody's, and the sender would learn that *somebody* collected without learning who —
+so the store holds a record per addressee and the card reports per addressee, on the same
+reasoning §5.5 gives for `/split` legs: a total is not an outcome.
+
+**The aggregate mask needs a tally beside it.** This is the one that only showed up on screen.
+For a reader who is an addressee the mask is their own copy and unambiguous. For the sender it
+has to summarise three copies in one glyph, and either choice is a lie: hollow-when-any-opened
+reads as "everybody has", hollow-only-when-all-opened buries the fact that the secret has been
+read. We lead with the security fact and add `1/3` next to the mask, which costs one token and
+leaks nothing — the handles are already in the same pill. §5.22 should require the count
+wherever a seal has more than one addressee.
+
+**A duration, and it is optional.** An unopened secret with no clock on it stays openable
+forever, which is the wrong default for a credential but the right default for the grammar:
+a sender who omits it has not chosen an expiry, and inventing a short one for them would burn
+secrets they were still waiting on. `[duration]` sits before the note, since the note is
+trailing free text and cannot have anything after it.
+
+**§5.18 `/cancel` has to extend to it, and has to report what it could not reach.** Without
+this, a secret sealed to the wrong handle or with the wrong value is openable forever and the
+sender has no move at all. `/cancel` bound to your own `/once` burns every copy nobody has
+opened. What it cannot do is un-read the ones already opened, so the result says so in numbers —
+"burned 2 unopened, but 1 had already been opened" — because a card reading "burned" flat would
+claim it had. Note that this is a different status from a withdrawn request: a withdrawn request
+was never owed, where a burned secret was genuinely available and is now destroyed, and a reader
+has to be able to tell a thing that was killed from a thing that was never live.
+
+**The sender must not keep a copy, and that has a cost worth stating.** If the sending client
+retains the plaintext then "only once" is false and the sender's own transcript is the leak the
+verb existed to prevent. The consequence is that a mistyped secret cannot be resent, only
+burned and sealed again. Which is why the confirmation shows the fully-qualified handle (§4.2
+already requires it, and here it is the only check that matters) and why a changed identity key
+blocks the command outright rather than warning — sealing to a stale key is unrecoverable in a
+way a payment to a stale key is not, because there is nothing to refund.
+
+**It is an unsuppressable read receipt, which contradicts the shape of §5.15.** `/receipt`
+makes acknowledgment voluntary, deliberately, and says a missing receipt is not evidence.
+`/once` cannot offer that: opening the secret spends it, spending it is visible, and there is
+no way to read the payload without telling the sender you read it. That is a genuinely useful
+property — a seal that goes hollow before the recipient says they opened it is a compromise
+notice — but it is a disclosure the recipient never agreed to, so §5.22 has to say so, and the
+client has to say so at the point of opening rather than in a manual. We considered requiring a
+second confirmation in front of the reveal, since §4.2 asks for one where a command discloses
+something, and rejected it: a modal stacked on top of a hovercard is a worse place to read a
+warning than the line immediately above the button. The cost is stated in place and the click
+is the confirmation.
+
+**Reveal is not idempotent, so it cannot be retried.** The state transition happens on display.
+If the client dies between decrypting and painting, the secret is gone and no amount of
+retrying will bring it back. Spec should say where the transition happens, and it should
+require a copy affordance in the revealed state: a one-time value with no way to capture it is
+a design that loses people their credentials, and then they stop using the verb.
+
+**It bounds the transcript, not the people.** Worth a line in Security Considerations, because
+the name invites the wrong reading. `/once` guarantees that the *record* stops holding the
+secret. It guarantees nothing about screenshots, clipboards, saved files, or either party's
+memory — the sender composed the thing and obviously knows it, and the recipient may keep what
+they opened. It is a transport rather than a vault, and the property it actually delivers is that
+no third reader of the thread, and no future reader of it, ever sees the payload.
+
 ### 3.15 Implemented as specified, no changes needed
 
 Recording these so the next reader knows they were exercised rather than skipped:

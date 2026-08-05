@@ -46,7 +46,17 @@ export type ArgKind =
   /** an optional `p`/`public` marker, ahead of the recipient — /renounce */
   | "visibility"
   /** `#slug`, naming a collectible the user holds */
-  | "asset";
+  | "asset"
+  /**
+   * The payload of `/once`: one token, or a quoted run for a passphrase that
+   * has spaces in it.
+   *
+   * The only argument in the grammar that is free text without being the *last*
+   * free text — a `/once` carries a secret and a note, and the note is the half
+   * that is meant to stay readable. Section 2.3 has no shape for that, which is
+   * why quoting exists here and nowhere else.
+   */
+  | "secret";
 
 export interface CommandSpec {
   verb: CommandVerb | ReservedVerb | CustomVerb;
@@ -89,14 +99,14 @@ export interface CommandSpec {
 export const COMMANDS: CommandSpec[] = [
   {
     verb: "pay",
-    usage: "/pay <recipient> <amount> [memo]",
-    summary: "Send satoshis, fiat or a token to one handle.",
+    usage: "/pay <recipient…> <amount> [memo]",
+    summary: "Send satoshis, fiat or a token. Several handles divide the amount.",
     section: "5.1",
     confirms: true,
     detail:
-      "One payment to one handle. The amount can be satoshis, a fiat figure your wallet converts, or a token. Nothing leaves your wallet until you confirm the sheet, and the memo travels with the payment where the recipient's wallet can show it.",
+      "One amount to one handle, or to several. Name more than one and the amount divides between them, as a separate payment each — the amount you type is what leaves your wallet either way, which is the point: you are budgeting, not multiplying. Division that does not come out even puts the remainder on the first handle you wrote, so both sides can work out who got the extra satoshi. The amount can be satoshis, a fiat figure your wallet converts, or a token, and nothing moves until you confirm the sheet.",
     example: "/pay @nexus 5000 sats for the venue deposit",
-    args: ["recipient", "amount", "text"],
+    args: ["recipients", "amount", "text"],
   },
   {
     verb: "message",
@@ -274,12 +284,12 @@ export const COMMANDS: CommandSpec[] = [
   {
     verb: "cancel",
     usage: "/cancel",
-    summary: "Withdraw a payment request you sent.",
+    summary: "Withdraw a request you sent, or burn a secret nobody has opened.",
     section: "5.18",
     confirms: true,
     binds: "required",
     detail:
-      "A request you sent sits in the other side's list until they pay it. Without a way to take it back the only exits are paying and nagging. Reply to your own request and this withdraws it, so their client stops showing it as owed.",
+      "Takes back something of yours that is still outstanding. A request you sent sits in the other side's list until they pay it, and without this the only exits are paying and nagging. On a /once it burns the copies nobody has opened yet — the sealed wrong password is otherwise openable forever, and this is the only way to kill it. Anything already opened stays opened; nothing here reaches into somebody else's head.",
     args: [],
   },
   {
@@ -313,6 +323,18 @@ export const COMMANDS: CommandSpec[] = [
       "You name someone to hold both sides. Commit the asset, or commit the payment, and the escrow forms when the other side commits the matching half to the same agent before either window closes. The agent then accepts, holds both, and releases. Nothing is arbitrated: if the agent absconds both sides lose, which is why the confirmation shows you what the network says about them before you commit.",
     example: "/escrow @nexus #egg69 69 bsv 2h",
     args: ["recipient", "asset", "optional-amount", "duration"],
+  },
+  {
+    verb: "once",
+    usage: "/once <recipient…> <secret> [duration] [note]",
+    summary:
+      "Seal a secret or a document each handle can open exactly once. Nobody opens it twice.",
+    section: "5.22",
+    confirms: true,
+    detail:
+      "A credential, a key, a passphrase, a contract, a recording: anything the transcript has no business keeping. Attach files and they go inside the seal rather than into the thread, which is the case that matters most — a document pasted into a room stays there forever. With something attached the secret becomes optional, and quoting it is what marks it as the secret rather than the start of the note. It is sealed to each recipient's key, so this client cannot open it either, which means a mistake cannot be resent, only burned and sealed again. Name several handles and each gets their own copy to open once, tracked separately, so you can see who has collected theirs. Five dots until it is opened and five hollow ones afterwards, on both sides, so opening it tells you it was opened whether they mention it or not. A duration bounds how long it stays openable; reply to your own /once with /cancel to burn whatever nobody has taken yet.",
+    example: '/once @nexus "correct horse battery staple" 24h rotate it once you are in',
+    args: ["recipients", "secret", "duration", "text"],
   },
 
   /* Nexus's own verbs, advertised per section 8. `/help` is listed first
@@ -663,6 +685,8 @@ export type Reach = "everyone" | "contacts" | "ecosystem" | "toll";
 const REACH_VALUES: Reach[] = ["everyone", "contacts", "ecosystem", "toll"];
 const DURATION_RE = /^(\d+)([mhd])$/;
 const PERIOD_RE = /^\/(day|week|month)$/;
+const SECRET_MISSING =
+  "/once needs something to seal. Put the secret after the handle, in quotes if it has spaces in it.";
 
 export interface ParsedCommand {
   verb: string;
@@ -676,6 +700,14 @@ export interface ParsedCommand {
   reach?: Reach;
   /** the collectible named by a `#slug` argument */
   asset?: Collectible;
+  /**
+   * The payload of a `/once`, unquoted.
+   *
+   * Held apart from `text` on purpose. `text` is the note, which is meant to
+   * survive in the transcript; this is the half that must not, and keeping them
+   * in one field would mean every renderer had to remember which end to hide.
+   */
+  secret?: string;
   scope?: string;
   serial?: string;
   /** `p`/`public` on /renounce: sign it openly rather than anonymously */
@@ -705,6 +737,19 @@ export function parseCommand(
    * moves, which is what section 4.2 actually asks for.
    */
   implicitRecipient?: MessagePerson,
+  /**
+   * Whether the draft carries staged files.
+   *
+   * The one place a verb's grammar depends on something outside the line. With
+   * files attached the payload of a `/once` is the files, so an unquoted first
+   * token is prose rather than a secret — otherwise "/once @a the contract is
+   * signed" would seal the word "the" and file the rest as a memo. Still pure:
+   * this is an input, not a lookup.
+   *
+   * BRC-218 §5.14 set the precedent by making `/sign` mean something different
+   * with an attachment; it just never said the grammar could shift with one.
+   */
+  hasAttachment = false,
 ): ParseResult {
   if (input.startsWith("//")) return { kind: "chat", text: input.slice(1) };
   if (!input.startsWith("/")) return { kind: "chat", text: input };
@@ -760,6 +805,51 @@ export function parseCommand(
       else command.errors.push(`${tokens[index]} is not a valid recipient.`);
       index += 1;
       if (!wantsMany) break;
+    }
+  }
+
+  /*
+   * The secret of a `/once`, which is one token unless it is quoted.
+   *
+   * Quoting is confined to this slot rather than done in the tokeniser. A
+   * quote-aware split would change what every other verb does with a memo that
+   * happens to contain an apostrophe, and "don't" is a much more common thing
+   * to type than a passphrase is.
+   */
+  if (spec.args.includes("secret")) {
+    const token = tokens[index];
+    const opener = token?.[0];
+    const quoted = opener === '"' || opener === "'";
+    if (hasAttachment && !quoted) {
+      // The files are the payload. Anything here is the note, which the
+      // free-text branch below will pick up untouched.
+    } else if (!token) {
+      command.errors.push(SECRET_MISSING);
+    } else if (opener === '"' || opener === "'") {
+      let end = index;
+      let joined = token;
+      const closed = (value: string): boolean =>
+        value.length > 1 && value.endsWith(opener);
+      while (end < tokens.length && !closed(joined)) {
+        end += 1;
+        if (end < tokens.length) joined += ` ${tokens[end]}`;
+      }
+      if (!closed(joined)) {
+        // Silently taking the first word instead would send a fragment of a
+        // passphrase and report it as sent.
+        command.errors.push(
+          `The quoted secret is never closed. Finish it with a matching ${opener}, or write it as one word.`,
+        );
+        index = tokens.length;
+      } else {
+        const inner = joined.slice(1, -1);
+        if (inner) command.secret = inner;
+        else command.errors.push(SECRET_MISSING);
+        index = end + 1;
+      }
+    } else {
+      command.secret = token;
+      index += 1;
     }
   }
 
@@ -893,12 +983,14 @@ export function parseCommand(
 
 function validate(command: ParsedCommand, spec: CommandSpec): void {
   const needsRecipient =
-    spec.args.includes("recipient") &&
+    (spec.args.includes("recipient") || spec.args.includes("recipients")) &&
     !["trolltoll", "scope"].includes(spec.verb);
   if (needsRecipient && command.recipients.length === 0) {
     command.errors.push(`/${spec.verb} needs a recipient.`);
   }
-  if (spec.args.includes("recipients") && command.recipients.length < 2) {
+  /* Two-or-more is /split's own requirement rather than a property of the
+     `recipients` slot: /pay accepts many and is perfectly happy with one. */
+  if (spec.verb === "split" && command.recipients.length < 2) {
     command.errors.push("/split needs at least two recipients.");
   }
   for (const recipient of command.recipients) {
@@ -949,7 +1041,10 @@ function validate(command: ParsedCommand, spec: CommandSpec): void {
  */
 export function remainingSyntax(
   input: string,
-  { implicitRecipient = false }: { implicitRecipient?: boolean } = {},
+  {
+    implicitRecipient = false,
+    hasAttachment = false,
+  }: { implicitRecipient?: boolean; hasAttachment?: boolean } = {},
 ): string {
   if (!input.startsWith("/") || input.startsWith("//")) return "";
   const verb = input.slice(1).split(/\s/)[0] ?? "";
@@ -960,7 +1055,7 @@ export function remainingSyntax(
   const typedVerb = input.slice(1);
   if (typedVerb !== verb && !/^\S+\s/.test(typedVerb)) return "";
 
-  const parsed = parseCommand(input);
+  const parsed = parseCommand(input, undefined, hasAttachment);
   if (parsed.kind !== "command") return "";
   const c = parsed.command;
   const out: string[] = [];
@@ -998,6 +1093,8 @@ export function remainingSyntax(
         return Boolean(c.serial);
       case "visibility":
         return Boolean(c.public);
+      case "secret":
+        return Boolean(c.secret);
       case "text":
       case "command":
         return Boolean(c.text);
@@ -1019,8 +1116,13 @@ export function remainingSyntax(
         }
         break;
       case "recipients":
-        if (c.recipients.length === 0) out.push("<recipient>", "<recipient…>");
-        else if (c.recipients.length === 1) out.push("<recipient…>");
+        if (c.recipients.length === 0) {
+          /* A one-to-one supplies the first handle, so what is left to type is
+             optional extras. Not for /split, which needs two of its own and
+             would be hinting that none are required. */
+          if (implicitRecipient && spec.verb !== "split") out.push("[recipient…]");
+          else out.push("<recipient>", "<recipient…>");
+        } else if (c.recipients.length === 1) out.push("<recipient…>");
         break;
       case "amount":
         if (!c.amount) out.push("<amount>");
@@ -1057,6 +1159,13 @@ export function remainingSyntax(
         break;
       case "asset":
         if (!c.asset) out.push("#asset");
+        break;
+      case "secret":
+        /* With files staged the payload is the files, so the secret becomes
+           optional — and the placeholder carries its own quotes, because
+           quoting is exactly what distinguishes "this word is the secret" from
+           "this word is the start of the note". */
+        if (!c.secret) out.push(hasAttachment ? '["secret"]' : "<secret>");
         break;
     }
   }
@@ -1115,6 +1224,15 @@ export function argumentSlots(input: string): { start: number; end: number }[] {
     if (spec.args[index] === "amount" || spec.args[index] === "amount-or-off") {
       const unit = /^\s+(sats?|BSV)\b/i.exec(input.slice(end));
       if (unit) end += unit[0].length;
+    }
+    // A quoted secret is one argument however many words it holds, so Tab
+    // selects the whole passphrase rather than its first word.
+    if (spec.args[index] === "secret") {
+      const opener = input[match.index];
+      if (opener === '"' || opener === "'") {
+        const close = input.indexOf(opener, match.index + 1);
+        if (close !== -1) end = close + 1;
+      }
     }
     slots.push({ start: match.index, end });
     if (end > match.index + match[0].length) re.lastIndex = end;

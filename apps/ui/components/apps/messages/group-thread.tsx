@@ -40,6 +40,10 @@ import {
   type MediaItem,
 } from "@/lib/data";
 
+import {
+  ChainPolicyMark,
+  usePermanenceGate,
+} from "@/components/apps/messages/chain-policy";
 import { ArrowLeft, Settings } from "lucide-react";
 import {
   useEffect,
@@ -81,6 +85,33 @@ function MemberList({
       </ul>
     </div>
   );
+}
+
+/**
+ * Scroll to the message a saved-list row asked for, and ring it briefly.
+ *
+ * Runs after the scroll-to-end effect on purpose — effects fire in declaration
+ * order, so landing on the message wins over landing at the bottom. The focus
+ * releases itself a couple of seconds later, so coming back to the conversation
+ * leaves you where you left it instead of jumping to a message you already read.
+ */
+function useFocusMessage(conversationId: string): string | null {
+  const { messageFocus, clearMessageFocus } = useHub();
+
+  useEffect(() => {
+    if (!messageFocus) return;
+    const target = document.getElementById(`msg-${messageFocus}`);
+    // Not here yet — the effect runs again when the thread that holds it mounts.
+    if (!target) return;
+    target.scrollIntoView({ block: "center" });
+    const timer = setTimeout(clearMessageFocus, 2200);
+    return () => clearTimeout(timer);
+  }, [messageFocus, clearMessageFocus, conversationId]);
+
+  /* The ring is the hub's focus itself rather than a copy of it in local state:
+     one value, cleared on one timer, and nothing set synchronously inside an
+     effect for React to re-render twice over. */
+  return messageFocus;
 }
 
 /**
@@ -147,6 +178,10 @@ export function GroupThread({
     },
     participants: members,
     attachments: staged,
+    /* `/once` seals the staged files instead of sending them, so they have to
+       leave the draft — otherwise they ride out in the clear on the next
+       ordinary message, which is what sealing them was against. */
+    onConsumeAttachments: () => setStaged([]),
     ...(replyTarget
       ? {
           replyTo: {
@@ -160,6 +195,29 @@ export function GroupThread({
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [thread.id, messages.length]);
+
+  const ringed = useFocusMessage(thread.id);
+
+  /* Hoisted out of the Composer's own prop so the permanence gate can call the
+     same sender the composer would have. */
+  const sendMessage = (text: string): void => {
+    setSent((current) => [
+      ...current,
+      {
+        id: `local-${Date.now()}`,
+        conversationId: thread.id,
+        senderId: "me",
+        text,
+        createdAt: new Date().toISOString(),
+        status: "sent" as const,
+        ...(staged.length > 0
+          ? { attachment: { kind: "media" as const, items: staged } }
+          : {}),
+      },
+    ]);
+    setStaged([]);
+  };
+  const permanence = usePermanenceGate(thread.id, sendMessage);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -197,6 +255,10 @@ export function GroupThread({
             <span className="truncate">
               {members.length + 1} {content.messages.hovercard.members.toLowerCase()}
             </span>
+            {/* In the metadata line rather than beside the settings gear: this
+                is a fact about the room that everyone in it needs, and it has
+                to be readable without opening anything. */}
+            <ChainPolicyMark conversationId={thread.id} />
           </p>
         </div>
 
@@ -265,6 +327,7 @@ export function GroupThread({
           {messages.map((message) => (
             <MessageBubble
               key={message.id}
+              focused={message.id === ringed}
               message={
                 /* A removed message leaves its outline behind. Vanishing it
                    would rewrite the transcript for everyone who read it, and
@@ -332,31 +395,18 @@ export function GroupThread({
 
       {tab === "messages" && (
       <Composer
-        key={seedKey ?? 0}
+        key={`${seedKey ?? 0}-${permanence.resetKey}`}
         {...(focusOnOpen ? { focusOnOpen } : {})}
         {...(seed ? { seed } : {})}
-        placeholder={`${copy.messagePlaceholder} ${title}`}
+        placeholder={
+          permanence.placeholder ?? `${copy.messagePlaceholder} ${title}`
+        }
+        beforeSend={permanence.beforeSend}
         attachments={staged}
         onRemoveAttachment={(index) =>
           setStaged((current) => current.filter((_, i) => i !== index))
         }
-        onSend={(text) => {
-          setSent((current) => [
-            ...current,
-            {
-              id: `local-${Date.now()}`,
-              conversationId: thread.id,
-              senderId: "me",
-              text,
-              createdAt: new Date().toISOString(),
-              status: "sent" as const,
-              ...(staged.length > 0
-                ? { attachment: { kind: "media" as const, items: staged } }
-                : {}),
-            },
-          ]);
-          setStaged([]);
-        }}
+        onSend={sendMessage}
         onCommand={runner.start}
         onAttach={() => setPicker("media")}
         onAttachFile={() => setPicker("files")}
@@ -374,8 +424,11 @@ export function GroupThread({
 
       {lightbox.viewer}
 
+      {permanence.sheet}
+
       <CommandSheet
         command={runner.pending?.command ?? null}
+        attachments={staged}
         boundMessage={runner.pending?.boundMessage}
         boundSender={runner.pending?.boundSender}
         onCancel={runner.cancel}

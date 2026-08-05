@@ -10,6 +10,7 @@ import {
   type RailEntry,
 } from "@/components/hub/hub-provider";
 import {
+  content,
   getChatThreads,
   getHubApp,
   getMailMessages,
@@ -21,8 +22,7 @@ import {
   Gift,
   Layers,
   LayoutGrid,
-  PanelLeftClose,
-  PanelLeftOpen,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
@@ -124,7 +124,7 @@ export function IconRail(): ReactNode {
     mainView,
     setMainView,
     railCollapsed,
-    toggleRail,
+    openSettings,
     activeApp,
     openApp,
     railEntries,
@@ -531,17 +531,24 @@ export function IconRail(): ReactNode {
               "justify-between gap-1 px-2"
         }`}
       >
+        {/* Settings, not the panel toggle: closing the panel now lives beside
+            the panel's own title, and the rail keeps the two things that are
+            about the whole product rather than about one app. */}
         <button
           type="button"
-          aria-label={railCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          onClick={toggleRail}
-          className="focus-ring rounded-md p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+          aria-label={content.settings.title}
+          onClick={openSettings}
+          aria-current={mainView === "settings" ? "true" : undefined}
+          /* Open is the tint behind the gear, not a recoloured gear. Same rule
+             as the settings categories: the accent marks where you are, and the
+             glyph stays the colour every other icon in the rail footer is. */
+          className={`focus-ring rounded-md p-1.5 transition-colors ${
+            mainView === "settings"
+              ? "bg-accent/15 text-foreground"
+              : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+          }`}
         >
-          {railCollapsed ? (
-            <PanelLeftOpen className="size-4" aria-hidden="true" />
-          ) : (
-            <PanelLeftClose className="size-4" aria-hidden="true" />
-          )}
+          <Settings className="size-4" aria-hidden="true" />
         </button>
         {!railCollapsed && <ShellVersion />}
         <button

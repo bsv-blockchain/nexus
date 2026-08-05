@@ -18,6 +18,7 @@ import {
   type ParsedCommand,
 } from "@/lib/commands";
 import {
+  burnSecret,
   cancelSubscription,
   delegationsFor,
   recordCertificate,
@@ -31,6 +32,7 @@ import {
   beginResolving,
   recordEscrowSide,
   recordTransfer,
+  sealSecret,
   setToll,
   toggleWatch,
   withdrawRequest,
@@ -48,6 +50,28 @@ function serial(seed: string): string {
     hash = (hash ^ seed.charCodeAt(i)) * 16777619;
   }
   return (hash >>> 0).toString(16).padStart(8, "0").toUpperCase();
+}
+
+const DURATION_MS = { m: 60_000, h: 3_600_000, d: 86_400_000 };
+
+/**
+ * The wall-clock moment a `<duration>` argument runs out.
+ *
+ * BRC-218's duration grammar is `1*DIGIT ("m" / "h" / "d")`, so all three units
+ * are handled here rather than in each caller — a verb that only understood
+ * hours would read `30d` as thirty of something and be quietly wrong by a
+ * factor of twenty-four.
+ */
+function expiryFrom(
+  duration: string | undefined,
+  fromIso: string,
+): string | undefined {
+  const match = /^(\d+)([mhd])$/.exec(duration ?? "");
+  if (!match) return undefined;
+  const unit = DURATION_MS[match[2] as keyof typeof DURATION_MS];
+  return new Date(
+    new Date(fromIso).getTime() + Number(match[1]) * unit,
+  ).toISOString();
 }
 
 function signatureFor(seed: string): string {
@@ -87,14 +111,24 @@ export function useCommandRunner({
   /** the single counterparty in a DM, allowed to stand in for a recipient */
   implicitRecipient,
   attachments = [],
+  onConsumeAttachments,
 }: {
   conversationId: string;
   onCard: (message: ChatMessage) => void;
   replyTo?: { message: ChatMessage; sender?: MessagePerson | undefined } | undefined;
   participants: MessagePerson[];
   implicitRecipient?: MessagePerson | undefined;
-  /** files staged on the draft, which `/sign` signs along with the message */
+  /**
+   * Files staged on the draft. `/sign` signs them along with the message;
+   * `/once` seals them instead of sending them.
+   */
   attachments?: MediaItem[];
+  /**
+   * Clear the staged files, for a verb that took them rather than sent them.
+   * Without it a sealed document would still be sitting on the draft, ready to
+   * go out in the clear with whatever the user types next.
+   */
+  onConsumeAttachments?: (() => void) | undefined;
 }): {
   pending: PendingCommand | null;
   start: (input: string) => void;
@@ -105,7 +139,11 @@ export function useCommandRunner({
 
   const start = useCallback(
     (input: string) => {
-      const result = parseCommand(input, implicitRecipient);
+      const result = parseCommand(
+        input,
+        implicitRecipient,
+        attachments.length > 0,
+      );
       if (result.kind === "chat") return;
       const command = result.command;
       const spec = command.spec;
@@ -219,7 +257,14 @@ export function useCommandRunner({
         ...(replyTo?.sender ? { boundSender: replyTo.sender } : {}),
       });
     },
-    [conversationId, implicitRecipient, onCard, participants, replyTo],
+    [
+      attachments.length,
+      conversationId,
+      implicitRecipient,
+      onCard,
+      participants,
+      replyTo,
+    ],
   );
 
   const cancel = useCallback(() => setPending(null), []);
@@ -250,6 +295,97 @@ export function useCommandRunner({
         switch (command.verb) {
           case "pay": {
             if (!first || !command.amount) return null;
+
+            /*
+             * Several handles divide the amount.
+             *
+             * The figure typed is what leaves the wallet either way — naming
+             * three people budgets it three ways rather than tripling it,
+             * which is the only reading that does not make a typo expensive.
+             * The division and the partial-failure handling are /split's, so
+             * the two cannot disagree about who got the odd satoshi.
+             */
+            if (command.recipients.length > 1) {
+              const people = command.recipients
+                .map((r) => r.person)
+                .filter((p): p is MessagePerson => Boolean(p));
+              const payToken = command.amount.token;
+              const decimals = payToken
+                ? (getToken(payToken.id)?.decimals ?? 0)
+                : 0;
+              const scale = 10 ** decimals;
+              const total = payToken
+                ? Math.round(payToken.units * scale)
+                : command.amount.sats;
+              const shares = splitLegs(total, people.length);
+              const legs: CommandLeg[] = people.map((person, index) => {
+                const ok = !person.keyChanged;
+                const raw = shares[index] ?? 0;
+                const leg: CommandLeg = {
+                  personId: person.id,
+                  sats: payToken ? 0 : raw,
+                  ...(payToken ? { units: raw / scale } : {}),
+                  ok,
+                };
+                if (!ok) leg.error = "identity key changed";
+                return leg;
+              });
+              /* Each recipient's toll is theirs and rides on top of their own
+                 share, so one expensive messagebox does not quietly shrink
+                 what everybody else receives. */
+              let tolls = 0;
+              for (const leg of legs) {
+                const person = getMessagePerson(leg.personId);
+                if (!leg.ok || !person) continue;
+                const legToll = person.tollSats ?? 0;
+                tolls += legToll;
+                recordPayment({
+                  person,
+                  sats: payToken ? legToll : leg.sats + legToll,
+                  memo: command.text ?? "/pay",
+                  accountId: account.id,
+                  ...(payToken && leg.units !== undefined
+                    ? { token: { id: payToken.id, units: leg.units } }
+                    : {}),
+                });
+              }
+              const failed = legs.filter((leg) => !leg.ok).length;
+              commandToast({
+                verb: "pay",
+                title: failed
+                  ? `${legs.length - failed} of ${legs.length} payments sent`
+                  : `Split between ${legs.length}`,
+                detail: payToken
+                  ? `${payToken.units} ${payToken.symbol}`
+                  : formatSats(total),
+                ...(payToken
+                  ? {
+                      subject: {
+                        kind: "token" as const,
+                        tokenId: payToken.id,
+                        units: payToken.units,
+                      },
+                    }
+                  : {}),
+              });
+              return {
+                verb: "pay",
+                status: failed ? "partial" : "sent",
+                recipientIds: people.map((person) => person.id),
+                legs,
+                ...(payToken
+                  ? { token: payToken }
+                  : {
+                      amountSats: total,
+                      ...(command.amount.fiat
+                        ? { fiat: command.amount.fiat }
+                        : {}),
+                    }),
+                ...(tolls ? { tollSats: tolls } : {}),
+                ...(command.text ? { memo: command.text } : {}),
+              };
+            }
+
             const toll = first.tollSats ?? 0;
             const token = command.amount.token;
             recordPayment({
@@ -810,20 +946,67 @@ export function useCommandRunner({
 
           case "cancel": {
             const original = bound?.command;
-            if (!bound || !original || original.verb !== "request") {
+            if (
+              !bound ||
+              !original ||
+              (original.verb !== "request" && original.verb !== "once")
+            ) {
               return {
                 verb: "cancel",
                 status: "failed",
-                note: "Reply to a request you sent. This withdraws that request, and nothing else.",
+                note: "Reply to a request or a sealed secret you sent. This withdraws that one thing, and nothing else.",
               };
             }
             if (bound.senderId !== "me") {
               return {
                 verb: "cancel",
                 status: "failed",
-                note: "You can only withdraw a request you sent. Theirs is theirs to withdraw.",
+                note:
+                  original.verb === "once"
+                    ? "You can only burn a secret you sealed. Theirs is theirs to burn, and opening it is not the same act."
+                    : "You can only withdraw a request you sent. Theirs is theirs to withdraw.",
               };
             }
+
+            /*
+             * On a `/once` this burns whatever nobody has opened.
+             *
+             * What it cannot do is the thing a user hopes for, so the card says
+             * so in numbers: a copy somebody already opened has been read, and
+             * `/cancel` does not reach into their head. Reporting "burned" flat
+             * would claim it did.
+             */
+            if (original.verb === "once") {
+              const copy = content.messages.once;
+              if (!original.secretId) return null;
+              const { burned, alreadyOpen } = burnSecret(original.secretId);
+              commandToast({
+                verb: "cancel",
+                title: burned ? copy.burnedToast : copy.burnedNothing,
+                detail: burned
+                  ? `${burned} sealed, ${alreadyOpen} already opened`
+                  : copy.burnedAllOpen,
+                subject: first
+                  ? { kind: "person", person: first }
+                  : { kind: "ecosystem", ecosystem: "nexus" },
+                tone: burned ? "info" : "warning",
+              });
+              return {
+                verb: "cancel",
+                status: burned ? "burned" : "failed",
+                ...(original.recipientIds
+                  ? { recipientIds: original.recipientIds }
+                  : {}),
+                refersToMessageId: bound.id,
+                boundMessageId: bound.id,
+                note: burned
+                  ? alreadyOpen
+                    ? `Burned ${burned} unopened, but ${alreadyOpen} had already been opened. What those handles read, they still have.`
+                    : "Burned before anyone opened it. The payload is gone and nobody read it."
+                  : copy.burnedAllOpen,
+              };
+            }
+
             withdrawRequest(bound.id);
             commandToast({
               verb: "cancel",
@@ -981,6 +1164,93 @@ export function useCommandRunner({
             };
           }
 
+          case "once": {
+            const people = command.recipients
+              .map((r) => r.person)
+              .filter((p): p is MessagePerson => Boolean(p));
+            /*
+             * Files count as something to seal.
+             *
+             * Which is the point of letting them in at all: a signed contract or
+             * a keystore is the case where "paste it into the thread and ask them
+             * to delete it" is worst, and where a verb that only carried a word
+             * left the user with nothing better to do.
+             */
+            const payload = {
+              ...(command.secret ? { text: command.secret } : {}),
+              ...(attachments.length > 0
+                ? {
+                    attachment: {
+                      kind: "media" as const,
+                      items: attachments,
+                    },
+                  }
+                : {}),
+            };
+            if (people.length === 0 || (!payload.text && !payload.attachment)) {
+              return {
+                verb: "once",
+                status: "failed",
+                ...(first ? { recipientIds: [first.id] } : {}),
+                note: "Name at least one handle, and give it a secret or attach a file to seal.",
+              };
+            }
+            /*
+             * Sealed without keeping a copy, one per addressee.
+             *
+             * The plaintext is deliberately not passed to the store. `/once`
+             * seals to each recipient's key, so a sender who can still read it
+             * has not sent a one-time secret — they have sent a normal message
+             * with a mask over it, and the mask is on the wrong side of the
+             * conversation to be worth anything.
+             *
+             * A copy each rather than one shared record, because each addressee
+             * opens their own once: with one record the first to look would
+             * spend everybody's, and the sender would learn that somebody
+             * collected without learning who.
+             */
+            const id = `sec-${serial(`${people.map((p) => p.id).join()}${now}`)}`;
+            const expiresAt = expiryFrom(command.duration, now);
+            sealSecret({
+              secretId: id,
+              toIds: people.map((person) => person.id),
+              // `rehearsal`, never `payload`: this side cannot open it, and the
+              // copy exists only so one device can act out the other side.
+              rehearsal: payload,
+              ...(expiresAt ? { expiresAt } : {}),
+            });
+            /*
+             * The files leave the draft here, and this is not cosmetic.
+             *
+             * Anything still staged would ride out on the next ordinary message,
+             * in the clear, into the transcript — which is precisely the thing
+             * the user just chose to seal them against.
+             */
+            if (attachments.length > 0) onConsumeAttachments?.();
+            commandToast({
+              verb: "once",
+              title: "Sealed and sent",
+              detail:
+                people.length === 1
+                  ? `${handleOf(people[0]!)} can open it once`
+                  : `${people.length} handles, one opening each`,
+              subject: { kind: "person", person: people[0]! },
+              tone: "info",
+            });
+            return {
+              verb: "once",
+              status: "sealed",
+              recipientIds: people.map((person) => person.id),
+              secretId: id,
+              ...(attachments.length > 0
+                ? { sealedFiles: attachments.length }
+                : {}),
+              ...(command.duration ? { duration: command.duration } : {}),
+              ...(expiresAt ? { expiresAt } : {}),
+              ...(command.text ? { memo: command.text } : {}),
+            };
+          }
+
           case "vouch": {
             if (!first) return null;
             recordVouch(first.id, command.text);
@@ -1057,7 +1327,14 @@ export function useCommandRunner({
         }
       }
     },
-    [attachments, conversationId, onCard, participants, pending],
+    [
+      attachments,
+      conversationId,
+      onCard,
+      onConsumeAttachments,
+      participants,
+      pending,
+    ],
   );
 
   return { pending, start, cancel, confirm };

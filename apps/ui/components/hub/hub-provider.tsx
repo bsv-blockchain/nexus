@@ -39,7 +39,21 @@ import {
 export type AppSlug = HubApp["slug"];
 export type LibraryTab = "spaces" | "downloads" | "apps";
 /** What the main canvas shows, independent of which rail panel is open. */
-export type MainViewKind = "app" | "store" | "profiles";
+export type MainViewKind = "app" | "store" | "profiles" | "settings";
+
+/**
+ * The settings categories, in the narrow column.
+ *
+ * A union rather than free strings so the sidebar and the content area cannot
+ * drift apart: adding a category is one edit and the compiler finds the panel
+ * that has to exist for it.
+ */
+export type SettingsCategory =
+  | "general"
+  | "privacy"
+  | "browsing"
+  | "appearance"
+  | "about";
 
 /** A rail slot: a single app or a folder-style group of apps. */
 export type RailEntry =
@@ -91,7 +105,15 @@ export interface DetailPane {
    * answering on its own, since it is the part of an identity that is an
    * opinion rather than arithmetic.
    */
-  kind: "person" | "conversation" | "vouches" | "new";
+  kind:
+    | "person"
+    | "conversation"
+    | "vouches"
+    | "new"
+    /** every release, newest first */
+    | "releases"
+    /** one release, `id` being its version */
+    | "release";
   /** MessagePerson id, or conversation id, per `kind` */
   id: string;
 }
@@ -247,6 +269,10 @@ interface HubState {
   /** what the main canvas shows (decoupled from the open rail panel) */
   mainView: MainViewKind;
   setMainView: (view: MainViewKind) => void;
+  settingsCategory: SettingsCategory;
+  setSettingsCategory: (category: SettingsCategory) => void;
+  /** open the settings surface, taking over both the panel and the canvas */
+  openSettings: () => void;
   /** collapse the rail to icons-only (hides the wider panel column) */
   railCollapsed: boolean;
   toggleRail: () => void;
@@ -258,6 +284,15 @@ interface HubState {
   setMailTab: (tab: MailTab) => void;
   messageThread: string | null;
   setMessageThread: (id: string | null) => void;
+  /**
+   * A message the open thread should scroll to and mark, set by whatever sent
+   * the reader there — the saved list, for now. Cleared by the thread once it
+   * has done it, so returning to the conversation later lands where you left it
+   * rather than jumping back to an old message.
+   */
+  messageFocus: string | null;
+  openMessageAt: (conversationId: string, messageId: string) => void;
+  clearMessageFocus: () => void;
   /** show only conversations with unread messages */
   messagesUnreadOnly: boolean;
   setMessagesUnreadOnly: (only: boolean) => void;
@@ -599,6 +634,13 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   const [railCollapsed, setRailCollapsed] = useState(false);
   // What the main canvas shows (app by default; store/profiles open via tabs).
   const [mainView, setMainView] = useState<MainViewKind>("app");
+  const [settingsCategory, setSettingsCategory] =
+    useState<SettingsCategory>("general");
+  const openSettings = useCallback(() => {
+    setMainView("settings");
+    // The panel has to be open for the categories to be reachable at all.
+    setRailCollapsed(false);
+  }, []);
   const [activeSpaceId, setActiveSpaceId] = useState(defaultSpace.id);
   const [identityKeys, setIdentityKeys] =
     useState<IdentityKey[]>(getIdentityKeys);
@@ -633,6 +675,15 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   const [mailFolder, setMailFolder] = useState("Inbox");
   const [mailTab, setMailTab] = useState<MailTab>("all");
   const [messageThread, setMessageThread] = useState<string | null>(null);
+  const [messageFocus, setMessageFocus] = useState<string | null>(null);
+  const openMessageAt = useCallback(
+    (conversationId: string, messageId: string) => {
+      setMessageThread(conversationId);
+      setMessageFocus(messageId);
+    },
+    [],
+  );
+  const clearMessageFocus = useCallback(() => setMessageFocus(null), []);
   const [messagesUnreadOnly, setMessagesUnreadOnly] = useState(false);
   const [conversationsVersion, setConversationsVersion] = useState(0);
   const bumpConversations = useCallback(
@@ -1404,6 +1455,9 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       libraryTab,
       setLibraryTab,
       mainView,
+      settingsCategory,
+      setSettingsCategory,
+      openSettings,
       setMainView,
       railCollapsed,
       toggleRail,
@@ -1465,6 +1519,9 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       setMailTab,
       messageThread,
       setMessageThread,
+      messageFocus,
+      openMessageAt,
+      clearMessageFocus,
       messagesUnreadOnly,
       setMessagesUnreadOnly,
       conversationsVersion,
@@ -1601,6 +1658,11 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       openNewConversation,
       closeNewConversation,
       messageThread,
+      messageFocus,
+      openMessageAt,
+      clearMessageFocus,
+      settingsCategory,
+      openSettings,
       vaultKind,
       learnCourse,
       voteStatus,

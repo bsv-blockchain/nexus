@@ -107,7 +107,8 @@ export function MessagesApp(): ReactNode {
           — otherwise the composer and the end of the list sit underneath it. */}
       <div className="flex h-full min-h-0 flex-col pb-16 md:pb-0">
       {!isDesktop && !messageThread ? (
-        <div className="flex h-full min-h-0 flex-col p-3">
+        /* The mobile root sits on the app canvas, not the sidebar surface. */
+        <div className="flex h-full min-h-0 flex-col p-3 [--list-bg:var(--background)]">
           <div className="flex items-center justify-between gap-2 px-1 pb-3">
             <h1 className="text-lg font-bold">{copy.title}</h1>
             <button

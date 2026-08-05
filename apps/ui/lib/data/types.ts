@@ -339,6 +339,7 @@ export interface TxOverlay {
 /** Which wallet ecosystem owns a handle's namespace. */
 export type EcosystemId =
   | "nexus"
+  | "yours"
   | "treechat"
   | "twetch"
   | "handcash"
@@ -621,7 +622,13 @@ export type CommandVerb =
    * Formerly reserved by BRC-218 section 6. Claimed by section 5.21, which
    * specifies the named-agent case only and leaves dispute resolution out.
    */
-  | "escrow";
+  | "escrow"
+  /**
+   * A secret the transcript is not allowed to keep, per section 5.22. Every
+   * other verb's payload is meant to be readable later; this one is meant to
+   * stop being readable the moment it has been read once.
+   */
+  | "once";
 
 /**
  * The five verbs BRC-218 section 6 reserves without specifying. A conforming
@@ -668,7 +675,22 @@ export type CommandStatus =
   /** the agent delivered both sides */
   | "released"
   /** the offer window closed with nothing matched */
-  | "expired";
+  | "expired"
+  /** a one-time secret nobody has opened yet */
+  | "sealed"
+  /**
+   * A one-time secret the sender burned before it was opened, per §5.18. Not
+   * `withdrawn`: a withdrawn request was never owed, where this was genuinely
+   * available and is now destroyed, and a reader has to be able to tell a secret
+   * that was killed from one that was never live.
+   */
+  | "burned"
+  /**
+   * A one-time secret that has been opened. Terminal in both directions: the
+   * recipient cannot open it twice and the sender never could, so this status
+   * doubles as a read receipt the recipient cannot suppress — BRC-218 §5.22(6).
+   */
+  | "revealed";
 
 /** One leg of a `/split`, which fails independently per BRC-218 section 5.5. */
 export interface CommandLeg {
@@ -708,6 +730,24 @@ export interface CommandCard {
   boundMessageId?: string;
   /** the id of the message whose command this one refunds or withdraws */
   refersToMessageId?: string;
+  /**
+   * The one-time secret this card carries, by reference.
+   *
+   * Never the secret itself. A card is transcript, and a transcript that holds
+   * the plaintext has already broken the only promise `/once` makes. The
+   * payload lives in the client's sealed store until it is opened, and the
+   * store drops it there and then.
+   */
+  secretId?: string;
+  /**
+   * How many documents went into the seal.
+   *
+   * A property of the envelope rather than of its contents, which is why it is
+   * on the card and survives the opening: "a document was sealed here and
+   * collected at 14:32" is the part of the record worth keeping. The names and
+   * the bytes are not here, and never were.
+   */
+  sealedFiles?: number;
   /** collectible id, for a transfer or an escrowed asset */
   assetId?: string;
   /** on-chain transaction the transfer settled in */

@@ -16,6 +16,7 @@ import { VaultApp } from "@/components/apps/vault-app";
 import { VoteApp } from "@/components/apps/vote-app";
 import { WalletApp } from "@/components/apps/wallet-app";
 import { AppTile } from "@/components/hub/app-icon";
+import { SettingsApp } from "@/components/apps/settings-app";
 import { AppStore } from "@/components/hub/app-store";
 import { DetailPane } from "@/components/hub/detail-pane";
 import { GettingStartedPage } from "@/components/hub/getting-started-page";
@@ -195,6 +196,10 @@ function AppCanvas(): ReactNode {
 export function MainView(): ReactNode {
   const { activeApp, activePage, mainView } = useHub();
   const showStore = mainView === "store";
+  /* Settings paints on the app background, never the browser page's. Without
+     this it inherits `bg-canvas` whenever Browse happens to be the app behind
+     it, and renders dark-theme text on a white sheet. */
+  const showSettings = mainView === "settings";
   const showProfiles = mainView === "profiles";
   const canvasIsBrowser = activeApp === "browser" && !activePage;
 
@@ -221,10 +226,21 @@ export function MainView(): ReactNode {
     <main
       id="main-content"
       className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border shadow-xl ${
-        !showStore && canvasIsBrowser ? "bg-canvas" : "bg-background"
+        !showStore && !showSettings && canvasIsBrowser
+          ? "bg-canvas"
+          : "bg-background"
       }`}
     >
-      {activePage === "getting-started" ? (
+      {showSettings ? (
+        /* Settings and its reference pane share the row, the same way an app and
+           its pane do — the What's new pane is opened from here. */
+        <div className="flex min-h-0 flex-1">
+          <div className="min-h-0 min-w-0 flex-1">
+            <SettingsApp />
+          </div>
+          <DetailPane />
+        </div>
+      ) : activePage === "getting-started" ? (
         <div className="min-h-0 flex-1">
           <GettingStartedPage />
         </div>

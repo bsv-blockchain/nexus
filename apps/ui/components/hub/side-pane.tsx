@@ -32,6 +32,7 @@ export function SidePane({
   onClose,
   children,
   footer,
+  actions,
 }: {
   open: boolean;
   title: string;
@@ -39,6 +40,15 @@ export function SidePane({
   children: ReactNode;
   /** pinned below the scroll area, for destructive or committing actions */
   footer?: ReactNode;
+  /**
+   * Controls on the header's trailing edge, for settings that belong to whatever
+   * the pane is showing rather than to the pane itself.
+   *
+   * A slot rather than a fixed control, because this component frames a profile,
+   * a vouch list and a conversation's settings alike — and a gear that means
+   * something in one of those means nothing in the others.
+   */
+  actions?: ReactNode;
 }): ReactNode {
   useEffect(() => {
     if (!open) return;
@@ -95,9 +105,10 @@ export function SidePane({
                 >
                   <X className="size-4" aria-hidden="true" />
                 </button>
-                <h2 className="min-w-0 truncate text-sm font-semibold">
+                <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">
                   {title}
                 </h2>
+                {actions && <span className="shrink-0">{actions}</span>}
               </div>
               {body}
             </div>
@@ -126,7 +137,10 @@ export function SidePane({
               >
                 <ArrowLeft className="size-5" aria-hidden="true" />
               </button>
-              <h2 className="min-w-0 truncate text-sm font-semibold">{title}</h2>
+              <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">
+                {title}
+              </h2>
+              {actions && <span className="shrink-0">{actions}</span>}
             </div>
             {body}
           </motion.div>

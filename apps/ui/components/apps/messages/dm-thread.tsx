@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  ChainPolicyMark,
+  usePermanenceGate,
+} from "@/components/apps/messages/chain-policy";
 import { CommandSheet } from "@/components/apps/messages/command-sheet";
 import { Composer } from "@/components/apps/messages/composer";
 import {
@@ -38,6 +42,33 @@ import {
 } from "@/lib/messages";
 import { ArrowLeft, MessageSquare, UserRound } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+
+/**
+ * Scroll to the message a saved-list row asked for, and ring it briefly.
+ *
+ * Runs after the scroll-to-end effect on purpose — effects fire in declaration
+ * order, so landing on the message wins over landing at the bottom. The focus
+ * releases itself a couple of seconds later, so coming back to the conversation
+ * leaves you where you left it instead of jumping to a message you already read.
+ */
+function useFocusMessage(conversationId: string): string | null {
+  const { messageFocus, clearMessageFocus } = useHub();
+
+  useEffect(() => {
+    if (!messageFocus) return;
+    const target = document.getElementById(`msg-${messageFocus}`);
+    // Not here yet — the effect runs again when the thread that holds it mounts.
+    if (!target) return;
+    target.scrollIntoView({ block: "center" });
+    const timer = setTimeout(clearMessageFocus, 2200);
+    return () => clearTimeout(timer);
+  }, [messageFocus, clearMessageFocus, conversationId]);
+
+  /* The ring is the hub's focus itself rather than a copy of it in local state:
+     one value, cleared on one timer, and nothing set synchronously inside an
+     effect for React to re-render twice over. */
+  return messageFocus;
+}
 
 /** A 1:1 conversation: header with presence, message list, composer. */
 export function DmThread({
@@ -80,6 +111,10 @@ export function DmThread({
     },
     participants: person ? [person] : [],
     attachments: staged,
+    /* `/once` seals the staged files instead of sending them, so they have to
+       leave the draft — otherwise they ride out in the clear on the next
+       ordinary message, which is what sealing them was against. */
+    onConsumeAttachments: () => setStaged([]),
     ...(person ? { implicitRecipient: person } : {}),
     ...(replyTarget
       ? {
@@ -96,6 +131,26 @@ export function DmThread({
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [conversationId, messages.length]);
+
+  const ringed = useFocusMessage(conversationId);
+
+  /* Hoisted out of the Composer's own prop so the permanence gate can call the
+     same sender the composer would have. */
+  const sendMessage = (text: string): void => {
+    append({
+      id: `local-${Date.now()}`,
+      conversationId,
+      senderId: "me",
+      text,
+      createdAt: new Date().toISOString(),
+      status: "sent",
+      ...(staged.length > 0
+        ? { attachment: { kind: "media" as const, items: staged } }
+        : {}),
+    });
+    setStaged([]);
+  };
+  const permanence = usePermanenceGate(conversationId, sendMessage);
 
   if (!person) {
     return (
@@ -165,6 +220,10 @@ export function DmThread({
               {eco && !eco.local ? "· " : ""}
               {PRESENCE_LABEL[presence]}
             </span>
+            {/* Same reasoning as the group header: what this conversation puts
+                on chain is a fact both sides need, in the line where the other
+                facts about it already are. */}
+            <ChainPolicyMark conversationId={conversationId} />
           </p>
         </div>
 
@@ -224,6 +283,7 @@ export function DmThread({
                 key={message.id}
                 message={message}
                 sender={message.senderId === "me" ? undefined : person}
+                focused={message.id === ringed}
                 onReply={() => setReplyId(message.id)}
                 onDismiss={() =>
                   setSent((current) => current.filter((m) => m.id !== message.id))
@@ -258,28 +318,19 @@ export function DmThread({
 
       {tab === "messages" && (
       <Composer
-        key={seedKey ?? 0}
+        key={`${seedKey ?? 0}-${permanence.resetKey}`}
         {...(focusOnOpen ? { focusOnOpen } : {})}
         {...(seed ? { seed } : {})}
-        placeholder={`${copy.messagePlaceholder} ${firstName(person.name)}`}
+        placeholder={
+          permanence.placeholder ??
+          `${copy.messagePlaceholder} ${firstName(person.name)}`
+        }
+        beforeSend={permanence.beforeSend}
         attachments={staged}
         onRemoveAttachment={(index) =>
           setStaged((current) => current.filter((_, i) => i !== index))
         }
-        onSend={(text) => {
-          append({
-            id: `local-${Date.now()}`,
-            conversationId,
-            senderId: "me",
-            text,
-            createdAt: new Date().toISOString(),
-            status: "sent",
-            ...(staged.length > 0
-              ? { attachment: { kind: "media" as const, items: staged } }
-              : {}),
-          });
-          setStaged([]);
-        }}
+        onSend={sendMessage}
         onCommand={runner.start}
         implicitRecipient
         onAttach={() => setPicker("media")}
@@ -298,8 +349,11 @@ export function DmThread({
 
       {lightbox.viewer}
 
+      {permanence.sheet}
+
       <CommandSheet
         command={runner.pending?.command ?? null}
+        attachments={staged}
         boundMessage={runner.pending?.boundMessage}
         boundSender={runner.pending?.boundSender}
         onCancel={runner.cancel}

@@ -346,6 +346,68 @@ html.theme-animate {
 }
 
 /*
+ * The `/once` seal mask: five dots, alive for exactly as long as there is
+ * something behind them.
+ *
+ * A travelling wave rather than a pulse — each dot lifts in turn, the run
+ * settles, and then it rests for over half the cycle. A transcript can hold
+ * several of these at once, and a mask that jitters continuously is noise;
+ * one that hops every couple of seconds reads as "still here, still yours".
+ * The overshoot easing is what makes it a hop rather than a slide.
+ */
+@keyframes nexus-seal-hop {
+  0%,
+  34%,
+  100% {
+    transform: translateY(0);
+  }
+  12% {
+    transform: translateY(-0.3em);
+  }
+}
+
+/*
+ * And the moment it is spent: each dot squashes flat and springs back, in the
+ * same order it hopped. The glyph is already hollow by then, so what a reader
+ * sees is the fill being knocked out of one circle after another rather than
+ * five characters silently changing between frames.
+ */
+@keyframes nexus-seal-empty {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  35% {
+    transform: scale(1.15, 0.12);
+    opacity: 0.35;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.nexus-seal-dot {
+  display: inline-block;
+  /* Staggered off the dot's own position, so one rule drives the whole run. */
+  animation-delay: calc(var(--seal-index) * 90ms);
+}
+
+.nexus-seal-dot--sealed {
+  animation-name: nexus-seal-hop;
+  animation-duration: 2.2s;
+  animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation-iteration-count: infinite;
+}
+
+.nexus-seal-dot--emptying {
+  animation-name: nexus-seal-empty;
+  animation-duration: 0.44s;
+  animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation-fill-mode: both;
+}
+
+/*
  * Hover marquee: a truncated title scrolls left to reveal its full length,
  * pausing at each end, then bounces back. --marquee-shift is the negative
  * overflow width, set inline once the text is measured as overflowing.

@@ -371,6 +371,65 @@ export const content = {
       releasedNote: "Both halves delivered. The asset is theirs to send on.",
       theirCall: "Only the named agent can accept or decline this.",
     },
+    /* The one-time secret `/once` seals, and the single opening it allows. */
+    once: {
+      /* Five glyphs whatever the payload, on purpose: a mask that grows with
+         the secret tells a reader whether they are looking at a PIN or a key,
+         which is most of what the seal was hiding. */
+      sealedMask: "●●●●●",
+      spentMask: "○○○○○",
+      sealedLabel: "Sealed secret, not opened yet",
+      spentLabel: "Secret already opened",
+      voidLabel: "Secret gone, never opened",
+      onlyOnce:
+        "Sealed to the handles above and no other keys, and each opens exactly once.",
+      reveal: "Reveal it once",
+      revealCost:
+        "Opening it spends it and tells them you opened it. There is no second look.",
+      revealedAt: "Opened",
+      notRevealed: "Not opened yet",
+      /* Per-addressee, where one /once went to several handles. */
+      ofOpened: "of",
+      openedAddressees: "addressees have opened theirs",
+      waitingShort: "waiting",
+      burnedShort: "burned",
+      lapsedShort: "lapsed",
+      openableUntil: "Openable until",
+      burnedNote:
+        "Burned by the sender before it was opened. Anyone who had already opened theirs still has it.",
+      lapsedNote:
+        "The window closed with this copy unopened. Nothing was read, and nothing can be now.",
+      copy: "Copy",
+      copied: "Copied",
+      save: "Save",
+      fileSealed: "document sealed with it",
+      filesSealed: "documents sealed with it",
+      keepIt:
+        "This is the only time it is shown. Close this and it is gone from here for good.",
+      keepItFiles:
+        "This is the only time it is shown. Save anything you need before closing — the documents are unreachable after that, here and anywhere else.",
+      /* The prototype stand-in for the counterparty, labelled as one. */
+      rehearseHint:
+        "Prototype: there is only one device here, so you can open it as them. In reality they do this on theirs and you only see the seal go hollow.",
+      rehearseAs: "as",
+      rehearseToast: "Opened on behalf of",
+      rehearseToastNote:
+        "Prototype only. A real sender never sees the contents — just that it was collected",
+      goneNote:
+        "The payload is gone. What stays is that it was opened, and when.",
+      goneNoteSender:
+        "They opened it. Nothing more can be read from it, by them or by you.",
+      sendersView:
+        "Sealed to their keys, one opening each. This client cannot open it either, so a mistyped secret cannot be recalled — reply to it with /cancel to burn what nobody has taken yet.",
+      theirCall: "Only the handles it was sealed to can open it.",
+      revealedToast: "Secret opened",
+      revealedToastNote: "Spent. They can see that you opened it",
+      /* /cancel on a /once, per §5.18 */
+      burnedToast: "Sealed copies burned",
+      burnedNothing: "Nothing left to burn",
+      burnedAllOpen:
+        "Every addressee had already opened theirs. Burning reaches nothing, and what they read they still have.",
+    },
     /* The card `/send` leaves in the thread. */
     transfer: {
       asset: "Collectible",
@@ -475,6 +534,83 @@ export const content = {
       cancel: "Cancel",
       send: "Attach",
     },
+    /**
+     * What this client puts on chain, from the bar under the conversation list.
+     *
+     * Written as three consequences rather than three feature names, because the
+     * difference between them is what somebody can still do afterwards —
+     * delete it, prove it, or neither.
+     */
+    chain: {
+      button: "What goes on chain",
+      title: "On chain",
+      messages: "Messages on chain",
+      messagesHint: "Permanent. Nobody can delete it, you included.",
+      /* Renamed off "Receipts": §5.15's /receipt is a voluntary acknowledgment
+         the recipient can decline, and this is the sender anchoring proof of
+         delivery. One word for two mechanisms was going to be read as one. */
+      receipts: "Delivery proofs on chain",
+      receiptsHint: "Proof it arrived. The words stay deletable.",
+      nothing: "Nothing on chain",
+      nothingHint: "Messagebox only. Nothing lasts, nothing is provable.",
+      note: "Applies from here on.",
+      /* The `/once` caveat only appears where "Messages on chain" can be
+         chosen, which is the conversation pane — a caveat about an option that
+         is not on screen is a sentence a reader has to hold for nothing. */
+      noteConversation: "Applies from here on. A sealed /once is never anchored.",
+      /* The conversation-level pane, where the global setting is the fallback. */
+      forConversation: "This conversation",
+      usingDefault: "Following your default",
+      overridden: "Set for this conversation",
+      reset: "Follow the default",
+      /* The inline mark in the thread header — both sides see the same thing. */
+      markLabel: "On chain for this conversation",
+      /* The composer, where anchoring is about to have a consequence. */
+      placeholder: "Write something permanent",
+      ackTitle: "This goes on chain for good",
+      ackBody:
+        "Messages in this conversation are anchored. Once it is written nobody can delete it, you included, and anyone can read the record forever.",
+      ackConfirm: "Post it permanently",
+      ackCancel: "Not yet",
+      ackAgain: "Asked once per conversation, and again if the setting changes.",
+      bothSides: "Everyone here sees this, and it applies to what you send.",
+    },
+    /** the saved-messages list, swapped in under the conversation list */
+    saved: {
+      title: "Saved messages",
+      showing: "Saved",
+      empty: "Nothing saved yet. Right-click a message to keep it here.",
+      remove: "Remove from saved",
+      removed: "Removed from saved",
+    },
+    /** right-click / long-press on a message */
+    messageMenu: {
+      label: "Message options",
+      copyLink: "Copy link",
+      linkCopied: "Link copied",
+      renderImage: "Render as image",
+      save: "Save message",
+      unsave: "Remove from saved",
+      saved: "Saved",
+      unsaved: "Removed from saved",
+      viewOnChain: "View on chain",
+      mute: "Mute",
+      unmute: "Unmute",
+      muted: "Muted",
+      unmuted: "Unmuted",
+    },
+    /** the still a message can be turned into, and the two things you do with it */
+    messageImage: {
+      title: "Render as image",
+      hint: "A still of this message, sized for sharing. Only what you see here.",
+      copyImage: "Copy image",
+      saveImage: "Save image",
+      copied: "Image copied",
+      /* Clipboard writes for images need a permission and a secure origin, so
+         this is a real outcome rather than a defensive string. */
+      copyFailed: "Your browser would not let this copy. Save it instead.",
+      saved: "Image saved",
+    },
     /** `/help` reply — local, ephemeral, never sent */
     help: {
       app: "Nexus",
@@ -530,9 +666,13 @@ export const content = {
         held: "In escrow",
         released: "Released",
         expired: "Expired",
+        sealed: "Sealed",
+        revealed: "Revealed",
+        burned: "Burned",
       },
       to: "to",
       from: "from",
+      sealedFor: "Sealed for",
       plusToll: "plus toll",
       every: "Every",
       varies: "satoshi amount varies with the rate",
@@ -596,6 +736,7 @@ export const content = {
         whois: "Resolve",
         vouch: "Vouch for them",
         renounce: "Renounce them",
+        once: "Seal and send",
       },
       effect: {
         pay: "Resolves the handle and sends a payment, delivered unbroadcast inside a signed envelope.",
@@ -623,7 +764,12 @@ export const content = {
           "Adds public reputation to their handle, signed by your identity key. Anyone running /whois on them will see it.",
         renounce:
           "Withdraws your regard for them, signed by your identity key. The reason is shown on their profile; your handle is hidden unless you wrote p or public.",
+        once: "Encrypts the secret to their key and sends it. They can open it once, and after that nobody can.",
       },
+      secret: "Secret",
+      sealing: "Sealed with it",
+      secretShow: "Show the secret",
+      secretHide: "Hide the secret",
       visibility: "Visibility",
       visibilityPublic: "Signed openly — your handle is shown",
       visibilityAnon: "Anonymous — your handle is hidden",
@@ -684,6 +830,9 @@ export const content = {
           "Revocation is detectable rather than instantaneous. Until the spend confirms, treat the delegate as still able to act.",
         receipt:
           "Receipts are voluntary. A missing receipt is not evidence that a message was undelivered or unread.",
+        once: "Sealed to the handle above and to no other key. This client keeps no copy, so a wrong handle or a mistyped secret cannot be recalled or resent — only sealed again to somebody else.",
+        onceRead:
+          "You will see when they open it, whether or not they say so. If it shows as opened before they tell you they opened it, treat the secret as compromised and rotate it.",
       },
     },
     /** `/whois` identity card — BRC-218 section 5.7 */
@@ -1281,6 +1430,102 @@ export const content = {
     },
   },
 
+  /** the settings surface the rail's gear opens */
+  settings: {
+    title: "Settings",
+    soon: "Coming soon",
+    /* Pairing a phone to this Nexus, at the head of General. */
+    sync: {
+      title: "Sync Nexus by QR code",
+      codeLabel: "Pairing code",
+      step1: "Open Nexus on your phone",
+      step2: "Go to Settings › Devices › Add device",
+      step3: "Point your phone at this screen to confirm",
+      byCode: "Sync with a pairing code instead",
+    },
+    general: {
+      title: "General",
+      hint: "Sync, search, links and this device.",
+      searchTitle: "Search",
+      linksTitle: "Links",
+      deviceTitle: "This device",
+    },
+    privacy: {
+      title: "Privacy",
+      hint: "Who can reach you, what it costs them, and what outlives the chat.",
+      reachTitle: "Who can reach you",
+      reachHint:
+        "Enforced at your messagebox rather than by the sender's client, so somebody who ignores it still gets nowhere. Same setting as /scope.",
+      reachEveryone: "Everyone",
+      reachEveryoneHint: "Anyone who knows your handle.",
+      reachContacts: "Contacts only",
+      reachContactsHint: "People already in your address book.",
+      reachEcosystem: "Your ecosystem",
+      reachEcosystemHint: "Handles registered on the same ecosystem as you.",
+      reachToll: "Strangers pay a toll",
+      reachTollHint: "Open to anyone willing to attach the amount below.",
+      reachSaved: "Reachable by",
+      tollTitle: "Message toll",
+      tollHint:
+        "What a stranger attaches to each message. You keep it whether or not you reply. Same setting as /trolltoll.",
+      tollOff: "No toll",
+      tollSet: "Toll set",
+      tollLifted: "Toll lifted",
+      tollPerSender: "Tolls you set for one person",
+      tollPerSenderHint:
+        "Unaffected by the general toll. Lifting this one leaves those exactly as they were.",
+      chainTitle: "What goes on chain",
+      chainHint: "The default for new conversations.",
+      chainSaved: "Default updated",
+      chainPerConversation: "Conversations set on their own",
+      chainPerConversationHint:
+        "Set from a conversation's settings, where the room is in front of you. Anchoring whole messages is only offered there.",
+      dataTitle: "Data",
+      clearDataHint: "History, cookies and cached files on this device.",
+    },
+    browsing: {
+      title: "Browsing",
+      hint: "Sites, tabs and downloads.",
+      sitesTitle: "Sites",
+      tabsTitle: "Tabs",
+      filesTitle: "Files",
+      downloadsHint: "Opens the downloads panel.",
+    },
+    about: {
+      title: "About",
+      hint: "Version and what changed.",
+      versionTitle: "This build",
+      version: "Version",
+      released: "Released",
+      whatsNew: "What's new",
+      whatsNewHint: "Every release, and what shipped in it.",
+    },
+    appearance: {
+      title: "Appearance",
+      hint: "Theme and colour.",
+      themeTitle: "Theme",
+      themeHint: "Light, dark, or whatever this device is set to.",
+      themeProfile: "Themes belong to the active profile, so each one can look like itself.",
+    },
+  },
+
+  /** the What's new pane, read from lib/data/releases.ts */
+  releases: {
+    title: "What's new",
+    whatsNewIn: "What's new in",
+    latest: "Latest release",
+    past: "Past releases",
+    before: "The release before this",
+    update: "update",
+    updates: "updates",
+  },
+
+  /** shell chrome that is not any one app's */
+  hub: {
+    collapsePanel: "Close this panel",
+    expandPanel: "Open the panel",
+  },
+
   repositories: {
     button: "App repositories",
     title: "App repositories",
@@ -1297,6 +1542,23 @@ export const content = {
     commonSourceTag: "Mini app store",
     commonSourceDesc: "One curated source for every app",
     commonSourceToggle: "Common Source mode",
+    /* Suggestions offered from the URL field itself, so a reader who has never
+       seen a repository URL has something to try rather than a blank box. */
+    pickSuggested: "Try one of these",
+    pickHint: "Third-party stores. Adding one is a decision, not a setting.",
+    /*
+     * The warning in front of adding a store, per the design review.
+     *
+     * Deliberately not a toast after the fact: what a repository does is decide
+     * which code the hub is willing to offer you, so the moment to say who
+     * vouches for it is before it is added rather than after.
+     */
+    confirmTitle: "Add an unvetted repository?",
+    confirmBody:
+      "Nothing in this store has been reviewed by Nexus or the BSV Association. Its apps ask for the same permissions as any other — your keys, your wallet, your identity — and only the operator of this URL decides what appears in it.",
+    confirmSource: "Adding",
+    confirmCancel: "Cancel",
+    confirmAdd: "Add it anyway",
   },
 
   theme: {

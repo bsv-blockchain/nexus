@@ -1,5 +1,14 @@
 "use client";
 
+import { ChainPolicyButton } from "@/components/apps/messages/chain-policy";
+import {
+  getEffects,
+  getEffectsServerSnapshot,
+  subscribeEffects,
+  unsaveMessage,
+  type SavedMessage,
+} from "@/lib/command-effects";
+import { toast } from "sonner";
 import { GroupAvatar } from "@/components/apps/messages/group-avatar";
 import { MemberAvatar } from "@/components/apps/messages/member-avatar";
 import { MessageStatusIcon } from "@/components/apps/messages/message-status-icon";
@@ -10,6 +19,7 @@ import { groupIconOf } from "@/lib/group-icon";
 import {
   content,
   getChatMessages,
+  getChatThread,
   getChatThreads,
   getMessagePerson,
   getUnreadCount,
@@ -18,8 +28,13 @@ import {
   type MessagePerson,
 } from "@/lib/data";
 import { firstName, formatMessageDate } from "@/lib/messages";
-import { BellOff, Paperclip, Search } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { BellOff, Bookmark, BookmarkX, Paperclip, Search } from "lucide-react";
+import {
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 
 type Row =
   | {
@@ -237,14 +252,92 @@ function ConversationRow({ row }: { row: Row }): ReactNode {
 }
 
 /**
+ * One saved message.
+ *
+ * Says which conversation it came from as well as who wrote it: a line you put
+ * aside a week ago is unplaceable without the room it was in, and that is the
+ * fact a saved list has that the transcript does not need to repeat.
+ */
+function SavedRow({ entry }: { entry: SavedMessage }): ReactNode {
+  const { openMessageAt } = useHub();
+  const copy = content.messages.saved;
+  const person = getMessagePerson(entry.senderId);
+  const thread = getChatThread(entry.conversationId);
+  const where = thread?.group
+    ? thread.group.title
+    : (getMessagePerson(thread?.personId ?? "")?.name ?? "");
+
+  return (
+    <div className="group/saved hover:bg-surface-hover flex items-start gap-2.5 rounded-lg px-2 py-2">
+      <button
+        type="button"
+        onClick={() => openMessageAt(entry.conversationId, entry.messageId)}
+        className="focus-ring flex min-w-0 flex-1 items-start gap-2.5 text-left"
+      >
+        {person && (
+          <span className="mt-0.5 shrink-0">
+            <MemberAvatar person={person} size={32} />
+          </span>
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="flex items-baseline justify-between gap-2">
+            <span className="min-w-0 truncate text-[13px] font-semibold">
+              {person ? firstName(person.name) : content.messages.someone}
+              {where && (
+                <span className="text-muted-foreground font-normal">
+                  {" "}
+                  · {where}
+                </span>
+              )}
+            </span>
+            <time
+              dateTime={entry.createdAt}
+              className="text-muted-foreground shrink-0 text-[10px]"
+            >
+              {formatMessageDate(entry.createdAt)}
+            </time>
+          </span>
+          {/* Two lines rather than one: a saved message is kept for what it
+              says, so the preview has to carry enough of it to be recognised. */}
+          <span className="text-muted-foreground mt-0.5 line-clamp-2 text-xs text-pretty">
+            {entry.preview}
+          </span>
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          unsaveMessage(entry.messageId);
+          toast.success(copy.removed);
+        }}
+        aria-label={`${copy.remove}: ${entry.preview.slice(0, 40)}`}
+        className="focus-ring text-muted-foreground hover:text-negative mt-0.5 shrink-0 rounded-md p-1 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/saved:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100"
+      >
+        <BookmarkX className="size-4" aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+/**
  * The searchable conversation list. Rendered both in the desktop contextual
  * sidebar and as the mobile root view, so it owns no chrome of its own.
+ *
+ * The bar at the foot switches it between conversations and saved messages.
+ * Two lists in one column rather than a second panel, because they answer the
+ * same question — where do I go next — and only one of them is ever wanted.
  */
 export function ConversationList(): ReactNode {
   const { messagesUnreadOnly, conversationFlags } = useHub();
   const [query, setQuery] = useState("");
+  const [showSaved, setShowSaved] = useState(false);
   const rows = useConversationRows();
   const copy = content.messages;
+  const saved = useSyncExternalStore(
+    subscribeEffects,
+    getEffects,
+    getEffectsServerSnapshot,
+  ).savedMessages;
 
   const needle = query.trim().toLowerCase();
   const visible = rows.filter((row) => {
@@ -266,8 +359,26 @@ export function ConversationList(): ReactNode {
   const starred = visible.filter((row) => conversationFlags[row.id]?.starred);
   const rest = visible.filter((row) => !conversationFlags[row.id]?.starred);
 
+  /* The same search box filters both lists, over the saved line and whoever
+     wrote it — a saved list you cannot search is a drawer. */
+  const savedVisible = saved.filter((entry) => {
+    if (!needle) return true;
+    const who = getMessagePerson(entry.senderId)?.name ?? "";
+    return (
+      entry.preview.toLowerCase().includes(needle) ||
+      who.toLowerCase().includes(needle)
+    );
+  });
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    /*
+       The bar has to be the same colour as whatever is behind the list, and that
+       differs by where the list is mounted: `surface` in the desktop sidebar,
+       `background` on the mobile canvas. So the shade is a variable with the
+       sidebar's value as the default, and the mobile call site overrides it —
+       cheaper and harder to get wrong than a prop threaded through for a colour.
+    */
+    <div className="flex min-h-0 flex-1 flex-col [--list-bg:var(--surface)]">
       <div className="mb-2 flex items-center gap-2 rounded-lg bg-surface px-3 py-2">
         <Search
           className="size-4 shrink-0 text-muted-foreground"
@@ -282,8 +393,27 @@ export function ConversationList(): ReactNode {
         />
       </div>
 
-      <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
-        {visible.length === 0 ? (
+      {/*
+        The scroller and the bar share this box, and the bar sits on top of it.
+
+        `pb-12` is the bar's own height given back to the scroller, so the last
+        conversation can still be reached — a translucent bar with nothing
+        reserved behind it leaves the final row permanently half-covered, which
+        looks like a rendering bug rather than a design.
+      */}
+      <div className="relative min-h-0 flex-1">
+      <div className="h-full space-y-0.5 overflow-y-auto pb-12">
+        {showSaved ? (
+          savedVisible.length === 0 ? (
+            <p className="text-muted-foreground py-8 text-center text-sm text-pretty">
+              {needle ? copy.noResults : copy.saved.empty}
+            </p>
+          ) : (
+            savedVisible.map((entry) => (
+              <SavedRow key={entry.messageId} entry={entry} />
+            ))
+          )
+        ) : visible.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             {messagesUnreadOnly && !needle ? copy.noUnread : copy.noResults}
           </p>
@@ -309,6 +439,48 @@ export function ConversationList(): ReactNode {
             ))}
           </>
         )}
+      </div>
+
+      {/* Rows pass behind it rather than stopping at it: a hard edge across the
+          list reads as the end of the list, and this is a bar over a scroller,
+          not a footer under one. The gradient above the bar is what says so. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-16"
+        style={{
+          backgroundImage:
+            "linear-gradient(to top, var(--list-bg), transparent)",
+        }}
+      />
+      <div
+        className="border-border/60 absolute inset-x-0 bottom-0 flex items-center justify-between border-t px-1 py-1"
+        style={{ backgroundColor: "var(--list-bg)" }}
+      >
+        {/* A toggle, not a destination: it swaps what this column is a list of,
+            so it stays pressed while the saved list is showing rather than
+            navigating away and leaving no way back. */}
+        <button
+          type="button"
+          onClick={() => setShowSaved((value) => !value)}
+          aria-pressed={showSaved}
+          aria-label={copy.saved.title}
+          title={copy.saved.title}
+          className={`focus-ring inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-semibold transition-colors ${
+            showSaved
+              ? "bg-accent/15 text-accent"
+              : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+          }`}
+        >
+          <Bookmark className="size-4 shrink-0" aria-hidden="true" />
+          {/* The count only where it is not the whole point of the label: with
+              the list open you are looking at them. */}
+          {!showSaved && saved.length > 0 && (
+            <span className="tabular-nums">{saved.length}</span>
+          )}
+          {showSaved && <span>{copy.saved.showing}</span>}
+        </button>
+        <ChainPolicyButton />
+      </div>
       </div>
     </div>
   );

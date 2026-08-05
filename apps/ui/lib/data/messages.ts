@@ -63,7 +63,7 @@ export const messagePeople: MessagePerson[] = [
     id: "rhea-mensah",
     name: "Rhea Mensah",
     handle: "rheam",
-    ecosystem: "nexus",
+    ecosystem: "yours",
     role: "Protocol engineer",
     bio: "Works on SPV proofs and overlay topic design. Reviews more specs than she writes.",
     organization: "BSV Association",
@@ -78,7 +78,7 @@ export const messagePeople: MessagePerson[] = [
     id: "tomas-lindqvist",
     name: "Tomás Lindqvist",
     handle: "tomasl",
-    ecosystem: "nexus",
+    ecosystem: "yours",
     role: "Wallet developer",
     bio: "Ships wallet UX for micropayments. Convinced fees under a cent change what you can build.",
     organization: "Babbage",
@@ -93,7 +93,7 @@ export const messagePeople: MessagePerson[] = [
     id: "amara-okonkwo",
     name: "Amara Okonkwo",
     handle: "amarao",
-    ecosystem: "nexus",
+    ecosystem: "yours",
     role: "Token & ordinals dev",
     bio: "Mints, indexes and occasionally burns 1Sat ordinals. Runs a public overlay indexer.",
     organization: "1Sat",
@@ -108,7 +108,7 @@ export const messagePeople: MessagePerson[] = [
     id: "kenji-watanabe",
     name: "Kenji Watanabe",
     handle: "kenjiw",
-    ecosystem: "nexus",
+    ecosystem: "yours",
     role: "Node operator",
     bio: "Runs a teranode instance and publishes weekly throughput numbers nobody asked for.",
     organization: "BSV Association",
@@ -123,7 +123,7 @@ export const messagePeople: MessagePerson[] = [
     id: "lena-fischer",
     name: "Lena Fischer",
     handle: "lenaf",
-    ecosystem: "nexus",
+    ecosystem: "yours",
     role: "Certificate issuer",
     bio: "Issues identity certificates and argues that attestations beat logins.",
     organization: "Nexus",
@@ -2933,6 +2933,69 @@ export const chatMessages: ChatMessage[] = [
     },
   },
 
+  /* ---- /once — both sides of a one-time secret, in the same DM ----
+
+     Inbound and still sealed, so the reveal is walkable: a secret you sealed
+     yourself is sealed to somebody else's key and cannot be opened here, which
+     leaves the arriving one as the only version of this state a single device
+     can reach. The outbound one below is already open, which is the sender's
+     half — you find out it was read, and that is the whole of what you find
+     out. */
+  {
+    id: "m-cmd-once-brandon",
+    conversationId: "dm-hc-brandon",
+    senderId: "hc-brandon",
+    text: "Sandbox key for the staging messagebox, so you can point Nexus at it without it sitting in a thread forever: {command}. Open it when you're at the machine — it opens once, and I'll know when you have.",
+    createdAt: "2026-07-29T15:41:00.000Z",
+    command: {
+      verb: "once",
+      status: "sealed",
+      recipientIds: ["me"],
+      secretId: "sec-seed-inbound",
+      memo: "staging only, and it rotates on Friday",
+    },
+  },
+  {
+    id: "m-cmd-once-mine",
+    conversationId: "dm-hc-brandon",
+    senderId: "me",
+    text: "Same the other way, for the overlay callback: {command}",
+    createdAt: "2026-07-29T15:58:00.000Z",
+    status: "read",
+    command: {
+      verb: "once",
+      status: "sealed",
+      recipientIds: ["hc-brandon"],
+      secretId: "sec-seed-outbound",
+      memo: "the callback token, not the signing key",
+    },
+  },
+  /* A document inside the seal rather than in the thread. The case the verb
+     was really for: a password can be rotated, a signed annex sitting in a
+     room forever cannot be unsent. */
+  {
+    id: "m-cmd-once-doc",
+    conversationId: "dm-hc-brandon",
+    senderId: "hc-brandon",
+    text: "And the annex itself, plus the call where we agreed the wording — sealed rather than posted, because this one shouldn't live in a room: {command}",
+    createdAt: "2026-07-29T16:20:00.000Z",
+    command: {
+      verb: "once",
+      status: "sealed",
+      recipientIds: ["me"],
+      secretId: "sec-seed-doc",
+      sealedFiles: 2,
+      memo: "draft 4 and the recording, passphrase included",
+    },
+  },
+  {
+    id: "m-cmd-once-reply",
+    conversationId: "dm-hc-brandon",
+    senderId: "hc-brandon",
+    text: "Got it, and your side went hollow the second I opened it. That's the part I didn't expect to like — I can't read a secret without telling you I read it, so if yours ever goes hollow on its own you know to rotate rather than wonder.",
+    createdAt: "2026-07-29T16:09:00.000Z",
+  },
+
   /* ---- /delegate, /revoke, /handoff, /scope, /trolltoll — HandCash rails ---- */
   {
     id: "m-cmd-delegate-nadia",
@@ -3012,6 +3075,31 @@ export const chatMessages: ChatMessage[] = [
       amountSats: 300,
       note: "Charged per message, never refunded when I reply. Per-sender tolls are unaffected.",
     },
+  },
+  /* One secret, three handles, one of them collected — the state a single
+     sealed record could not represent, and the one that makes `/cancel` on a
+     `/once` worth having. */
+  {
+    id: "m-cmd-once-room",
+    conversationId: "group-handcash-rails",
+    senderId: "me",
+    text: "Rotated the staging credential, so here it is for the three of you rather than three times over: {command}. Each of you gets one opening, and I can see who has taken theirs.",
+    createdAt: "2026-07-30T12:22:00.000Z",
+    status: "read",
+    command: {
+      verb: "once",
+      status: "sealed",
+      recipientIds: ["hc-lin", "hc-nadia", "hc-samir"],
+      secretId: "sec-seed-room",
+      memo: "staging, not production",
+    },
+  },
+  {
+    id: "m-cmd-once-room-reply",
+    conversationId: "group-handcash-rails",
+    senderId: "hc-lin",
+    text: "Got mine. Useful that the card tells you the other two haven't looked yet — last time we did this over email I had no idea who had actually read it.",
+    createdAt: "2026-07-30T12:33:00.000Z",
   },
   {
     id: "m-cmd-scope",
