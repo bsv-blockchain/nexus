@@ -10,11 +10,10 @@
 #                    submit.production.android (serviceAccountKeyPath + track) to
 #                    eas.json and --auto-submit here once the key lands.
 #
-#   stores-ios       production IPA on EAS's builders. NOT auto-submitted either:
-#                    non-interactive iOS submission requires ios.ascAppId in
-#                    eas.json's submit profile, which is not configured — with `{}`
-#                    eas-cli refuses rather than resolving the app id. Set ascAppId
-#                    and add --auto-submit to switch to hands-off store delivery.
+#   stores-ios       production IPA on EAS's builders, auto-submitted to TestFlight.
+#                    eas.json now carries submit.production.ios.ascAppId
+#                    (6797608340), which non-interactive submission requires — with
+#                    an empty profile eas-cli refuses rather than resolving the id.
 #                    Runs on macOS because the two Rust xcframeworks
 #                    (SecpNative/EngineNative) are gitignored build products that
 #                    exist only on dev machines — CI must rebuild them from the
@@ -124,9 +123,9 @@ jobs:
       - name: bundle the chrome
         run: npm run ui:bundle
 
-      - name: build store IPA (iOS)
+      - name: build and submit to TestFlight (iOS)
         working-directory: apps/mobile
-        run: eas build --platform ios --profile production --non-interactive
+        run: eas build --platform ios --profile production --non-interactive --auto-submit
 
   apk:
     needs: verify-version

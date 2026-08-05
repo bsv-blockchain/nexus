@@ -89,9 +89,12 @@ The tag then drives CI:
 - **release-desktop.yml** — signed + notarized mac dmg/zip, signed Windows
   installer (DigiCert), GPG-signed Linux AppImage/deb → attached to a **draft**
   GitHub release `vX.Y.Z`
-- **release-mobile.yml** — `eas build --profile production --auto-submit` for both
-  stores (credentials and build numbers live on EAS), plus a signed sideloadable
-  APK attached to the same draft release
+- **release-mobile.yml** — production builds for both stores on EAS (credentials
+  and build numbers live there), plus a signed sideloadable APK attached to the same
+  draft release. iOS auto-submits to TestFlight; Android builds the AAB but does not
+  submit until a Google service account is configured on EAS and the first AAB has
+  been uploaded to Play by hand (Google requires the Console for a new package's
+  first upload).
 
 Publishing the draft GitHub release stays a human act. Store review flows are
 watched on the EAS/App Store/Play dashboards, not in Actions.
