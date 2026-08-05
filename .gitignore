@@ -28,6 +28,8 @@ apps/desktop/ui/
 apps/ui/node_modules/
 apps/ui/.next/
 apps/ui/out/
+# Written by `vercel link`. Per-checkout, and it carries the org/project ids.
+.vercel/
 
 # Rust/native build output — the tracked source builds these; they are 1.4 GB when present
 packages/react-native-*/node_modules/

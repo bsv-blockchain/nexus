@@ -2,6 +2,8 @@
 
 A BSV wallet and browser across iOS, Android, macOS, Windows, and Linux. It hosts arbitrary third-party sites with a wallet provider (`window.nexus`) injected into them at document-start, gated per origin.
 
+A sixth target, **web**, is not a product: it is the demo build the design work runs on. See [Web — the preview target](#web--the-preview-target).
+
 ## Architecture — Decision A′
 
 See `docs/ARCHITECTURE.md` for the full rationale.
@@ -35,6 +37,69 @@ npm run ios                # in a separate terminal
 
 ```bash
 npm run android            # in a separate terminal
+```
+
+### Web — the preview target
+
+The sixth target, and the only one that is not a product. It runs the full demo:
+every prototype app, every fixture, no wallet. It exists so design ideas can be
+put in front of a customer or a partner the same afternoon, and it is never
+shipped to a store.
+
+Locally:
+
+```bash
+npm run web
+```
+
+To share a URL, deploy it to Vercel:
+
+```bash
+npm run web:deploy
+```
+
+That prints a preview URL you can send to anyone. It is `noindex`, and each run
+gets its own URL, so two people can compare two ideas side by side. Publishing
+to the project's own domain instead:
+
+```bash
+npm run web:deploy -- --prod
+```
+
+First time on a machine, you need the CLI and access to the team — the script
+tells you if either is missing, and links `apps/ui` for you once you have both:
+
+```bash
+npm i -g vercel@latest && vercel login
+```
+
+`@latest` matters — `apps/ui` is on Next 16, and a CLI from before Next 15 shipped
+misreads it. `npm run web:deploy` warns if yours is too old.
+
+## Demo surfaces versus shipping surfaces
+
+`apps/ui` is a fork of the design repository, where all fifteen apps are
+prototypes drawn against ~9k lines of typed fixtures in `lib/data`. Two of them
+are no longer prototypes: **Browser** drives real WebViews in the shell's native
+tab layer, and **Wallet** spends real satoshis through `@nexus/wallet-core`.
+
+One build-time flag decides which of the two worlds a build carries, and the
+default is the strict one — forgetting a flag should cost a demo, not ship a fake
+balance to the App Store.
+
+| | apps shown | wallet | demo imagery | payload |
+|---|---|---|---|---|
+| shells (`npm run ui:bundle`) | Browser, Wallet | real, or an honest empty state | pruned | 4.6 MB |
+| web (`npm run web`) | all fifteen | fixtures | included | 29.6 MB |
+
+`apps/ui/lib/surfaces.ts` holds the list and the reasoning. The bar for adding a
+slug to it is a service that answers.
+
+To see the demo build exactly as the shells package it — useful when a bug only
+shows up in the export, not in `next dev`:
+
+```bash
+npm run ui:build:demo && npm run serve
 ```
 
 ## Gates — what the spike must show

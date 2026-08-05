@@ -82,3 +82,6 @@ native-engine-ffi/packages/EngineNativeFFI/EngineNative.xcframework/
 credentials.json
 *.jks
 *.keystore
+
+# The web target's local link state. Nothing on EAS builds for Vercel.
+.vercel/
