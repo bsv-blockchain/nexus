@@ -332,12 +332,37 @@ export function createWalletHost({ userDataDir, onStateChange }) {
         // that outlives `wallet = null`.
         stopMonitor()
         wallet = null
-        await localStorage.deleteMnemonic()
-        await localStorage.deleteSnap()
-        await localStorage.deleteRecoveredKey()
-        await localStorage.deletePassword()
+
+        /*
+         * Every delete is attempted even if an earlier one fails, then the results
+         * are judged together.
+         *
+         * secureStore swallows its own errors — deliberately, so one failure does
+         * not abort the deletes after it — which means the only way to know a
+         * secret is actually gone is the boolean it returns. Reporting ok:true
+         * regardless is the dangerous default here: "sign out" is what someone
+         * presses before handing over a laptop, and a phrase that survived a full
+         * disk or a read-only volume while the screen said the keys were erased is
+         * exactly the failure that matters.
+         */
+        const results = await Promise.all([
+          localStorage.deleteMnemonic(),
+          localStorage.deleteSnap(),
+          localStorage.deleteRecoveredKey(),
+          localStorage.deletePassword()
+        ])
         publish()
-        return { ok: true }
+
+        // deleteSnap clears two locations and reports nothing useful, so it is not
+        // judged here; the three keychain secrets are.
+        const [mnemonicGone, , recoveredGone, passwordGone] = results
+        if (mnemonicGone && recoveredGone && passwordGone) return { ok: true }
+
+        throw new Error(
+          'Signed out of this session, but the stored keys could not be erased from ' +
+            'this device. Do not treat this machine as wiped — check disk space and ' +
+            'permissions, then sign out again.'
+        )
       },
 
       'settings.get': async () => {

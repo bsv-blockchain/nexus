@@ -221,6 +221,21 @@ async function getSecret(key) {
   }
 }
 
+/**
+ * Remove a secret, and say whether it is actually gone.
+ *
+ * The return value exists because "delete my keys from this device" is the one
+ * operation where a swallowed failure is dangerous: persist() can reject on a
+ * full disk, a read-only volume or a permissions change, and a caller that
+ * assumed success would tell the user their phrase was erased while it sat in
+ * the file. Callers that genuinely do not care (best-effort cleanup) can ignore
+ * the boolean; wallet.logout must not.
+ *
+ * Errors are still not thrown — a delete that fails should not abort the deletes
+ * that follow it — so the boolean is the whole signal.
+ *
+ * @returns {Promise<boolean>} true when the store no longer holds the key.
+ */
 async function deleteSecret(key) {
   try {
     const store = await load()
@@ -231,8 +246,19 @@ async function deleteSecret(key) {
     // Mobile clears the flag on any single delete; keep that, or a wallet that
     // deleted one secret would keep answering reads for the others.
     await keyValue.removeItem(HAS_WALLET_KEYS)
+    return true
   } catch (err) {
     console.warn(`[secureStore] delete ${key}`, err)
+    // The in-memory mutation above may have succeeded while the write did not, so
+    // the file is the authority here, not `cache`. Re-read it rather than trust
+    // either: a rejected persist leaves the previous contents on disk.
+    cache = null
+    try {
+      const onDisk = await load()
+      return onDisk[key] === undefined
+    } catch {
+      return false
+    }
   }
 }
 
@@ -242,7 +268,7 @@ async function deleteSecret(key) {
 export const setMnemonic = (mnemonic) => setSecret(MNEMONIC_KEY, mnemonic)
 /** @returns {Promise<string | null>} */
 export const getMnemonic = () => getSecret(MNEMONIC_KEY)
-/** @returns {Promise<void>} */
+/** @returns {Promise<boolean>} true when the secret is gone from the store. */
 export const deleteMnemonic = () => deleteSecret(MNEMONIC_KEY)
 
 /* ------------------------------- password -------------------------------- */
@@ -251,7 +277,7 @@ export const deleteMnemonic = () => deleteSecret(MNEMONIC_KEY)
 export const setPassword = (password) => setSecret(PASSWORD_KEY, password)
 /** @returns {Promise<string | null>} */
 export const getPassword = () => getSecret(PASSWORD_KEY)
-/** @returns {Promise<void>} */
+/** @returns {Promise<boolean>} true when the secret is gone from the store. */
 export const deletePassword = () => deleteSecret(PASSWORD_KEY)
 
 /* ----------------------------- recovered key ----------------------------- */
@@ -274,7 +300,7 @@ export const deleteSnapshot = () => deleteSecret(SNAPSHOT_KEY)
 export const setRecoveredKey = (wif) => setSecret(RECOVERED_KEY, wif)
 /** @returns {Promise<string | null>} */
 export const getRecoveredKey = () => getSecret(RECOVERED_KEY)
-/** @returns {Promise<void>} */
+/** @returns {Promise<boolean>} true when the secret is gone from the store. */
 export const deleteRecoveredKey = () => deleteSecret(RECOVERED_KEY)
 
 /** Drops the in-memory copy; the file is untouched. Test seam. */
