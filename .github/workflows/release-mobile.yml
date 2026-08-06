@@ -3,22 +3,17 @@
 #
 # Three legs:
 #
-#   aab              production AAB on EAS's builders, attached to the tag's draft
-#                    GitHub release. Upload it to Play yourself.
+#   aab              production AAB on EAS's builders, auto-submitted to Play's
+#                    INTERNAL testing track, and also attached to the tag's draft
+#                    GitHub release.
 #
-#                    It used to carry --auto-submit, which needs a Google service
-#                    account: a robot account whose JSON key lets EAS push to Play
-#                    with no human present. v0.1.0 died on exactly that —
-#                    "Google Service Account Keys cannot be set up in
-#                    --non-interactive mode" — and we chose not to create one. The
-#                    cost is one drag-and-drop per release into Play Console →
-#                    Internal testing → Create new release; the saving is one fewer
-#                    credential with standing upload rights to the store.
-#
-#                    If that trade stops being worth it, restore --auto-submit and
-#                    assign the key under expo.dev → credentials → Android → Google
-#                    Service Account Key for Play Store Submissions. Nothing else
-#                    here has to change.
+#                    v0.1.0 died here on "Google Service Account Keys cannot be set
+#                    up in --non-interactive mode". The account now exists and its
+#                    key is in EAS credentials. Its Play permissions are scoped so
+#                    that "Release to production" is NOT granted — the most this
+#                    credential can do is reach internal testers. Promotion to
+#                    production stays a human act in Play Console, by design and now
+#                    also by permission.
 #
 #   stores-ios       production IPA on EAS's builders, auto-submitted to TestFlight.
 #                    eas.json now carries submit.production.ios.ascAppId
@@ -91,10 +86,19 @@ jobs:
       - name: bundle the chrome
         run: npm run ui:bundle
 
-      - name: build AAB
+      # --auto-submit is back: the Google service account exists now
+      # (play-store-service-account@bsva-469618), its key is in EAS credentials, and a
+      # submission of build 4c1933cd proved the path end to end before this landed.
+      # Its Play permissions deliberately exclude "Release to production", so the worst
+      # this key can do is put a build in front of internal testers.
+      #
+      # The AAB is STILL downloaded and attached to the draft release. Auto-submit sends
+      # it to internal testing; the attachment is what you archive, hand to someone
+      # without Play access, or upload by hand the day EAS is down.
+      - name: build AAB and submit to Play internal testing
         working-directory: apps/mobile
         run: |
-          eas build --platform android --profile production --non-interactive --json > build.json
+          eas build --platform android --profile production --non-interactive --auto-submit --json > build.json
           URL=$(node -p "JSON.parse(require('fs').readFileSync('build.json','utf8'))[0].artifacts.buildUrl")
           curl -fL "$URL" -o "Nexus-${GITHUB_REF_NAME}.aab"
 
