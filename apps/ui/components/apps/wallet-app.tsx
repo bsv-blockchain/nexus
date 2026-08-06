@@ -275,7 +275,16 @@ export function WalletApp(): ReactNode {
                     live
                       ? setPayOpen("get")
                       : setWalletIntent({ kind: "receive" }),
-                  onExchange: () => setWalletIntent({ kind: "exchange" }),
+                  /*
+                   * Exchange exists in the demo and nowhere else. There is no rail
+                   * behind it on a real wallet, so it rendered as a third button
+                   * whose only outcome was "not available yet" — a control that
+                   * spends a tap to say no. Portfolio drops any action with no
+                   * handler, so omitting it here is what hides it.
+                   */
+                  ...(fixtureSheets
+                    ? { onExchange: () => setWalletIntent({ kind: "exchange" }) }
+                    : {}),
                 })}
           />
         );
