@@ -59,6 +59,21 @@ export interface DesktopWalletDeps {
    * become 'confirmed' without the user navigating away and back.
    */
   onTransactionStatusChanged?: () => void
+  /**
+   * A page wants to spend, and the permissions manager wants an answer.
+   *
+   * Supplied by host.mjs, which owns the threshold, the queue and the push to the
+   * chrome. Bound below rather than left unbound: the manager BLOCKS the page's
+   * createAction until this is granted or denied, so leaving it unbound is not a
+   * safe default — it is a payment that never resolves.
+   */
+  onSpendingAuthorizationRequested?: (request: {
+    requestID: string
+    originator: string
+    reason?: string
+    renewal?: boolean
+    spending: { satoshis: number; lineItems?: unknown[] }
+  }) => void
 }
 
 export interface DesktopWallet {
@@ -192,7 +207,13 @@ export async function buildDesktopWallet(
   privilegedKeyManager: PrivilegedKeyManager,
   deps: DesktopWalletDeps
 ): Promise<DesktopWallet> {
-  const { databaseDir, chain, adminOriginator, onTransactionStatusChanged } = deps
+  const {
+    databaseDir,
+    chain,
+    adminOriginator,
+    onTransactionStatusChanged,
+    onSpendingAuthorizationRequested
+  } = deps
 
   const keyDeriver = new KeyDeriver(new PrivateKey(primaryKey))
   const identityKey = keyDeriver.identityKey
@@ -234,14 +255,29 @@ export async function buildDesktopWallet(
     differentiatePrivilegedOperations: true,
     seekBasketInsertionPermissions: false,
     seekBasketListingPermissions: false,
-    // No prompt surface exists in main yet, so nothing may DEPEND on a human
-    // answering. These four are the ones mobile also auto-grants; the rest keep
-    // their defaults and will refuse rather than hang.
+    // These four are the ones mobile also auto-grants; the rest keep their
+    // defaults and will refuse rather than hang. Spending is NOT among them —
+    // see the binding below.
     seekPermissionsForPublicKeyRevelation: false,
     seekPermissionsForIdentityKeyRevelation: false,
     seekPermissionsForKeyLinkageRevelation: false,
     seekPermissionsForIdentityResolution: false
   })
+
+  /*
+   * Spending asks a human, on this shell too.
+   *
+   * This used to be unbound, with a comment saying main had no prompt surface —
+   * true when it was written, and no longer: the chrome renders the sheet and
+   * answers over permission.resolve. Leaving it unbound was never neutral. An
+   * unbound onSpendingAuthorizationRequested means the manager raises a request
+   * nothing consumes and holds the page's createAction open forever, so the
+   * difference between the two shells was not "desktop asks less" but "desktop
+   * hangs instead of asking".
+   */
+  if (onSpendingAuthorizationRequested) {
+    manager.bindCallback('onSpendingAuthorizationRequested', onSpendingAuthorizationRequested as any)
+  }
 
   const monitor = buildMonitor({ chain, storageManager, services, storage, onTransactionStatusChanged })
 
