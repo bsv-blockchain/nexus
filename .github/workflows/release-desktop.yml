@@ -239,17 +239,29 @@ jobs:
         shell: cmd
         run: smctl windows certsync
 
+      # This step signs MORE than it was written to. `smctl windows certsync` above
+      # installs the KeyLocker certificate into the Windows certificate store, and
+      # electron-builder's automatic signtool discovery then finds it with no
+      # configuration at all. The v0.1.0 log is unambiguous:
+      #
+      #   • signing with signtool.exe  path=out\win-unpacked\Nexus.exe
+      #   • signing with signtool.exe  path=out\win-unpacked\resources\elevate.exe
+      #   • signing with signtool.exe  path=out\Nexus-Setup-0.1.0.__uninstaller.exe
+      #   • signing with signtool.exe  path=out\Nexus-Setup-0.1.0.exe
+      #
+      # An earlier comment here claimed the opposite — that nothing was configured, so
+      # only the outer installer got signed and the inner binaries shipped unsigned,
+      # inherited from bsv-desktop. That was never true of this pipeline. It is
+      # recorded because the belief would have sent someone to "fix" a signing path
+      # that already works, and the fix would have been to configure the certificate
+      # a second way.
+      #
+      # The consequence worth keeping in mind: inner-binary signing depends on
+      # certsync having succeeded, and electron-builder only WARNS when it finds no
+      # certificate. The verify step below therefore checks an inner binary too, not
+      # just the installer the explicit signing pass covers.
       - name: build (Windows)
         if: matrix.platform == 'windows-2022'
-        # Built unsigned — electron-builder attempts Windows signing only when a
-        # certificate is configured (win.signtoolOptions / CSC_LINK), and none is.
-        # (The reference sets CSC_IDENTITY_AUTO_DISCOVERY=false here, but that flag
-        # is consulted by the macOS signer only; it is dropped rather than cargo-culted.)
-        # The installer is then signed below, against the KeyLocker cert — the same
-        # post-build split bsv-desktop ships with. Known, inherited limitation of that
-        # split: the binaries INSIDE the installer (Nexus.exe, the uninstaller,
-        # elevate.exe) remain unsigned; fixing that means signing during packaging via
-        # win.signtoolOptions, a deliberate divergence to take up separately.
         working-directory: apps/desktop
         run: npx electron-builder --win --x64 --publish never
 
@@ -274,6 +286,17 @@ jobs:
             & $signtool verify /pa "$file"
             if ($LASTEXITCODE -ne 0) { throw "Verification failed for $file" }
           }
+
+          # The app the user actually runs after installing. It is signed during
+          # packaging, by electron-builder's own signtool discovery against the
+          # certsynced certificate — which only WARNS when it finds nothing. Without
+          # this check, a certsync that silently stopped working would still produce a
+          # green build and a correctly signed installer that plants an unsigned exe.
+          $inner = "apps/desktop/out/win-unpacked/Nexus.exe"
+          if (-not (Test-Path $inner)) { throw "Missing $inner — packaging layout changed" }
+          Write-Host "--- Verifying (packaged during build): $inner ---"
+          & $signtool verify /pa $inner
+          if ($LASTEXITCODE -ne 0) { throw "Nexus.exe inside the installer is not signed - did 'smctl windows certsync' succeed?" }
 
       - name: upload Windows artifacts
         if: matrix.platform == 'windows-2022'

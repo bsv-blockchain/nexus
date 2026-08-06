@@ -2,6 +2,7 @@
   "name": "nexus",
   "private": true,
   "version": "0.1.0",
+  "license": "Apache-2.0",
   "description": "Nexus \u2014 BSV wallet + browser across mobile and desktop",
   "workspaces": [
     "apps/desktop",

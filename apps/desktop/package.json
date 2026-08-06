@@ -1,9 +1,11 @@
 {
   "name": "@nexus/desktop",
   "version": "0.1.0",
+  "license": "Apache-2.0",
   "private": true,
   "description": "Nexus desktop shell — Electron, WebContentsView per tab.",
   "homepage": "https://github.com/bsv-blockchain/nexus",
+  "desktopName": "org.bsvassociation.nexus.desktop",
   "type": "module",
   "main": "dist-electron/main.cjs",
   "scripts": {
@@ -92,7 +94,10 @@
       "icon": "build/icon.png",
       "maintainer": "BSV Association",
       "executableName": "nexus",
-      "artifactName": "${productName}-${version}-${arch}.${ext}"
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "synopsis": "BSV wallet and browser",
+      "packageCategory": "net",
+      "syncDesktopName": true
     },
     "electronVersion": "43.2.0",
     "dmg": {
