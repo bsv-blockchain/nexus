@@ -119,16 +119,47 @@ In `useWalletBridge.ts` (same method-table pattern, same `ref.current` idiom):
 - Capabilities (`preload-chrome.cjs:22`): add `'settings'`, and `'tx'` if
   workstream D2 lands.
 
-### D2 (stretch, independently landable): desktop `tx.*`
+### D2 (landed): desktop `tx.*`
 
 Port the six `tx.*` methods from `usePayBridge.ts:408-478` into a desktop
 `payHost.mjs`: `tx.list`, `tx.abort`, `tx.refreshProof`, `tx.rawHex`,
 `tx.exportCsv`, `tx.explorerUrl`. All are storage/services reads — no Monitor,
 no outbox, no radios. Declare `'tx'`. The chrome's live `<Transactions/>`
-pager then works on desktop. `pay.*` stays absent: the chrome must hide
-Send/Receive in live mode when `!can('pay')` (today it opens FIXTURE sheets —
-on a shipping build those render fixture contacts or nothing; hiding is honest,
-porting the pay rails to desktop is its own future spec).
+pager then works on desktop.
+
+### D3 (landed, `f577b9d`): desktop `pay.*`
+
+This section said pay rails were "its own future spec". They were, and it was
+short, because the logic is already platform-agnostic in
+`packages/wallet-core/src/utils/pay/**` — the mobile hook is a wrapper, so the
+desktop host is a second wrapper rather than a second implementation.
+
+Seventeen methods: `classify`, `validateAddress`, `copyKeys`, the four
+`address.*`, the nine `handle.*`, `proofNudge`, plus `offline.status` /
+`offline.sendNow` from the Monitor work. `nearby.open` is NOT ported — it drives
+two local radios Electron main has no path to.
+
+The Monitor came first because the rails need it, and it is built by
+`buildWallet.ts` but started by `host.mjs`, which stops it at sign out, network
+switch and `before-quit`. That answers the original objection (a factory that
+starts timers leaves the caller unable to stop them) rather than bypassing it.
+
+No SSE on desktop: Electron 43 main is Node 24.18, where `EventSource` sits
+behind `--experimental-eventsource`, and `ArcSSEClient` passes
+react-native-sse-shaped options the WHATWG class would ignore — dropping
+Last-Event-ID and the ARC key. Desktop polls instead. Adding SSE means a
+dependency or an upstream change, not a flag.
+
+Still absent on desktop: the background address sweeper. `pay.address.receive`
+writes the watchlist, so a sweeper landing later is correct from day one, but
+today an incoming address payment credits when the user presses "Check this
+address now" rather than on arrival.
+
+Consequence for the chrome, and the reason two defects existed: declaring `pay`
+makes the payment grid render, and two of its six cells are hardware. Rails must
+be gated on capability — `can('nearby')` for the nearby cells, `can('scan')` for
+`ScanButton` — because `payHost()`/`scanHost()` throw rather than returning null,
+so an ungated control's only outcome is a raw bridge error.
 
 ## Chrome (apps/ui)
 
@@ -177,12 +208,25 @@ porting the pay rails to desktop is its own future spec).
 
 ## Out of scope, recorded
 
-- Desktop pay.* rails (Send/Receive on desktop) — own spec; requires Monitor/
-  outbox strategy in Electron main (bsv-desktop forks a monitor child process:
-  `electron/monitor-worker.ts` — the reference when we do it).
+- **Desktop background address sweeper.** The only piece of the pay port
+  deliberately left out: `wallet-core`'s sweeper is driven by mobile's
+  WalletContext rather than by the Monitor, so wiring it is its own change.
+  Until then an incoming address payment credits on a manual check.
+- **Desktop biometrics.** Keys sit in the OS keychain via `safeStorage`, with no
+  presence check in front of them. bsv-desktop's `electron/vault.ts` (AES-GCM
+  under a scrypt-wrapped DEK) plus `electron/biometric.ts` (macOS
+  `promptTouchID`) is the reference, and its own notes are honest that TouchID
+  there proves presence rather than holding a Secure Enclave key.
+- **Desktop SSE** — see D3. Needs a dependency or an upstream `ArcSSEClient`
+  that accepts a WHATWG-shaped EventSource.
+- Mobile's `TaskCheckForProofs`/`TaskUnFail` patches live inline in
+  WalletContext and were not duplicated into desktop; extracting them into
+  wallet-core beside `configureNewHeaderPolling` would serve both shells.
+- Exchange has no live path on any platform — the fixture sheet is the only
+  implementation, and it is demo-only now, so live builds simply lack the action.
 - Passphrase (BIP-39 25th word), Shamir shares UI (wallet-core has
   `backupShares.ts`, zero callers), DB export/import, ARC override UI,
-  trust-network UI, currency setting, vault/TouchID on desktop.
+  trust-network UI, currency setting.
 - The mobile-browser SettingsSheet (browser sheet fiction, demo-only).
 
 ## Verification gates
