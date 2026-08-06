@@ -31,7 +31,8 @@ import { useCommandEffects } from "@/lib/use-command-effects";
 import { useActivity } from "@/lib/wallet-live";
 import { PaySheet, type Direction } from "@/components/apps/wallet/pay-flow";
 import { Transactions } from "@/components/apps/wallet/transactions";
-import { payAvailable } from "@/lib/pay-data";
+import { resolveDataMode } from "@/lib/data-mode";
+import { can, payAvailable } from "@/lib/pay-data";
 import { DEMO_SURFACES } from "@/lib/surfaces";
 import {
   Coins,
@@ -42,7 +43,7 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 /**
  * Canvas sections. The sidebar renders these on desktop, tabs on mobile.
@@ -113,6 +114,16 @@ export function WalletApp(): ReactNode {
    * build work, and they never touch a wallet.
    */
   const live = payAvailable();
+  /*
+   * A live wallet on a shell with no pay rails (desktop today). The fixture
+   * sheets are the only thing Send/Receive/Exchange could open there —
+   * invented contacts next to a real balance — so the actions disappear
+   * instead. Porting the rails to that shell is its own spec.
+   */
+  const hidePayActions = resolveDataMode() === "live" && !can("pay");
+  // The live Activity pager needs only the ledger (tx.*), not the pay rails —
+  // desktop has the former and not yet the latter.
+  const liveActivity = live || (resolveDataMode() === "live" && can("tx"));
   const [payOpen, setPayOpen] = useState<Direction | null>(null);
   const [detail, setDetail] = useState<{
     section: WalletSection;
@@ -155,6 +166,27 @@ export function WalletApp(): ReactNode {
     ? (transactions.find((tx) => tx.id === txId) ?? null)
     : null;
 
+  /*
+   * The fixture sheets render only in demo mode, but walletIntent arrives from
+   * places that do not know which mode this is — the sidebar's docked
+   * Send/Receive, TokenDetail's buttons. In live mode the intent is translated
+   * here instead: to the real PaySheet when the shell has pay rails, to an
+   * honest refusal when it does not. Without this, a docked Send on a live
+   * wallet opened a fixture sheet full of invented contacts.
+   */
+  const fixtureSheets = activity.mode === "demo";
+  useEffect(() => {
+    if (!walletIntent || fixtureSheets) return;
+    if (live) {
+      if (walletIntent.kind === "send") setPayOpen("pay");
+      else if (walletIntent.kind === "receive") setPayOpen("get");
+      else toast.info("Exchange is not available yet.");
+    } else {
+      toast.info("Payments are not available on this device yet.");
+    }
+    setWalletIntent(null);
+  }, [walletIntent, fixtureSheets, live, setWalletIntent]);
+
   const go = (section: WalletSection): void => {
     setWalletSection(section);
     setDetail(null);
@@ -194,9 +226,11 @@ export function WalletApp(): ReactNode {
       case "activity":
         // Live: the wallet's own ledger, with the status mapping and per-row
         // actions the source app had. Demo: the fixture history, unchanged.
+        // Gated on the tx capability, not payAvailable(): the pager only reads
+        // the ledger, and desktop ships tx.* without the pay rails.
         return (
           <div className="mx-auto w-full max-w-2xl">
-            {live ? (
+            {liveActivity ? (
               <Transactions />
             ) : (
               <>
@@ -233,11 +267,16 @@ export function WalletApp(): ReactNode {
         return (
           <Portfolio
             onOpenToken={openToken}
-            onSend={() => (live ? setPayOpen("pay") : send())}
-            onReceive={() =>
-              live ? setPayOpen("get") : setWalletIntent({ kind: "receive" })
-            }
-            onExchange={() => setWalletIntent({ kind: "exchange" })}
+            {...(hidePayActions
+              ? {}
+              : {
+                  onSend: () => (live ? setPayOpen("pay") : send()),
+                  onReceive: () =>
+                    live
+                      ? setPayOpen("get")
+                      : setWalletIntent({ kind: "receive" }),
+                  onExchange: () => setWalletIntent({ kind: "exchange" }),
+                })}
           />
         );
     }
@@ -292,29 +331,47 @@ export function WalletApp(): ReactNode {
         onClose={() => setPayOpen(null)}
       />
 
-      <SendSheet
-        open={walletIntent?.kind === "send"}
-        tokenId={walletIntent?.tokenId ?? "bsv"}
-        presetPersonId={walletIntent?.personId ?? null}
-        onClose={closeIntent}
-        onSend={({ token, units, person }) => {
-          recordPayment({
-            person,
-            sats: token.base ? Math.round(units * 100_000_000) : 0,
-            memo: copy.sentFromWallet,
-            accountId: account.id,
-            ...(token.base ? {} : { token: { id: token.id, units } }),
-          });
-          closeIntent();
-          toast.success(`${copy.sent} ${person.name}`);
-        }}
-      />
+      {/* Demo only — in live mode the translation effect above consumes the
+          intent before these could open, and mounting them at all would put
+          fixture contacts one state-glitch away from a real wallet. */}
+      {fixtureSheets ? (
+        <>
+          <SendSheet
+            open={walletIntent?.kind === "send"}
+            tokenId={walletIntent?.tokenId ?? "bsv"}
+            presetPersonId={walletIntent?.personId ?? null}
+            onClose={closeIntent}
+            onSend={({ token, units, person }) => {
+              recordPayment({
+                person,
+                sats: token.base ? Math.round(units * 100_000_000) : 0,
+                memo: copy.sentFromWallet,
+                accountId: account.id,
+                ...(token.base ? {} : { token: { id: token.id, units } }),
+              });
+              closeIntent();
+              toast.success(`${copy.sent} ${person.name}`);
+            }}
+          />
 
-      <ReceiveSheet
-        open={walletIntent?.kind === "receive"}
-        tokenId={walletIntent?.tokenId ?? "bsv"}
-        onClose={closeIntent}
-      />
+          <ReceiveSheet
+            open={walletIntent?.kind === "receive"}
+            tokenId={walletIntent?.tokenId ?? "bsv"}
+            onClose={closeIntent}
+          />
+
+          <ExchangeSheet
+            open={walletIntent?.kind === "exchange"}
+            onClose={closeIntent}
+            onExchange={({ from, to, fromUnits, toUnits }) => {
+              closeIntent();
+              toast.success(
+                `${copy.exchanged} ${fromUnits} ${from.symbol} → ${toUnits.toFixed(2)} ${to.symbol}`,
+              );
+            }}
+          />
+        </>
+      ) : null}
 
       <Sheet
         open={Boolean(whois)}
@@ -323,17 +380,6 @@ export function WalletApp(): ReactNode {
       >
         {whois && <WhoisCard person={whois} />}
       </Sheet>
-
-      <ExchangeSheet
-        open={walletIntent?.kind === "exchange"}
-        onClose={closeIntent}
-        onExchange={({ from, to, fromUnits, toUnits }) => {
-          closeIntent();
-          toast.success(
-            `${copy.exchanged} ${fromUnits} ${from.symbol} → ${toUnits.toFixed(2)} ${to.symbol}`,
-          );
-        }}
-      />
     </div>
     </ProfileActionsProvider>
   );

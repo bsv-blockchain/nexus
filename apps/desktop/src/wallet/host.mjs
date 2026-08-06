@@ -1,13 +1,15 @@
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { generateMnemonicWallet } from '@nexus/wallet-core/src/utils/mnemonicWallet'
 import { restoreDesktopWallet } from './buildWallet.ts'
+import { createPayHost } from './payHost.mjs'
 import { createLocalStorage } from '../platform/index.mjs'
 import { installDesktopOnlineProbe } from '../platform/onlineProbe.mjs'
 
 /**
  * The desktop wallet, as the chrome sees it.
  *
- * The mobile shell answers these same four methods from
+ * The mobile shell answers these same methods from
  * apps/mobile/src/wallet/useWalletBridge.ts. This is the Electron half: identical
  * method names, identical return shapes, so `apps/ui` needs no branch and the
  * capability list is the only thing that differs between shells.
@@ -20,6 +22,9 @@ import { installDesktopOnlineProbe } from '../platform/onlineProbe.mjs'
 const SATS_PER_BSV = 100_000_000
 const ACCOUNT_ID = 'default'
 const ADMIN_ORIGINATOR = 'admin.com'
+// Key-value key for the chosen chain. Plain storage, not the keychain: which
+// network the user looks at is a preference, not a secret.
+const NETWORK_KEY = 'network'
 
 /** A base64 reference masquerading as a description; see the mobile bridge. */
 const LOOKS_LIKE_A_REFERENCE = /^[A-Za-z0-9+/]{16,}={0,2}$/
@@ -46,6 +51,19 @@ export function createWalletHost({ userDataDir, onStateChange }) {
 
   const publish = () => onStateChange?.({ ready: wallet !== null, building })
 
+  /**
+   * The persisted chain choice, 'main' when nothing (or nonsense) is stored.
+   *
+   * Read per call rather than cached: settings.setNetwork writes through the same
+   * key-value store, and a cache here would be a second source of truth that
+   * survives it. Anything unrecognised collapses to 'main' so an old build reading
+   * a future value degrades to the default instead of refusing to start.
+   */
+  const currentNetwork = async () => {
+    const stored = await localStorage.getItem(NETWORK_KEY)
+    return stored === 'test' ? 'test' : 'main'
+  }
+
   const require_ = () => {
     if (!wallet) throw new Error('wallet is not ready')
     return wallet
@@ -54,11 +72,22 @@ export function createWalletHost({ userDataDir, onStateChange }) {
   /** Admin-originator call into our own wallet, for what the chrome asks on its own behalf. */
   const asAdmin = (fn) => fn(require_().manager, ADMIN_ORIGINATOR)
 
+  // The tx.* surface reads through the same wallet. Getters, not snapshots:
+  // restore, logout and setNetwork all swap `wallet` (and the chain) at runtime.
+  const payHost = createPayHost({
+    getWallet: () => wallet,
+    getNetwork: currentNetwork,
+    adminOriginator: ADMIN_ORIGINATOR
+  })
+
   return {
     /** For the shell: whether a wallet exists, so it can decide what to show. */
     get isReady() {
       return wallet !== null
     },
+
+    /** tx.* as a separate table, so main.mjs wires (and a reader audits) it as a unit. */
+    payMethods: payHost.methods,
 
     methods: {
       'wallet.info': async () => {
@@ -76,9 +105,7 @@ export function createWalletHost({ userDataDir, onStateChange }) {
           available: true,
           ready: wallet !== null,
           building,
-          // Only mainnet is offered here for now. Saying 'main' when the build is
-          // hardcoded to it is honest; a settings surface can widen it later.
-          network: 'main',
+          network: await currentNetwork(),
           identityKey
         }
       },
@@ -156,7 +183,7 @@ export function createWalletHost({ userDataDir, onStateChange }) {
         try {
           wallet = await restoreDesktopWallet(phrase, {
             databaseDir,
-            chain: 'main',
+            chain: await currentNetwork(),
             adminOriginator: ADMIN_ORIGINATOR
           })
           // Only after the wallet is proven to build. Storing a phrase that turned
@@ -171,6 +198,109 @@ export function createWalletHost({ userDataDir, onStateChange }) {
           building = false
           publish()
         }
+      },
+
+      'wallet.create': async () => {
+        // Refuse before generating anything: creating over live keys is a wipe.
+        // A stored phrase counts even with no wallet built from it yet (a locked
+        // keychain at resume, say) — the setMnemonic below would overwrite it
+        // irrecoverably.
+        if (wallet || building) {
+          throw new Error('a wallet already exists on this device — sign out first')
+        }
+        if (await localStorage.getMnemonic()) {
+          throw new Error('a recovery phrase is already stored on this device — sign out first')
+        }
+
+        const { mnemonic } = generateMnemonicWallet()
+        building = true
+        publish()
+        try {
+          wallet = await restoreDesktopWallet(mnemonic, {
+            databaseDir,
+            chain: await currentNetwork(),
+            adminOriginator: ADMIN_ORIGINATOR
+          })
+          // Same order as restore: never store a phrase the build has not proven out.
+          const stored = await localStorage.setMnemonic(mnemonic)
+          if (!stored) {
+            console.warn('[wallet] created, but the phrase could not be stored: no OS keychain')
+          }
+          return { ok: true, mnemonic, storedSecurely: stored }
+        } finally {
+          building = false
+          publish()
+        }
+      },
+
+      'wallet.backup': async () => {
+        // No biometric gate on desktop (vault/TouchID is out of scope this pass);
+        // the OS keychain is the whole of the protection here. The chrome renders
+        // the phrase once and must never persist it.
+        const mnemonic = await localStorage.getMnemonic()
+        if (!mnemonic) throw new Error('no recovery phrase is stored on this device')
+        return { mnemonic }
+      },
+
+      'wallet.logout': async () => {
+        // Keys and managers go; the ledger databases stay. Transaction history is
+        // not a secret, and a re-restore onto this device should find it waiting.
+        wallet = null
+        await localStorage.deleteMnemonic()
+        await localStorage.deleteSnap()
+        await localStorage.deleteRecoveredKey()
+        await localStorage.deletePassword()
+        publish()
+        return { ok: true }
+      },
+
+      'settings.get': async () => {
+        // encryptionStatus is the honest answer to "can this machine keep a
+        // secret"; the chrome owns the warning copy. No messageBoxUrl on desktop:
+        // nothing here reads one, and reporting a URL would imply the pay rails
+        // exist.
+        const status = await localStorage.encryptionStatus()
+        return {
+          network: await currentNetwork(),
+          networks: ['main', 'test'],
+          secure: {
+            storedSecurely: status.available,
+            method: status.available ? 'keychain' : 'none'
+          }
+        }
+      },
+
+      'settings.setNetwork': async (params) => {
+        const network = params?.network
+        if (network !== 'main' && network !== 'test') {
+          throw new Error(`unknown network "${network}" — offered chains are 'main' and 'test'`)
+        }
+        if (building) throw new Error('the wallet is still building; try again shortly')
+
+        // Persist first: even if the rebuild below fails, the next launch should
+        // come up on the chain the user chose rather than silently reverting.
+        await localStorage.setItem(NETWORK_KEY, network)
+
+        const phrase = await localStorage.getMnemonic()
+        if (phrase) {
+          // Teardown + rebuild, not mutation: the chain decides which database and
+          // which services the whole stack points at. Same class of work as
+          // restore, and the same phrase finds its per-chain database by name.
+          wallet = null
+          building = true
+          publish()
+          try {
+            wallet = await restoreDesktopWallet(phrase, {
+              databaseDir,
+              chain: network,
+              adminOriginator: ADMIN_ORIGINATOR
+            })
+          } finally {
+            building = false
+            publish()
+          }
+        }
+        return { ok: true }
       }
     },
 
@@ -188,7 +318,7 @@ export function createWalletHost({ userDataDir, onStateChange }) {
         publish()
         wallet = await restoreDesktopWallet(phrase, {
           databaseDir,
-          chain: 'main',
+          chain: await currentNetwork(),
           adminOriginator: ADMIN_ORIGINATOR
         })
       } catch (err) {

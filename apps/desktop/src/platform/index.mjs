@@ -77,6 +77,11 @@ export function createLocalStorage() {
     },
     deleteSnap: async () => {
       try {
+        // Both locations. setSnap writes the KEYCHAIN (see the header), so deleting
+        // only the key-value copy left the real snapshot behind and a logged-out
+        // wallet could resume on the next launch. The legacy plaintext key goes
+        // too, for stores written by earlier builds.
+        await secureStore.deleteSnapshot()
         await keyValue.removeItem(SNAP_KEY)
       } catch (err) {
         console.warn('[deleteSnap]', err)

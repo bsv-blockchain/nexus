@@ -24,6 +24,13 @@ type NexusHost = {
     accounts: () => Promise<WalletAccount[]>;
     transactions: (opts?: { accountId?: string; limit?: number }) => Promise<WalletTransaction[]>;
     restore?: (mnemonic: string) => Promise<{ ok: boolean }>;
+    create?: () => Promise<{ ok: boolean; mnemonic: string }>;
+    backup?: () => Promise<{ mnemonic: string }>;
+    logout?: () => Promise<{ ok: boolean }>;
+  };
+  settings?: {
+    get: () => Promise<HostSettings>;
+    setNetwork: (network: "main" | "test") => Promise<{ ok: boolean }>;
   };
   setOverlay?: (open: boolean) => Promise<unknown>;
 };
@@ -33,8 +40,25 @@ export interface WalletInfo {
   available: boolean;
   /** True once keys are loaded and the wallet can answer queries. */
   ready: boolean;
+  /** True while keys are still deriving — "give it a moment", not "no wallet here". */
+  building?: boolean;
   network?: "main" | "test";
   identityKey?: string;
+}
+
+/** What the shell answers to settings.get; see packages/bridge/src/protocol.js. */
+export interface HostSettings {
+  network: "main" | "test";
+  networks: ("main" | "test")[];
+  messageBoxUrl?: string;
+  /**
+   * How the shell keeps the phrase. `none` means plain disk — the Settings
+   * surface must say so out loud rather than let the UI imply a keychain.
+   */
+  secure: {
+    storedSecurely: boolean;
+    method: "keychain-biometric" | "keychain" | "none";
+  };
 }
 
 function host(): NexusHost | null {
@@ -138,6 +162,63 @@ export async function restoreWallet(mnemonic: string): Promise<void> {
   const wallet = host()?.wallet;
   if (!wallet?.restore) throw new Error("this shell cannot restore a wallet");
   await wallet.restore(mnemonic);
+}
+
+/**
+ * Ask the shell to generate and store a brand-new wallet.
+ *
+ * The same trust split as restore, in the other direction: the shell owns
+ * generation and the keychain, and hands the words across this boundary exactly
+ * once so the user can write them down. Callers render them and let go — the
+ * phrase must not outlive the screen that shows it.
+ */
+export async function createWallet(): Promise<{ ok: boolean; mnemonic: string }> {
+  const wallet = host()?.wallet;
+  if (!wallet?.create) throw new Error("this shell cannot create a wallet");
+  return wallet.create();
+}
+
+/**
+ * The stored recovery phrase, for the backup screen.
+ *
+ * Gated by the platform's biometric prompt where there is one, so the call can
+ * sit waiting on a human. Same rule as create: render, never persist.
+ */
+export async function revealBackup(): Promise<{ mnemonic: string }> {
+  const wallet = host()?.wallet;
+  if (!wallet?.backup) throw new Error("this shell cannot reveal a recovery phrase");
+  return wallet.backup();
+}
+
+/**
+ * Delete this device's key material and tear the wallet down.
+ *
+ * The ledger databases stay behind on purpose — history is not a secret, and a
+ * re-restore onto the same device should find it waiting. The shell publishes
+ * wallet.state afterwards, which is what puts the onboarding gate back up; no
+ * navigation happens here.
+ */
+export async function logoutWallet(): Promise<void> {
+  const wallet = host()?.wallet;
+  if (!wallet?.logout) throw new Error("this shell cannot sign out");
+  await wallet.logout();
+}
+
+export async function readSettings(): Promise<HostSettings> {
+  const settings = host()?.settings;
+  if (!settings) throw new Error("this shell has no settings surface");
+  return settings.get();
+}
+
+/**
+ * Switch chains. This tears the whole manager stack down and rebuilds it, so
+ * callers should re-read settings afterwards — the answer is the only proof the
+ * switch actually took.
+ */
+export async function setNetwork(network: "main" | "test"): Promise<void> {
+  const settings = host()?.settings;
+  if (!settings) throw new Error("this shell cannot switch networks");
+  await settings.setNetwork(network);
 }
 
 /**

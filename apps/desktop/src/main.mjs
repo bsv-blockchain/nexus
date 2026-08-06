@@ -55,6 +55,16 @@ const CHROME_URL = process.env.NEXUS_CHROME_URL ?? null
 // already resolved by the time it takes effect.
 app.setName('Nexus')
 
+/**
+ * Dev harness only, like NEXUS_EVAL below: point the whole app at a throwaway
+ * userData directory. Wallet tests exercise create/logout, and running those
+ * against the developer's real profile would delete the stored phrase of a
+ * funded wallet. Packaged apps never see this variable.
+ */
+if (process.env.NEXUS_USER_DATA) {
+  app.setPath('userData', process.env.NEXUS_USER_DATA)
+}
+
 let win = null
 let tabManager = null
 let router = null
@@ -97,6 +107,9 @@ function createWindow() {
         tabCount: tabManager.count()
       }),
       ...walletHost.methods,
+      // tx.* — the desktop port of the mobile pay bridge's transaction surface;
+      // see src/wallet/payHost.mjs for what it deliberately leaves out.
+      ...walletHost.payMethods,
       [METHODS.TAB_CREATE]: ({ url, options }) => tabManager.create(url, options),
       [METHODS.TAB_DESTROY]: ({ id }) => tabManager.destroy(id),
       [METHODS.TAB_NAVIGATE]: ({ id, url }) => tabManager.navigate(id, url),

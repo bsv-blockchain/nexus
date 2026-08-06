@@ -13,13 +13,14 @@ const client = createHostClient({
   channel: CHANNEL,
   shell: 'electron',
   platform: process.platform,
-  // Only what main.mjs actually registers. 'wallet' is now real: the manager stack
-  // is built in the main process and answers wallet.info/accounts/transactions/
-  // restore. Still absent, deliberately: 'pay' and 'tx' (the rails are not wired
-  // yet), 'scan' (no camera path) and 'nearby' (no local radios). Declaring the
-  // truth is what lets the chrome hide a surface instead of rendering one whose
-  // every button answers "unknown method".
-  capabilities: ['tabs', 'wallet'],
+  // Only what main.mjs actually registers. 'wallet' is the manager stack built in
+  // the main process; 'settings' and 'tx' are the wallet-settings and transaction
+  // surfaces beside it (src/wallet/host.mjs, payHost.mjs). Still absent,
+  // deliberately: 'pay' (no rails in Electron main yet), 'scan' (no camera path)
+  // and 'nearby' (no local radios). Declaring the truth is what lets the chrome
+  // hide a surface instead of rendering one whose every button answers "unknown
+  // method".
+  capabilities: ['tabs', 'wallet', 'settings', 'tx'],
   post: (msg) => ipcRenderer.send('nexus:host:out', msg)
 })
 

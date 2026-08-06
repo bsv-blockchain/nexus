@@ -17,6 +17,7 @@ import {
   Gift,
   Layers,
   LayoutGrid,
+  Settings,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -67,8 +68,14 @@ export function MobileSheet(): ReactNode {
 }
 
 function MobileSheetContent(): ReactNode {
-  const { setMobileSheetOpen, installedApps, openApp, spaces, openShare } =
-    useHub();
+  const {
+    setMobileSheetOpen,
+    installedApps,
+    openApp,
+    spaces,
+    openShare,
+    openSettings,
+  } = useHub();
   const [view, setView] = useState<SheetView>({ kind: "root" });
   const installed = getHubApps().filter((app) =>
     installedApps.includes(app.slug),
@@ -166,6 +173,18 @@ function MobileSheetContent(): ReactNode {
             )}
 
             <div className="my-2 h-px bg-border" aria-hidden="true" />
+
+            {/* The desktop rail's gear does not exist below md, and Settings is
+                where backup and sign-out live — a phone without this row has no
+                path to its own recovery phrase. */}
+            <RootRow
+              label={content.settings.title}
+              icon={Settings}
+              onClick={() => {
+                setMobileSheetOpen(false);
+                openSettings();
+              }}
+            />
 
             <button
               type="button"

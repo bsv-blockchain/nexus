@@ -60,9 +60,11 @@ export function Portfolio({
   onExchange,
 }: {
   onOpenToken: (tokenId: string) => void;
-  onSend: () => void;
-  onReceive: () => void;
-  onExchange: () => void;
+  /** Absent means the shell has no rail behind the button — it hides rather
+      than open a sheet that could only show fixtures. */
+  onSend?: () => void;
+  onReceive?: () => void;
+  onExchange?: () => void;
 }): ReactNode {
   const copy = content.wallet;
   const { rows, total, change, loading, error, mode } = usePortfolio();
@@ -70,6 +72,11 @@ export function Portfolio({
   // neither, and a flat line next to "0.00%" reads as a real quote rather than as
   // missing data.
   const showTrend = mode === "demo";
+  const actions = [
+    { label: copy.send, icon: ArrowUpRight, onClick: onSend },
+    { label: copy.receive, icon: ArrowDownLeft, onClick: onReceive },
+    { label: copy.exchange, icon: Repeat, onClick: onExchange },
+  ].filter((action) => action.onClick);
 
   return (
     <div className="mx-auto w-full max-w-2xl">
@@ -96,23 +103,21 @@ export function Portfolio({
           </p>
         ) : null}
 
-        <div className="mt-5 grid grid-cols-3 gap-2">
-          {[
-            { label: copy.send, icon: ArrowUpRight, onClick: onSend },
-            { label: copy.receive, icon: ArrowDownLeft, onClick: onReceive },
-            { label: copy.exchange, icon: Repeat, onClick: onExchange },
-          ].map(({ label, icon: Icon, onClick }) => (
-            <button
-              key={label}
-              type="button"
-              onClick={onClick}
-              className="focus-ring flex flex-col items-center gap-1.5 rounded-xl bg-surface-raised px-3 py-3 text-xs font-semibold ring-1 ring-border/60 transition-colors hover:bg-surface-hover"
-            >
-              <Icon className="size-4 text-accent" aria-hidden="true" />
-              {label}
-            </button>
-          ))}
-        </div>
+        {actions.length > 0 && (
+          <div className="mt-5 grid grid-cols-3 gap-2">
+            {actions.map(({ label, icon: Icon, onClick }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={onClick}
+                className="focus-ring flex flex-col items-center gap-1.5 rounded-xl bg-surface-raised px-3 py-3 text-xs font-semibold ring-1 ring-border/60 transition-colors hover:bg-surface-hover"
+              >
+                <Icon className="size-4 text-accent" aria-hidden="true" />
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="mt-6">

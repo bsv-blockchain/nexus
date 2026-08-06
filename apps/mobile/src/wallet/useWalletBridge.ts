@@ -1,9 +1,14 @@
 import { useCallback, useContext, useMemo, useRef } from 'react'
 import { InteractionManager } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import * as LocalAuthentication from 'expo-local-authentication'
 import { METHODS } from '@nexus/bridge'
 import { createCwiHost, type CwiWallet } from '@nexus/substrate/src/browser/cwiHost'
+import { generateMnemonicWallet } from '@nexus/wallet-core/src/utils/mnemonicWallet'
+import { DEFAULT_MESSAGE_BOX_URL, MESSAGE_BOX_URL_KEY } from '@nexus/wallet-core/src/utils/pay/rails/handle'
 import { WalletContext } from './WalletContext'
 import { ExchangeRateContext } from './ExchangeRateContext'
+import { useLocalStorage } from './LocalStorageProvider'
 
 /**
  * The wallet, as the DOM chrome and browsed pages see it.
@@ -56,6 +61,12 @@ export function useWalletBridge(): WalletBridge {
   ref.current = wallet
   const rateRef = useRef(satoshisPerUSD)
   rateRef.current = satoshisPerUSD
+
+  // The stored mnemonic never crosses WalletContext's value — it lives behind
+  // LocalStorageProvider's biometric gate, so backup has to read it there directly.
+  const localStorage = useLocalStorage()
+  const localRef = useRef(localStorage)
+  localRef.current = localStorage
 
   const permissioned = useCallback((): CwiWallet | null => {
     return (ref.current.managers.permissionsManager as unknown as CwiWallet) ?? null
@@ -163,10 +174,9 @@ export function useWalletBridge(): WalletBridge {
       },
 
       /**
-       * Restore from a BIP-39 recovery phrase. This is the only way a wallet comes
-       * into existence in Nexus today — there is no create-new flow yet, and inventing
-       * one that generates keys the user has never seen backed up would be worse than
-       * having none.
+       * Restore from a BIP-39 recovery phrase. One of the two ways a wallet comes into
+       * existence here; the chrome collects the words and the shell owns every key
+       * operation. The create flow below is the same split in the other direction.
        */
       [METHODS.WALLET_RESTORE]: async (params: { mnemonic?: string } | null) => {
         const phrase = (params?.mnemonic ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
@@ -179,6 +189,81 @@ export function useWalletBridge(): WalletBridge {
         // whether it worked is the state it left behind, not the absence of a throw.
         const w = ref.current
         if (!w.walletBuilt) throw new Error('the wallet could not be built from that phrase')
+        return { ok: true }
+      },
+
+      /**
+       * Create a new wallet shell-side: generate 12 words, build, store. The phrase
+       * crosses the bridge exactly once so the chrome can show it for writing down.
+       * buildWalletFromMnemonic persists it (setMnemonic) before the reveal, so a
+       * user who abandons the backup screen mid-flow has lost nothing.
+       */
+      [METHODS.WALLET_CREATE]: async () => {
+        // Refused rather than replaced: building over an existing wallet's keys is a
+        // wipe, and a wipe must go through the explicit sign-out with its warning.
+        if (ref.current.walletBuilt) {
+          throw new Error('a wallet already exists on this device — sign out first')
+        }
+        const { mnemonic } = generateMnemonicWallet()
+        await ref.current.buildWalletFromMnemonic(mnemonic)
+        // Same honesty rule as restore: the build swallows its own errors, so the
+        // state it left behind is the only true report of whether it worked.
+        if (!ref.current.walletBuilt) throw new Error('the wallet could not be built')
+        return { ok: true, mnemonic }
+      },
+
+      /**
+       * The stored recovery phrase, for the backup screen. getMnemonic sits behind
+       * LocalStorageProvider's biometric gate, so the OS prompt is the access control
+       * here; the chrome's side of the contract is render-only, never persist.
+       */
+      [METHODS.WALLET_BACKUP]: async () => {
+        const mnemonic = await localRef.current.getMnemonic()
+        if (!mnemonic) throw new Error('no recovery phrase is stored on this device')
+        return { mnemonic }
+      },
+
+      [METHODS.WALLET_LOGOUT]: async () => {
+        // logout() is fire-and-forget internally (a .then chain that deletes
+        // snap+mnemonic+recoveredKey and resets state), so the chrome learns the real
+        // outcome from the wallet.state push, not from this reply. One microtask lets
+        // the chain start before we acknowledge.
+        ref.current.logout()
+        await Promise.resolve()
+        return { ok: true }
+      },
+
+      [METHODS.SETTINGS_GET]: async () => {
+        const w = ref.current
+        // The same source pay.handle.messageBox answers from (usePayBridge): the
+        // saved override or the default. Replicated rather than reaching into the pay
+        // bridge — the settings surface must not couple to the pay surface.
+        const messageBoxUrl = (await AsyncStorage.getItem(MESSAGE_BOX_URL_KEY)) || DEFAULT_MESSAGE_BOX_URL
+        const [hasHardware, enrolled] = await Promise.all([
+          LocalAuthentication.hasHardwareAsync(),
+          LocalAuthentication.isEnrolledAsync()
+        ])
+        return {
+          network: w.selectedNetwork === 'main' ? 'main' : 'test',
+          networks: ['main', 'test'],
+          messageBoxUrl,
+          // expo-secure-store keeps the phrase in the keychain either way; whether a
+          // biometric stands in front of it is the device's answer, not ours.
+          secure: {
+            storedSecurely: true,
+            method: hasHardware && enrolled ? 'keychain-biometric' : 'keychain'
+          }
+        }
+      },
+
+      [METHODS.SETTINGS_SET_NETWORK]: async (params: { network?: string } | null) => {
+        const network = params?.network
+        // teratest stays env/dev-only; the settings surface offers exactly what
+        // settings.get advertised in `networks`.
+        if (network !== 'main' && network !== 'test') {
+          throw new Error(`network must be 'main' or 'test'; got ${String(network)}`)
+        }
+        await ref.current.switchNetwork(network)
         return { ok: true }
       }
     }),

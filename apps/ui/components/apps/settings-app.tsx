@@ -18,6 +18,8 @@ import {
 } from "@/lib/command-effects";
 import { content, currentRelease, releases } from "@/lib/data";
 import { formatSats } from "@/lib/messages";
+import { DEMO_SURFACES } from "@/lib/surfaces";
+import { WalletSettingsPanel } from "@/components/apps/settings-wallet";
 import {
   Globe,
   Info,
@@ -27,17 +29,26 @@ import {
   ReceiptText,
   ShieldCheck,
   Sliders,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 
-export const SETTINGS_CATEGORIES: {
+const ALL_SETTINGS_CATEGORIES: {
   id: SettingsCategory;
   label: string;
   hint: string;
   icon: LucideIcon;
 }[] = [
+  {
+    id: "wallet",
+    // Literals, not content.ts: that file is the design repo's fixture set and
+    // merges flow through it; this category exists only in our live builds.
+    label: "Wallet",
+    hint: "Keys, network and backup.",
+    icon: Wallet,
+  },
   {
     id: "general",
     label: content.settings.general.title,
@@ -71,6 +82,44 @@ export const SETTINGS_CATEGORIES: {
 ];
 
 /**
+ * Same split as WALLET_SECTIONS in wallet-app.tsx: the demo keeps the
+ * designer's five categories untouched, while a shipping build offers only
+ * what a real shell can answer — its wallet, its theme, and what build it is.
+ * The demo panels are wired to fixtures and `soon` toasts, which on a live
+ * build would be seventeen controls that lie.
+ */
+const DEMO_CATEGORY_IDS: ReadonlySet<SettingsCategory> = new Set([
+  "general",
+  "privacy",
+  "browsing",
+  "appearance",
+  "about",
+]);
+const LIVE_CATEGORY_IDS: ReadonlySet<SettingsCategory> = new Set([
+  "wallet",
+  "appearance",
+  "about",
+]);
+
+export const SETTINGS_CATEGORIES = ALL_SETTINGS_CATEGORIES.filter((category) =>
+  (DEMO_SURFACES ? DEMO_CATEGORY_IDS : LIVE_CATEGORY_IDS).has(category.id),
+);
+
+/**
+ * The category to show for a request this build does not carry.
+ *
+ * The hub's default is `general`, which a live build drops — and hub state can
+ * also arrive from an older session. Falling back to the first entry beats
+ * rendering a header with no panel under it; same reasoning as the
+ * WALLET_SECTIONS fallback in wallet-app.tsx.
+ */
+function resolveCategory(requested: SettingsCategory): SettingsCategory {
+  return SETTINGS_CATEGORIES.some((entry) => entry.id === requested)
+    ? requested
+    : (SETTINGS_CATEGORIES[0]?.id ?? "about");
+}
+
+/**
  * The categories, in the narrow column.
  *
  * Same shape as every other app's contextual sidebar — a flat list of
@@ -78,7 +127,12 @@ export const SETTINGS_CATEGORIES: {
  * opens rather than a mode with its own rules.
  */
 export function SettingsSidebar(): ReactNode {
-  const { settingsCategory, setSettingsCategory, toggleRail } = useHub();
+  const {
+    settingsCategory: requestedCategory,
+    setSettingsCategory,
+    toggleRail,
+  } = useHub();
+  const settingsCategory = resolveCategory(requestedCategory);
   return (
     <div className="flex h-full min-h-0 flex-col px-1.5 pt-0.5">
       <div className="flex items-center gap-2 pb-3">
@@ -136,7 +190,7 @@ export function SettingsSidebar(): ReactNode {
 
 /* ------------------------------------------------------------- building blocks */
 
-function Group({
+export function Group({
   title,
   hint,
   children,
@@ -161,7 +215,7 @@ function Group({
 }
 
 /** A row that states a setting and its current value. */
-function Row({
+export function Row({
   label,
   hint,
   value,
@@ -208,7 +262,7 @@ function Row({
  * kind of decision: a handful of mutually exclusive settings whose consequences
  * differ enough that each one needs a sentence rather than a label.
  */
-function Choice<T extends string>({
+export function Choice<T extends string>({
   value,
   options,
   onPick,
@@ -577,12 +631,78 @@ function AppearancePanel(): ReactNode {
   );
 }
 
+type HostInfo = { version?: string; shell?: string; platform?: string };
+
+/**
+ * The shell's version, for the About panel of a shipping build.
+ *
+ * The fixture release list describes the design repo, not the binary the user
+ * is running: the number worth quoting in a bug report is the shell
+ * manifest's, asked over the bridge. Same check-then-subscribe as
+ * components/hub/shell-version.tsx — the host client can be injected after
+ * this mounts (the react-native-webview onPageStarted race), and a mount-only
+ * check would leave the version permanently blank when injection loses it.
+ */
+function HostVersionBlock(): ReactNode {
+  const [info, setInfo] = useState<HostInfo | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const ask = (): boolean => {
+      const host = (
+        window as unknown as { nexusHost?: { info?: () => Promise<HostInfo> } }
+      ).nexusHost;
+      if (!host?.info) return false;
+      host
+        .info()
+        .then((next) => {
+          if (alive) setInfo(next);
+        })
+        .catch(() => {
+          // Better a blank version than a wrong one.
+        });
+      return true;
+    };
+    if (ask()) {
+      return () => {
+        alive = false;
+      };
+    }
+    const onReady = (): void => void ask();
+    window.addEventListener("nexushost:ready", onReady, { once: true });
+    return () => {
+      alive = false;
+      window.removeEventListener("nexushost:ready", onReady);
+    };
+  }, []);
+
+  return (
+    <div className="flex items-center gap-3 px-3 py-3">
+      <IdentitySigil
+        value={info?.version ?? content.brand.name}
+        size={44}
+        className="shrink-0 rounded-xl"
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">
+          {content.brand.name}
+          {info?.version ? ` v${info.version}` : ""}
+        </span>
+        <span className="text-muted-foreground mt-0.5 block text-[11px] text-pretty">
+          {info ? `${info.shell ?? "?"} · ${info.platform ?? "?"}` : "no shell connected"}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 /**
  * About: which build this is, and the way into what changed.
  *
- * The version comes from the release list rather than from a constant, so there
- * is one place a release is recorded and no way for the number shown here to
- * disagree with the notes behind it.
+ * In demo the version comes from the release list rather than from a constant,
+ * so there is one place a release is recorded and no way for the number shown
+ * here to disagree with the notes behind it. A live build shows the shell's
+ * version instead — the fixture number would describe a different artifact.
  */
 function AboutPanel(): ReactNode {
   const copy = content.settings.about;
@@ -590,23 +710,27 @@ function AboutPanel(): ReactNode {
   return (
     <>
       <Group title={copy.versionTitle}>
-        <div className="flex items-center gap-3 px-3 py-3">
-          <IdentitySigil
-            value={currentRelease.version}
-            size={44}
-            className="shrink-0 rounded-xl"
-          />
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold">
-              {content.brand.name} v{currentRelease.version}
+        {DEMO_SURFACES ? (
+          <div className="flex items-center gap-3 px-3 py-3">
+            <IdentitySigil
+              value={currentRelease.version}
+              size={44}
+              className="shrink-0 rounded-xl"
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold">
+                {content.brand.name} v{currentRelease.version}
+              </span>
+              <span className="text-muted-foreground mt-0.5 block text-[11px] text-pretty">
+                {copy.released}{" "}
+                <time dateTime={currentRelease.date}>{currentRelease.date}</time>{" "}
+                · {currentRelease.headline}
+              </span>
             </span>
-            <span className="text-muted-foreground mt-0.5 block text-[11px] text-pretty">
-              {copy.released}{" "}
-              <time dateTime={currentRelease.date}>{currentRelease.date}</time>{" "}
-              · {currentRelease.headline}
-            </span>
-          </span>
-        </div>
+          </div>
+        ) : (
+          <HostVersionBlock />
+        )}
         <Row
           label={copy.whatsNew}
           hint={copy.whatsNewHint}
@@ -626,13 +750,43 @@ function AboutPanel(): ReactNode {
  * rest of the product.
  */
 export function SettingsApp(): ReactNode {
-  const { settingsCategory } = useHub();
+  const { settingsCategory: requestedCategory, setSettingsCategory } = useHub();
+  const settingsCategory = resolveCategory(requestedCategory);
   const category = SETTINGS_CATEGORIES.find(
     (entry) => entry.id === settingsCategory,
   );
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
+    <div className="flex h-full min-h-0 flex-1 flex-col">
+      {/* Mobile category tabs; the sidebar carries these at md+ — same split as
+          the wallet's section nav. Without them a phone (which never sees the
+          panel column) lands on one category with no way to the others. */}
+      <nav
+        aria-label={content.settings.title}
+        className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-3 py-2 md:hidden"
+      >
+        {SETTINGS_CATEGORIES.map(({ id, label, icon: Icon }) => {
+          const active = id === settingsCategory;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setSettingsCategory(id)}
+              aria-current={active ? "page" : undefined}
+              className={`focus-ring flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                active
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:bg-surface-hover"
+              }`}
+            >
+              <Icon className="size-3.5" aria-hidden="true" />
+              {label}
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-2xl px-5 py-6 sm:px-8">
         <header className="mb-5">
           <h1 className="text-lg font-bold">{category?.label}</h1>
@@ -640,11 +794,13 @@ export function SettingsApp(): ReactNode {
             {category?.hint}
           </p>
         </header>
+        {settingsCategory === "wallet" && <WalletSettingsPanel />}
         {settingsCategory === "general" && <GeneralPanel />}
         {settingsCategory === "privacy" && <PrivacyPanel />}
         {settingsCategory === "browsing" && <BrowsingPanel />}
         {settingsCategory === "appearance" && <AppearancePanel />}
         {settingsCategory === "about" && <AboutPanel />}
+      </div>
       </div>
     </div>
   );

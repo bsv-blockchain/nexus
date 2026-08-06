@@ -53,7 +53,9 @@ export type SettingsCategory =
   | "privacy"
   | "browsing"
   | "appearance"
-  | "about";
+  | "about"
+  /** live builds only — keys, network and backup; see settings-wallet.tsx */
+  | "wallet";
 
 /** A rail slot: a single app or a folder-style group of apps. */
 export type RailEntry =
