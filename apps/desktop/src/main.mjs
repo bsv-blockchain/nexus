@@ -93,6 +93,10 @@ function createWindow() {
   // WebContentsViews, so key material must not share a process with it. See
   // src/wallet/buildWallet.ts for the full reasoning and how it differs from
   // bsv-desktop, which builds its wallet in the renderer.
+  // A second createWindow — macOS 'activate' after every window was closed — builds a
+  // second host. Stop the outgoing one first or its Monitor and connectivity poll
+  // keep running beside the replacement's, against the same database.
+  walletHost?.shutdown()
   walletHost = createWalletHost({
     userDataDir: app.getPath('userData'),
     onStateChange: (state) => router?.emit('wallet.state', state)
@@ -107,8 +111,9 @@ function createWindow() {
         tabCount: tabManager.count()
       }),
       ...walletHost.methods,
-      // tx.* — the desktop port of the mobile pay bridge's transaction surface;
-      // see src/wallet/payHost.mjs for what it deliberately leaves out.
+      // pay.* and tx.* — the desktop port of the mobile pay bridge; see
+      // src/wallet/payHost.mjs for the one rail it deliberately leaves out (nearby)
+      // and why preload-chrome.cjs still withholds 'nearby' and 'scan'.
       ...walletHost.payMethods,
       [METHODS.TAB_CREATE]: ({ url, options }) => tabManager.create(url, options),
       [METHODS.TAB_DESTROY]: ({ id }) => tabManager.destroy(id),
@@ -286,6 +291,17 @@ app.whenReady().then(() => {
 // with no windows open (dock icon remains), every other desktop platform quits.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+
+/**
+ * The wallet runs timers now — a Monitor task loop and a connectivity poll (see
+ * src/wallet/host.mjs). Nothing else stops them, and quitting with a fresh task pass
+ * about to start is how a partially-written wallet database is earned. Synchronous
+ * on purpose: 'before-quit' does not await, so anything asynchronous here would be a
+ * promise the exiting process never returns to.
+ */
+app.on('before-quit', () => {
+  walletHost?.shutdown()
 })
 
 app.on('activate', () => {

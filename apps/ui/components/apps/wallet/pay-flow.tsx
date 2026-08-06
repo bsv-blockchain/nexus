@@ -23,6 +23,7 @@
 
 import { Sheet } from "@/components/apps/messages/sheet";
 import {
+  can,
   payHost,
   scanHost,
   shareHost,
@@ -799,8 +800,14 @@ function NearbyCell({ role, onDone }: { role: "payer" | "payee"; onDone: () => v
  * `accept` is what the caller can actually use; anything else the camera sees is
  * ignored and scanning continues, which is what lets an animated multi-frame code
  * be read without every intermediate frame counting as a failure.
+ *
+ * Renders nothing where the shell has no camera. scanHost() throws "this device
+ * has no camera surface" rather than returning null, so an ungated button is a
+ * button whose only outcome is an error — and the field beside it still accepts
+ * a pasted address, which is the whole job on a desktop.
  */
 function ScanButton({ accept, hint, onText }: { accept: RailId[]; hint: string; onText: (text: string) => void }): ReactNode {
+  if (!can("scan")) return null;
   return (
     <button
       type="button"
@@ -833,6 +840,9 @@ export function PaySheet({
   initialDirection?: Direction;
 }): ReactNode {
   const online = useOnline();
+  // Two local radios and a camera; Electron main has a path to neither, so the
+  // shell says so in its capability list rather than the chrome guessing.
+  const hasNearby = can("nearby");
   const [direction, setDirection] = useState<Direction>(initialDirection);
   const [cell, setCell] = useState<Cell | null>(null);
 
@@ -898,7 +908,17 @@ export function PaySheet({
             </div>
 
             <ul className="space-y-2">
-              {CELLS[direction].map(({ cell: id, title, subtitle, icon: Icon }) => {
+              {/*
+               * Nearby is dropped entirely where the shell has no radios — it is not
+               * a rail that degrades, it is one that does not exist. Electron
+               * declares pay without nearby, and left in place the cell rendered
+               * "unknown method pay.nearby.open" as its error text. Worse offline,
+               * where the rule below disables the other two: nearby would have been
+               * the only pressable cell and the only one that could not work.
+               */}
+              {CELLS[direction]
+                .filter(({ cell }) => hasNearby || !cell.endsWith("nearby"))
+                .map(({ cell: id, title, subtitle, icon: Icon }) => {
                 // Handle needs a message-box round trip and address needs an
                 // overlay lookup; neither works underground. Nearby is the whole
                 // point of being offline.
@@ -924,7 +944,7 @@ export function PaySheet({
                     </button>
                   </li>
                 );
-              })}
+                })}
             </ul>
           </>
         );

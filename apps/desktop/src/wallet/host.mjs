@@ -1,6 +1,9 @@
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { generateMnemonicWallet } from '@nexus/wallet-core/src/utils/mnemonicWallet'
+import { TaskSendOffline } from '@nexus/wallet-core/src/utils/monitor/TaskSendOffline'
+import { getOnline, subscribeOnline } from '@nexus/wallet-core/src/utils/net/online'
+import { DEFAULT_MESSAGE_BOX_URL, MESSAGE_BOX_URL_KEY } from '@nexus/wallet-core/src/utils/pay/rails/handle'
 import { restoreDesktopWallet } from './buildWallet.ts'
 import { createPayHost } from './payHost.mjs'
 import { createLocalStorage } from '../platform/index.mjs'
@@ -25,6 +28,9 @@ const ADMIN_ORIGINATOR = 'admin.com'
 // Key-value key for the chosen chain. Plain storage, not the keychain: which
 // network the user looks at is a preference, not a secret.
 const NETWORK_KEY = 'network'
+// A sync burst changes a dozen rows inside a second and every push costs the chrome
+// a full refetch, so transaction-change pushes are collected into one.
+const TX_NOTIFY_COALESCE_MS = 500
 
 /** A base64 reference masquerading as a description; see the mobile bridge. */
 const LOOKS_LIKE_A_REFERENCE = /^[A-Za-z0-9+/]{16,}={0,2}$/
@@ -45,11 +51,93 @@ export function createWalletHost({ userDataDir, onStateChange }) {
   installDesktopOnlineProbe()
   const localStorage = createLocalStorage()
 
-  /** @type {{ manager: any, storage: any, identityKey: string, userId: number|null } | null} */
+  /**
+   * Feed the offline drain's online gate.
+   *
+   * TaskSendOffline.trigger refuses to run at all while `onlineNow` is false, and
+   * nothing else in main sets it. Both halves are needed: the desktop probe reports
+   * CHANGES only — Electron has no connectivity event, so platform/online.mjs polls
+   * and compares — so without the initial read a machine that has been online all
+   * along would never arm the drain, and a held payment would wait for the network
+   * to flap before going out.
+   */
+  const stopOnlineFeed = subscribeOnline((online) => TaskSendOffline.noteConnectivity(online))
+  void getOnline().then((online) => TaskSendOffline.noteConnectivity(online))
+
+  /** @type {{ manager: any, storage: any, identityKey: string, userId: number|null, monitor: any } | null} */
   let wallet = null
   let building = false
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let notifyTimer = null
 
   const publish = () => onStateChange?.({ ready: wallet !== null, building })
+
+  /**
+   * Tell the chrome a transaction moved.
+   *
+   * The protocol has no transaction-changed event, and wallet.state is the push the
+   * chrome already re-reads accounts and transactions on (apps/ui/lib/wallet-data.ts
+   * useSource), so the Monitor's status changes ride that one. Trailing rather than
+   * immediate, for the reason on TX_NOTIFY_COALESCE_MS.
+   */
+  const notifyTxChanged = () => {
+    if (notifyTimer) return
+    notifyTimer = setTimeout(() => {
+      notifyTimer = null
+      publish()
+    }, TX_NOTIFY_COALESCE_MS)
+  }
+
+  /**
+   * Stop the background work the current wallet owns.
+   *
+   * Called before every teardown — logout, the setNetwork rebuild, quit — because
+   * the Monitor holds the storage manager: one left running after the reference is
+   * dropped keeps polling a wallet the user has signed out of, and after a network
+   * switch two of them would poll two chains at once.
+   */
+  const stopMonitor = () => {
+    try {
+      wallet?.monitor?.stopTasks()
+    } catch (err) {
+      console.warn('[wallet] monitor did not stop cleanly:', err?.message)
+    }
+  }
+
+  /**
+   * Set a freshly built wallet's Monitor running, on the next turn of the loop.
+   *
+   * Deferred for the reason mobile defers it past interactions: startTasks opens
+   * header polling and proof crawls, and the build that just finished is the most
+   * contended moment of a launch. The identity check is what makes deferring safe —
+   * a logout or a network switch landing between the build and this callback would
+   * otherwise start a background loop against a wallet nobody owns any more.
+   */
+  const startMonitorSoon = (built) => {
+    if (!built.monitor) return
+    setTimeout(() => {
+      if (wallet !== built) return
+      // startTasks only settles when stopTasks is called, so this catch is for a
+      // failed loop, not for completion.
+      built.monitor.startTasks().catch((err) => console.warn('[wallet] monitor stopped:', err?.message))
+    }, 0)
+  }
+
+  /**
+   * Build the wallet from a phrase. Every path that produces one goes through here,
+   * so the Monitor is created and started exactly once per build and the deps object
+   * has a single definition rather than a copy per caller.
+   */
+  const buildFrom = async (phrase, chain) => {
+    const built = await restoreDesktopWallet(phrase, {
+      databaseDir,
+      chain,
+      adminOriginator: ADMIN_ORIGINATOR,
+      onTransactionStatusChanged: notifyTxChanged
+    })
+    startMonitorSoon(built)
+    return built
+  }
 
   /**
    * The persisted chain choice, 'main' when nothing (or nonsense) is stored.
@@ -72,12 +160,15 @@ export function createWalletHost({ userDataDir, onStateChange }) {
   /** Admin-originator call into our own wallet, for what the chrome asks on its own behalf. */
   const asAdmin = (fn) => fn(require_().manager, ADMIN_ORIGINATOR)
 
-  // The tx.* surface reads through the same wallet. Getters, not snapshots:
-  // restore, logout and setNetwork all swap `wallet` (and the chain) at runtime.
+  // The pay.* and tx.* surfaces read through the same wallet. Getters, not
+  // snapshots: restore, logout and setNetwork all swap `wallet` (and the chain) at
+  // runtime. The key-value store is shared rather than re-created, so the message
+  // box URL the pay rails read is the same one this host's settings write.
   const payHost = createPayHost({
     getWallet: () => wallet,
     getNetwork: currentNetwork,
-    adminOriginator: ADMIN_ORIGINATOR
+    adminOriginator: ADMIN_ORIGINATOR,
+    localStorage
   })
 
   return {
@@ -86,7 +177,7 @@ export function createWalletHost({ userDataDir, onStateChange }) {
       return wallet !== null
     },
 
-    /** tx.* as a separate table, so main.mjs wires (and a reader audits) it as a unit. */
+    /** pay.* and tx.* as a separate table, so main.mjs wires (and a reader audits) it as a unit. */
     payMethods: payHost.methods,
 
     methods: {
@@ -181,11 +272,7 @@ export function createWalletHost({ userDataDir, onStateChange }) {
         building = true
         publish()
         try {
-          wallet = await restoreDesktopWallet(phrase, {
-            databaseDir,
-            chain: await currentNetwork(),
-            adminOriginator: ADMIN_ORIGINATOR
-          })
+          wallet = await buildFrom(phrase, await currentNetwork())
           // Only after the wallet is proven to build. Storing a phrase that turned
           // out to be unusable would make the next launch fail silently instead of
           // asking again.
@@ -216,11 +303,7 @@ export function createWalletHost({ userDataDir, onStateChange }) {
         building = true
         publish()
         try {
-          wallet = await restoreDesktopWallet(mnemonic, {
-            databaseDir,
-            chain: await currentNetwork(),
-            adminOriginator: ADMIN_ORIGINATOR
-          })
+          wallet = await buildFrom(mnemonic, await currentNetwork())
           // Same order as restore: never store a phrase the build has not proven out.
           const stored = await localStorage.setMnemonic(mnemonic)
           if (!stored) {
@@ -245,6 +328,9 @@ export function createWalletHost({ userDataDir, onStateChange }) {
       'wallet.logout': async () => {
         // Keys and managers go; the ledger databases stay. Transaction history is
         // not a secret, and a re-restore onto this device should find it waiting.
+        // The Monitor goes FIRST — it is the only thing here holding a reference
+        // that outlives `wallet = null`.
+        stopMonitor()
         wallet = null
         await localStorage.deleteMnemonic()
         await localStorage.deleteSnap()
@@ -256,13 +342,17 @@ export function createWalletHost({ userDataDir, onStateChange }) {
 
       'settings.get': async () => {
         // encryptionStatus is the honest answer to "can this machine keep a
-        // secret"; the chrome owns the warning copy. No messageBoxUrl on desktop:
-        // nothing here reads one, and reporting a URL would imply the pay rails
-        // exist.
+        // secret"; the chrome owns the warning copy.
         const status = await localStorage.encryptionStatus()
+        // The same source pay.handle.messageBox answers from (payHost.mjs): the
+        // saved override or the default. Read directly rather than through the pay
+        // host — the settings surface must not couple to the pay surface — which is
+        // the same split mobile's useWalletBridge makes.
+        const messageBoxUrl = (await localStorage.getItem(MESSAGE_BOX_URL_KEY)) || DEFAULT_MESSAGE_BOX_URL
         return {
           network: await currentNetwork(),
           networks: ['main', 'test'],
+          messageBoxUrl,
           secure: {
             storedSecurely: status.available,
             method: status.available ? 'keychain' : 'none'
@@ -286,15 +376,14 @@ export function createWalletHost({ userDataDir, onStateChange }) {
           // Teardown + rebuild, not mutation: the chain decides which database and
           // which services the whole stack points at. Same class of work as
           // restore, and the same phrase finds its per-chain database by name.
+          // Stopping the old Monitor is part of the teardown, not housekeeping:
+          // skip it and two of them poll two chains against two databases.
+          stopMonitor()
           wallet = null
           building = true
           publish()
           try {
-            wallet = await restoreDesktopWallet(phrase, {
-              databaseDir,
-              chain: network,
-              adminOriginator: ADMIN_ORIGINATOR
-            })
+            wallet = await buildFrom(phrase, network)
           } finally {
             building = false
             publish()
@@ -316,17 +405,29 @@ export function createWalletHost({ userDataDir, onStateChange }) {
         if (!phrase) return
         building = true
         publish()
-        wallet = await restoreDesktopWallet(phrase, {
-          databaseDir,
-          chain: await currentNetwork(),
-          adminOriginator: ADMIN_ORIGINATOR
-        })
+        wallet = await buildFrom(phrase, await currentNetwork())
       } catch (err) {
         console.warn('[wallet] resume failed:', err?.message)
       } finally {
         building = false
         publish()
       }
+    },
+
+    /**
+     * Stop everything this host started. main.mjs calls it on 'before-quit'.
+     *
+     * All three are timers that would otherwise outlive the window: the Monitor's
+     * task loop, the connectivity poll behind the offline drain, and a pending
+     * refetch push. Stopping the loop does not abort a task already in flight — it
+     * stops the NEXT pass from starting while the app is tearing down, which is the
+     * part we control.
+     */
+    shutdown() {
+      stopMonitor()
+      stopOnlineFeed()
+      if (notifyTimer) clearTimeout(notifyTimer)
+      notifyTimer = null
     }
   }
 }
