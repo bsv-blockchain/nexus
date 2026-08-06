@@ -36,8 +36,16 @@ npm run ios                # in a separate terminal
 ### Mobile (Android emulator)
 
 ```bash
+export ANDROID_HOME=$HOME/Library/Android/sdk
 npm run android            # in a separate terminal
 ```
+
+`ANDROID_HOME` is not optional and the failure does not say so usefully. Gradle
+finds the SDK through `android/local.properties`, which `expo prebuild --clean`
+deletes and `.gitignore` keeps out of the repo — so the first Android build after
+any prebuild dies with *"SDK location not found"* several hundred lines into a log
+that `npm` then truncates to a lifecycle-script error. Exporting the variable
+avoids the file entirely.
 
 ### Web — the preview target
 

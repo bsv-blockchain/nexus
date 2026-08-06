@@ -47,8 +47,14 @@ export function WalletGate(): ReactNode {
    * while the words are still on screen. Holding the gate open for as long as a
    * flow is mid-air or a phrase is showing is what makes Continue, not the
    * shell, decide when the words disappear.
+   *
+   * `error` is held for the same reason and it is not hypothetical: on Android,
+   * create built the wallet and then reported a failure, so the wallet went
+   * ready, the gate unmounted, and the message explaining what had happened went
+   * with it — leaving a wallet whose owner had never seen its recovery phrase and
+   * no indication anything was wrong. A screen that fails must stay on screen.
    */
-  const flowHeld = busy || mnemonic !== null;
+  const flowHeld = busy || mnemonic !== null || error !== null;
 
   // Nothing to gate: demo fixtures, or a wallet that is up.
   const blocking =

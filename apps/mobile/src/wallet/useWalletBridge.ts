@@ -82,6 +82,29 @@ export function useWalletBridge(): WalletBridge {
     [permissioned]
   )
 
+  /**
+   * Wait for the build to be visible in `ref.current`.
+   *
+   * `buildWalletFromMnemonic` swallows its own errors, so the state it leaves behind
+   * is the only honest report of whether it worked — but that state arrives through
+   * React, and awaiting the call does not await the re-render that republishes it
+   * here. Reading `walletBuilt` on the next line is therefore a race, and it is one
+   * that LOSES on Android: verified on a Pixel 9 emulator, where create built the
+   * wallet, threw "could not be built" anyway, and left a wallet whose owner had
+   * never been shown the recovery phrase. iOS happened to win the same race.
+   *
+   * Polling rather than a subscription because there is nothing to subscribe to:
+   * the context value is the notification.
+   */
+  const settleBuilt = useCallback(async (timeoutMs = 5000): Promise<boolean> => {
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+      if (ref.current.walletBuilt && ref.current.managers.permissionsManager) return true
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+    return false
+  }, [])
+
   const identityKey = useCallback(async (): Promise<string | undefined> => {
     try {
       const res = (await asAdmin((w, o) => w.getPublicKey({ identityKey: true }, o))) as { publicKey?: string }
@@ -186,9 +209,12 @@ export function useWalletBridge(): WalletBridge {
         }
         await ref.current.buildWalletFromMnemonic(phrase)
         // buildWalletFromMnemonic swallows its own errors, so the honest report of
-        // whether it worked is the state it left behind, not the absence of a throw.
-        const w = ref.current
-        if (!w.walletBuilt) throw new Error('the wallet could not be built from that phrase')
+        // whether it worked is the state it left behind — once that state has had
+        // time to arrive. See settleBuilt: reading it on the next line loses on
+        // Android and reports a failure for a wallet that built perfectly well.
+        if (!(await settleBuilt())) {
+          throw new Error('the wallet could not be built from that phrase')
+        }
         return { ok: true }
       },
 
@@ -206,9 +232,10 @@ export function useWalletBridge(): WalletBridge {
         }
         const { mnemonic } = generateMnemonicWallet()
         await ref.current.buildWalletFromMnemonic(mnemonic)
-        // Same honesty rule as restore: the build swallows its own errors, so the
-        // state it left behind is the only true report of whether it worked.
-        if (!ref.current.walletBuilt) throw new Error('the wallet could not be built')
+        // The build swallows its own errors, so the state it left behind is the only
+        // true report — but it has to be given time to arrive. Throwing early here
+        // means a wallet that exists and an owner who never saw its phrase.
+        if (!(await settleBuilt())) throw new Error('the wallet could not be built')
         return { ok: true, mnemonic }
       },
 
@@ -267,7 +294,7 @@ export function useWalletBridge(): WalletBridge {
         return { ok: true }
       }
     }),
-    [asAdmin, identityKey]
+    [asAdmin, identityKey, settleBuilt]
   )
 
   const handleCwi = useMemo(
