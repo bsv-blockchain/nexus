@@ -133,6 +133,18 @@ function Shell() {
     router.emit('wallet.state', walletBridge.state)
   }, [router, walletBridge.state])
 
+  /*
+   * A spend above the auto-approve limit needs a person, and the person is in the
+   * chrome. The wallet is BLOCKED until the answer comes back — the permissions
+   * manager holds the page's createAction open — so this push is the only thing
+   * standing between a large payment request and a page frozen until the bridge
+   * gives up on it. Null is pushed too: it tells the chrome the queue drained,
+   * which is how a sheet closes when a request is answered from somewhere else.
+   */
+  useEffect(() => {
+    router.emit('permission.request', walletBridge.pendingSpend)
+  }, [router, walletBridge.pendingSpend])
+
   useEffect(() => {
     setShellUiSink({
       toast: (message, kind) => router.emit('ui.toast', { message, kind }),
