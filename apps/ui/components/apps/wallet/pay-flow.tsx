@@ -87,6 +87,8 @@ const CELLS: Record<Direction, CellSpec[]> = {
   ],
 };
 
+const DIRECTION_TITLES: Record<Direction, string> = { pay: "Pay", get: "Get paid" };
+
 const CELL_TITLES: Record<Cell, string> = {
   "pay-nearby": "Someone nearby",
   "pay-handle": "Someone remote",
@@ -843,7 +845,9 @@ export function PaySheet({
   // Two local radios and a camera; Electron main has a path to neither, so the
   // shell says so in its capability list rather than the chrome guessing.
   const hasNearby = can("nearby");
-  const [direction, setDirection] = useState<Direction>(initialDirection);
+  // Not state. Whoever opened the sheet chose the direction, and there is no control
+  // in here that can change it — see the heading below.
+  const direction = initialDirection;
   const [cell, setCell] = useState<Cell | null>(null);
 
   const offline = useAsync(() => payHost().offline.status(), {
@@ -854,10 +858,7 @@ export function PaySheet({
   } as OfflineStatus, open, [cell, online]);
 
   useEffect(() => {
-    if (open) {
-      setDirection(initialDirection);
-      setCell(null);
-    }
+    if (open) setCell(null);
   }, [open, initialDirection]);
 
   // One deferred proof sweep per visit, gated in the shell. Best-effort: a failed
@@ -890,22 +891,13 @@ export function PaySheet({
               onSendNow={() => void payHost().offline.sendNow().then(() => offline.reload())}
             />
 
-            {/* Direction first: it is what the user already knows. */}
-            <div className="mb-5 grid grid-cols-2 gap-1 rounded-xl bg-surface p-1">
-              {(["pay", "get"] as const).map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDirection(d)}
-                  aria-pressed={direction === d}
-                  className={`focus-ring rounded-lg py-2 text-sm font-semibold transition-colors ${
-                    direction === d ? "bg-surface-raised text-foreground shadow-sm" : "text-muted-foreground"
-                  }`}
-                >
-                  {d === "pay" ? "Pay" : "Get paid"}
-                </button>
-              ))}
-            </div>
+            {/*
+             * Direction is stated, not chosen. Nothing opens this sheet without
+             * already having answered it — Send and Receive are the only two doors
+             * in — so a segmented control here re-asked a question the user had just
+             * answered, and offered them the chance to contradict themselves.
+             */}
+            <h3 className="mb-4 text-base font-bold">{DIRECTION_TITLES[direction]}</h3>
 
             <ul className="space-y-2">
               {/*
@@ -952,7 +944,11 @@ export function PaySheet({
   };
 
   return (
-    <Sheet open={open} onClose={onClose} label={cell ? CELL_TITLES[cell] : "Payments"}>
+    <Sheet
+      open={open}
+      onClose={onClose}
+      label={cell ? CELL_TITLES[cell] : DIRECTION_TITLES[direction]}
+    >
       <div className="p-4">
         {cell ? (
           <button
@@ -961,7 +957,7 @@ export function PaySheet({
             className="focus-ring mb-3 flex items-center gap-1 text-xs font-semibold text-accent"
           >
             <ChevronLeft className="size-3.5" aria-hidden="true" />
-            Payments
+            {DIRECTION_TITLES[direction]}
           </button>
         ) : null}
         {body()}
