@@ -142,7 +142,21 @@ const CREATE_HOST_CLIENT_SOURCE = `function createHostClient(options) {
       // the shell hands it straight to key derivation and the device keychain.
       // Five minutes: BIP-39 → BIP-32 derivation is seconds of pure JS, and the
       // device then puts up a Face ID / passcode sheet that waits on a human.
-      restore: function (mnemonic) { return call('wallet.restore', { mnemonic: mnemonic }, 300000) }
+      restore: function (mnemonic) { return call('wallet.restore', { mnemonic: mnemonic }, 300000) },
+      // The same trust split in the other direction: the shell generates and
+      // stores the words, the chrome shows them ONCE for writing down. Same
+      // five-minute bound as restore, for the same two reasons.
+      create: function () { return call('wallet.create', null, 300000) },
+      // The stored phrase, for the backup screen. Bounded by a biometric prompt
+      // where the platform has one. Render it, never persist it.
+      backup: function () { return call('wallet.backup', null, 300000) },
+      logout: function () { return call('wallet.logout', null, 60000) }
+    },
+    settings: {
+      get: function () { return call('settings.get', null) },
+      // Tears the whole manager stack down and rebuilds it against the other
+      // chain — the same class of work as restore, so the same bound.
+      setNetwork: function (network) { return call('settings.setNetwork', { network: network }, 300000) }
     },
     // Payments. The rail is never chosen here — classify() infers it from how the
     // counterparty was identified, and the chrome renders whatever comes back.

@@ -31,6 +31,23 @@ const METHODS = {
   // Onboarding. Restoring from a recovery phrase is how a wallet comes into being
   // here; the chrome collects the words and the shell owns every key operation.
   WALLET_RESTORE: 'wallet.restore',
+  // Create-new is the same trust split in the other direction: the shell generates
+  // and stores the words, and hands them to the chrome ONCE for the user to write
+  // down. Refused while a wallet exists — creating over someone's keys is a wipe.
+  WALLET_CREATE: 'wallet.create',
+  // The stored recovery phrase, for the backup screen. Behind the platform's
+  // biometric gate where there is one; the chrome must treat the result as
+  // radioactive — render, never persist.
+  WALLET_BACKUP: 'wallet.backup',
+  // Deletes key material (phrase, recovered key, snapshot) and tears the managers
+  // down. Deliberately NOT the ledger databases: transaction history is not a
+  // secret, and a re-restore onto the same device should find its history waiting.
+  WALLET_LOGOUT: 'wallet.logout',
+
+  // The wallet-facing settings surface. Small on purpose: everything here must be
+  // answerable by both shells, or the Settings screen forks per platform.
+  SETTINGS_GET: 'settings.get',
+  SETTINGS_SET_NETWORK: 'settings.setNetwork',
 
   /**
    * Native surfaces. Three things the chrome cannot do itself — read a camera,
