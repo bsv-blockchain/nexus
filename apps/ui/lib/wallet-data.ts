@@ -31,6 +31,8 @@ type NexusHost = {
   settings?: {
     get: () => Promise<HostSettings>;
     setNetwork: (network: "main" | "test") => Promise<{ ok: boolean }>;
+    setArc?: (url: string | null, token: string | null) => Promise<{ ok: boolean }>;
+    setAutoApprove?: (satoshis: number) => Promise<{ ok: boolean; satoshis: number }>;
   };
   setOverlay?: (open: boolean) => Promise<unknown>;
 };
@@ -47,10 +49,38 @@ export interface WalletInfo {
 }
 
 /** What the shell answers to settings.get; see packages/bridge/src/protocol.js. */
+/**
+ * Where this wallet broadcasts, per network.
+ *
+ * `hasToken` rather than the token: the chrome only needs to know whether one is
+ * set, so it can say so and offer to replace it. Sending the secret into a WebView
+ * to sit in an input is how it ends up in a screenshot.
+ */
+export interface ArcSettings {
+  url: string;
+  hasToken: boolean;
+  defaultUrl: string;
+  isDefault: boolean;
+}
+
+/** The ceiling under which a page's spend goes through without asking. */
+export interface AutoApproveSettings {
+  satoshis: number;
+  defaultSatoshis: number;
+}
+
 export interface HostSettings {
   network: "main" | "test";
   networks: ("main" | "test")[];
   messageBoxUrl?: string;
+  /**
+   * Null where the shell cannot answer for it — the desktop shell builds Services
+   * with no options and has no spending-authorization prompt, so neither control
+   * would do anything there. The panel renders nothing rather than a dead row; the
+   * same rule the pay grid follows for hardware rails it does not have.
+   */
+  arc?: ArcSettings | null;
+  autoApprove?: AutoApproveSettings | null;
   /**
    * How the shell keeps the phrase. `none` means plain disk — the Settings
    * surface must say so out loud rather than let the UI imply a keychain.
@@ -219,6 +249,31 @@ export async function setNetwork(network: "main" | "test"): Promise<void> {
   const settings = host()?.settings;
   if (!settings) throw new Error("this shell cannot switch networks");
   await settings.setNetwork(network);
+}
+
+/**
+ * Point this network's broadcasts at a different ARC, or back at the default.
+ *
+ * Rebuilds the wallet, same as a network switch: the endpoint is baked into Services
+ * when it is constructed, so a write without a rebuild would leave the wallet
+ * broadcasting to the old host while this screen showed the new one. Re-read
+ * settings afterwards — the answer is the only proof it took.
+ *
+ * `url: null` resets. `token: null` leaves any existing token ALONE rather than
+ * clearing it, so editing the URL cannot silently discard a working key; pass an
+ * empty string to actually remove one.
+ */
+export async function setArc(url: string | null, token: string | null): Promise<void> {
+  const settings = host()?.settings;
+  if (!settings?.setArc) throw new Error("this shell cannot change the broadcast endpoint");
+  await settings.setArc(url, token);
+}
+
+/** The spend ceiling, in satoshis. Zero means ask every time. */
+export async function setAutoApprove(satoshis: number): Promise<void> {
+  const settings = host()?.settings;
+  if (!settings?.setAutoApprove) throw new Error("this shell has no spending limit");
+  await settings.setAutoApprove(satoshis);
 }
 
 /**

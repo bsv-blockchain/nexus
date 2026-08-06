@@ -6,6 +6,13 @@ import { METHODS } from '@nexus/bridge'
 import { createCwiHost, type CwiWallet } from '@nexus/substrate/src/browser/cwiHost'
 import { generateMnemonicWallet } from '@nexus/wallet-core/src/utils/mnemonicWallet'
 import { DEFAULT_MESSAGE_BOX_URL, MESSAGE_BOX_URL_KEY } from '@nexus/wallet-core/src/utils/pay/rails/handle'
+import {
+  AUTO_APPROVE_STORAGE_KEY,
+  DEFAULT_ARC_URLS,
+  DEFAULT_AUTO_APPROVE_THRESHOLD,
+  arcApiTokenStorageKey,
+  arcUrlStorageKey
+} from '@nexus/wallet-core/src/constants'
 import { WalletContext } from './WalletContext'
 import { ExchangeRateContext } from './ExchangeRateContext'
 import { useLocalStorage } from './LocalStorageProvider'
@@ -271,10 +278,32 @@ export function useWalletBridge(): WalletBridge {
           LocalAuthentication.hasHardwareAsync(),
           LocalAuthentication.isEnrolledAsync()
         ])
+        // Per network, because an endpoint that serves mainnet is not the one that
+        // serves testnet — a single override would silently follow you across a
+        // network switch and broadcast to the wrong chain's ARC.
+        const network = w.selectedNetwork === 'main' ? 'main' : 'test'
+        const [arcUrl, arcToken, autoApprove] = await Promise.all([
+          AsyncStorage.getItem(arcUrlStorageKey(network)),
+          AsyncStorage.getItem(arcApiTokenStorageKey(network)),
+          AsyncStorage.getItem(AUTO_APPROVE_STORAGE_KEY)
+        ])
         return {
-          network: w.selectedNetwork === 'main' ? 'main' : 'test',
+          network,
           networks: ['main', 'test'],
           messageBoxUrl,
+          arc: {
+            url: arcUrl || DEFAULT_ARC_URLS[network] || '',
+            // NEVER the token itself. The chrome only needs to know whether one is
+            // set so it can say so and offer to replace it; sending the secret to a
+            // WebView to render in an input is how it ends up in a screenshot.
+            hasToken: Boolean(arcToken),
+            defaultUrl: DEFAULT_ARC_URLS[network] || '',
+            isDefault: !arcUrl || arcUrl === DEFAULT_ARC_URLS[network]
+          },
+          autoApprove: {
+            satoshis: autoApprove === null ? DEFAULT_AUTO_APPROVE_THRESHOLD : Number(autoApprove) || 0,
+            defaultSatoshis: DEFAULT_AUTO_APPROVE_THRESHOLD
+          },
           // expo-secure-store keeps the phrase in the keychain either way; whether a
           // biometric stands in front of it is the device's answer, not ours.
           secure: {
@@ -293,6 +322,56 @@ export function useWalletBridge(): WalletBridge {
         }
         await ref.current.switchNetwork(network)
         return { ok: true }
+      },
+
+      /**
+       * Point this network's broadcasts somewhere else, or back at the default.
+       *
+       * The rebuild is the whole point: Services is constructed once with the
+       * endpoint baked in (WalletContext reads these same keys at build time), so
+       * writing the key without rebuilding would leave the wallet broadcasting to
+       * the old ARC while the settings screen showed the new one. switchNetwork to
+       * the CURRENT network is the rebuild — it is the same teardown, and there is
+       * no cheaper one to reach for.
+       */
+      [METHODS.SETTINGS_SET_ARC]: async (params: { url?: string | null; token?: string | null } | null) => {
+        const w = ref.current
+        const network = w.selectedNetwork === 'main' ? 'main' : 'test'
+        const url = params?.url == null ? null : String(params.url).trim().replace(/\/+$/, '')
+        const token = params?.token == null ? null : String(params.token).trim()
+
+        // null resets; a string sets. An empty string is a user who cleared the
+        // field, which means the same thing as reset rather than "broadcast to ''".
+        if (!url) await AsyncStorage.removeItem(arcUrlStorageKey(network))
+        else await AsyncStorage.setItem(arcUrlStorageKey(network), url)
+
+        // A token is only rewritten when one was supplied. Passing null must not
+        // silently discard a working key just because the user edited the URL.
+        if (token !== null) {
+          if (token) await AsyncStorage.setItem(arcApiTokenStorageKey(network), token)
+          else await AsyncStorage.removeItem(arcApiTokenStorageKey(network))
+        }
+
+        await w.switchNetwork(network)
+        return { ok: true }
+      },
+
+      /**
+       * The ceiling under which a page's spend goes through without asking.
+       *
+       * Clamped at zero, and zero is meaningful: it means ask every time. There is
+       * no upper clamp — someone who wants a high limit on their own wallet is
+       * entitled to one, and inventing a maximum here would be this screen deciding
+       * how much of their money they are allowed to be trusted with.
+       */
+      [METHODS.SETTINGS_SET_AUTO_APPROVE]: async (params: { satoshis?: number } | null) => {
+        const satoshis = Math.max(0, Math.round(Number(params?.satoshis ?? 0)))
+        if (!Number.isFinite(satoshis)) throw new Error('the limit must be a number of satoshis')
+        await AsyncStorage.setItem(AUTO_APPROVE_STORAGE_KEY, String(satoshis))
+        // No rebuild and nothing to notify: WalletContext's spending-authorization
+        // callback re-reads this key on every request, so the next spend already
+        // sees it. That re-read is why this is a write and not a restart.
+        return { ok: true, satoshis }
       }
     }),
     [asAdmin, identityKey, settleBuilt]
