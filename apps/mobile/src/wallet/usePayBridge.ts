@@ -22,6 +22,11 @@ import {
 import { watchAddress } from '@nexus/wallet-core/src/utils/pay/watchlist'
 import { takeProofNudge } from '@nexus/wallet-core/src/utils/pay/proofNudge'
 import {
+  makeIdentityClient,
+  resolveIdentity,
+  searchIdentities
+} from '@nexus/wallet-core/src/utils/identity/resolveIdentity'
+import {
   DEFAULT_MESSAGE_BOX_URL,
   MESSAGE_BOX_URL_KEY,
   NO_MESSAGE_BOX,
@@ -265,6 +270,36 @@ export function usePayBridge(): Record<string, (params: any) => any> {
           satoshis: Number(satoshis),
           messageBoxUrl: url
         })
+      },
+
+      /**
+       * Who a handle belongs to, and who matches a typed name.
+       *
+       * Both are DECORATIVE relative to the payment — a payer who pasted a key can
+       * always pay it — so neither is allowed to break the screen. `resolve` never
+       * rejects by contract (an unresolvable key and an unknown peer look the same
+       * to a caller, because the UI treatment is the same), and `search` answers an
+       * empty list rather than throwing when no identity client can be built.
+       */
+      'pay.handle.resolve': async ({ identityKey }: { identityKey: string }) => {
+        const client = makeIdentityClient(requireWallet(), ref.current.adminOriginator)
+        if (!client) return { identity: null }
+        const [, identity] = await resolveIdentity(client, String(identityKey))
+        return { identity }
+      },
+
+      'pay.handle.search': async ({ query }: { query: string }) => {
+        const text = String(query ?? '').trim()
+        if (!text) return { results: [] }
+        const client = makeIdentityClient(requireWallet(), ref.current.adminOriginator)
+        if (!client) return { results: [] }
+        try {
+          return { results: await searchIdentities(client, text) }
+        } catch {
+          // searchIdentities DOES throw, unlike resolveIdentity. A failed lookup
+          // must leave the field usable for a pasted key.
+          return { results: [] }
+        }
       },
 
       'pay.handle.outbox': async () => getOutboxEntries(requireStorage() as any),

@@ -129,6 +129,21 @@ export function useHolding(tokenId: string): HoldingView {
   };
 }
 
+/**
+ * USD per BSV, or null when nothing can price it.
+ *
+ * For surfaces that need the rate without needing a portfolio — the amount field
+ * on the payment sheet, which offers dollar entry only when a dollar figure would
+ * mean something. Deliberately does NOT publish pricing the way usePortfolio does:
+ * this is a reader, and two writers of the same module global would race.
+ */
+export function useBsvRate(): number | null {
+  const accounts = useWalletAccounts();
+  if (accounts.mode === "demo") return getToken("bsv")?.usdPerUnit ?? null;
+  const rate = accounts.data[0]?.fiatRate ?? 0;
+  return rate > 0 ? rate : null;
+}
+
 export interface Activity {
   transactions: WalletTransaction[];
   loading: boolean;

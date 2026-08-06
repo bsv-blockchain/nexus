@@ -32,12 +32,14 @@ import {
   usePoll,
   type InboxRow,
   type MessageBoxState,
+  type PayIdentity,
   type RailId,
   type OfflineStatus,
   type OutboxEntry,
   type ProcessedTx,
 } from "@/lib/pay-data";
-import { SATS_PER_BSV } from "@/lib/wallet";
+import { SATS_PER_BSV, usd } from "@/lib/wallet";
+import { useBsvRate } from "@/lib/wallet-live";
 import {
   AlertCircle,
   ArrowUpRight,
@@ -53,6 +55,7 @@ import {
   Settings,
   User,
   Wallet,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -133,6 +136,9 @@ const INBOX_POLL_MS = 5000;
 
 /** How long a tapped Give up stays armed before it disarms itself. */
 const DISCARD_ARM_MS = 5000;
+
+/** Identity search is a network call; this is how long typing has to pause first. */
+const SEARCH_DEBOUNCE_MS = 350;
 
 function sats(n: number): string {
   return `${n.toLocaleString("en-US")} sats`;
@@ -239,25 +245,81 @@ function CopyChip({ text, label }: { text: string; label: string }): ReactNode {
   );
 }
 
-/** Amount in satoshis. The wallet's unit — no conversion games on the way in. */
+/**
+ * The amount.
+ *
+ * Satoshis are what leaves the wallet and what `value` always holds — dollars are
+ * a display concern that stops at this component's edge, so no caller ever holds
+ * a fiat figure. The toggle appears only when there is a real exchange rate:
+ * converting someone's "$50" through a stale constant sends the wrong amount of
+ * money, which is worse than not offering the option. Same rule the balance
+ * screens follow, applied where it can actually cost something.
+ */
 function AmountField({ value, onChange }: { value: string; onChange: (v: string) => void }): ReactNode {
-  const n = Number(value);
-  const bsv = Number.isFinite(n) && n > 0 ? n / SATS_PER_BSV : 0;
+  const usdPerBsv = useBsvRate();
+  const [inUsd, setInUsd] = useState(false);
+  // Dollars typed so far, kept apart from `value`: round-tripping satoshis back
+  // through the rate would rewrite the digits under someone mid-keystroke.
+  const [dollars, setDollars] = useState("");
+
+  // A rate that disappears mid-entry (the shell lost it) must not strand the field
+  // in a mode it can no longer convert.
+  useEffect(() => {
+    if (usdPerBsv === null) setInUsd(false);
+  }, [usdPerBsv]);
+
+  const satoshis = Number(value);
+  const bsv = Number.isFinite(satoshis) && satoshis > 0 ? satoshis / SATS_PER_BSV : 0;
+
+  const onDollars = (text: string): void => {
+    if (text && !/^\d*\.?\d{0,2}$/.test(text)) return;
+    setDollars(text);
+    if (usdPerBsv === null) return;
+    const amount = Number(text);
+    onChange(text && Number.isFinite(amount) ? String(Math.round((amount / usdPerBsv) * SATS_PER_BSV)) : "");
+  };
+
   return (
     <div>
-      <FieldLabel>Amount</FieldLabel>
+      <div className="mb-1.5 flex items-baseline justify-between">
+        <FieldLabel>Amount</FieldLabel>
+        {usdPerBsv !== null ? (
+          <button
+            type="button"
+            onClick={() => {
+              setInUsd((v) => !v);
+              setDollars("");
+              onChange("");
+            }}
+            className="focus-ring text-[11px] font-semibold text-accent"
+          >
+            {inUsd ? "Enter satoshis" : "Enter dollars"}
+          </button>
+        ) : null}
+      </div>
       <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2.5">
+        {inUsd ? <span className="shrink-0 text-lg font-semibold text-muted-foreground">$</span> : null}
         <input
-          value={value}
-          onChange={(e) => onChange(e.target.value.replace(/[^0-9]/g, ""))}
-          inputMode="numeric"
-          placeholder="0"
-          aria-label="Amount in satoshis"
+          value={inUsd ? dollars : value}
+          onChange={(e) =>
+            inUsd ? onDollars(e.target.value) : onChange(e.target.value.replace(/[^0-9]/g, ""))
+          }
+          inputMode={inUsd ? "decimal" : "numeric"}
+          placeholder={inUsd ? "0.00" : "0"}
+          aria-label={inUsd ? "Amount in US dollars" : "Amount in satoshis"}
           className="w-full bg-transparent text-lg font-semibold outline-none"
         />
-        <span className="shrink-0 text-xs font-semibold text-muted-foreground">sats</span>
+        <span className="shrink-0 text-xs font-semibold text-muted-foreground">{inUsd ? "USD" : "sats"}</span>
       </div>
-      {bsv > 0 ? <p className="mt-1 text-[11px] text-muted-foreground">{bsv.toFixed(8)} BSV</p> : null}
+      {/* The other unit, always — whichever way it was typed, the payer sees both
+          before the tap. */}
+      {satoshis > 0 ? (
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          {inUsd
+            ? `${satoshis.toLocaleString("en-US")} sats · ${bsv.toFixed(8)} BSV`
+            : `${bsv.toFixed(8)} BSV${usdPerBsv !== null ? ` · ${usd(bsv * usdPerBsv)}` : ""}`}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -584,6 +646,197 @@ function AddressSend(): ReactNode {
         Pay
       </Cta>
     </div>
+  );
+}
+
+// ── Recipient ───────────────────────────────────────────────────────────────
+
+/**
+ * Who you are paying, on the handle rail.
+ *
+ * A search box that resolves names, accepts a pasted identity key, opens the
+ * scanner, and collapses to an identity card once a counterparty is chosen. The
+ * field used to be a bare text input labelled "02…", which asked a payer to
+ * recognise their friend by the first two characters of a public key and gave
+ * them nothing to check against before parting with money.
+ *
+ * Identity is decoration and the rail never depends on it: a pasted key is
+ * payable whether or not anything resolves, and every failure here is silent.
+ */
+function RecipientField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (identityKey: string) => void;
+}): ReactNode {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<PayIdentity[]>([]);
+  const [chosen, setChosen] = useState<PayIdentity | null>(null);
+  const [searching, setSearching] = useState(false);
+
+  // A key is a key, whatever it was typed into. 66 hex characters starting 02/03
+  // is a compressed public key and nothing else, so it is taken as the recipient
+  // directly rather than searched for as a name.
+  const looksLikeKey = /^0[23][0-9a-fA-F]{64}$/.test(query.trim());
+
+  useEffect(() => {
+    const text = query.trim();
+    if (looksLikeKey) {
+      onChange(text);
+      setResults([]);
+      // Resolve for display only — who this is, if anyone knows. The payment does
+      // not wait for it and does not care if it never answers.
+      let cancelled = false;
+      void payHost()
+        .handle.resolve(text)
+        .then(({ identity }) => {
+          if (!cancelled && identity) setChosen(identity);
+        })
+        .catch(() => {});
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    onChange("");
+    if (text.length < 2) {
+      setResults([]);
+      return;
+    }
+    // Debounced: a lookup per keystroke is a network call per keystroke.
+    let cancelled = false;
+    setSearching(true);
+    const timer = setTimeout(() => {
+      void payHost()
+        .handle.search(text)
+        .then(({ results: found }) => {
+          if (cancelled) return;
+          setResults(found);
+        })
+        .catch(() => {
+          if (!cancelled) setResults([]);
+        })
+        .finally(() => {
+          if (!cancelled) setSearching(false);
+        });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      setSearching(false);
+    };
+  }, [query, looksLikeKey, onChange]);
+
+  const clear = useCallback(() => {
+    setChosen(null);
+    setQuery("");
+    setResults([]);
+    onChange("");
+  }, [onChange]);
+
+  if (chosen && value) {
+    return (
+      <div>
+        <FieldLabel>Paying</FieldLabel>
+        <div className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5">
+          <IdentityAvatar identity={chosen} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold">
+              {chosen.name?.trim() || "Unnamed"}
+            </span>
+            <span className="block truncate font-mono text-[11px] text-muted-foreground">
+              {chosen.abbreviatedKey || chosen.identityKey}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={clear}
+            aria-label="Choose someone else"
+            className="focus-ring shrink-0 rounded-lg p-1 text-muted-foreground hover:text-foreground"
+          >
+            <X className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <FieldLabel>Their handle</FieldLabel>
+      <div className="focus-ring flex items-center gap-1 rounded-xl border border-border bg-surface px-3 py-2.5">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search a name, or paste their key"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          aria-label="Recipient name or identity key"
+          className="w-full bg-transparent text-sm outline-none"
+        />
+        {searching ? <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" aria-hidden="true" /> : null}
+        <ScanButton
+          accept={["handle"]}
+          hint="Point the camera at their handle or payment link"
+          onText={(t) => setQuery(t.trim())}
+        />
+      </div>
+
+      {/* A pasted key that nothing knows about is still payable — say so rather
+          than leaving the payer wondering whether the field took it. */}
+      {looksLikeKey && !chosen ? (
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Key accepted. Nobody has published a name for it.
+        </p>
+      ) : null}
+
+      {results.length > 0 ? (
+        <ul className="mt-2 divide-y divide-border overflow-hidden rounded-xl bg-surface">
+          {results.map((identity) => (
+            <li key={identity.identityKey}>
+              <button
+                type="button"
+                onClick={() => {
+                  setChosen(identity);
+                  onChange(identity.identityKey);
+                }}
+                className="focus-ring flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-surface-hover"
+              >
+                <IdentityAvatar identity={identity} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">
+                    {identity.name?.trim() || "Unnamed"}
+                  </span>
+                  <span className="block truncate font-mono text-[11px] text-muted-foreground">
+                    {identity.abbreviatedKey || identity.identityKey}
+                  </span>
+                </span>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+/** Their picture if they published one, their initial otherwise. */
+function IdentityAvatar({ identity }: { identity: PayIdentity }): ReactNode {
+  const url = identity.avatarURL?.trim();
+  if (url) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={url} alt="" className="size-8 shrink-0 rounded-full object-cover" />;
+  }
+  return (
+    <span
+      aria-hidden="true"
+      className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-bold text-accent"
+    >
+      {(identity.name?.trim()?.[0] ?? "?").toUpperCase()}
+    </span>
   );
 }
 
@@ -969,26 +1222,7 @@ function HandleSend(): ReactNode {
 
   return (
     <div className="space-y-4">
-      <div>
-        <FieldLabel>Their handle</FieldLabel>
-        <div className="focus-ring flex items-center gap-1 rounded-xl border border-border bg-surface px-3 py-2.5">
-        <input
-          value={recipient}
-          onChange={(e) => setRecipient(e.target.value.trim())}
-          placeholder="02…"
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          aria-label="Recipient identity key"
-          className="w-full bg-transparent font-mono text-sm outline-none"
-        />
-        <ScanButton
-          accept={["handle"]}
-          hint="Point the camera at their handle or payment link"
-          onText={(t) => setRecipient(t.trim())}
-        />
-        </div>
-      </div>
+      <RecipientField value={recipient} onChange={setRecipient} />
 
       <AmountField value={amount} onChange={setAmount} />
 

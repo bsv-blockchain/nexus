@@ -51,6 +51,24 @@ export interface OutboxEntry {
 }
 
 /**
+ * A resolved counterparty, as @bsv/sdk's IdentityClient describes one.
+ *
+ * Declared here rather than imported from the SDK: the chrome is a DOM bundle that
+ * deliberately holds no wallet dependency, and this is the wire shape the shell
+ * already sends. Every field is decoration on a payment that can go ahead without
+ * it — an unresolvable handle is still payable.
+ */
+export interface PayIdentity {
+  name: string;
+  avatarURL: string;
+  abbreviatedKey: string;
+  identityKey: string;
+  badgeIconURL: string;
+  badgeLabel: string;
+  badgeClickURL: string;
+}
+
+/**
  * Which MessageBox server the handle rail delivers through.
  *
  * `defaultUrl` and `noneValue` come from the shell rather than being spelled here:
@@ -126,6 +144,14 @@ interface PayHost {
       identity: (sats?: number) => Promise<{ identityKey: string; link: string }>;
       messageBox: () => Promise<MessageBoxState>;
       setMessageBox: (url: string) => Promise<{ url: string }>;
+      /**
+       * Who a handle belongs to, and who matches a typed name. Both are decoration
+       * on a payment that works without them, so neither rejects: an unresolvable
+       * key and an unknown peer are the same answer here, and a failed search is an
+       * empty list rather than an error the field has to render.
+       */
+      resolve: (identityKey: string) => Promise<{ identity: PayIdentity | null }>;
+      search: (query: string) => Promise<{ results: PayIdentity[] }>;
       send: (identityKey: string, satoshis: number) => Promise<{ outboxId: string }>;
       outbox: () => Promise<OutboxEntry[]>;
       retry: (id: string) => Promise<{ ok: boolean }>;

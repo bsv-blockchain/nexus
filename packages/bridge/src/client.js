@@ -178,6 +178,8 @@ const CREATE_HOST_CLIENT_SOURCE = `function createHostClient(options) {
         messageBox: function () { return call('pay.handle.messageBox', null) },
         setMessageBox: function (url) { return call('pay.handle.setMessageBox', { url: url }) },
         send: function (identityKey, satoshis) { return call('pay.handle.send', { identityKey: identityKey, satoshis: satoshis }, 180000) },
+        resolve: function (identityKey) { return call('pay.handle.resolve', { identityKey: identityKey }, 30000) },
+        search: function (query) { return call('pay.handle.search', { query: query }, 30000) },
         outbox: function () { return call('pay.handle.outbox', null, 30000) },
         retry: function (id) { return call('pay.handle.retry', { id: id }, 120000) },
         dismiss: function (id) { return call('pay.handle.dismiss', { id: id }) },
