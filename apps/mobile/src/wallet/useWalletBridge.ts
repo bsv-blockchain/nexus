@@ -24,8 +24,6 @@ import { useLocalStorage } from './LocalStorageProvider'
  * apps/ui/lib/wallet-data.ts for the seam.
  */
 
-const SATS_PER_BSV = 100_000_000
-
 /** The single account a BRC-100 wallet has. There are no sub-accounts to enumerate. */
 const ACCOUNT_ID = 'default'
 
@@ -52,15 +50,17 @@ export interface WalletBridge {
 
 export function useWalletBridge(): WalletBridge {
   const wallet = useContext(WalletContext)
-  const { satoshisPerUSD } = useContext(ExchangeRateContext)
+  const { usdPerBsv } = useContext(ExchangeRateContext)
 
   // Every method below reads through this ref rather than closing over the context
   // value: `methods` is handed to createHostRouter once, and a stale closure would
   // pin it to the pre-wallet render forever.
   const ref = useRef(wallet)
   ref.current = wallet
-  const rateRef = useRef(satoshisPerUSD)
-  rateRef.current = satoshisPerUSD
+  // Null until a real source answers. The context's hardcoded fallback exists so an
+  // amount field stays usable offline; it must never reach the chrome as a quote.
+  const rateRef = useRef(usdPerBsv)
+  rateRef.current = usdPerBsv
 
   // The stored mnemonic never crosses WalletContext's value — it lives behind
   // LocalStorageProvider's biometric gate, so backup has to read it there directly.
@@ -152,7 +152,8 @@ export function useWalletBridge(): WalletBridge {
             address: key ?? '',
             balanceSatoshis,
             fiatCurrency: 'USD',
-            fiatRate: rateRef.current > 0 ? SATS_PER_BSV / rateRef.current : 0,
+            // Zero means "no rate", and the chrome renders an em dash for it.
+            fiatRate: rateRef.current ?? 0,
             createdAt: new Date(0).toISOString()
           }
         ]

@@ -87,6 +87,11 @@ export function Portfolio({
         <p className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
           {loading ? "—" : usd(total)}
         </p>
+        {/* An em dash above says the total is unknown; this says why. Without it a
+            funded wallet with no rate looks like a broken wallet. */}
+        {!loading && total === null && rows.length > 0 ? (
+          <p className="mt-1 text-sm text-muted-foreground">{copy.noRate}</p>
+        ) : null}
         {/* A real wallet cannot answer "how much did this move today", and printing
             0.00% would be an answer rather than an absence of one. */}
         {change !== null ? (

@@ -51,11 +51,15 @@ export const AmountInput: React.FC<AmountInputProps> = ({ value, onChangeText, s
   const { t } = useTranslation()
   const { colors } = useTheme()
   const { settings } = useWallet()
-  const { satoshisPerUSD } = useContext(ExchangeRateContext)
+  const { satoshisPerUSD, usdPerBsv } = useContext(ExchangeRateContext)
   const reducedMotion = useReducedMotion()
 
   const currency = settings?.currency || 'BSV'
-  const isUSD = currency === 'USD'
+  // No real rate means no dollar entry. The context keeps a hardcoded fallback so a
+  // field stays usable, but converting someone's "$50" through a constant that is
+  // 20% stale sends 20% of the wrong amount — refuse, and take satoshis instead.
+  const rateKnown = usdPerBsv !== null
+  const isUSD = currency === 'USD' && rateKnown
   const isSendMax = value === SEND_MAX_VALUE
 
   // In USD mode, we maintain a separate display value (dollars) from the satoshi value
@@ -129,7 +133,7 @@ export const AmountInput: React.FC<AmountInputProps> = ({ value, onChangeText, s
   const satsForConversion = value ? parseInt(value, 10) : 0
   const secondaryText = isUSD
     ? (satsForConversion > 0 ? formatAmount(satsForConversion, 'BSV', satoshisPerUSD) : null)
-    : (satsForConversion > 0 && satoshisPerUSD > 0 ? formatAmount(satsForConversion, 'USD', satoshisPerUSD) : null)
+    : (satsForConversion > 0 && rateKnown ? formatAmount(satsForConversion, 'USD', satoshisPerUSD) : null)
 
   const entering = reducedMotion ? undefined : FadeInUp.duration(durations.instant)
   const exiting = reducedMotion ? undefined : FadeOutDown.duration(durations.instant)

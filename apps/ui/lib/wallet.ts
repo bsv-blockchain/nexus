@@ -12,43 +12,54 @@ import {
   type Token,
   type WalletTransaction,
 } from "@/lib/data";
+import type { DataMode } from "@/lib/data-mode";
 
 export const SATS_PER_BSV = 100_000_000;
 
 export interface Holding {
   token: Token;
   units: number;
-  usd: number;
+  /** Null when nothing can price it — see usdPerUnitOf. Not the same as zero. */
+  usd: number | null;
 }
 
-/** Held assets, most valuable first, with BSV always pinned to the top. */
+/**
+ * Held assets, most valuable first, with BSV always pinned to the top.
+ *
+ * Fixture-side only — a live wallet's single holding is assembled in wallet-live.ts
+ * from the shell's balance, so every price here is a fixture price by definition.
+ */
 export function holdings(): Holding[] {
   return getTokenBalances()
     .map(({ token, units }) => ({ token, units, usd: units * token.usdPerUnit }))
     .sort((a, b) => {
       if (a.token.base !== b.token.base) return a.token.base ? -1 : 1;
-      return b.usd - a.usd;
+      return (b.usd ?? 0) - (a.usd ?? 0);
     });
 }
 
 export function portfolioUsd(): number {
-  return holdings().reduce((total, h) => total + h.usd, 0);
+  return holdings().reduce((total, h) => total + (h.usd ?? 0), 0);
 }
 
 /** Value-weighted 24h move across the whole portfolio. */
 export function portfolioChange24h(): number {
   const rows = holdings();
-  const total = rows.reduce((sum, h) => sum + h.usd, 0);
+  const total = portfolioUsd();
   if (total === 0) return 0;
-  return rows.reduce((sum, h) => sum + h.token.change24h * (h.usd / total), 0);
+  return rows.reduce(
+    (sum, h) => sum + h.token.change24h * ((h.usd ?? 0) / total),
+    0,
+  );
 }
 
 export function holdingOf(tokenId: string): Holding | undefined {
   return holdings().find((h) => h.token.id === tokenId);
 }
 
-/** `$3,412.88` */
-export function usd(amount: number): string {
+/** `$3,412.88`, or an em dash when there is no price to render. */
+export function usd(amount: number | null): string {
+  if (amount === null) return "—";
   return amount.toLocaleString("en-US", {
     style: "currency",
     currency: "USD",
@@ -79,27 +90,44 @@ export function txToken(tx: WalletTransaction): Token | undefined {
 }
 
 /**
- * The device's live USD-per-BSV, when there is one.
+ * How this session prices an asset.
  *
  * The fixtures carry their own BSV price, and in live mode it is simply wrong — the
  * portfolio total was reading the device's rate while every transaction row read the
  * fixture's, so the same balance appeared at two different dollar values on two
  * screens. One rate, set once by the live data layer, keeps them agreeing.
+ *
+ * And when a live wallet has no rate at all, the answer is null rather than the
+ * fixture's price or zero. `$0.00` is a claim about the balance; the fixture price
+ * is a fiction; an em dash is the only honest one of the three.
  */
-let liveUsdPerBsv: number | null = null;
+let pricing: { mode: DataMode; usdPerBsv: number | null } = {
+  mode: "demo",
+  usdPerBsv: null,
+};
 
-export function setLiveBsvRate(usdPerBsv: number | null): void {
-  liveUsdPerBsv = usdPerBsv && usdPerBsv > 0 ? usdPerBsv : null;
+export function setBsvPricing(mode: DataMode, usdPerBsv: number | null): void {
+  pricing = {
+    mode,
+    usdPerBsv: usdPerBsv !== null && usdPerBsv > 0 ? usdPerBsv : null,
+  };
 }
 
-export function usdPerUnitOf(token: Token): number {
-  if (token.id === "bsv" && liveUsdPerBsv !== null) return liveUsdPerBsv;
+/** USD per unit, or null when this session cannot price the asset. */
+export function usdPerUnitOf(token: Token): number | null {
+  // A live wallet holds BSV and nothing else; a fixture price for any other
+  // symbol would be describing a holding that does not exist.
+  if (pricing.mode === "live") {
+    return token.id === "bsv" ? pricing.usdPerBsv : null;
+  }
   return token.usdPerUnit;
 }
 
-export function txUsd(tx: WalletTransaction): number {
+export function txUsd(tx: WalletTransaction): number | null {
   const token = txToken(tx);
-  return token ? txUnits(tx) * usdPerUnitOf(token) : 0;
+  if (!token) return null;
+  const rate = usdPerUnitOf(token);
+  return rate === null ? null : txUnits(tx) * rate;
 }
 
 const DAY_MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];

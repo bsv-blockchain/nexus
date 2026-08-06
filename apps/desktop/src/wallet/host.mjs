@@ -5,6 +5,7 @@ import { TaskSendOffline } from '@nexus/wallet-core/src/utils/monitor/TaskSendOf
 import { getOnline, subscribeOnline } from '@nexus/wallet-core/src/utils/net/online'
 import { DEFAULT_MESSAGE_BOX_URL, MESSAGE_BOX_URL_KEY } from '@nexus/wallet-core/src/utils/pay/rails/handle'
 import { restoreDesktopWallet } from './buildWallet.ts'
+import { createExchangeRate } from './exchangeRate.mjs'
 import { createPayHost } from './payHost.mjs'
 import { createLocalStorage } from '../platform/index.mjs'
 import { installDesktopOnlineProbe } from '../platform/onlineProbe.mjs'
@@ -50,6 +51,7 @@ export function createWalletHost({ userDataDir, onStateChange }) {
 
   installDesktopOnlineProbe()
   const localStorage = createLocalStorage()
+  const exchangeRate = createExchangeRate(localStorage)
 
   /**
    * Feed the offline drain's online gate.
@@ -221,10 +223,10 @@ export function createWalletHost({ userDataDir, onStateChange }) {
             address: key,
             balanceSatoshis,
             fiatCurrency: 'USD',
-            // No exchange-rate service in main yet. Zero is visibly "unknown"
-            // rather than a made-up number, and the chrome renders $0.00 for it —
-            // which is worse than a real rate and better than a wrong one.
-            fiatRate: 0,
+            // WhatsOnChain, cached, timeout-bounded, and never fabricated: zero
+            // means no source has answered yet, and the chrome renders an em dash
+            // with "Exchange rate unavailable" rather than $0.00.
+            fiatRate: (await exchangeRate.usdPerBsv()) ?? 0,
             createdAt: new Date(0).toISOString()
           }
         ]

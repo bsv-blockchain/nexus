@@ -17,13 +17,13 @@ import { whoisFor } from "@/lib/messages";
 import {
   changeTone,
   groupByDay,
-  holdingOf,
   percent,
   txToken,
   txUnits,
   txUsd,
   usd,
 } from "@/lib/wallet";
+import { useHolding } from "@/lib/wallet-live";
 import {
   ArrowDownLeft,
   ArrowLeft,
@@ -113,11 +113,17 @@ export function TokenDetail({
   onOpenTx: (id: string) => void;
 }): ReactNode {
   const copy = content.wallet;
-  const token = getToken(tokenId);
-  const holding = holdingOf(tokenId);
-  if (!token || !holding) {
+  // The holding comes from the portfolio, not from the fixtures: this screen used to
+  // print the demo's 34.2180455 BSV at the demo's $72.50 to a live wallet, above an
+  // activity list that was correctly empty.
+  const { holding, loading, showTrend } = useHolding(tokenId);
+  if (loading && !holding) {
+    return <Page title={copy.loading} onBack={onBack}>{null}</Page>;
+  }
+  if (!holding) {
     return <Page title={copy.notFound} onBack={onBack}>{null}</Page>;
   }
+  const token = holding.token;
   const own = transactions.filter(
     (tx) => (tx.tokenId ?? "bsv") === tokenId,
   );
@@ -136,23 +142,31 @@ export function TokenDetail({
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               {usd(holding.usd)}{" "}
-              <span className={`font-semibold ${changeTone(token.change24h)}`}>
-                {percent(token.change24h)}
-              </span>
+              {/* A 24h move is a fixture property. Nothing on a live device knows
+                  what this asset did yesterday, and "+0.0%" would answer as if it did. */}
+              {showTrend && (
+                <span className={`font-semibold ${changeTone(token.change24h)}`}>
+                  {percent(token.change24h)}
+                </span>
+              )}
             </p>
           </div>
-          <Spark holding={holding} width={96} height={34} />
+          {showTrend && <Spark holding={holding} width={96} height={34} />}
         </div>
 
-        <p className="mt-4 text-sm text-pretty text-muted-foreground">
-          {token.blurb}
-        </p>
+        {token.blurb && (
+          <p className="mt-4 text-sm text-pretty text-muted-foreground">
+            {token.blurb}
+          </p>
+        )}
 
         <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-4 text-sm">
-          <div>
-            <dt className="text-xs text-muted-foreground">{copy.protocol}</dt>
-            <dd className="mt-0.5 font-medium">{token.protocol}</dd>
-          </div>
+          {token.protocol && (
+            <div>
+              <dt className="text-xs text-muted-foreground">{copy.protocol}</dt>
+              <dd className="mt-0.5 font-medium">{token.protocol}</dd>
+            </div>
+          )}
           <div>
             <dt className="text-xs text-muted-foreground">{copy.issuer}</dt>
             <dd className="mt-0.5 flex items-center gap-1.5 font-medium">
