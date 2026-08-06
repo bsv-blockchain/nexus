@@ -18,8 +18,17 @@
 #            against the KeyLocker certificate and verified.
 #   Linux    GPG: detach-signed AppImage plus a signed SHA256SUMS manifest.
 #
-# Publishing model: every run refreshes a DRAFT GitHub release for the tag.
-# Making a draft public stays a human act.
+# Publishing model: every TAG run refreshes a DRAFT GitHub release. Making a draft
+# public stays a human act.
+#
+# Dispatching this workflow on a BRANCH is a rehearsal: it builds, signs and
+# notarizes exactly as a release does, and publishes nothing. Use it before cutting
+# a tag whenever the packaging, signing or certificate path has changed —
+#
+#   gh workflow run release-desktop.yml --ref my-branch
+#
+# — because a tag cannot be un-cut, and the only failures this pipeline has ever had
+# were ones no local build could reproduce.
 name: release-desktop
 
 on:
@@ -42,14 +51,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      # workflow_dispatch is for RE-RUNNING a tag's release: dispatch it on the tag
-      # ref. From a branch there is no version to release — refuse loudly.
+      # Two modes, decided by the ref:
+      #
+      #   a vX.Y.Z tag   a real release. Metadata must agree with the tag, and the
+      #                  release job below publishes a draft.
+      #   any branch     a REHEARSAL. Builds, signs and notarizes exactly as a
+      #                  release does, and publishes nothing.
+      #
+      # This used to refuse the second case outright, which meant the only way to
+      # find out whether the signing path worked was to cut a tag — and a tag is
+      # forever. v0.1.0 was spent discovering that apps/desktop/build had never
+      # been committed. A rehearsal costs runner minutes and one Apple
+      # notarization; a burnt version number costs more.
       - run: |
-          if [[ "$GITHUB_REF" != refs/tags/v* ]]; then
-            echo "::error::this workflow releases tags — dispatch it on a vX.Y.Z tag, not '$GITHUB_REF_NAME'"
-            exit 1
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            node tools/version.mjs --check --tag "$GITHUB_REF_NAME"
+          else
+            echo "::notice title=Rehearsal::'$GITHUB_REF_NAME' is not a version tag — building and signing, publishing nothing."
+            node tools/version.mjs --check
           fi
-          node tools/version.mjs --check --tag "$GITHUB_REF_NAME"
 
   build:
     needs: verify-version
@@ -307,6 +327,10 @@ jobs:
 
   release:
     needs: build
+    # Tags only. A rehearsal proves the artifacts can be built and signed; it must
+    # not leave a draft release behind for a version nobody cut. The artifacts are
+    # still downloadable from the run's own Artifacts panel.
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
