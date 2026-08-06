@@ -22,7 +22,7 @@
     "web:deploy": "node tools/web.mjs deploy",
     "typecheck": "tsc --noEmit -p apps/mobile",
     "test": "node --experimental-transform-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test-timeout=60000 --test \"packages/*/test/**/*.test.mjs\"",
-    "check": "node tools/check-injection-sources.mjs",
+    "check": "node tools/check-env.mjs && node tools/check-injection-sources.mjs",
     "ui:bundle": "node tools/build-ui.mjs && node tools/bundle-ui.mjs",
     "postinstall": "patch-package",
     "version:check": "node tools/version.mjs --check",

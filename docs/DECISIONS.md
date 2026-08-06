@@ -28,7 +28,12 @@ Publisher, Signer, Attestations, Baskets, Learn.
 - **Storage is LOCAL by default on mobile and desktop.** No remote storage service, no WAB.
   The wallet's source of truth is the on-device database.
 - **ARC / chaintracks: `arcade-v2-*.bsvblockchain.tech` only.**
-- **MessageBox: `message-box-us-1.bsvb.tech`** (replacing `messagebox.babbage.systems`).
+- **MessageBox: `gmb.bsvblockchain.tech`** (replacing `messagebox.babbage.systems`, and
+  the never-adopted `message-box-us-1.bsvb.tech`). Not a source literal: it is
+  `EXPO_PUBLIC_MESSAGEBOX_URL` / `NEXUS_MESSAGEBOX_URL` in the committed `/.env`, so
+  changing it is a one-line diff rather than a hunt through `packages/` for whichever
+  of three constants happened to be the one that was read. `npm run check` fails if
+  the copies EAS and Expo need ever drift from it.
 - Nothing points at `wab-us-1.bsvb.tech` or `store-us-1.bsvb.tech`.
 
 Consequence worth stating: local-only storage means no cross-device recovery from the

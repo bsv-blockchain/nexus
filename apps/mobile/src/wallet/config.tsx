@@ -19,6 +19,8 @@ export function toWalletChain(chain: AppChain): WalletChain {
 
 export const DEFAULT_WAB_URL = 'noWAB'
 export const DEFAULT_STORAGE_URL = 'local'
-export const DEFAULT_MESSAGEBOX_URL = 'https://messagebox.babbage.systems'
+// The MessageBox host lives in ONE place: DEFAULT_MESSAGE_BOX_URL in the handle rail,
+// which reads it from the environment. A copy here had no importers and had already
+// drifted to a host nothing was talking to.
 export const DEFAULT_CHAIN: AppChain = 'main'
 export const ADMIN_ORIGINATOR = 'admin.com'

@@ -14,11 +14,44 @@
  *   node build-main.mjs --watch   rebuild on change
  */
 import { build, context } from 'esbuild'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
+const ROOT = join(HERE, '../..')
 const watch = process.argv.includes('--watch')
+
+/**
+ * Service endpoints from the committed /.env, baked in at build time.
+ *
+ * Baked, not read at runtime: a packaged app runs in whatever environment the user's
+ * desktop session happens to have, which is not the one this build ran in. Reading
+ * `process.env` from inside main would mean the shipped binary silently fell back to
+ * the source literal on every machine but a developer's.
+ *
+ * A real environment variable still wins, so CI and one-off builds can override
+ * without editing a tracked file.
+ */
+function envFromRepo() {
+  /** @type {Record<string, string>} */
+  const values = {}
+  try {
+    for (const line of readFileSync(join(ROOT, '.env'), 'utf8').split('\n')) {
+      const match = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim())
+      if (match) values[match[1]] = match[2].trim()
+    }
+  } catch {
+    // No .env in this checkout. The constants carry their own fallbacks, which is
+    // the case this is allowed to be silent about.
+  }
+  const define = {}
+  for (const name of Object.keys(values)) {
+    if (!name.startsWith('NEXUS_')) continue
+    define[`process.env.${name}`] = JSON.stringify(process.env[name] ?? values[name])
+  }
+  return define
+}
 
 /** @type {import('esbuild').BuildOptions} */
 const options = {
@@ -43,6 +76,7 @@ const options = {
   external: ['electron', 'node:sqlite', 'node:async_hooks'],
   logLevel: 'info',
   define: {
+    ...envFromRepo(),
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'production'),
     // CJS output has no import.meta, and esbuild's fallback is `{}` — so
     // `fileURLToPath(import.meta.url)` became `fileURLToPath(undefined)` and threw

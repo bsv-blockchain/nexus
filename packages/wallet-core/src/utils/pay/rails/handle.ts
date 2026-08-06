@@ -12,7 +12,28 @@ import type { IncomingPayment, PaymentToken, PeerPayClient } from '@bsv/message-
 import { markOutboxSent, saveOutboxEntry, updateOutboxEntry, type OutboxEntry } from '@nexus/wallet-core/src/utils/peerpay/outbox'
 
 export const MESSAGE_BOX_URL_KEY = 'message_box_url'
-export const DEFAULT_MESSAGE_BOX_URL = 'https://messagebox.babbage.systems'
+
+/**
+ * The MessageBox host a build ships pointing at, from the environment.
+ *
+ * This is THE definition — the two other `DEFAULT_MESSAGEBOX_URL` constants that used
+ * to sit in apps/mobile and wallet-core/chain.ts were dead copies, and one of them had
+ * already drifted to a different host than the one actually being used.
+ *
+ * Two names because two bundlers are involved and neither reads the other's variables:
+ * Metro inlines `EXPO_PUBLIC_*` into the mobile bundle, and the desktop build defines
+ * `NEXUS_*` into the Electron main bundle. Both are set in the committed /.env; see
+ * that file for why they are in the open and how they are kept in step.
+ *
+ * The literal is a last resort, not the configuration. It exists so a checkout with no
+ * env at all still builds something that works rather than posting payments to
+ * `undefined`, and it must stay equal to /.env — tools/check-env.mjs enforces that.
+ */
+export const DEFAULT_MESSAGE_BOX_URL =
+  process.env.EXPO_PUBLIC_MESSAGEBOX_URL ||
+  process.env.NEXUS_MESSAGEBOX_URL ||
+  'https://gmb.bsvblockchain.tech'
+
 /** The sentinel the config panel writes when the user opts out of a server. */
 export const NO_MESSAGE_BOX = 'noMessageBox'
 

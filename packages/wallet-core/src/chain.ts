@@ -27,4 +27,6 @@ export const ADMIN_ORIGINATOR = 'admin.com'
 export const DEFAULT_STORAGE_URL = 'local'
 /** No wallet authentication backend. */
 export const DEFAULT_WAB_URL = 'noWAB'
-export const DEFAULT_MESSAGEBOX_URL = 'https://message-box-us-1.bsvb.tech'
+// The MessageBox host lives in ONE place: DEFAULT_MESSAGE_BOX_URL in
+// utils/pay/rails/handle.ts, which reads it from the environment. A copy here had no
+// importers, so the host it named was never the host any payment used.
