@@ -217,9 +217,21 @@ export function createPayHost({ getWallet, getNetwork, adminOriginator, localSto
         return { identityKey: publicKey, link: peerPayLinkFor(publicKey, params?.sats) }
       },
 
+      /**
+       * `defaultUrl` and `noneValue` travel with the answer so the chrome can offer
+       * "reset" and "use no server" without hardcoding either. The sentinel in
+       * particular is a rail-level constant — a chrome that spelled it itself would
+       * silently stop disabling the rail the day the rail renamed it.
+       */
       'pay.handle.messageBox': async () => {
         const url = await messageBoxUrl()
-        return { url, isDefault: url === DEFAULT_MESSAGE_BOX_URL, disabled: url === NO_MESSAGE_BOX }
+        return {
+          url,
+          isDefault: url === DEFAULT_MESSAGE_BOX_URL,
+          disabled: url === NO_MESSAGE_BOX,
+          defaultUrl: DEFAULT_MESSAGE_BOX_URL,
+          noneValue: NO_MESSAGE_BOX
+        }
       },
 
       'pay.handle.setMessageBox': async ({ url }) => {
@@ -293,7 +305,14 @@ export function createPayHost({ getWallet, getNetwork, adminOriginator, localSto
             error: result.attempts[String(p.messageId)].error
           }))
 
-        return { accepted: result.accepted, stuck }
+        // Everything NOT left in the attempt map was credited, so that is what the
+        // figure sums. The chrome shows it on the receipt: a count alone tells a
+        // payee that something arrived without telling them whether it was theirs.
+        const creditedSatoshis = payments
+          .filter((p) => !result.attempts[String(p.messageId)])
+          .reduce((sum, p) => sum + (p.token?.amount ?? 0), 0)
+
+        return { accepted: result.accepted, creditedSatoshis, stuck }
       },
 
       /**

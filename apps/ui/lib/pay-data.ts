@@ -50,6 +50,22 @@ export interface OutboxEntry {
   lastError?: string;
 }
 
+/**
+ * Which MessageBox server the handle rail delivers through.
+ *
+ * `defaultUrl` and `noneValue` come from the shell rather than being spelled here:
+ * they are rail constants, and a chrome carrying its own copy of the disable
+ * sentinel would go on sending a string the rail had stopped recognising.
+ */
+export interface MessageBoxState {
+  url: string;
+  isDefault: boolean;
+  /** The user has chosen no server. The handle rail cannot deliver at all. */
+  disabled: boolean;
+  defaultUrl: string;
+  noneValue: string;
+}
+
 /** A payment the wallet has given up crediting automatically. */
 export interface InboxRow {
   messageId: string;
@@ -108,13 +124,18 @@ interface PayHost {
     };
     handle: {
       identity: (sats?: number) => Promise<{ identityKey: string; link: string }>;
-      messageBox: () => Promise<{ url: string; isDefault: boolean; disabled: boolean }>;
+      messageBox: () => Promise<MessageBoxState>;
       setMessageBox: (url: string) => Promise<{ url: string }>;
       send: (identityKey: string, satoshis: number) => Promise<{ outboxId: string }>;
       outbox: () => Promise<OutboxEntry[]>;
       retry: (id: string) => Promise<{ ok: boolean }>;
       dismiss: (id: string) => Promise<{ ok: boolean }>;
-      inbox: (retry?: string[]) => Promise<{ accepted: number; stuck: InboxRow[] }>;
+      /**
+       * `creditedSatoshis` is what the arrival is worth, not just how many there
+       * were: a receipt that says "1 payment received" without a figure asks the
+       * payee to go and look, which is the doubt the receipt exists to remove.
+       */
+      inbox: (retry?: string[]) => Promise<{ accepted: number; creditedSatoshis: number; stuck: InboxRow[] }>;
       discard: (messageId: string) => Promise<{ ok: boolean }>;
     };
     offline: {
