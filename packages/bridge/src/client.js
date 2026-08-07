@@ -171,6 +171,27 @@ const CREATE_HOST_CLIENT_SOURCE = `function createHostClient(options) {
       exportDb: function () { return call('backup.exportDb', null, 600000) },
       importDb: function () { return call('backup.importDb', null, 600000) }
     },
+    permission: {
+      /*
+       * Answer a spend request. The amount is what the user actually authorised,
+       * which need not be what was asked for; ephemeral false means the grant
+       * survives this one payment.
+       *
+       * Default timeout on purpose: the shell only has to hand the answer to the
+       * permissions manager, which is a local call. The long wait is on the other
+       * side of this, in the page.
+       */
+      resolve: function (requestID, approved, opts) {
+        var o = opts || {}
+        return call('permission.resolve', {
+          requestID: requestID,
+          approved: approved,
+          amount: o.amount,
+          ephemeral: o.ephemeral !== false
+        })
+      },
+      pending: function () { return call('permission.pending', null) }
+    },
     // Payments. The rail is never chosen here — classify() infers it from how the
     // counterparty was identified, and the chrome renders whatever comes back.
     // Anything that broadcasts, sweeps or talks to a message box gets a long

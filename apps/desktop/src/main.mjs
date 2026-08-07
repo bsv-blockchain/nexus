@@ -99,7 +99,11 @@ function createWindow() {
   walletHost?.shutdown()
   walletHost = createWalletHost({
     userDataDir: app.getPath('userData'),
-    onStateChange: (state) => router?.emit('wallet.state', state)
+    onStateChange: (state) => router?.emit('wallet.state', state),
+    // A spend above the auto-approve limit needs a person, and the person is in
+    // the chrome. Null is pushed too — that is how the sheet closes when the
+    // queue drains.
+    onPermissionRequest: (request) => router?.emit('permission.request', request)
   })
 
   router = createHostRouter({

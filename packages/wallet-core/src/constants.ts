@@ -48,12 +48,18 @@ export const SEARCH_ENGINES: SearchEngine[] = [
 
 export const DEFAULT_SEARCH_ENGINE_ID = 'startpage'
 
-/** Auto-approve transactions below this satoshi amount without showing the spend modal */
-export const DEFAULT_AUTO_APPROVE_THRESHOLD = 100_000
-/** Minimum milliseconds between auto-approved transactions (global, origin-agnostic) */
-export const AUTO_APPROVE_COOLDOWN_MS = 10_000
-/** AsyncStorage key for persisted auto-approve threshold */
-export const AUTO_APPROVE_STORAGE_KEY = 'autoApproveThreshold'
+/*
+ * Re-exported, not defined here: this file imports react-native on line 1, and
+ * Electron main cannot follow it — esbuild walks into react-native/index.js and
+ * dies on the flow types. Both shells enforce the same spending limit, so the
+ * limit lives in ./spending, which has no platform in it. Existing mobile imports
+ * from this module keep working.
+ */
+export {
+  AUTO_APPROVE_COOLDOWN_MS,
+  AUTO_APPROVE_STORAGE_KEY,
+  DEFAULT_AUTO_APPROVE_THRESHOLD
+} from '@nexus/wallet-core/src/spending'
 
 /** AsyncStorage key for custom ARC URL override (per network) */
 export const arcUrlStorageKey = (network: string) => `arc_custom_url_${network}`

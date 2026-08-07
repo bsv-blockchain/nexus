@@ -48,11 +48,46 @@ function humanMemo(description: string | undefined): string {
   return LOOKS_LIKE_A_REFERENCE.test(text) ? '' : text
 }
 
+/**
+ * What the chrome is told about a spend request.
+ *
+ * A deliberate subset of the shell's SpendingRequest. The running totals it also
+ * carries (`totalPastSpending`, `amountPreviouslyAuthorized`) are zero at every
+ * call site today, and sending fields that are always zero invites a sheet that
+ * renders them as facts.
+ */
+export interface SpendPayload {
+  requestID: string
+  originator: string
+  description?: string
+  authorizationAmount: number
+  renewal?: boolean
+  lineItems: any[]
+}
+
+function toSpendPayload(request: any): SpendPayload {
+  return {
+    requestID: String(request.requestID),
+    originator: String(request.originator ?? ''),
+    description: request.description,
+    authorizationAmount: Number(request.authorizationAmount ?? 0),
+    renewal: Boolean(request.renewal),
+    lineItems: Array.isArray(request.lineItems) ? request.lineItems : []
+  }
+}
+
 export interface WalletBridge {
   methods: Record<string, (params: any) => any>
   handleCwi: ReturnType<typeof createCwiHost>
   /** Coarse lifecycle, for the shell to push to the chrome when it changes. */
   state: { ready: boolean; building: boolean }
+  /**
+   * The spend request at the head of the queue, or null.
+   *
+   * Surfaced here rather than read from WalletContext in App.tsx so the wallet
+   * coupling stays in one file — App.tsx only knows it has something to push.
+   */
+  pendingSpend: SpendPayload | null
 }
 
 export function useWalletBridge(): WalletBridge {
@@ -357,6 +392,54 @@ export function useWalletBridge(): WalletBridge {
       },
 
       /**
+       * The user's answer to a spend request, from the chrome's sheet.
+       *
+       * `advanceSpendingQueue` is what closes the loop: it pops the head, which
+       * both releases the blocked permissions manager and lets the next queued
+       * request through. Granting without advancing leaves the queue stuck with a
+       * request nobody will ever answer again.
+       *
+       * Deny is not an error condition — it is the user saying no — so a failure
+       * inside denyPermission is swallowed rather than reported back as if the
+       * chrome had done something wrong.
+       */
+      [METHODS.PERMISSION_RESOLVE]: async (params: {
+        requestID?: string
+        approved?: boolean
+        amount?: number
+        ephemeral?: boolean
+      } | null) => {
+        const requestID = String(params?.requestID ?? '')
+        if (!requestID) throw new Error('permission.resolve needs a requestID')
+        const w = ref.current
+        const manager = w.managers.permissionsManager
+        if (!manager) throw new Error('wallet is not ready')
+
+        // Only ever answer the request the chrome was actually shown. A stale
+        // reply — the sheet unmounting after the queue moved on — must not grant
+        // a spend the user never saw.
+        const head = w.spendingRequests?.[0]
+        if (!head || head.requestID !== requestID) return { ok: false, stale: true }
+
+        if (params?.approved) {
+          manager.grantPermission({
+            requestID,
+            ephemeral: params?.ephemeral !== false,
+            ...(typeof params?.amount === 'number' ? { amount: params.amount } : {})
+          })
+        } else {
+          try {
+            await manager.denyPermission(requestID)
+          } catch {
+            // Expected: denial is a user choice, and the manager rejects the
+            // underlying call as a consequence rather than as a fault here.
+          }
+        }
+        w.advanceSpendingQueue()
+        return { ok: true }
+      },
+
+      /**
        * The ceiling under which a page's spend goes through without asking.
        *
        * Clamped at zero, and zero is meaningful: it means ask every time. There is
@@ -372,6 +455,18 @@ export function useWalletBridge(): WalletBridge {
         // callback re-reads this key on every request, so the next spend already
         // sees it. That re-read is why this is a write and not a restart.
         return { ok: true, satoshis }
+      },
+
+      /**
+       * Whatever spend request is outstanding, if any.
+       *
+       * The push is the normal path; this exists for the one case the push cannot
+       * cover — the chrome reloading while a request is already queued, after the
+       * event has been and gone.
+       */
+      [METHODS.PERMISSION_PENDING]: async () => {
+        const head = ref.current.spendingRequests?.[0]
+        return head ? toSpendPayload(head) : null
       }
     }),
     [asAdmin, identityKey, settleBuilt]
@@ -395,5 +490,16 @@ export function useWalletBridge(): WalletBridge {
     [ready, wallet.walletBuilding]
   )
 
-  return { methods, handleCwi, state }
+  // Keyed on requestID rather than on the object: the queue array is rebuilt on
+  // every render, and pushing an identical request each time would re-open the
+  // sheet under the user's finger.
+  const head = wallet.spendingRequests?.[0]
+  const headId = head?.requestID
+  const pendingSpend = useMemo(
+    () => (head ? toSpendPayload(head) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [headId]
+  )
+
+  return { methods, handleCwi, state, pendingSpend }
 }

@@ -90,7 +90,23 @@ const METHODS = {
   // view sits above a WebView's content regardless of z-index), so a chrome sheet or
   // menu would be half-hidden behind the page. The chrome tells the shell when it is
   // covering itself, and the shell takes the tab layer down for the duration.
-  CHROME_SET_OVERLAY: 'chrome.setOverlay'
+  CHROME_SET_OVERLAY: 'chrome.setOverlay',
+
+  /**
+   * The user's answer to a permission request the shell asked for.
+   *
+   * The request travels the other way, as PERMISSION_REQUEST below. This is the only
+   * way a queued request is ever resolved: the wallet's permissions manager is
+   * BLOCKED on it — `createAction` from a browsed page does not return until someone
+   * grants or denies — so a chrome that drops one hangs the page until the bridge
+   * times out.
+   */
+  PERMISSION_RESOLVE: 'permission.resolve',
+  /**
+   * Whatever request is outstanding, for a chrome that reloaded after the push.
+   * The event is the normal path; this closes the one hole it cannot.
+   */
+  PERMISSION_PENDING: 'permission.pending'
 }
 
 /** Shell → chrome pushes. */
@@ -112,7 +128,20 @@ const EVENTS = {
    * would have to poll: wallet.info is answered once per mount, and a wallet that
    * finishes building thirty seconds into a cold start would never be noticed.
    */
-  WALLET_STATE: 'wallet.state'
+  WALLET_STATE: 'wallet.state',
+
+  /**
+   * A browsed page wants to spend, and the amount is above the auto-approve limit.
+   *
+   * Pushed rather than polled because the wallet is BLOCKED while it waits — the
+   * permissions manager holds `createAction` open until the answer comes back
+   * through PERMISSION_RESOLVE. The chrome must always answer, including on unmount:
+   * a dropped request is a page frozen mid-payment.
+   *
+   * Payload is the SpendingRequest shape from the mobile WalletContext, minus
+   * anything the chrome has no business seeing. `requestID` is the correlation key.
+   */
+  PERMISSION_REQUEST: 'permission.request'
 }
 
 function isRequest(msg) {
