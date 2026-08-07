@@ -156,7 +156,20 @@ const CREATE_HOST_CLIENT_SOURCE = `function createHostClient(options) {
       get: function () { return call('settings.get', null) },
       // Tears the whole manager stack down and rebuilds it against the other
       // chain — the same class of work as restore, so the same bound.
-      setNetwork: function (network) { return call('settings.setNetwork', { network: network }, 300000) }
+      setNetwork: function (network) { return call('settings.setNetwork', { network: network }, 300000) },
+      // Rebuilds Services against the new endpoint, so it costs what a network
+      // switch costs rather than what a preference write costs.
+      setArc: function (url, token) { return call('settings.setArc', { url: url, token: token }, 300000) },
+      setAutoApprove: function (satoshis) { return call('settings.setAutoApprove', { satoshis: satoshis }) }
+    },
+    backup: {
+      // Deriving the primary key can put a biometric prompt on screen and the
+      // Shamir split is real work; neither belongs on a short timeout.
+      shares: function () { return call('backup.shares', null, 300000) },
+      // Both open a native file dialog and then move a whole database, which is a
+      // person deciding where to put a file, not a round trip.
+      exportDb: function () { return call('backup.exportDb', null, 600000) },
+      importDb: function () { return call('backup.importDb', null, 600000) }
     },
     // Payments. The rail is never chosen here — classify() infers it from how the
     // counterparty was identified, and the chrome renders whatever comes back.

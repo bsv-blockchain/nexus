@@ -380,6 +380,25 @@ export function createWalletHost({ userDataDir, onStateChange }) {
           network: await currentNetwork(),
           networks: ['main', 'test'],
           messageBoxUrl,
+          /*
+           * Null means "this shell cannot answer for it", and the chrome renders no
+           * row rather than a control that does nothing. Both are honest absences
+           * with a fixable cause, not decisions:
+           *
+           *   arc          buildWallet.ts constructs `new Services(chain)` with no
+           *                options, so the override keys wallet-core defines are
+           *                never read here. Wiring it means moving desktop onto
+           *                createServices(), which also changes which broadcast
+           *                providers it uses — a change that deserves its own
+           *                verification rather than riding along with a settings row.
+           *   autoApprove  there is no spending-authorization prompt in main at all
+           *                (see the WalletPermissionsManager options in
+           *                buildWallet.ts), so there is no gate for a limit to raise
+           *                or lower. A limit here would be a number that changes
+           *                nothing.
+           */
+          arc: null,
+          autoApprove: null,
           secure: {
             storedSecurely: status.available,
             method: status.available ? 'keychain' : 'none'

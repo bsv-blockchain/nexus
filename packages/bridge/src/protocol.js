@@ -48,6 +48,32 @@ const METHODS = {
   // answerable by both shells, or the Settings screen forks per platform.
   SETTINGS_GET: 'settings.get',
   SETTINGS_SET_NETWORK: 'settings.setNetwork',
+  /**
+   * The broadcast endpoint, per network. Both halves are real settings rather than
+   * developer conveniences: an ARC that needs a token is unusable without somewhere
+   * to put one, and a wallet pinned to a dead endpoint cannot broadcast at all.
+   * Passing null resets to the shipped default.
+   */
+  SETTINGS_SET_ARC: 'settings.setArc',
+  /**
+   * How much a page may spend before the wallet stops asking. Storing it is not the
+   * hard part — WalletContext has read this key since the port — but nothing has
+   * ever been able to change it, so every wallet runs on the compiled-in default.
+   */
+  SETTINGS_SET_AUTO_APPROVE: 'settings.setAutoApprove',
+
+  /**
+   * Backup and recovery, beyond the twelve words.
+   *
+   * `backup.shares` splits the primary key 2-of-3 (Shamir) and returns printable
+   * HTML — the chrome cannot derive a key and must never hold one, so the shell
+   * does both behind whatever gate it has. `exportDb`/`importDb` move the ledger
+   * itself, which is the only copy of transaction history a local-only wallet has.
+   * Import REPLACES that ledger and rebuilds the wallet.
+   */
+  BACKUP_SHARES: 'backup.shares',
+  BACKUP_EXPORT_DB: 'backup.exportDb',
+  BACKUP_IMPORT_DB: 'backup.importDb',
 
   /**
    * Native surfaces. Three things the chrome cannot do itself — read a camera,
