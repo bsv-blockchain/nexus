@@ -4,6 +4,11 @@ import { generateMnemonicWallet } from '@nexus/wallet-core/src/utils/mnemonicWal
 import { TaskSendOffline } from '@nexus/wallet-core/src/utils/monitor/TaskSendOffline'
 import { getOnline, subscribeOnline } from '@nexus/wallet-core/src/utils/net/online'
 import { DEFAULT_MESSAGE_BOX_URL, MESSAGE_BOX_URL_KEY } from '@nexus/wallet-core/src/utils/pay/rails/handle'
+import {
+  AUTO_APPROVE_COOLDOWN_MS,
+  AUTO_APPROVE_STORAGE_KEY,
+  DEFAULT_AUTO_APPROVE_THRESHOLD
+} from '@nexus/wallet-core/src/spending'
 import { restoreDesktopWallet } from './buildWallet.ts'
 import { createExchangeRate } from './exchangeRate.mjs'
 import { createPayHost } from './payHost.mjs'
@@ -41,7 +46,7 @@ function humanMemo(description) {
   return LOOKS_LIKE_A_REFERENCE.test(text) ? '' : text
 }
 
-export function createWalletHost({ userDataDir, onStateChange }) {
+export function createWalletHost({ userDataDir, onStateChange, onPermissionRequest }) {
   // One directory for wallet databases, under userData so the OS backs it up and
   // uninstall removes it. bsv-desktop puts its databases in ~/.bsv-desktop, outside
   // every OS convention, and has accumulated dozens of stale files plus plaintext
@@ -75,6 +80,107 @@ export function createWalletHost({ userDataDir, onStateChange }) {
   const publish = () => onStateChange?.({ ready: wallet !== null, building })
 
   /**
+   * Spend requests waiting on a human, oldest first.
+   *
+   * A queue rather than a single slot because two pages — or one page twice — can
+   * ask while the sheet is up, and the manager blocks each of them independently.
+   * Only the head is ever shown; answering it admits the next.
+   */
+  const spendQueue = []
+  /** Guards the burst case: one approval must not silently cover a run of them. */
+  let lastAutoApproveAt = 0
+
+  const pushHead = () => onPermissionRequest?.(spendQueue[0] ?? null)
+
+  /**
+   * The stored spend limit, or the compiled default.
+   *
+   * One reader for both callers — the gate below and settings.get — so the number
+   * the settings screen shows is by construction the number the next payment is
+   * measured against, rather than a second lookup that could disagree with it.
+   */
+  const currentAutoApprove = async () => {
+    try {
+      const stored = await localStorage.getItem(AUTO_APPROVE_STORAGE_KEY)
+      return stored === null ? DEFAULT_AUTO_APPROVE_THRESHOLD : Number(stored) || 0
+    } catch {
+      // Unreadable settings must never become "approve everything".
+      return DEFAULT_AUTO_APPROVE_THRESHOLD
+    }
+  }
+
+  /**
+   * Decide whether a spend needs a person, and get it in front of one if it does.
+   *
+   * The threshold is re-read from storage on EVERY request rather than cached at
+   * build time: a limit changed in Settings has to take effect on the next spend,
+   * not on the next launch. Mobile learned this the same way — a mount-time read
+   * left the old value live and made auto-approve feel stuck on.
+   */
+  const onSpendingAuthorizationRequested = (request) => {
+    const requestID = request?.requestID
+    const spending = request?.spending
+    if (!requestID || !spending) return
+    const satoshis = Number(spending.satoshis ?? 0)
+
+    void (async () => {
+      // Read on EVERY request, not cached at build: a limit changed in Settings has
+      // to apply to the next spend, not the next launch. Mobile's comment records
+      // the same lesson — a mount-time read left the old value live and made
+      // auto-approve feel stuck on.
+      const threshold = await currentAutoApprove()
+
+      const now = Date.now()
+      if (threshold > 0 && satoshis <= threshold && now - lastAutoApproveAt >= AUTO_APPROVE_COOLDOWN_MS) {
+        lastAutoApproveAt = now
+        wallet?.manager?.grantPermission({ requestID, ephemeral: true, amount: satoshis })
+        return
+      }
+
+      spendQueue.push({
+        requestID: String(requestID),
+        originator: String(request.originator ?? ''),
+        description: request.reason,
+        authorizationAmount: satoshis,
+        renewal: Boolean(request.renewal),
+        lineItems: Array.isArray(spending.lineItems) ? spending.lineItems : []
+      })
+      // Only the head is displayed, so a second request while one is up changes
+      // nothing on screen — pushing unconditionally would replace the sheet the
+      // user is reading with a different payment.
+      if (spendQueue.length === 1) pushHead()
+    })()
+  }
+
+  /** Answer the head and admit the next. Nothing else may resolve a request. */
+  const resolveSpend = async ({ requestID, approved, amount, ephemeral }) => {
+    const head = spendQueue[0]
+    // A stale reply — the sheet unmounting after the queue moved on — must never
+    // grant a spend the user was not shown.
+    if (!head || head.requestID !== requestID) return { ok: false, stale: true }
+    const manager = wallet?.manager
+    if (!manager) throw new Error('wallet is not ready')
+
+    if (approved) {
+      manager.grantPermission({
+        requestID,
+        ephemeral: ephemeral !== false,
+        ...(typeof amount === 'number' ? { amount } : {})
+      })
+    } else {
+      try {
+        await manager.denyPermission(requestID)
+      } catch {
+        // Denial is a user choice; the manager rejecting the underlying call is
+        // the consequence, not a fault here.
+      }
+    }
+    spendQueue.shift()
+    pushHead()
+    return { ok: true }
+  }
+
+  /**
    * Tell the chrome a transaction moved.
    *
    * The protocol has no transaction-changed event, and wallet.state is the push the
@@ -103,6 +209,19 @@ export function createWalletHost({ userDataDir, onStateChange }) {
       wallet?.monitor?.stopTasks()
     } catch (err) {
       console.warn('[wallet] monitor did not stop cleanly:', err?.message)
+    }
+    /*
+     * Drop any spend request the outgoing wallet raised.
+     *
+     * Its permissions manager is going away, so nothing could answer these even if
+     * the user tried — and leaving them queued would put a sheet in front of the
+     * NEXT wallet asking it to approve a payment it knows nothing about. The pages
+     * that raised them lose their calls either way; that is what signing out or
+     * switching chains mid-payment means.
+     */
+    if (spendQueue.length > 0) {
+      spendQueue.length = 0
+      pushHead()
     }
   }
 
@@ -135,7 +254,8 @@ export function createWalletHost({ userDataDir, onStateChange }) {
       databaseDir,
       chain,
       adminOriginator: ADMIN_ORIGINATOR,
-      onTransactionStatusChanged: notifyTxChanged
+      onTransactionStatusChanged: notifyTxChanged,
+      onSpendingAuthorizationRequested
     })
     startMonitorSoon(built)
     return built
@@ -380,12 +500,63 @@ export function createWalletHost({ userDataDir, onStateChange }) {
           network: await currentNetwork(),
           networks: ['main', 'test'],
           messageBoxUrl,
+          /*
+           * Null means "this shell cannot answer for it", and the chrome renders no
+           * row rather than a control that does nothing.
+           *
+           * ARC is the one honest absence left: buildWallet.ts constructs
+           * `new Services(chain)` with no options, so the override keys wallet-core
+           * defines are never read here. Wiring it means moving desktop onto
+           * createServices(), which also changes which broadcast providers it uses —
+           * a change that deserves its own verification rather than riding along
+           * with a settings row.
+           */
+          arc: null,
+          /*
+           * Real, now that this shell has a gate for it to raise or lower. The
+           * threshold is read on every spending request (see
+           * onSpendingAuthorizationRequested above), so what is reported here is
+           * what the next payment will actually be measured against.
+           */
+          autoApprove: {
+            satoshis: await currentAutoApprove(),
+            defaultSatoshis: DEFAULT_AUTO_APPROVE_THRESHOLD
+          },
           secure: {
             storedSecurely: status.available,
             method: status.available ? 'keychain' : 'none'
           }
         }
       },
+
+      /**
+       * The spend limit. Answered here because this shell now enforces it.
+       *
+       * A write and nothing more: onSpendingAuthorizationRequested re-reads the key
+       * per request, so the next payment already sees the new number. Zero means
+       * ask every time, and there is no upper clamp — inventing a maximum would be
+       * this shell deciding how much of their own money a user may be trusted with.
+       */
+      'settings.setAutoApprove': async (params) => {
+        const satoshis = Math.max(0, Math.round(Number(params?.satoshis ?? 0)))
+        if (!Number.isFinite(satoshis)) throw new Error('the limit must be a number of satoshis')
+        await localStorage.setItem(AUTO_APPROVE_STORAGE_KEY, String(satoshis))
+        return { ok: true, satoshis }
+      },
+
+      'permission.resolve': async (params) => {
+        const requestID = String(params?.requestID ?? '')
+        if (!requestID) throw new Error('permission.resolve needs a requestID')
+        return resolveSpend({
+          requestID,
+          approved: Boolean(params?.approved),
+          amount: params?.amount,
+          ephemeral: params?.ephemeral
+        })
+      },
+
+      /** For a chrome that reloaded after the push had already gone out. */
+      'permission.pending': async () => spendQueue[0] ?? null,
 
       'settings.setNetwork': async (params) => {
         const network = params?.network

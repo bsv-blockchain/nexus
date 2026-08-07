@@ -1,0 +1,79 @@
+# The checks that should have been running all along.
+#
+# Until this file existed, .github/workflows held only the two release pipelines,
+# both tag-triggered — so nothing ran on a push or a pull request, and
+# `npm run check` had been failing on main for as long as anyone had been able to
+# run it locally without noticing. A check nobody runs is a check that does not
+# exist.
+#
+# Deliberately cheap: install, then four commands that need no simulator, no
+# signing identity and no secrets. Anything that needs a device belongs in a
+# release rehearsal, not here — the point of this workflow is that it is fast
+# enough that nobody is tempted to skip it.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A superseded run tells you about a commit nobody is looking at any more.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      # Pinned to 24 to match the release workflows. `npm ci` needs the lockfile
+      # to have been produced by a compatible npm, and a version drift between CI
+      # and release is how a build passes here and fails there.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+
+      # apps/ui is its own npm project with its own lockfile (it carries its own
+      # React), so the root install does not cover it — same two-step the desktop
+      # release does.
+      - name: Install
+        run: |
+          npm ci
+          npm ci --prefix apps/ui
+
+      # Injected-source safety and service-endpoint drift. Runs FIRST because it is
+      # the fastest and the one most likely to catch a genuine footgun: a backtick
+      # in an injected source string silently ends the template, and a stringified
+      # function becomes a Hermes [bytecode] stub that fails only on a device.
+      - name: Check injected sources and env
+        run: npm run check
+
+      # Every `if: always()` below is deliberate. A red typecheck must not hide a
+      # red test — one run should report everything that is wrong, not the first
+      # thing.
+      - name: Typecheck (mobile)
+        if: always()
+        run: npm run typecheck
+
+      - name: Typecheck (chrome)
+        if: always()
+        run: npx tsc --noEmit -p apps/ui/tsconfig.json
+
+      - name: Test
+        if: always()
+        run: npm test
+
+      # The chrome is what every shell ships, and a build failure here breaks all
+      # five platforms at once. Builds the LIVE configuration — the one that goes
+      # to users — rather than the demo one.
+      - name: Build the chrome
+        if: always()
+        run: npm run ui:build

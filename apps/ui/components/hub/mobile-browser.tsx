@@ -8,6 +8,7 @@ import {
   type RailEntry,
 } from "@/components/hub/hub-provider";
 import { content, getHubApp, getMockPage, type BrowserTab } from "@/lib/data";
+import { DEMO_SURFACES } from "@/lib/surfaces";
 import { useHostOverlay } from "@/lib/wallet-data";
 import {
   AlignLeft,
@@ -257,13 +258,25 @@ function UrlDetailsSheet({
     toast.success("Link copied", { description: host });
   };
 
+  /*
+   * Find on Page and Summarize are demo-only.
+   *
+   * Neither does anything: Summarize raised a "coming soon" toast, and Find on
+   * Page was worse — it just closed the sheet, which looks like it worked. Both
+   * stay in the demo, where the grid of four is the point; a shipping build shows
+   * the two that are real rather than four buttons where half answer nothing.
+   */
   const actions: { label: string; icon: LucideIcon; onClick: () => void }[] = [
-    { label: copy.actions.findOnPage, icon: TextSearch, onClick: onClose },
-    {
-      label: copy.actions.summarize,
-      icon: AlignLeft,
-      onClick: () => toast.info("Summarize is coming soon"),
-    },
+    ...(DEMO_SURFACES
+      ? [
+          { label: copy.actions.findOnPage, icon: TextSearch, onClick: onClose },
+          {
+            label: copy.actions.summarize,
+            icon: AlignLeft,
+            onClick: () => toast.info("Summarize is coming soon"),
+          },
+        ]
+      : []),
     {
       label: copy.actions.pin,
       icon: Pin,
@@ -348,29 +361,32 @@ function UrlDetailsSheet({
         ))}
       </div>
 
-      {/* Rows */}
-      <div className="mt-3 space-y-2">
-        <button
-          type="button"
-          onClick={() => toast.info("Display options coming soon")}
-          className="focus-ring flex w-full items-center gap-3 rounded-2xl bg-surface px-4 py-3.5 text-sm font-medium ring-1 ring-border"
-        >
-          <Type className="size-5 text-muted-foreground" aria-hidden="true" />
-          <span className="flex-1 text-left">{copy.displayOptions}</span>
-          <ChevronRight
-            className="size-4 text-muted-foreground"
-            aria-hidden="true"
-          />
-        </button>
-        <button
-          type="button"
-          onClick={() => toast.info("Site settings coming soon")}
-          className="focus-ring flex w-full items-center gap-3 rounded-2xl bg-surface px-4 py-3.5 text-sm font-medium ring-1 ring-border"
-        >
-          <Settings className="size-5 text-muted-foreground" aria-hidden="true" />
-          <span className="flex-1 text-left">{copy.siteSettings}</span>
-        </button>
-      </div>
+      {/* Rows. Both are demo-only: neither has anything behind it yet, and a row
+          whose whole behaviour is a toast is a promise the build cannot keep. */}
+      {DEMO_SURFACES ? (
+        <div className="mt-3 space-y-2">
+          <button
+            type="button"
+            onClick={() => toast.info("Display options coming soon")}
+            className="focus-ring flex w-full items-center gap-3 rounded-2xl bg-surface px-4 py-3.5 text-sm font-medium ring-1 ring-border"
+          >
+            <Type className="size-5 text-muted-foreground" aria-hidden="true" />
+            <span className="flex-1 text-left">{copy.displayOptions}</span>
+            <ChevronRight
+              className="size-4 text-muted-foreground"
+              aria-hidden="true"
+            />
+          </button>
+          <button
+            type="button"
+            onClick={() => toast.info("Site settings coming soon")}
+            className="focus-ring flex w-full items-center gap-3 rounded-2xl bg-surface px-4 py-3.5 text-sm font-medium ring-1 ring-border"
+          >
+            <Settings className="size-5 text-muted-foreground" aria-hidden="true" />
+            <span className="flex-1 text-left">{copy.siteSettings}</span>
+          </button>
+        </div>
+      ) : null}
     </SheetShell>
   );
 }
@@ -642,8 +658,14 @@ function TabSwitcher({
   activeTabId: string | null;
   onPick: (tabId: string) => void;
   onNewTab: () => void;
-  onSettings: () => void;
-  onHub: () => void;
+  /**
+   * Absent where the destination is demo-only, and the button goes with it —
+   * the same shape the wallet's docked actions use. A control that opens a
+   * screen made entirely of "coming soon" is worse than no control: it spends
+   * the user's attention to tell them nothing.
+   */
+  onSettings?: (() => void) | undefined;
+  onHub?: (() => void) | undefined;
   onClose: () => void;
 }): ReactNode {
   const startIndex = Math.max(
@@ -781,15 +803,21 @@ function TabSwitcher({
       </div>
 
       {/* Bottom control bar */}
+      {/* New tab stays centred whether or not it has neighbours — the grid keeps
+          its three columns and the empty ones simply render nothing. */}
       <div className="grid grid-cols-3 items-center px-8 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        <button
-          type="button"
-          onClick={onHub}
-          aria-label={content.mobileBrowser.hub}
-          className="focus-ring flex size-12 items-center justify-center justify-self-start rounded-full bg-surface-raised text-muted-foreground ring-1 ring-border"
-        >
-          <Monitor className="size-5" aria-hidden="true" />
-        </button>
+        {onHub ? (
+          <button
+            type="button"
+            onClick={onHub}
+            aria-label={content.mobileBrowser.hub}
+            className="focus-ring flex size-12 items-center justify-center justify-self-start rounded-full bg-surface-raised text-muted-foreground ring-1 ring-border"
+          >
+            <Monitor className="size-5" aria-hidden="true" />
+          </button>
+        ) : (
+          <span aria-hidden="true" />
+        )}
         <button
           type="button"
           onClick={onNewTab}
@@ -798,14 +826,18 @@ function TabSwitcher({
         >
           <Plus className="size-6 text-foreground" aria-hidden="true" />
         </button>
-        <button
-          type="button"
-          onClick={onSettings}
-          aria-label={content.mobileBrowser.settings.title}
-          className="focus-ring flex size-12 items-center justify-center justify-self-end rounded-full bg-surface-raised text-muted-foreground ring-1 ring-border"
-        >
-          <Settings className="size-5" aria-hidden="true" />
-        </button>
+        {onSettings ? (
+          <button
+            type="button"
+            onClick={onSettings}
+            aria-label={content.mobileBrowser.settings.title}
+            className="focus-ring flex size-12 items-center justify-center justify-self-end rounded-full bg-surface-raised text-muted-foreground ring-1 ring-border"
+          >
+            <Settings className="size-5" aria-hidden="true" />
+          </button>
+        ) : (
+          <span aria-hidden="true" />
+        )}
       </div>
       <button
         type="button"
@@ -1418,15 +1450,25 @@ export function MobileBrowser({
               setIncognito(false);
               setSheet("address");
             }}
-            onSettings={() => setSheet("settings")}
-            onHub={() => setSheet("sync")}
+            /*
+             * Both destinations are demo-only, so in a shipping build the buttons
+             * that reach them are not rendered at all. SettingsSheet is twelve
+             * rows of "coming soon" and one working toggle; SyncScreen's only
+             * action is a "Sign in with Nexus" that signs in to nothing.
+             */
+            onSettings={DEMO_SURFACES ? () => setSheet("settings") : undefined}
+            onHub={DEMO_SURFACES ? () => setSheet("sync") : undefined}
             onClose={close}
           />
         )}
-        {sheet === "settings" && (
+        {/* Gated at the render too, not only at the two buttons above. With
+            DEMO_SURFACES folded to a literal false the branches are dead code and
+            both components leave the bundle, so "is it reachable" stops depending
+            on nobody adding a second route to them later. */}
+        {DEMO_SURFACES && sheet === "settings" && (
           <SettingsSheet key="settings" onClose={() => setSheet("switcher")} />
         )}
-        {sheet === "sync" && <SyncScreen key="sync" onClose={close} />}
+        {DEMO_SURFACES && sheet === "sync" && <SyncScreen key="sync" onClose={close} />}
       </AnimatePresence>
     </>
   );

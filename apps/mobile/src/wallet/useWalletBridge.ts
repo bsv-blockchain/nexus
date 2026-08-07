@@ -6,6 +6,13 @@ import { METHODS } from '@nexus/bridge'
 import { createCwiHost, type CwiWallet } from '@nexus/substrate/src/browser/cwiHost'
 import { generateMnemonicWallet } from '@nexus/wallet-core/src/utils/mnemonicWallet'
 import { DEFAULT_MESSAGE_BOX_URL, MESSAGE_BOX_URL_KEY } from '@nexus/wallet-core/src/utils/pay/rails/handle'
+import {
+  AUTO_APPROVE_STORAGE_KEY,
+  DEFAULT_ARC_URLS,
+  DEFAULT_AUTO_APPROVE_THRESHOLD,
+  arcApiTokenStorageKey,
+  arcUrlStorageKey
+} from '@nexus/wallet-core/src/constants'
 import { WalletContext } from './WalletContext'
 import { ExchangeRateContext } from './ExchangeRateContext'
 import { useLocalStorage } from './LocalStorageProvider'
@@ -41,11 +48,46 @@ function humanMemo(description: string | undefined): string {
   return LOOKS_LIKE_A_REFERENCE.test(text) ? '' : text
 }
 
+/**
+ * What the chrome is told about a spend request.
+ *
+ * A deliberate subset of the shell's SpendingRequest. The running totals it also
+ * carries (`totalPastSpending`, `amountPreviouslyAuthorized`) are zero at every
+ * call site today, and sending fields that are always zero invites a sheet that
+ * renders them as facts.
+ */
+export interface SpendPayload {
+  requestID: string
+  originator: string
+  description?: string
+  authorizationAmount: number
+  renewal?: boolean
+  lineItems: any[]
+}
+
+function toSpendPayload(request: any): SpendPayload {
+  return {
+    requestID: String(request.requestID),
+    originator: String(request.originator ?? ''),
+    description: request.description,
+    authorizationAmount: Number(request.authorizationAmount ?? 0),
+    renewal: Boolean(request.renewal),
+    lineItems: Array.isArray(request.lineItems) ? request.lineItems : []
+  }
+}
+
 export interface WalletBridge {
   methods: Record<string, (params: any) => any>
   handleCwi: ReturnType<typeof createCwiHost>
   /** Coarse lifecycle, for the shell to push to the chrome when it changes. */
   state: { ready: boolean; building: boolean }
+  /**
+   * The spend request at the head of the queue, or null.
+   *
+   * Surfaced here rather than read from WalletContext in App.tsx so the wallet
+   * coupling stays in one file — App.tsx only knows it has something to push.
+   */
+  pendingSpend: SpendPayload | null
 }
 
 export function useWalletBridge(): WalletBridge {
@@ -271,10 +313,32 @@ export function useWalletBridge(): WalletBridge {
           LocalAuthentication.hasHardwareAsync(),
           LocalAuthentication.isEnrolledAsync()
         ])
+        // Per network, because an endpoint that serves mainnet is not the one that
+        // serves testnet — a single override would silently follow you across a
+        // network switch and broadcast to the wrong chain's ARC.
+        const network = w.selectedNetwork === 'main' ? 'main' : 'test'
+        const [arcUrl, arcToken, autoApprove] = await Promise.all([
+          AsyncStorage.getItem(arcUrlStorageKey(network)),
+          AsyncStorage.getItem(arcApiTokenStorageKey(network)),
+          AsyncStorage.getItem(AUTO_APPROVE_STORAGE_KEY)
+        ])
         return {
-          network: w.selectedNetwork === 'main' ? 'main' : 'test',
+          network,
           networks: ['main', 'test'],
           messageBoxUrl,
+          arc: {
+            url: arcUrl || DEFAULT_ARC_URLS[network] || '',
+            // NEVER the token itself. The chrome only needs to know whether one is
+            // set so it can say so and offer to replace it; sending the secret to a
+            // WebView to render in an input is how it ends up in a screenshot.
+            hasToken: Boolean(arcToken),
+            defaultUrl: DEFAULT_ARC_URLS[network] || '',
+            isDefault: !arcUrl || arcUrl === DEFAULT_ARC_URLS[network]
+          },
+          autoApprove: {
+            satoshis: autoApprove === null ? DEFAULT_AUTO_APPROVE_THRESHOLD : Number(autoApprove) || 0,
+            defaultSatoshis: DEFAULT_AUTO_APPROVE_THRESHOLD
+          },
           // expo-secure-store keeps the phrase in the keychain either way; whether a
           // biometric stands in front of it is the device's answer, not ours.
           secure: {
@@ -293,6 +357,116 @@ export function useWalletBridge(): WalletBridge {
         }
         await ref.current.switchNetwork(network)
         return { ok: true }
+      },
+
+      /**
+       * Point this network's broadcasts somewhere else, or back at the default.
+       *
+       * The rebuild is the whole point: Services is constructed once with the
+       * endpoint baked in (WalletContext reads these same keys at build time), so
+       * writing the key without rebuilding would leave the wallet broadcasting to
+       * the old ARC while the settings screen showed the new one. switchNetwork to
+       * the CURRENT network is the rebuild — it is the same teardown, and there is
+       * no cheaper one to reach for.
+       */
+      [METHODS.SETTINGS_SET_ARC]: async (params: { url?: string | null; token?: string | null } | null) => {
+        const w = ref.current
+        const network = w.selectedNetwork === 'main' ? 'main' : 'test'
+        const url = params?.url == null ? null : String(params.url).trim().replace(/\/+$/, '')
+        const token = params?.token == null ? null : String(params.token).trim()
+
+        // null resets; a string sets. An empty string is a user who cleared the
+        // field, which means the same thing as reset rather than "broadcast to ''".
+        if (!url) await AsyncStorage.removeItem(arcUrlStorageKey(network))
+        else await AsyncStorage.setItem(arcUrlStorageKey(network), url)
+
+        // A token is only rewritten when one was supplied. Passing null must not
+        // silently discard a working key just because the user edited the URL.
+        if (token !== null) {
+          if (token) await AsyncStorage.setItem(arcApiTokenStorageKey(network), token)
+          else await AsyncStorage.removeItem(arcApiTokenStorageKey(network))
+        }
+
+        await w.switchNetwork(network)
+        return { ok: true }
+      },
+
+      /**
+       * The user's answer to a spend request, from the chrome's sheet.
+       *
+       * `advanceSpendingQueue` is what closes the loop: it pops the head, which
+       * both releases the blocked permissions manager and lets the next queued
+       * request through. Granting without advancing leaves the queue stuck with a
+       * request nobody will ever answer again.
+       *
+       * Deny is not an error condition — it is the user saying no — so a failure
+       * inside denyPermission is swallowed rather than reported back as if the
+       * chrome had done something wrong.
+       */
+      [METHODS.PERMISSION_RESOLVE]: async (params: {
+        requestID?: string
+        approved?: boolean
+        amount?: number
+        ephemeral?: boolean
+      } | null) => {
+        const requestID = String(params?.requestID ?? '')
+        if (!requestID) throw new Error('permission.resolve needs a requestID')
+        const w = ref.current
+        const manager = w.managers.permissionsManager
+        if (!manager) throw new Error('wallet is not ready')
+
+        // Only ever answer the request the chrome was actually shown. A stale
+        // reply — the sheet unmounting after the queue moved on — must not grant
+        // a spend the user never saw.
+        const head = w.spendingRequests?.[0]
+        if (!head || head.requestID !== requestID) return { ok: false, stale: true }
+
+        if (params?.approved) {
+          manager.grantPermission({
+            requestID,
+            ephemeral: params?.ephemeral !== false,
+            ...(typeof params?.amount === 'number' ? { amount: params.amount } : {})
+          })
+        } else {
+          try {
+            await manager.denyPermission(requestID)
+          } catch {
+            // Expected: denial is a user choice, and the manager rejects the
+            // underlying call as a consequence rather than as a fault here.
+          }
+        }
+        w.advanceSpendingQueue()
+        return { ok: true }
+      },
+
+      /**
+       * The ceiling under which a page's spend goes through without asking.
+       *
+       * Clamped at zero, and zero is meaningful: it means ask every time. There is
+       * no upper clamp — someone who wants a high limit on their own wallet is
+       * entitled to one, and inventing a maximum here would be this screen deciding
+       * how much of their money they are allowed to be trusted with.
+       */
+      [METHODS.SETTINGS_SET_AUTO_APPROVE]: async (params: { satoshis?: number } | null) => {
+        const satoshis = Math.max(0, Math.round(Number(params?.satoshis ?? 0)))
+        if (!Number.isFinite(satoshis)) throw new Error('the limit must be a number of satoshis')
+        await AsyncStorage.setItem(AUTO_APPROVE_STORAGE_KEY, String(satoshis))
+        // No rebuild and nothing to notify: WalletContext's spending-authorization
+        // callback re-reads this key on every request, so the next spend already
+        // sees it. That re-read is why this is a write and not a restart.
+        return { ok: true, satoshis }
+      },
+
+      /**
+       * Whatever spend request is outstanding, if any.
+       *
+       * The push is the normal path; this exists for the one case the push cannot
+       * cover — the chrome reloading while a request is already queued, after the
+       * event has been and gone.
+       */
+      [METHODS.PERMISSION_PENDING]: async () => {
+        const head = ref.current.spendingRequests?.[0]
+        return head ? toSpendPayload(head) : null
       }
     }),
     [asAdmin, identityKey, settleBuilt]
@@ -316,5 +490,16 @@ export function useWalletBridge(): WalletBridge {
     [ready, wallet.walletBuilding]
   )
 
-  return { methods, handleCwi, state }
+  // Keyed on requestID rather than on the object: the queue array is rebuilt on
+  // every render, and pushing an identical request each time would re-open the
+  // sheet under the user's finger.
+  const head = wallet.spendingRequests?.[0]
+  const headId = head?.requestID
+  const pendingSpend = useMemo(
+    () => (head ? toSpendPayload(head) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [headId]
+  )
+
+  return { methods, handleCwi, state, pendingSpend }
 }

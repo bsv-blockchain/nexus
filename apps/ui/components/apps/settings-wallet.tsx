@@ -20,7 +20,11 @@ import {
   logoutWallet,
   readSettings,
   revealBackup,
+  setArc,
+  setAutoApprove,
   setNetwork,
+  type ArcSettings,
+  type AutoApproveSettings,
   type HostSettings,
 } from "@/lib/wallet-data";
 import { toast } from "sonner";
@@ -51,6 +55,189 @@ const CUSTODY_COPY: Record<
     hint: "The recovery phrase is kept on disk without OS encryption. Anyone with access to this computer's files can read it.",
   },
 };
+
+/**
+ * Where this network's transactions are broadcast.
+ *
+ * Per network, and the label says so: an endpoint that serves mainnet is not the
+ * one that serves testnet, and an override that followed you across a switch would
+ * quietly post mainnet transactions to a testnet ARC.
+ *
+ * The token is write-only. The shell reports whether one is set and never what it
+ * is, so this field can add or replace a key but not read one back — leaving it
+ * blank keeps whatever is already stored rather than clearing it, which is the
+ * behaviour someone editing only the URL expects.
+ */
+function ArcGroup({ arc, onSaved }: { arc: ArcSettings; onSaved: () => void }): ReactNode {
+  const [url, setUrl] = useState(arc.url);
+  const [token, setToken] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const dirty = url.trim() !== arc.url || token.length > 0;
+
+  const apply = (nextUrl: string | null, nextToken: string | null): void => {
+    setSaving(true);
+    setArc(nextUrl, nextToken)
+      .then(() => {
+        toast.success("Broadcast endpoint saved");
+        setToken("");
+        onSaved();
+      })
+      .catch((err: unknown) => toast.error(err instanceof Error ? err.message : String(err)))
+      .finally(() => setSaving(false));
+  };
+
+  return (
+    <Group
+      title="Broadcast endpoint"
+      hint="Where this network's transactions are handed to the network. Changing it rebuilds the wallet."
+    >
+      <div className="space-y-2 px-3 py-2.5">
+        <label className="block">
+          <span className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">
+            ARC URL
+          </span>
+          <input
+            value={url}
+            onChange={(event) => setUrl(event.target.value)}
+            placeholder={arc.defaultUrl}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            inputMode="url"
+            className="border-border bg-surface mt-1 w-full rounded-lg border px-3 py-2 font-mono text-xs outline-none"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">
+            API token
+          </span>
+          <input
+            value={token}
+            onChange={(event) => setToken(event.target.value)}
+            type="password"
+            placeholder={arc.hasToken ? "A token is set — type to replace it" : "Only if your endpoint needs one"}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            className="border-border bg-surface mt-1 w-full rounded-lg border px-3 py-2 font-mono text-xs outline-none"
+          />
+        </label>
+
+        <div className="flex items-center gap-3 pt-1">
+          <button
+            type="button"
+            onClick={() => apply(url.trim() || null, token || null)}
+            disabled={saving || !dirty}
+            className="focus-ring bg-accent text-accent-foreground rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50"
+          >
+            {saving ? "Applying…" : "Apply"}
+          </button>
+          {!arc.isDefault ? (
+            <button
+              type="button"
+              onClick={() => {
+                setUrl(arc.defaultUrl);
+                apply(null, null);
+              }}
+              disabled={saving}
+              className="focus-ring text-accent text-xs font-semibold disabled:opacity-50"
+            >
+              Use the default
+            </button>
+          ) : null}
+          {arc.hasToken ? (
+            <button
+              type="button"
+              onClick={() => apply(url.trim() || null, "")}
+              disabled={saving}
+              className="focus-ring text-muted-foreground ml-auto text-xs font-semibold disabled:opacity-50"
+            >
+              Remove token
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </Group>
+  );
+}
+
+/**
+ * How much a page may spend before the wallet stops asking.
+ *
+ * Entered in satoshis because that is what is actually spent, and the limit is a
+ * safety boundary — converting it through an exchange rate would make the boundary
+ * move on its own while you were not looking.
+ *
+ * Zero is a real answer, not an empty field: it means ask every time.
+ */
+function AutoApproveGroup({
+  limit,
+  onSaved,
+}: {
+  limit: AutoApproveSettings;
+  onSaved: () => void;
+}): ReactNode {
+  const [value, setValue] = useState(String(limit.satoshis));
+  const [saving, setSaving] = useState(false);
+  const parsed = Number(value);
+  const valid = value !== "" && Number.isFinite(parsed) && parsed >= 0;
+  const dirty = valid && Math.round(parsed) !== limit.satoshis;
+
+  return (
+    <Group
+      title="Spend without asking"
+      hint="Payments below this go through silently. Anything above it asks you first."
+    >
+      <div className="space-y-2 px-3 py-2.5">
+        <div className="border-border bg-surface flex items-center gap-2 rounded-lg border px-3 py-2">
+          <input
+            value={value}
+            onChange={(event) => setValue(event.target.value.replace(/[^0-9]/g, ""))}
+            inputMode="numeric"
+            aria-label="Spend limit in satoshis"
+            className="w-full bg-transparent text-sm font-semibold outline-none"
+          />
+          <span className="text-muted-foreground shrink-0 text-xs font-semibold">sats</span>
+        </div>
+        <p className="text-muted-foreground text-[11px]">
+          {parsed === 0 && valid
+            ? "Every payment will ask for your approval."
+            : `Payments up to ${parsed.toLocaleString("en-US")} sats go through without asking.`}
+        </p>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setSaving(true);
+              setAutoApprove(Math.round(parsed))
+                .then(() => {
+                  toast.success("Spending limit saved");
+                  onSaved();
+                })
+                .catch((err: unknown) => toast.error(err instanceof Error ? err.message : String(err)))
+                .finally(() => setSaving(false));
+            }}
+            disabled={saving || !dirty}
+            className="focus-ring bg-accent text-accent-foreground rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+          {limit.satoshis !== limit.defaultSatoshis ? (
+            <button
+              type="button"
+              onClick={() => setValue(String(limit.defaultSatoshis))}
+              className="focus-ring text-accent text-xs font-semibold"
+            >
+              Use the default ({limit.defaultSatoshis.toLocaleString("en-US")})
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </Group>
+  );
+}
 
 export function WalletSettingsPanel(): ReactNode {
   const [settings, setSettings] = useState<HostSettings | null>(null);
@@ -198,6 +385,14 @@ export function WalletSettingsPanel(): ReactNode {
           </p>
         ) : null}
       </Group>
+
+      {settings.arc ? (
+        <ArcGroup arc={settings.arc} onSaved={refresh} />
+      ) : null}
+
+      {settings.autoApprove ? (
+        <AutoApproveGroup limit={settings.autoApprove} onSaved={refresh} />
+      ) : null}
 
       <Group
         title="Backup"
