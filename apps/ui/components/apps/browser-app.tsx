@@ -65,21 +65,17 @@ function browseBarHeight(): number {
   return h > 0 ? Math.ceil(h) : BROWSE_BAR_FALLBACK;
 }
 
-/**
- * Where the origin chip's row ends, or 0 when there is no chip.
+/*
+ * There used to be an `originChipBottom()` here, measuring a row above the page
+ * so the native rect could start below it. Gone with the row: on narrow the
+ * origin chip now lives in the bottom bar's middle cell (see OriginChip's
+ * `placement`), which the bar's own measurement already covers. The row it
+ * replaced cost a third of an inch of page on every phone, and the bar was
+ * holding that cell open for a site regardless.
  *
- * Measured for the same reason the browse bar is: the row only exists for a
- * site opened from the rail, its height is not a constant, and a native layer
- * whose rect started above it would paint over the one element saying which
- * origin the page is. Only the narrow branch needs this — a wide layout gets
- * the answer for free, because the pane's own rect already starts below the
- * row.
+ * Wide layouts keep the row and need no measurement: the pane's own rect is
+ * below it already.
  */
-function originChipBottom(): number {
-  const chip = document.querySelector("[data-nexus-origin-chip]");
-  const bottom = chip?.getBoundingClientRect().bottom ?? 0;
-  return bottom > 0 ? Math.ceil(bottom) : 0;
-}
 
 function NativeSiteFrame({ url }: { url: string }): ReactNode {
   const boxRef = useRef<HTMLDivElement>(null);
@@ -105,16 +101,14 @@ function NativeSiteFrame({ url }: { url: string }): ReactNode {
         // instead of unpadding a container the whole UI shares.
         //
         // The document already starts below the notch (the shell insets it), so
-        // the things to avoid are the floating bar at the bottom and — for a
-        // site opened from the rail — the origin chip's row at the top.
-        const top = originChipBottom();
+        // the only thing to avoid is the floating bar at the bottom — which now
+        // also carries the origin chip, so there is nothing left at the top to
+        // reserve for.
         void host.tabs.setBounds(id, {
           x: 0,
-          y: top,
+          y: 0,
           width: Math.round(window.innerWidth),
-          height: Math.round(
-            Math.max(0, window.innerHeight - browseBarHeight() - top),
-          ),
+          height: Math.round(Math.max(0, window.innerHeight - browseBarHeight())),
         });
         return;
       }
@@ -147,11 +141,11 @@ function NativeSiteFrame({ url }: { url: string }): ReactNode {
     // measurement can land before it exists and latch the fallback height. Observe it
     // once it appears — and re-push on the next frame, which covers the case where it
     // mounted between this effect and the tab actually being created.
+    // Observing the bar covers the origin chip too, now that the chip is inside
+    // it: a long host wraps, the bar grows, and this fires. The chip used to be
+    // observed separately because it was a row of its own above the page.
     const bar = document.querySelector("[data-nexus-browse-bar]");
     if (bar) ro.observe(bar);
-    // Same story for the chip's row: a long origin can wrap it to a second line.
-    const chip = document.querySelector("[data-nexus-origin-chip]");
-    if (chip) ro.observe(chip);
     const raf = requestAnimationFrame(pushBounds);
     window.addEventListener("resize", pushBounds);
     // Capture phase: any ancestor scrolling moves this pane without resizing it.
@@ -169,7 +163,16 @@ function NativeSiteFrame({ url }: { url: string }): ReactNode {
     };
   }, [url]);
 
-  return <div ref={boxRef} className="h-full w-full bg-canvas" />;
+  /*
+   * `bg-background`, not `bg-canvas`. Nothing of this element is ever meant to be
+   * seen — the native layer paints over all of it — so its colour only shows in
+   * the moments and slivers where the page does not: before the shell has created
+   * the tab, and in whatever sub-pixel the rounded/rounded-off bounds leave
+   * uncovered. `--canvas` is #f2f1ef in BOTH themes, so on a dark build those
+   * were a near-white flash and a near-white hairline round the page. App chrome
+   * is what should be behind app chrome.
+   */
+  return <div ref={boxRef} className="h-full w-full bg-background" />;
 }
 
 /**
@@ -293,8 +296,8 @@ export function BrowserApp(): ReactNode {
 
   if (!activeTab) {
     return (
-      <div className="flex h-full items-center justify-center bg-canvas text-canvas-foreground">
-        <p className="text-sm opacity-60">
+      <div className="flex h-full items-center justify-center bg-background">
+        <p className="text-muted-foreground text-sm">
           Open a tab from the sidebar, or press ⌘T.
         </p>
       </div>
@@ -321,10 +324,27 @@ export function BrowserApp(): ReactNode {
    * canvas, so nothing else names the origin. It is handed `activeTab.url`,
    * never the pinned row's url; see OriginChip for what that does and does not
    * currently buy.
+   *
+   * WIDE LAYOUTS ONLY, and the responsive rule lives inside OriginChip rather
+   * than here — `placement="canvas"` carries its own `hidden md:flex`. On narrow
+   * the chip is in the bottom bar's middle cell (MobileBrowser), because a row
+   * above the page spent page height on the one form factor that has none to
+   * spare. Still rendered on both, so the conditional below keeps a constant
+   * shape and BrowserCanvas keeps its child position — see the remount above.
    */
   const siteId = activeRef.kind === "site" ? activeRef.id : null;
   return (
-    <div className="flex h-full min-h-0 w-full flex-col bg-canvas">
+    /*
+     * `bg-background`: this is the FRAME, not the page.
+     *
+     * Every one of the four page renderers paints its own `bg-canvas`, so the only
+     * pixels this colour reaches are the ones around the page — the origin chip's
+     * row, and the corners the parent's `rounded-xl overflow-hidden` clips. With
+     * `bg-canvas` here those read as a near-white band and a near-white outline
+     * wrapped round a dark page, because `--canvas` is #f2f1ef in the dark theme
+     * too. The chip is chrome; it belongs on the app's own surface.
+     */
+    <div className="flex h-full min-h-0 w-full flex-col bg-background">
       {siteId !== null && (
         <OriginChip
           url={activeTab.url}

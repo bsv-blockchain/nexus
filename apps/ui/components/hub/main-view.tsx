@@ -183,17 +183,28 @@ function AppCanvas(): ReactNode {
 
 /** The right-hand canvas: Getting Started, Web3 Apps, Profiles manager, or the active app. */
 export function MainView(): ReactNode {
-  const { activeApp, activeRef, activePage, mainView } = useHub();
+  // `activeApp` and `activeRef` went with the background switch below: which app is
+  // behind this shell no longer changes what colour it is.
+  const { activePage, mainView } = useHub();
   const showSites = mainView === "sites";
-  /* Settings paints on the app background, never the browser page's. Without
-     this it inherits `bg-canvas` whenever Browse happens to be the app behind
-     it, and renders dark-theme text on a white sheet. */
   const showSettings = mainView === "settings";
   const showProfiles = mainView === "profiles";
-  // A pinned site is the browser too — same tab, same canvas, just reached from
-  // the rail — so it takes the page background rather than the app one.
-  const canvasIsBrowser =
-    (activeApp === "browser" || activeRef.kind === "site") && !activePage;
+
+  /*
+   * THIS SHELL IS ALWAYS `bg-background`.
+   *
+   * It used to switch to `bg-canvas` when the app behind it was the browser, on
+   * the theory that the canvas is a web page and a web page is white. Two things
+   * were wrong with that. `--canvas` is #f2f1ef in the DARK theme as well as the
+   * light one, and every page renderer in browser-app.tsx already paints its own
+   * `bg-canvas` — so the switch never coloured a page, only the chrome around one:
+   * the origin chip's row and the corners `rounded-xl overflow-hidden` clips. On a
+   * dark build that was a near-white band and outline framing a dark page.
+   *
+   * It also needed a guard per surface that is NOT a page (Settings had one, with
+   * a comment about rendering dark text on a white sheet), and every new surface
+   * would have needed its own. One background, no exceptions, no guards.
+   */
 
   // Profiles manager: profile columns on the left, the active app on the right.
   if (showProfiles) {
@@ -204,9 +215,7 @@ export function MainView(): ReactNode {
         </div>
         <main
           id="main-content"
-          className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border shadow-xl ${
-            canvasIsBrowser ? "bg-canvas" : "bg-background"
-          }`}
+          className="flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background shadow-xl"
         >
           <AppCanvas />
         </main>
@@ -217,11 +226,7 @@ export function MainView(): ReactNode {
   return (
     <main
       id="main-content"
-      className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border shadow-xl ${
-        !showSites && !showSettings && canvasIsBrowser
-          ? "bg-canvas"
-          : "bg-background"
-      }`}
+      className="flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background shadow-xl"
     >
       {showSettings ? (
         /* Settings and its reference pane share the row, the same way an app and

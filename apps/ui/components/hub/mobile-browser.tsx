@@ -2,6 +2,7 @@
 
 import { AppTile, SiteTile } from "@/components/hub/app-icon";
 import { Favicon } from "@/components/hub/favicon";
+import { OriginChip } from "@/components/hub/origin-chip";
 import {
   useHub,
   type RailEntry,
@@ -148,10 +149,17 @@ function TabStack({
  * Copy link and Share have nowhere else to live here, and because it is chrome
  * the user asks for rather than chrome the site opens with: the same bargain a
  * standalone PWA makes with the platform's own overflow menu.
+ *
+ * And `origin` fills the cell the address pill vacated. A site has no address
+ * bar anywhere, so something has to name the origin; it used to be a row above
+ * the page, which cost page height on the one form factor with none to spare.
+ * Here it costs nothing — the middle cell was already being held open as
+ * `aria-hidden` filler to stop the side buttons drifting.
  */
 function BottomBar({
   tabs,
   site,
+  origin,
   onRail,
   onSwitcher,
   onAddress,
@@ -159,6 +167,8 @@ function BottomBar({
 }: {
   tabs: BrowserTab[];
   site: boolean;
+  /** The active site's origin chip, or null when the canvas is not a site. */
+  origin: ReactNode;
   onRail: () => void;
   onSwitcher: () => void;
   onAddress: () => void;
@@ -174,7 +184,17 @@ function BottomBar({
       // A native layer paints ABOVE this document, so anything it overlaps is gone,
       // not merely dimmed — the tab rect has to end exactly where this bar begins.
       data-nexus-browse-bar=""
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-40 grid grid-cols-3 items-center border-t border-black/5 bg-white/70 px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl md:hidden dark:border-white/10 dark:bg-neutral-900/60"
+      /*
+       * Equal thirds while browsing, so the new-tab pill sits dead centre between
+       * a one-button left and a two-button right. For a site the middle column
+       * takes the slack instead: it holds a hostname that must not be elided, and
+       * a third of a phone is not enough for one. Safe there and not while
+       * browsing, because a site's two side controls are the same width as each
+       * other, so "the slack" is still centred.
+       */
+      className={`pointer-events-none fixed inset-x-0 bottom-0 z-40 grid items-center border-t border-black/5 bg-white/70 px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl md:hidden dark:border-white/10 dark:bg-neutral-900/60 ${
+        site ? "grid-cols-[auto_minmax(0,1fr)_auto] gap-3" : "grid-cols-3"
+      }`}
     >
       <button
         type="button"
@@ -184,12 +204,13 @@ function BottomBar({
       >
         <LayoutGrid className="size-5 text-foreground" aria-hidden="true" />
       </button>
-      {/* An empty cell, not a missing one: this is a three-column grid, and a
-          dropped child would let the right-hand group slide into the middle —
-          moving the two buttons a site DOES keep out from under the thumb that
-          already knows where they are. */}
+      {/* Never a missing cell: this is a three-column grid, and a dropped child
+          would let the right-hand group slide into the middle — moving the two
+          buttons a site DOES keep out from under the thumb that already knows
+          where they are. For a site the cell now carries the origin chip; the
+          `aria-hidden` span is only the fallback for a site whose tab has gone. */}
       {site ? (
-        <span aria-hidden="true" />
+        (origin ?? <span aria-hidden="true" />)
       ) : (
         <button
           type="button"
@@ -1469,8 +1490,11 @@ export function MobileBrowser({
     activeTabId,
     openTab,
     activeRef,
+    activeTab,
     mainView,
     activePage,
+    setActiveRef,
+    unpinSite,
   } = useHub();
   const [sheet, setSheet] = useState<Sheet>("none");
   const [incognito, setIncognito] = useState(false);
@@ -1488,6 +1512,27 @@ export function MobileBrowser({
    */
   const siteCanvas =
     activeRef.kind === "site" && mainView === "app" && !activePage;
+
+  /*
+   * The origin chip, for the bar's middle cell. Built here rather than inside
+   * BottomBar because the bar is presentational and this needs four things off
+   * the hub — and because the same component, with `placement="canvas"`, is what
+   * BrowserApp renders on wide layouts. One chip, two placements.
+   *
+   * `activeTab.url`, never the pinned row's url: a site that has navigated is at
+   * a different origin than the one it was pinned at, and the whole point of this
+   * element is saying which one you are actually talking to. Null when there is
+   * no tab yet, so the cell falls back to filler instead of naming nothing.
+   */
+  const originChip =
+    siteCanvas && activeTab && activeRef.kind === "site" ? (
+      <OriginChip
+        url={activeTab.url}
+        placement="bar"
+        onOpenInBrowser={() => setActiveRef({ kind: "app", slug: "browser" })}
+        onRemove={() => unpinSite(activeRef.id)}
+      />
+    ) : null;
 
   // Push the page back behind the matte while a bottom sheet is open.
   useEffect(() => {
@@ -1512,6 +1557,7 @@ export function MobileBrowser({
             key="bar"
             tabs={tabs}
             site={siteCanvas}
+            origin={originChip}
             onRail={() => setSheet("rail")}
             onSwitcher={() => setSheet("switcher")}
             onAddress={() => {
