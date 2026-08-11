@@ -140,7 +140,15 @@ jobs:
             echo "::notice::rehearsal — building the production AAB without submitting it to Play"
           fi
           eas build --platform android --profile production --non-interactive "${SUBMIT[@]}" --json > build.json
-          URL=$(node -p "JSON.parse(require('fs').readFileSync('build.json','utf8'))[0].artifacts.buildUrl")
+          # tools/eas-artifact-url.mjs, not an inline node -p: with --auto-submit the
+          # --json payload carries submissions alongside builds, so the old
+          # `[0].artifacts.buildUrl` read undefined and `node -p` printed the STRING
+          # "undefined" with exit 0. curl then failed on a host called "undefined" and
+          # took this job red on v0.2.0 — after the build and the Play submission had
+          # both succeeded. The script handles either shape and exits non-zero if it
+          # finds no URL, so a shape change fails here with a diagnosis instead of two
+          # steps later with a DNS error.
+          URL=$(node "$GITHUB_WORKSPACE/tools/eas-artifact-url.mjs" build.json)
           curl -fL "$URL" -o "Nexus-${SLUG}.aab"
 
       # So a rehearsal still yields an installable binary, the way the desktop
@@ -277,7 +285,10 @@ jobs:
           SLUG="${GITHUB_REF_NAME//\//-}"
           echo "SLUG=$SLUG" >> "$GITHUB_ENV"
           eas build --platform android --profile preview --non-interactive --json > build.json
-          URL=$(node -p "JSON.parse(require('fs').readFileSync('build.json','utf8'))[0].artifacts.buildUrl")
+          # Same extractor as the AAB leg. This leg never auto-submits so it always saw
+          # the array shape and always worked — which is precisely why the bug hid: the
+          # two call sites were identical and only one of them was ever wrong.
+          URL=$(node "$GITHUB_WORKSPACE/tools/eas-artifact-url.mjs" build.json)
           curl -fL "$URL" -o "Nexus-${SLUG}.apk"
 
       - name: upload APK artifact
