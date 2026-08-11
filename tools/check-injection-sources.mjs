@@ -9,6 +9,7 @@
  * safe to hand to a WebView.
  */
 import { createRequire } from 'node:module'
+import { execSync } from 'node:child_process'
 
 const require = createRequire(import.meta.url)
 const failures = []
@@ -93,6 +94,38 @@ for (const dir of ['packages', 'apps/mobile/src', 'apps/desktop/src']) {
           'silently becomes garbage on device. Hold the code as a string constant instead.'
       )
     }
+  }
+}
+
+// Favicons must come from the site's own origin. Routing them through a favicon
+// service hands a third party the hostname of every site the user has pinned,
+// every tab they have open and every favourite — from a wallet browser. This
+// was live once; see components/hub/favicon.tsx.
+{
+  const roots = ['apps/ui/components', 'apps/ui/lib', 'apps/ui/app']
+  // `favicon\.(ico|png)\?` matches a favicon-service query shape (e.g. some
+  // favicon.ico?domain=... proxy) without matching the site's own bare
+  // `/favicon.ico` (no query string), which apps/ui/lib/metadata.ts and
+  // apps/ui/lib/rail/origin.ts use legitimately.
+  const pattern =
+    's2/favicons|favicon\\.(ico|png)\\?|icons\\.duckduckgo\\.com|gstatic\\.com/faviconV2'
+  const offenders = []
+  for (const root of roots) {
+    const dir = join(ROOT, root)
+    let out = ''
+    try {
+      out = execSync(`grep -rn -E "${pattern}" ${dir} --include=*.ts --include=*.tsx 2>/dev/null || true`, {
+        encoding: 'utf8'
+      })
+    } catch {
+      /* grep exits non-zero when it matches nothing; the `|| true` covers it */
+    }
+    if (out.trim()) offenders.push(out.trim())
+  }
+  if (offenders.length) {
+    failures.push(`third-party favicon service referenced:\n${offenders.join('\n')}`)
+  } else {
+    console.log('ok  no third-party favicon service')
   }
 }
 
