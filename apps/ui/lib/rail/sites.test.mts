@@ -102,3 +102,73 @@ test("parsePinnedSites returns null on junk", () => {
   assert.equal(parsePinnedSites("{"), null);
   assert.equal(parsePinnedSites(JSON.stringify({})), null);
 });
+
+test("parsePinnedSites trims whitespace-only titles and falls back to hostname", () => {
+  const raw = JSON.stringify([{ ...seed()[0], title: "   " }]);
+  const parsed = parsePinnedSites(raw);
+  assert.equal(parsed?.[0]?.title, "example.com");
+});
+
+test("parsePinnedSites renumbers sortOrder to be contiguous, preventing collisions", () => {
+  // Simulate stored data with a gap: sortOrders [0, 1, 3] because row 2 was unpinnable
+  const raw = JSON.stringify([
+    { id: "s1", title: "A", url: "https://a.com/", origin: "x", sortOrder: 0, createdAt: NOW },
+    { id: "s2", title: "B", url: "https://b.com/", origin: "x", sortOrder: 1, createdAt: NOW },
+    { id: "s3", title: "C", url: "https://c.com/", origin: "x", sortOrder: 3, createdAt: NOW },
+  ]);
+  const parsed = parsePinnedSites(raw);
+  assert.equal(parsed?.length, 3);
+  assert.equal(parsed?.[0]?.sortOrder, 0);
+  assert.equal(parsed?.[1]?.sortOrder, 1);
+  assert.equal(parsed?.[2]?.sortOrder, 2);
+  // Verify addPinnedSite does not collide
+  const result = addPinnedSite(parsed || [], { url: "https://d.com/", now: NOW, id: "s4" });
+  assert.ok(result);
+  assert.equal(result.site.sortOrder, 3);
+  assert.equal(result.sites.length, 4);
+});
+
+test("parsePinnedSites treats missing or invalid sortOrder as 0 and renumbers", () => {
+  const raw = JSON.stringify([
+    { id: "s1", title: "A", url: "https://a.com/", origin: "x", createdAt: NOW },
+    { id: "s2", title: "B", url: "https://b.com/", origin: "x", sortOrder: NaN, createdAt: NOW },
+    { id: "s3", title: "C", url: "https://c.com/", origin: "x", sortOrder: Infinity, createdAt: NOW },
+  ]);
+  const parsed = parsePinnedSites(raw);
+  assert.equal(parsed?.length, 3);
+  assert.equal(parsed?.[0]?.sortOrder, 0);
+  assert.equal(parsed?.[1]?.sortOrder, 1);
+  assert.equal(parsed?.[2]?.sortOrder, 2);
+});
+
+test("parsePinnedSites canonicalizes stored URLs, deduping equivalent-but-different forms", () => {
+  // A stored row with www but not yet normalized
+  const raw = JSON.stringify([
+    { id: "s1", title: "Example", url: "https://www.example.com/", origin: "x", sortOrder: 0, createdAt: NOW },
+  ]);
+  const parsed = parsePinnedSites(raw);
+  assert.equal(parsed?.[0]?.url, "https://www.example.com/");
+
+  // Now try to add the canonical form without www
+  const result = addPinnedSite(parsed || [], { url: "https://example.com/", now: NOW, id: "s2" });
+  assert.ok(result);
+  // Both normalize to the same canonical form, so it should be deduplicated
+  // Actually, both keep their original form, but they should dedupe if normalized
+  // Let me reconsider: the stored one is https://www.example.com/, the new input is https://example.com/
+  // After normalizing both, they will both have their own form because normalizeUrlInput doesn't remove www
+  // So let me use a better example with a trailing slash difference
+
+  // Actually, let me test with scheme difference which normalizeUrlInput will handle
+  const raw2 = JSON.stringify([
+    { id: "s1", title: "Example", url: "example.com/", origin: "x", sortOrder: 0, createdAt: NOW },
+  ]);
+  const parsed2 = parsePinnedSites(raw2);
+  // The stored "example.com/" should be normalized to "https://example.com/"
+  assert.equal(parsed2?.[0]?.url, "https://example.com/");
+
+  // Adding the same URL in canonical form should dedupe
+  const result2 = addPinnedSite(parsed2 || [], { url: "https://example.com/", now: NOW, id: "s2" });
+  assert.ok(result2);
+  assert.equal(result2.site.id, "s1");
+  assert.equal(result2.sites.length, 1);
+});

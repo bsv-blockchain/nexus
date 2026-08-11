@@ -79,16 +79,28 @@ export function renamePinnedSite(
 function parseSite(value: unknown): PinnedSite | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
-  if (typeof record.id !== "string" || typeof record.url !== "string") return null;
-  if (!isPinnableUrl(record.url)) return null;
-  const origin = deriveOrigin(record.url);
+  if (typeof record.id !== "string") return null;
+
+  // Canonicalize the stored URL — it may be from an older format or tampered
+  const url = typeof record.url === "string" ? normalizeUrlInput(record.url) : null;
+  if (!url || !isPinnableUrl(url)) return null;
+  const origin = deriveOrigin(url);
   if (!origin) return null;
+
+  // Trim title and fall back to hostname if empty
+  const trimmedTitle = typeof record.title === "string" ? record.title.trim() : "";
+
+  // Validate sortOrder is a safe finite number
+  const sortOrder = typeof record.sortOrder === "number" && Number.isFinite(record.sortOrder)
+    ? Math.floor(record.sortOrder)
+    : 0;
+
   return {
     id: record.id,
-    title: typeof record.title === "string" && record.title ? record.title : hostTitle(record.url),
-    url: record.url,
+    title: trimmedTitle || hostTitle(url),
+    url,
     origin,
-    sortOrder: typeof record.sortOrder === "number" ? record.sortOrder : 0,
+    sortOrder,
     createdAt: typeof record.createdAt === "string" ? record.createdAt : "",
   };
 }
@@ -98,7 +110,8 @@ function parseSite(value: unknown): PinnedSite | null {
  *
  * `origin` is re-derived from `url` rather than read back, so a tampered or
  * stale storage entry cannot make the chip claim one site while the tab loads
- * another.
+ * another. Renumber sortOrder to be contiguous so later calls to addPinnedSite
+ * do not collide with existing rows.
  */
 export function parsePinnedSites(raw: string): PinnedSite[] | null {
   let parsed: unknown;
@@ -111,5 +124,6 @@ export function parsePinnedSites(raw: string): PinnedSite[] | null {
   return parsed
     .map(parseSite)
     .filter((site): site is PinnedSite => site !== null)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((site, index) => ({ ...site, sortOrder: index }));
 }
