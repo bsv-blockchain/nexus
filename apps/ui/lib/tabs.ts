@@ -40,6 +40,16 @@ function colorFor(text: string): string {
   return color ?? FAVICON_COLORS[0]!;
 }
 
+/**
+ * The letter-tile colour a site falls back to when it serves no favicon.
+ *
+ * Exported so a pinned site's rail tile and that site's tab agree: they are
+ * the same site, and two colours for it would read as two different things.
+ */
+export function faviconColorFor(url: string): string {
+  return colorFor(hostnameOf(url));
+}
+
 /** Builds a full tab record for a URL, reusing mock-page titles when known. */
 export function buildTab(
   input: string,
