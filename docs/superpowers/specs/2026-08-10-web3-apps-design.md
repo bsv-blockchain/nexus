@@ -36,7 +36,7 @@ This spec does both: deletes the store, and builds the pinned-site rail.
 |---|---|
 | what the rail holds | two built-in apps (Payments, Browser) + websites the user pinned |
 | offline storage of pinned sites | **out of scope**, recorded as Phase 2 with its compliance cost (§7) |
-| a browsable directory | **no** — a small default set only, Safari's Favorites model |
+| a browsable directory | **no** — and no default pins either, matching BSV Browser's empty `defaultBookmarks` |
 | the web preview's thirteen fictional apps | kept reachable in demo builds as pre-seeded pins; the store chrome is deleted from the codebase, not flag-gated |
 | launch behaviour | app-like (no URL bar) with a persistent origin chip |
 | naming | section is **Web3 Apps**; the subtitle and verbs carry the "these are bookmarks" work |
@@ -61,7 +61,6 @@ interface PinnedSite {
   title: string;          // user-editable, defaults to the page's <title>
   url: string;            // full launch URL
   origin: string;         // derived from url; never user-editable
-  icon?: string;          // fetched favicon, cached as a data URI
   sortOrder: number;
   createdAt: string;
 }
@@ -69,7 +68,15 @@ interface PinnedSite {
 
 Pins are **deduped by `url`**. Adding a URL that is already pinned focuses the
 existing pin rather than creating a second one — the same check the favourites
-path already makes at `hub-provider.tsx:1192`.
+path already makes at `hub-provider.tsx:1192`, and the same check BSV Browser's
+`BookmarkStore.addBookmark` makes (`stores/BookmarkStore.tsx:22`).
+
+Deliberately **no icon field**. See §2's favicon rule: the icon is derived from
+the URL at render, never stored.
+
+This is BSV Browser's `Bookmark = { title, url, added }` with an id, a sort order
+and a derived origin. Nothing about the underlying model differs; Nexus only
+wraps it in different chrome.
 
 `origin` is stored derived and **re-derived on every launch and every navigation**
 rather than trusted from storage. It is what the chip renders, so it must not be
@@ -114,6 +121,30 @@ drag-a-tab gesture is reused, its type is not.
 The rail renders `RailRef`s. `{kind:'app'}` resolves through `getHubApp` as
 today; `{kind:'site'}` resolves through `pinnedSites` and draws the favicon on
 the same `AppTile` geometry, so the rail looks unchanged.
+
+### Favicons — fix the privacy leak while we are here
+
+`components/hub/favicon.tsx:55` fetches every icon from
+`https://www.google.com/s2/favicons?domain=<host>`. That hands Google the
+hostname of every site the user has pinned, every tab in the command palette,
+every favourite in `browser-nav`, on every render — the user's browsing, from a
+wallet browser, to a third party they never chose.
+
+BSV Browser does not do this. It derives `new URL(url).origin + '/favicon.ico'`
+and fetches from the site itself (`components/browser/BookmarkList.tsx:56`),
+cached by `expo-image` with `cachePolicy="memory-disk"` — and the comment there
+records why the cache matters: raw RN `<Image>` re-decodes per row and spiked the
+main thread when the bookmark sheet opened over a live WebView.
+
+Adopt the same rule in the chrome: derive `origin + '/favicon.ico'`, let the web
+view's own HTTP cache do the caching, keep the existing coloured-letter fallback
+in `Favicon` for the failure path. No third party, and no icon bytes in
+`localStorage`.
+
+This reaches beyond the Apps section — `browser-nav.tsx`, `command-palette.tsx`,
+`connect-app.tsx` and `mobile-browser.tsx` all render `Favicon` — but it is one
+component, the fix is the same everywhere, and shipping a pinned-site rail that
+reports itself to Google would undo the argument in §6.
 
 Tapping a site sets `activeRef` to that site and opens it in the native tab layer
 through the existing `NativeSiteFrame` path in `browser-app.tsx` — the measured
@@ -160,17 +191,21 @@ Two sections. No category folders, no sort control, no developer filter.
 
 - **On your rail** — pinned sites. Each row: favicon, title, `origin`, "Remove
   from rail". Title editable inline.
-- **Suggested** — defaults not currently pinned. Each row: favicon, title,
-  origin, a one-line description, "Add to rail". No ratings, no counts, no
-  publisher badge, no price.
 
-**The default set** is at most eight entries, shipped as plain data. On first run
-they are **pre-pinned** onto the rail, as Safari ships Favorites — a new user
-should not meet an empty rail and have to discover pinning. They are ordinary
-`PinnedSite` rows from that moment: removable, renamable, reorderable, with no
-special status in the type or in the UI. Removing one moves it back into
-Suggested; there is no way to distinguish a shipped default from a user's own pin
-afterwards, and nothing should try.
+There is no second section, because **Nexus ships no default sites.**
+
+BSV Browser reached this position already: `defaultBookmarks` in
+`shared/constants.ts:78` is an empty array with all ten of its entries commented
+out — commented rather than deleted, so it was a decision and not an oversight.
+Matching it means nothing on this screen was chosen by Nexus. That retires
+tripwire 1 in §6 outright rather than defending a line, and it deletes the
+Suggested section, the curation question and the "is eight too many" argument
+along with it.
+
+The cost is first-run guidance, and the empty state pays it: an illustration and
+one line — *"Open a site in Browser, then add it to your rail."* — with a button
+that opens Browser. The rail is never empty in practice, because Payments and
+Browser are always on it.
 
 Plus the "Add a site" field (§8 for validation).
 
@@ -259,27 +294,50 @@ Supporting points:
 
 Named so nobody trips one by accident. Each of these turns 4.7 on:
 
-1. **A browsable directory** of sites. The line between this and §3's default
-   set is not size, it is shape. A fixed list of at most eight entries, compiled
-   into the binary, with no search, no categories, no pagination and no remote
-   fetch, is a browser's starting bookmarks. Add a search field, category
-   browsing, or a server that supplies or updates the list, and it becomes a
-   catalog Nexus operates — which is offering software. **The default set must
-   never be fetched at runtime.**
+1. **Any Nexus-chosen list of sites** — a directory, a suggestions section, or
+   even a shipped set of default pins. §3 ships none, which is the strongest
+   available position: every site on the rail was chosen by the user. The moment
+   a list arrives, the question becomes its shape (searchable? categorised?
+   fetched from a server?) and the answer is arguable. Today it is not.
 2. **Repositories returning** — user-addable app sources are an alternative
    distribution channel on their face.
 3. **Offline archiving** — Phase 2, §7.
 
-### The 4.7.2 invariant, enforced mechanically
+### The 4.7.2 invariant, stated correctly
 
-`window.nexus` must never expose camera, radios, share or filesystem to a browsed
-page. It is four wallet methods today — `ping`, `getVersion`, `getPublicKey`,
-`createAction` (`packages/substrate/src/protocol.js:14`).
+An earlier draft of this spec said the browsed-page method list must never grow
+past the four it has today (`ping`, `getVersion`, `getPublicKey`, `createAction`,
+`packages/substrate/src/protocol.js:14`). **That is the wrong test and it would
+block correct work.** BSV Browser's CWI provider exposes about twenty-eight
+methods to browsed pages (`utils/webview/cwiProvider.ts`) — `createAction`,
+`signAction`, `listOutputs`, the certificate calls, `encrypt`/`decrypt`,
+`discoverByIdentityKey`, `getHeight`. If Nexus's browser is the same underneath,
+that list is where it is heading, and every one of those methods is
+wallet, crypto or chain. None is a native platform API. 4.7.2 is untouched.
 
-Add an assertion to `tools/check-injection-sources.mjs`, which already guards the
-injected sources, so growing that list fails `npm run check`. That converts
-"may not extend or expose native platform APIs to the software" from a promise
-into a build step.
+The test is capability class, not count. Two rules:
+
+**Nexus-owned bridge methods** — `window.nexus`, and `window.CWI` if the CWI
+provider is adopted — stay wallet, crypto and chain only. No Nexus-invented route
+to camera, microphone, radios, share sheet, filesystem or contacts. This is the
+line 4.7.2 draws, and it is the one to enforce in
+`tools/check-injection-sources.mjs`, which already guards the injected sources:
+fail `npm run check` when a method outside that class appears in the exposed
+list, so adding one is a deliberate act rather than a quiet one.
+
+**Web-standard APIs** — `getUserMedia`, `geolocation`, the clipboard — are a
+different question. Every browser gives these to web content, WKWebView provides
+them, and doing so is not "extending native platform APIs to software" in 4.7's
+sense; 4.7 is about mini apps hosted inside an app, and Phase 1 hosts none.
+
+But note what porting BSV Browser's webview layer would bring with it:
+`utils/webview/messageRouter.ts:145` records *"iOS: never show in-app
+PermissionModal for camera/microphone. Auto-allow when state is 'ask'"*, and :269
+auto-allows geolocation at the domain level. Whatever that is for BSV Browser's
+threat model, **auto-allowing a browsed page's camera, microphone or location
+without a user prompt is not acceptable in Nexus**, where the same page can also
+ask the wallet for money. If that layer is ported, the auto-allow paths are
+prompts. This is a 5.1 requirement before it is anything else.
 
 ## 7. Phase 2 — offline pinned sites (recorded, not built)
 
@@ -289,11 +347,15 @@ Its price, stated up front so the trade is visible to whoever picks it up:
   reporting with timely response; user blocking; a published index of software
   and metadata with **universal links to every site offered**; and an age
   restriction mechanism on verified or declared age.
-- **The likely-unavailable path.** Service workers in `WKWebView` require the
-  `WKAppBoundDomains` entitlement, capped at ten domains, and enabling it
-  restricts script injection to those same domains — which would break
-  `window.nexus` everywhere else. **Verify against current iOS before designing
-  around this**; it has held since iOS 14 but has not been re-checked here.
+- **The unavailable path, now confirmed in a shipping app.** Service workers in
+  `WKWebView` require the `WKAppBoundDomains` entitlement, capped at ten domains,
+  and enabling it restricts script injection to those same domains — which would
+  break `window.nexus` everywhere else. BSV Browser hit this and worked around
+  it: `ios/BSVBrowser/Info.plist` declares no `WKAppBoundDomains` key, and
+  `utils/webview/injectedPolyfills.ts:457` stubs `navigator.serviceWorker`
+  outright — a push-only shim, because the real thing is not there. It also
+  carries no `cacheEnabled` or offline props anywhere, so there is nothing to
+  port. Phase 2 is new work in both codebases.
 - **The viable path.** A shell-side archive, with assets served from a local
   origin per site. Both shells need a scheme handler or an on-device server.
   Substantial work, and it is what "storing downloaded web apps" actually means.
@@ -321,10 +383,14 @@ Unit tests:
 - URL validation, including the three rejected schemes
 - rail-layout migration from old persisted payloads (`{type:'app'}`, `apps[]`)
 - `reconcileRail` with mixed refs, and with a site inside a group
+- favicon URL derivation, including the malformed-URL fallback
 
 Build step:
 
-- `check-injection-sources.mjs` asserts the substrate method list has not grown
+- `check-injection-sources.mjs` fails when the exposed browsed-page method list
+  contains anything outside the wallet/crypto/chain class (§6)
+- a grep-level assertion that no component fetches from a third-party favicon
+  service; `google.com/s2/favicons` must not reappear
 
 Gates:
 
@@ -333,10 +399,14 @@ Gates:
 
 Manual:
 
+- first run: the rail holds Payments and Browser only, and the empty state
+  explains how to add a site
 - pin via tab-drag, via page menu, via the URL field
 - launch a pinned site; the chip shows the real origin
 - force a cross-origin redirect; the chip follows
 - remove, reorder, and drop a site into a folder alongside an app
+- favicons render from the sites' own `/favicon.ico`, and a site without one
+  falls back to the letter tile rather than a broken image
 - `?data=demo` still shows the thirteen seeded pins
 
 ## 10. Out of scope, recorded
@@ -345,5 +415,11 @@ Manual:
 - Binding the real wallet substrate to browsed tabs. Both shells still answer
   with spike constants; that wiring is its own change, and this spec only
   constrains what it must show the user when it happens.
-- Any discovery or directory surface (§6, tripwire 1).
+- Any discovery or directory surface, and any shipped default pins (§6,
+  tripwire 1).
 - Per-site data isolation beyond what the web view already gives each origin.
+- **Porting BSV Browser's webview layer** (`utils/webview/*` — the CWI provider,
+  `messageRouter`, `injectedPolyfills`). It is the right destination if the two
+  browsers are to be the same underneath, but it is a change of its own size and
+  it carries the camera / microphone / geolocation auto-allow behaviour flagged
+  in §6, which must become prompts before it lands in a wallet browser.
