@@ -105,12 +105,6 @@ export const releases: Release[] = [
         summary: "One place for sync, privacy, browsing and appearance.",
         body: "Reachability and message tolls were commands you could only reach by typing them into a thread, which meant nobody who had not read the grammar would ever find them. They live here now, alongside what this client writes to the chain.",
       },
-      {
-        id: "repositories",
-        title: "A warning before an unvetted app store",
-        summary: "Adding a repository is a decision, not a setting.",
-        body: "A repository decides which code the hub is willing to offer you, so it is closer to a permission than a preference. Every path to adding one now states plainly that nothing in it has been reviewed, and by whom it has not.",
-      },
     ],
   },
   {

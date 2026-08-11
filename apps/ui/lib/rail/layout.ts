@@ -35,70 +35,16 @@ export function sameRef(a: RailRef, b: RailRef): boolean {
   return refKey(a) === refKey(b);
 }
 
-function parseRef(value: unknown): RailRef | null {
-  if (!value || typeof value !== "object") return null;
-  const record = value as Record<string, unknown>;
-  if (record.kind === "app" && typeof record.slug === "string") {
-    return { kind: "app", slug: record.slug };
-  }
-  if (record.kind === "site" && typeof record.id === "string") {
-    return { kind: "site", id: record.id };
-  }
-  return null;
-}
-
-function parseEntry(value: unknown): RailEntry | null {
-  if (!value || typeof value !== "object") return null;
-  const record = value as Record<string, unknown>;
-
-  // Current shape.
-  if (record.type === "single") {
-    const ref = parseRef(record.ref);
-    return ref ? { type: "single", ref } : null;
-  }
-
-  // Pre-migration shape: a bare app slot.
-  if (record.type === "app" && typeof record.slug === "string") {
-    return { type: "single", ref: { kind: "app", slug: record.slug } };
-  }
-
-  if (record.type === "group" && typeof record.id === "string") {
-    const name = typeof record.name === "string" ? record.name : "";
-    // `members` is current; `apps` is the pre-migration array of slugs.
-    const members = Array.isArray(record.members)
-      ? record.members.map(parseRef).filter((ref): ref is RailRef => ref !== null)
-      : Array.isArray(record.apps)
-        ? record.apps
-            .filter((slug): slug is string => typeof slug === "string")
-            .map((slug): RailRef => ({ kind: "app", slug }))
-        : [];
-    // exactOptionalPropertyTypes: only attach `color` when there is one.
-    return typeof record.color === "string"
-      ? { type: "group", id: record.id, name, color: record.color, members }
-      : { type: "group", id: record.id, name, members };
-  }
-
-  return null;
-}
-
-/**
- * Read a persisted layout, upgrading anything an older build wrote.
+/*
+ * There is no reader for a persisted layout here, and no migration for one.
  *
- * Returns null when the payload is unusable, so the caller can fall back to a
- * freshly derived layout instead of rendering an empty rail.
+ * `migrateRailLayout` and its parsers were written to upgrade a stored payload,
+ * but the rail layout has never been persisted: the provider holds it in
+ * useState with no storage key, so no build has ever written the old shape and
+ * nothing has ever had to be upgraded from it. Should the layout gain a storage
+ * key later, the parser it needs will be written against the shape actually
+ * being stored at that point rather than against a guess kept alive for it.
  */
-export function migrateRailLayout(raw: string): RailEntry[] | null {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-  if (!Array.isArray(parsed)) return null;
-  return parsed
-    .map(parseEntry)
-    .filter((entry): entry is RailEntry => entry !== null);
-}
 
 /**
  * Reconcile a stored layout against what currently exists.

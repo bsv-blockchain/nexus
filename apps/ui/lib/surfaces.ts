@@ -38,7 +38,7 @@ export const DEMO_SURFACES = process.env.NEXT_PUBLIC_DEMO_DATA !== "0";
  */
 const SHIPPED: ReadonlySet<string> = new Set(["browser", "wallet"]);
 
-/** Whether an app belongs in this build's launcher, rail and store. */
+/** Whether an app belongs in this build's launcher and rail. */
 export function shipsApp(slug: HubApp["slug"]): boolean {
   return DEMO_SURFACES || SHIPPED.has(slug);
 }

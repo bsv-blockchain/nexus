@@ -11,7 +11,6 @@ import {
   getSpaces,
   conversationNotes,
   type BrowserTab,
-  type CollectionId,
   type Favorite,
   type GroupGates,
   type RoomRoles,
@@ -143,10 +142,6 @@ export type WalletSection =
   | "splits";
 export type IdentitySection = "keys" | "retired" | "certificates";
 export type AttestationFilter = "all" | "issued" | "received";
-export type AppPromptMode = "install" | "uninstall";
-export type AppPrompt =
-  | { kind: "app"; slug: AppSlug; mode: AppPromptMode }
-  | { kind: "collection"; id: CollectionId; mode: AppPromptMode };
 export interface MarketFilters {
   query: string;
   nameSort: "none" | "az" | "za";
@@ -250,10 +245,6 @@ interface HubState {
   presetGroup: (name: string, refs: RailRef[]) => void;
   renameGroup: (id: string, name: string) => void;
   setGroupColor: (id: string, color: string) => void;
-
-  /** collections-column filter */
-  appsCollection: CollectionId;
-  setAppsCollection: (id: CollectionId) => void;
 
   /**
    * What the rail shows as open: a builtin app or a pinned site.
@@ -415,11 +406,12 @@ interface HubState {
   setIdentitySection: (section: IdentitySection) => void;
   attestationFilter: AttestationFilter;
   setAttestationFilter: (filter: AttestationFilter) => void;
-  /** pending install/uninstall permission sheet */
-  appPrompt: AppPrompt | null;
-  openAppPrompt: (slug: AppSlug, mode: AppPromptMode) => void;
-  openCollectionPrompt: (id: CollectionId, mode: AppPromptMode) => void;
-  closeAppPrompt: () => void;
+  /*
+   * There was an install/uninstall permission sheet here, opened with a slug and
+   * a mode. Pinning a site grants it nothing, so there is no longer a moment at
+   * which it could fire; the consent it collected belongs at first request,
+   * keyed on origin, which is the spend-authorization path that already exists.
+   */
   /** show the Web3 Apps surface — the sites the user pinned */
   openWeb3Apps: () => void;
   openProfilesManager: () => void;
@@ -654,7 +646,6 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   // bar decides. Any explicit `setActiveRef` takes over from there.
   const [selectedRef, setSelectedRef] = useState<RailRef | null>(null);
   const [libraryTab, setLibraryTab] = useState<LibraryTab>("spaces");
-  const [appsCollection, setAppsCollection] = useState<CollectionId>("all");
   const [railLayout, setRailLayout] = useState<RailEntry[]>([]);
 
   // Always reconciled, never rendered raw: a stored layout can name a site that
@@ -871,19 +862,6 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     useState<IdentitySection>("keys");
   const [attestationFilter, setAttestationFilter] =
     useState<AttestationFilter>("all");
-  const [appPrompt, setAppPrompt] = useState<AppPrompt | null>(null);
-  const openAppPrompt = useCallback(
-    (slug: AppSlug, mode: AppPromptMode) =>
-      setAppPrompt({ kind: "app", slug, mode }),
-    [],
-  );
-  const openCollectionPrompt = useCallback(
-    (id: CollectionId, mode: AppPromptMode) =>
-      setAppPrompt({ kind: "collection", id, mode }),
-    [],
-  );
-  const closeAppPrompt = useCallback(() => setAppPrompt(null), []);
-
   const urlApp = useSyncExternalStore(subscribeToUrl, urlAppSlug, () => null);
   const fromUrl = getHubApps().find((app) => app.slug === urlApp)?.slug ?? null;
 
@@ -1560,8 +1538,6 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       presetGroup,
       renameGroup,
       setGroupColor,
-      appsCollection,
-      setAppsCollection,
       activeRef,
       setActiveRef,
       activeApp,
@@ -1690,10 +1666,6 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       setIdentitySection,
       attestationFilter,
       setAttestationFilter,
-      appPrompt,
-      openAppPrompt,
-      openCollectionPrompt,
-      closeAppPrompt,
     }),
     [
       pinnedSites,
@@ -1707,7 +1679,6 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       presetGroup,
       renameGroup,
       setGroupColor,
-      appsCollection,
       activeRef,
       setActiveRef,
       activeApp,
@@ -1811,10 +1782,6 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       signSection,
       identitySection,
       attestationFilter,
-      appPrompt,
-      openAppPrompt,
-      openCollectionPrompt,
-      closeAppPrompt,
     ],
   );
 

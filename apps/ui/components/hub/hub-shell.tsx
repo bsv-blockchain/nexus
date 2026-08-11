@@ -1,7 +1,5 @@
 "use client";
 
-import { AppCollections } from "@/components/hub/app-collections";
-import { AppPermissionSheet } from "@/components/hub/app-permission-sheet";
 import { CommandPalette } from "@/components/hub/command-palette";
 import { DownloadsPanel } from "@/components/hub/downloads-panel";
 import { HubProvider, useHub } from "@/components/hub/hub-provider";
@@ -24,7 +22,12 @@ function LibraryPanel(): ReactNode {
   // Settings takes the panel as well as the canvas: the categories are the only
   // way to move around it, so they have to be where every other app's list is.
   if (mainView === "settings") return <SettingsSidebar />;
-  if (libraryTab === "apps") return <AppCollections />;
+  /*
+   * Web3 Apps has no panel column of its own. It used to get the collections
+   * list, which was the store's filter — persona bundles that switched several
+   * apps on at once. With nothing to install there is nothing to filter, and the
+   * pinned-sites list is the whole surface, so the panel keeps showing profiles.
+   */
   // Profiles <-> Downloads crossfade: the outgoing pane staggers out, then the
   // incoming pane staggers in (and the reverse when closing Downloads).
   return (
@@ -113,7 +116,6 @@ function Shell(): ReactNode {
       <MobileSheet />
       <CommandPalette />
       <ShareModal />
-      <AppPermissionSheet />
       <WalletGate />
     </div>
   );

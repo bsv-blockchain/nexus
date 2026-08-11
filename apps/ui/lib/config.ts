@@ -16,7 +16,6 @@ export const themeConfig = {
 export const storageKeys = {
   /** the sites the user pinned to the rail */
   pinnedSites: "nexus.pinned-sites",
-  repositories: "nexus.app-repositories",
   /** what Messages anchors, globally and per conversation */
   chainPolicy: "nexus.chain-policy",
 } as const;
