@@ -38,6 +38,13 @@ test("normalizeUrlInput rejects input that is not a host", () => {
   assert.equal(normalizeUrlInput("no dots here"), null);
 });
 
+test("normalizeUrlInput rejects userinfo and script-bearing schemes", () => {
+  // Prevent laundering of javascript:, mailto:, sip:, etc. into valid URLs by prefixing https://
+  assert.equal(normalizeUrlInput("mailto:test@example.com"), null);
+  assert.equal(normalizeUrlInput("javascript:alert(1)@evil.com"), null);
+  assert.equal(normalizeUrlInput("sip:alice@example.com"), null);
+});
+
 test("isPinnableUrl accepts https, and http only for localhost", () => {
   assert.equal(isPinnableUrl("https://example.com/"), true);
   assert.equal(isPinnableUrl("http://localhost:3000/"), true);

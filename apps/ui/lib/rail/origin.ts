@@ -29,9 +29,36 @@ export function deriveOrigin(url: string): string | null {
 export function normalizeUrlInput(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
-  const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)
-    ? trimmed
-    : `https://${trimmed}`;
+
+  let candidate: string;
+
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) {
+    // Already has a scheme with ://
+    candidate = trimmed;
+  } else {
+    // No scheme with ://, so validate the bare authority before prefixing https://
+    // to prevent laundering of javascript:, mailto:, data:, etc. into valid URLs.
+    const authorityParts = trimmed.split("/");
+    const authority = authorityParts[0];
+    if (!authority) return null;
+
+    // Reject userinfo (the @ would make the parser treat this as authentication)
+    if (authority.includes("@")) return null;
+
+    // Reject bare IPv6 addresses (they need an explicit scheme to parse correctly).
+    // This is an accepted limitation: http://[::1]:3000 still works, bare [::1]:3000 does not.
+    if (authority.startsWith("[")) return null;
+
+    // Validate that any port is numeric (after the last :)
+    if (authority.includes(":")) {
+      const parts = authority.split(":");
+      const port = parts[parts.length - 1];
+      if (!port || !/^\d+$/.test(port)) return null;
+    }
+
+    candidate = `https://${trimmed}`;
+  }
+
   let parsed: URL;
   try {
     parsed = new URL(candidate);
