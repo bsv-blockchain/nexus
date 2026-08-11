@@ -71,6 +71,10 @@ export * from './utils/headers/prewarm'
 export * from './utils/headers/syncHeaders'
 
 // ── top-level utils ─────────────────────────────────────────────────────────
+// Entropy is what a wallet is backed up as (BRC-157); the two below are its two
+// encodings — a BIP-39 sentence and a set of BRC-140 shares. Read ./utils/entropy.ts
+// first: it is the only module that knows what entropy is, and the other two ask it.
+export * from './utils/entropy'
 export * from './utils/mnemonicWallet'
 export * from './utils/backupShares'
 export { default as config } from './utils/config'

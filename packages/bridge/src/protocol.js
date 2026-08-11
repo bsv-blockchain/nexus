@@ -30,7 +30,28 @@ const METHODS = {
   WALLET_TRANSACTIONS: 'wallet.transactions',
   // Onboarding. Restoring from a recovery phrase is how a wallet comes into being
   // here; the chrome collects the words and the shell owns every key operation.
+  // Twelve, fifteen, eighteen, twenty-one or twenty-four words — every length BIP-39
+  // defines, which is what BRC-157 requires. Both shells used to accept only 12 and
+  // 24, so a 15-word phrase from another wallet could not get in at all.
   WALLET_RESTORE: 'wallet.restore',
+  /**
+   * The other way in: BRC-140 backup shares.
+   *
+   * A separate method rather than an overload of WALLET_RESTORE, because the input,
+   * the failure modes and the trust question are all different. Under BRC-157 the
+   * shares reconstruct the wallet's ENTROPY, so recovery ends with the recovery phrase
+   * back in the user's hands and the wallet indistinguishable from a phrase-restored
+   * one — that is the whole point of the standard.
+   *
+   * `{ shares: string[], wordCount?: 12|15|18|21|24, legacy?: boolean }`
+   *
+   * `wordCount` is printed on the share page and is the one fact shares cannot carry;
+   * without it the shell falls back to BRC-157's leading-zero heuristic. `legacy` is
+   * for pages printed by BSV Browser / metanet-mobile, which split the primary key
+   * itself: BRC-140 has no version marker, so the two are indistinguishable and the
+   * user has to say which they hold. A legacy recovery has no phrase, ever.
+   */
+  WALLET_RESTORE_SHARES: 'wallet.restoreShares',
   // Create-new is the same trust split in the other direction: the shell generates
   // and stores the words, and hands them to the chrome ONCE for the user to write
   // down. Refused while a wallet exists — creating over someone's keys is a wipe.
@@ -63,13 +84,22 @@ const METHODS = {
   SETTINGS_SET_AUTO_APPROVE: 'settings.setAutoApprove',
 
   /**
-   * Backup and recovery, beyond the twelve words.
+   * Backup and recovery, beyond the words.
    *
-   * `backup.shares` splits the primary key 2-of-3 (Shamir) and returns printable
-   * HTML — the chrome cannot derive a key and must never hold one, so the shell
-   * does both behind whatever gate it has. `exportDb`/`importDb` move the ledger
-   * itself, which is the only copy of transaction history a local-only wallet has.
-   * Import REPLACES that ledger and rebuilds the wallet.
+   * `backup.shares` splits the wallet's ENTROPY 2-of-3 (Shamir, BRC-140) behind
+   * whatever gate the platform has, renders the printable document, and hands it
+   * straight to the OS — print dialogue on desktop, share sheet on mobile. It answers
+   * with counts and NEVER with a share: any `threshold` shares together are the
+   * wallet, and the chrome is a renderer that also hosts third-party pages.
+   *
+   * Entropy and not the primary key, per BRC-157: splitting `m/0'/0'` is what used to
+   * make the shares recover a different wallet than the phrase did.
+   *
+   * `exportDb`/`importDb` move the ledger itself, which is the only copy of
+   * transaction history a local-only wallet has. Import REPLACES that ledger and
+   * rebuilds the wallet. Both are still declared and still unimplemented — they share
+   * nothing with the key material above except the word "backup", and they need a
+   * native file dialogue on two shells.
    */
   BACKUP_SHARES: 'backup.shares',
   BACKUP_EXPORT_DB: 'backup.exportDb',

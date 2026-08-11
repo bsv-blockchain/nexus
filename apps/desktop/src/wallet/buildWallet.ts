@@ -301,6 +301,28 @@ export async function restoreDesktopWallet(
 }
 
 /**
+ * Restore from a bare primary key and build — the LEGACY backup-share path.
+ *
+ * Pages printed by BSV Browser / metanet-mobile Shamir-split `m/0'/0'` itself, so what
+ * their shares reconstruct is the primary key with nothing above it: no entropy, no
+ * phrase, and no way to ever produce either. BRC-157 exists to end that, and
+ * `wallet.restoreShares` without `legacy` goes through `restoreDesktopWallet` with a
+ * recovered phrase instead.
+ *
+ * This is here so a user holding one of those pages is not locked out. Note what it
+ * gives the privileged key manager: the primary key itself, because there is no master
+ * above it to hand over. That is a real difference from the phrase path and is the
+ * cost of the old scheme, not a choice being made here.
+ */
+export async function restoreDesktopWalletFromKey(
+  key: PrivateKey,
+  deps: DesktopWalletDeps
+): Promise<DesktopWallet & { manager: WalletPermissionsManager }> {
+  const privileged = new PrivilegedKeyManager(async () => key)
+  return await buildDesktopWallet(key.toArray('be', 32), privileged, deps)
+}
+
+/**
  * A SimpleWalletManager over the same build, for the snapshot path.
  *
  * Exported but not yet used by the shell: it is what will let desktop resume from a

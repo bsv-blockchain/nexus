@@ -28,7 +28,9 @@ const ChromeHost = forwardRef<WebView, ChromeHostProps>(function ChromeHost({ on
   const bridgeScript = buildChromeBridgeScript({
     shell: 'expo',
     platform: Platform.OS,
-    capabilities: ['tabs', 'wallet', 'pay', 'tx', 'scan', 'share', 'nearby', 'overlay', 'settings']
+    // 'backup' covers backup.shares only — exportDb/importDb are declared in the
+    // protocol and answered by nobody, on either shell.
+    capabilities: ['tabs', 'wallet', 'pay', 'tx', 'scan', 'share', 'nearby', 'overlay', 'settings', 'backup']
   })
 
   return (

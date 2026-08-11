@@ -1,6 +1,21 @@
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { generateMnemonicWallet } from '@nexus/wallet-core/src/utils/mnemonicWallet'
+import { PrivateKey } from '@bsv/sdk'
+import {
+  generateMnemonicWallet,
+  parseMnemonic,
+  recoverMnemonicWallet
+} from '@nexus/wallet-core/src/utils/mnemonicWallet'
+import { isWordCount } from '@nexus/wallet-core/src/utils/entropy'
+import {
+  DEFAULT_THRESHOLD,
+  DEFAULT_TOTAL_SHARES,
+  generateEntropyShares,
+  generatePrintHTML,
+  parseShareSet,
+  recoverKeyFromShares,
+  recoverMnemonicFromShares
+} from '@nexus/wallet-core/src/utils/backupShares'
 import { TaskSendOffline } from '@nexus/wallet-core/src/utils/monitor/TaskSendOffline'
 import { getOnline, subscribeOnline } from '@nexus/wallet-core/src/utils/net/online'
 import { DEFAULT_MESSAGE_BOX_URL, MESSAGE_BOX_URL_KEY } from '@nexus/wallet-core/src/utils/pay/rails/handle'
@@ -9,9 +24,10 @@ import {
   AUTO_APPROVE_STORAGE_KEY,
   DEFAULT_AUTO_APPROVE_THRESHOLD
 } from '@nexus/wallet-core/src/spending'
-import { restoreDesktopWallet } from './buildWallet.ts'
+import { restoreDesktopWallet, restoreDesktopWalletFromKey } from './buildWallet.ts'
 import { createExchangeRate } from './exchangeRate.mjs'
 import { createPayHost } from './payHost.mjs'
+import { printHtmlDocument } from './printDocument.mjs'
 import { createLocalStorage } from '../platform/index.mjs'
 import { installDesktopOnlineProbe } from '../platform/onlineProbe.mjs'
 
@@ -46,7 +62,44 @@ function humanMemo(description) {
   return LOOKS_LIKE_A_REFERENCE.test(text) ? '' : text
 }
 
-export function createWalletHost({ userDataDir, onStateChange, onPermissionRequest }) {
+/**
+ * The phrase gate, in one place for both routes in.
+ *
+ * This used to be `words.length !== 12 && words.length !== 24` inline, which rejected
+ * the 15-, 18- and 21-word phrases BIP-39 defines and BRC-157 requires — someone
+ * holding a 15-word phrase from another wallet could not get in at all. It now defers
+ * to wallet-core's `parseMnemonic`, which is the SAME call the build path makes, so a
+ * phrase that passes here cannot fail there.
+ *
+ * @returns the normalised phrase
+ */
+function requirePhrase(raw) {
+  const phrase = (raw ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
+  const parsed = parseMnemonic(phrase)
+  if (!parsed.valid) throw new Error(parsed.error)
+  return phrase
+}
+
+/** A printed word count, or undefined so the trim falls back to BRC-157's heuristic. */
+function optionalWordCount(value) {
+  if (value === undefined || value === null || value === '') return undefined
+  const count = Number(value)
+  if (!isWordCount(count)) {
+    throw new Error(`a recovery phrase is 12, 15, 18, 21 or 24 words; got ${value}`)
+  }
+  return count
+}
+
+/** Shares arrive as an array of strings from the chrome, and nothing else will do. */
+function requireShares(value) {
+  if (!Array.isArray(value)) throw new Error('backup shares are a list of strings')
+  const shares = value.map((s) => String(s ?? '').trim()).filter(Boolean)
+  const { error } = parseShareSet(shares)
+  if (error) throw new Error(error)
+  return shares
+}
+
+export function createWalletHost({ userDataDir, onStateChange, onPermissionRequest, getParentWindow }) {
   // One directory for wallet databases, under userData so the OS backs it up and
   // uninstall removes it. bsv-desktop puts its databases in ~/.bsv-desktop, outside
   // every OS convention, and has accumulated dozens of stale files plus plaintext
@@ -249,14 +302,29 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
    * so the Monitor is created and started exactly once per build and the deps object
    * has a single definition rather than a copy per caller.
    */
+  const buildDeps = (chain) => ({
+    databaseDir,
+    chain,
+    adminOriginator: ADMIN_ORIGINATOR,
+    onTransactionStatusChanged: notifyTxChanged,
+    onSpendingAuthorizationRequested
+  })
+
   const buildFrom = async (phrase, chain) => {
-    const built = await restoreDesktopWallet(phrase, {
-      databaseDir,
-      chain,
-      adminOriginator: ADMIN_ORIGINATOR,
-      onTransactionStatusChanged: notifyTxChanged,
-      onSpendingAuthorizationRequested
-    })
+    const built = await restoreDesktopWallet(phrase, buildDeps(chain))
+    startMonitorSoon(built)
+    return built
+  }
+
+  /**
+   * The LEGACY share route: a bare primary key, with no phrase above it.
+   *
+   * Separate from buildFrom rather than a branch inside it, so that no code path can
+   * reach it without having been told, explicitly, that these shares came from a
+   * pre-BRC-157 page. See restoreDesktopWalletFromKey.
+   */
+  const buildFromKey = async (key, chain) => {
+    const built = await restoreDesktopWalletFromKey(key, buildDeps(chain))
     startMonitorSoon(built)
     return built
   }
@@ -272,6 +340,30 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
   const currentNetwork = async () => {
     const stored = await localStorage.getItem(NETWORK_KEY)
     return stored === 'test' ? 'test' : 'main'
+  }
+
+  /**
+   * How this device would rebuild its wallet, or null if it holds no keys.
+   *
+   * One reader for the two callers that need it — `resume()` at launch and
+   * `settings.setNetwork`'s rebuild — because they must agree about which secret is
+   * authoritative. The phrase wins when both exist: it is the BRC-157 root, and the
+   * `recoveredKey` beside it could only be a legacy artifact of the same wallet or a
+   * leftover an incomplete sign-out failed to erase. Rebuilding from the phrase is
+   * correct in both readings.
+   *
+   * @returns {Promise<((chain: 'main'|'test') => Promise<any>) | null>}
+   */
+  const keyedRebuild = async () => {
+    const phrase = await localStorage.getMnemonic()
+    if (phrase) return (chain) => buildFrom(phrase, chain)
+
+    const wif = await localStorage.getRecoveredKey()
+    if (!wif) return null
+    // Parsed here rather than inside the rebuild, so an unusable stored key fails
+    // once, loudly, instead of on every network switch.
+    const key = PrivateKey.fromWif(wif)
+    return (chain) => buildFromKey(key, chain)
   }
 
   const require_ = () => {
@@ -384,11 +476,7 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
       },
 
       'wallet.restore': async (params) => {
-        const phrase = (params?.mnemonic ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
-        const words = phrase ? phrase.split(' ') : []
-        if (words.length !== 12 && words.length !== 24) {
-          throw new Error(`a recovery phrase is 12 or 24 words; got ${words.length}`)
-        }
+        const phrase = requirePhrase(params?.mnemonic)
         if (wallet) return { ok: true }
 
         building = true
@@ -409,6 +497,62 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
         }
       },
 
+      /**
+       * The other way in: BRC-140 backup shares.
+       *
+       * Under BRC-157 the shares reconstruct the wallet's ENTROPY, so this path ends
+       * with the RECOVERY PHRASE recovered and stored — the wallet that comes out is
+       * indistinguishable from a phrase-restored one, and can be backed up either way
+       * again. That is the whole point of the standard, and it is why `mnemonic` comes
+       * back on the reply: the user has just proved they hold enough shares, and the
+       * words are the thing they did not have a moment ago.
+       *
+       * `legacy: true` is for pages printed by BSV Browser / metanet-mobile, which
+       * split `m/0'/0'` itself. There is no phrase for such a wallet and never will
+       * be; the reply says so with `mnemonic: null` rather than pretending.
+       *
+       * Refused while a wallet or a stored secret exists, exactly as wallet.create is
+       * and for the same reason: restoring over live keys is a wipe, and a wipe must go
+       * through the explicit sign-out with its warning.
+       */
+      'wallet.restoreShares': async (params) => {
+        const shares = requireShares(params?.shares)
+        const wordCount = optionalWordCount(params?.wordCount)
+        const legacy = params?.legacy === true
+
+        if (wallet || building) {
+          throw new Error('a wallet already exists on this device — sign out first')
+        }
+        if ((await localStorage.getMnemonic()) || (await localStorage.getRecoveredKey())) {
+          throw new Error('keys are already stored on this device — sign out first')
+        }
+
+        // Recovered BEFORE the build starts, so a wrong or incomplete share set fails
+        // as a share error and not as a mysterious build failure.
+        const phrase = legacy ? null : recoverMnemonicFromShares(shares, wordCount)
+        const legacyKey = legacy ? recoverKeyFromShares(shares) : null
+
+        building = true
+        publish()
+        try {
+          const chain = await currentNetwork()
+          wallet = legacy ? await buildFromKey(legacyKey, chain) : await buildFrom(phrase, chain)
+
+          // Same ordering rule as restore and create: never store a secret the build
+          // has not proven usable.
+          const stored = legacy
+            ? await localStorage.setRecoveredKey(legacyKey.toWif())
+            : await localStorage.setMnemonic(phrase)
+          if (!stored) {
+            console.warn('[wallet] built from shares, but the key could not be stored: no OS keychain')
+          }
+          return { ok: true, storedSecurely: stored, legacy, mnemonic: phrase }
+        } finally {
+          building = false
+          publish()
+        }
+      },
+
       'wallet.create': async () => {
         // Refuse before generating anything: creating over live keys is a wipe.
         // A stored phrase counts even with no wallet built from it yet (a locked
@@ -419,6 +563,11 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
         }
         if (await localStorage.getMnemonic()) {
           throw new Error('a recovery phrase is already stored on this device — sign out first')
+        }
+        // A legacy share recovery stores a key and no phrase, and it is just as
+        // irrecoverable to write over.
+        if (await localStorage.getRecoveredKey()) {
+          throw new Error('a recovered key is already stored on this device — sign out first')
         }
 
         const { mnemonic } = generateMnemonicWallet()
@@ -443,8 +592,72 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
         // the OS keychain is the whole of the protection here. The chrome renders
         // the phrase once and must never persist it.
         const mnemonic = await localStorage.getMnemonic()
-        if (!mnemonic) throw new Error('no recovery phrase is stored on this device')
-        return { mnemonic }
+        if (!mnemonic) {
+          // Distinguish the legacy share wallet from an empty device: one of them has
+          // no phrase because it never had one, and telling the user to write down
+          // words that do not exist is worse than saying why.
+          if (await localStorage.getRecoveredKey()) {
+            throw new Error(
+              'This wallet was recovered from pre-BRC-157 backup shares, which carry no ' +
+                'recovery phrase. Its backup is those shares; keep them.'
+            )
+          }
+          throw new Error('no recovery phrase is stored on this device')
+        }
+        // The word count travels with the words so the reveal screen lays out 24 of
+        // them without counting, and so a caller can pass it back to a share recovery.
+        return { mnemonic, wordCount: parseMnemonic(mnemonic).wordCount }
+      },
+
+      /**
+       * Split this wallet's entropy into BRC-140 backup shares and print them.
+       *
+       * ── WHAT DOES NOT CROSS THE BRIDGE ──
+       *
+       * Shares. Any `threshold` of them together ARE the wallet, and the chrome is a
+       * renderer that also hosts arbitrary third-party pages in sibling
+       * WebContentsViews — the same reason the whole manager stack lives in main (see
+       * buildWallet.ts). So this method renders the document and hands it to the OS
+       * print dialogue itself, and answers with counts.
+       *
+       * ── WHAT IS SPLIT ──
+       *
+       * The ENTROPY, per BRC-157 — not `m/0'/0'`, which is what the old dead
+       * `generateBackupShares` did and what made shares and phrase recover two
+       * different wallets. A recovery from these shares gets the phrase back.
+       */
+      'backup.shares': async (params) => {
+        const threshold = Math.round(Number(params?.threshold ?? DEFAULT_THRESHOLD))
+        const totalShares = Math.round(Number(params?.totalShares ?? DEFAULT_TOTAL_SHARES))
+
+        const mnemonic = await localStorage.getMnemonic()
+        if (!mnemonic) {
+          if (await localStorage.getRecoveredKey()) {
+            throw new Error(
+              'This wallet was recovered from pre-BRC-157 backup shares and has no entropy ' +
+                'to split. Its backup is the shares you already hold.'
+            )
+          }
+          throw new Error('no recovery phrase is stored on this device')
+        }
+
+        // Decoding the phrase is what produces the entropy; it also re-validates it,
+        // so a stored phrase that has somehow been corrupted fails here rather than
+        // printing shares of something that is not this wallet.
+        const { entropy, wordCount, identityKey } = recoverMnemonicWallet(mnemonic)
+
+        // Throws with a user-facing reason for the one reachable refusal: a phrase
+        // whose entropy is all zeros ("abandon … about") is a perfectly good wallet
+        // that cannot be Shamir-split. The chrome shows this text verbatim.
+        const shares = generateEntropyShares(entropy, threshold, totalShares)
+        const html = await generatePrintHTML(shares, identityKey, { wordCount, threshold })
+
+        const result = await printHtmlDocument(html, {
+          parent: getParentWindow?.() ?? undefined,
+          title: 'Nexus backup shares'
+        })
+
+        return { ok: true, printed: result.printed, threshold, totalShares, wordCount }
       },
 
       'wallet.logout': async () => {
@@ -569,11 +782,14 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
         // come up on the chain the user chose rather than silently reverting.
         await localStorage.setItem(NETWORK_KEY, network)
 
-        const phrase = await localStorage.getMnemonic()
-        if (phrase) {
+        // Either stored secret can be the one this device has: a phrase, or a legacy
+        // share recovery's primary key. Reading only the phrase would have left a
+        // legacy wallet torn down and never rebuilt by a network switch.
+        const rebuild = await keyedRebuild()
+        if (rebuild) {
           // Teardown + rebuild, not mutation: the chain decides which database and
           // which services the whole stack points at. Same class of work as
-          // restore, and the same phrase finds its per-chain database by name.
+          // restore, and the same key finds its per-chain database by name.
           // Stopping the old Monitor is part of the teardown, not housekeeping:
           // skip it and two of them poll two chains against two databases.
           stopMonitor()
@@ -581,7 +797,7 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
           building = true
           publish()
           try {
-            wallet = await buildFrom(phrase, network)
+            wallet = await rebuild(network)
           } finally {
             building = false
             publish()
@@ -599,11 +815,15 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
      */
     async resume() {
       try {
-        const phrase = await localStorage.getMnemonic()
-        if (!phrase) return
+        // Either secret: a recovery phrase, or a legacy share recovery's primary key.
+        // Before keyedRebuild existed this read only the phrase, so a wallet restored
+        // from pre-BRC-157 shares came up empty on every relaunch and looked like a
+        // wallet that had lost its funds.
+        const rebuild = await keyedRebuild()
+        if (!rebuild) return
         building = true
         publish()
-        wallet = await buildFrom(phrase, await currentNetwork())
+        wallet = await rebuild(await currentNetwork())
       } catch (err) {
         console.warn('[wallet] resume failed:', err?.message)
       } finally {
