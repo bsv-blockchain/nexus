@@ -2,7 +2,7 @@
   "name": "nexus",
   "private": true,
   "version": "0.1.2",
-  "license": "Apache-2.0",
+  "license": "Open-BSV",
   "description": "Nexus — BSV wallet + browser across mobile and desktop",
   "workspaces": [
     "apps/desktop",
