@@ -21,15 +21,25 @@ export const content = {
       title: "Downloads",
       empty: "Nothing downloaded yet.",
     },
+    /*
+     * The rail's third-party half is a bookmark list, and every string here has
+     * to read like one. Nexus distributes nothing: there is no catalog, no
+     * publisher, no version and no grant, so there is no verb here that implies
+     * software arriving on the device. "Add to rail" is the whole promise.
+     */
     apps: {
-      title: "Apps",
-      installedSection: "Installed",
-      availableSection: "Available",
-      install: "Install",
-      uninstall: "Remove",
-      essential: "Essential",
-      installedBadge: "Installed",
-      empty: "No apps installed. Add one below.",
+      title: "Web3 Apps",
+      subtitle:
+        "Websites you've pinned to your rail. Opening one opens the website.",
+      onRail: "On your rail",
+      add: "Add to rail",
+      remove: "Remove from rail",
+      addPlaceholder: "example.com",
+      addLabel: "Add a site",
+      addInvalid: "That doesn't look like a web address.",
+      empty: "Open a site in Browser, then add it to your rail.",
+      emptyAction: "Open Browser",
+      rename: "Rename",
     },
   },
   wallet: {
@@ -1129,8 +1139,6 @@ export const content = {
     reorderCollections: "Reorder collections",
     enableAll: "Enable all",
     disableAll: "Remove all",
-    installHint: "Install",
-    moreApps: "More apps",
     searchPlaceholder: "Search apps",
     sortLabel: "Sort",
     sortNewest: "Newest",

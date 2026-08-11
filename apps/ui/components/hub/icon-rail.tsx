@@ -244,12 +244,12 @@ export function IconRail(): ReactNode {
     id === "spaces"
       ? mainView === "profiles"
       : id === "apps"
-        ? mainView === "store"
+        ? mainView === "sites"
         : libraryTab === "downloads";
   // Clicking a tab sets both the panel (libraryTab) and the main view.
   const openTabView = (id: LibraryTab): void => {
     setLibraryTab(id);
-    if (id === "apps") setMainView("store");
+    if (id === "apps") setMainView("sites");
     else if (id === "spaces") setMainView("profiles");
     else setMainView("app");
   };

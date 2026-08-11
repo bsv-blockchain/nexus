@@ -17,7 +17,7 @@ import { VoteApp } from "@/components/apps/vote-app";
 import { WalletApp } from "@/components/apps/wallet-app";
 import { AppTile } from "@/components/hub/app-icon";
 import { SettingsApp } from "@/components/apps/settings-app";
-import { AppStore } from "@/components/hub/app-store";
+import { Web3Apps } from "@/components/apps/web3-apps";
 import { DetailPane } from "@/components/hub/detail-pane";
 import { GettingStartedPage } from "@/components/hub/getting-started-page";
 import { ProfilesManager } from "@/components/hub/profiles-manager";
@@ -81,12 +81,10 @@ function LauncherTile({
   app,
   onOpen,
   hint,
-  hintAccent = false,
 }: {
   app: HubApp;
   onOpen: () => void;
   hint: string;
-  hintAccent?: boolean;
 }): ReactNode {
   return (
     <button
@@ -98,22 +96,24 @@ function LauncherTile({
         <AppTile app={app} size={44} />
       </span>
       <span className="text-sm font-semibold">{app.shortName}</span>
-      <span
-        className={`-mt-1 h-4 text-xs opacity-0 transition-opacity group-hover:opacity-100 ${
-          hintAccent ? "font-semibold text-accent" : "text-muted-foreground"
-        }`}
-      >
+      <span className="-mt-1 h-4 text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
         {hint}
       </span>
     </button>
   );
 }
 
+/**
+ * The launcher, shown when the active ref names no app this build carries.
+ *
+ * One grid, holding every app compiled in. There is no second grid of apps to
+ * add: nothing here is installable, so the "more apps" section had nothing left
+ * to point at once the store went. Sites are absent on purpose — a pinned site
+ * is reached from the rail or from Web3 Apps, and putting them here would make
+ * this screen a directory.
+ */
 function EmptyState(): ReactNode {
-  const { installedApps, openApp, openAppPrompt } = useHub();
-  const all = getHubApps();
-  const installed = all.filter((app) => installedApps.includes(app.slug));
-  const available = all.filter((app) => !installedApps.includes(app.slug));
+  const { openApp } = useHub();
 
   return (
     <div className="flex h-full flex-col items-center justify-center overflow-y-auto p-6 sm:p-10">
@@ -126,7 +126,7 @@ function EmptyState(): ReactNode {
         </p>
 
         <div className="mt-8 grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 md:grid-cols-5">
-          {installed.map((app) => (
+          {getHubApps().map((app) => (
             <LauncherTile
               key={app.slug}
               app={app}
@@ -135,25 +135,6 @@ function EmptyState(): ReactNode {
             />
           ))}
         </div>
-
-        {available.length > 0 && (
-          <>
-            <h2 className="mt-10 mb-3 px-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-              {content.appStore.moreApps}
-            </h2>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 md:grid-cols-5">
-              {available.map((app) => (
-                <LauncherTile
-                  key={app.slug}
-                  app={app}
-                  hint={content.appStore.installHint}
-                  hintAccent
-                  onOpen={() => openAppPrompt(app.slug, "install")}
-                />
-              ))}
-            </div>
-          </>
-        )}
       </div>
     </div>
   );
@@ -200,10 +181,10 @@ function AppCanvas(): ReactNode {
   );
 }
 
-/** The right-hand canvas: Getting Started, app store, Profiles manager, or the active app. */
+/** The right-hand canvas: Getting Started, Web3 Apps, Profiles manager, or the active app. */
 export function MainView(): ReactNode {
   const { activeApp, activeRef, activePage, mainView } = useHub();
-  const showStore = mainView === "store";
+  const showSites = mainView === "sites";
   /* Settings paints on the app background, never the browser page's. Without
      this it inherits `bg-canvas` whenever Browse happens to be the app behind
      it, and renders dark-theme text on a white sheet. */
@@ -237,7 +218,7 @@ export function MainView(): ReactNode {
     <main
       id="main-content"
       className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border shadow-xl ${
-        !showStore && !showSettings && canvasIsBrowser
+        !showSites && !showSettings && canvasIsBrowser
           ? "bg-canvas"
           : "bg-background"
       }`}
@@ -255,9 +236,9 @@ export function MainView(): ReactNode {
         <div className="min-h-0 flex-1">
           <GettingStartedPage />
         </div>
-      ) : showStore ? (
+      ) : showSites ? (
         <div className="min-h-0 flex-1">
-          <AppStore />
+          <Web3Apps />
         </div>
       ) : (
         <AppCanvas />

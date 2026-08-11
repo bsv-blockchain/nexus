@@ -3,7 +3,7 @@
 import { AppTile } from "@/components/hub/app-icon";
 import { ShellVersion } from "@/components/hub/shell-version";
 import { AppCollections } from "@/components/hub/app-collections";
-import { AppStore } from "@/components/hub/app-store";
+import { Web3Apps } from "@/components/apps/web3-apps";
 import { DownloadsPanel } from "@/components/hub/downloads-panel";
 import { useHub } from "@/components/hub/hub-provider";
 import { SpaceContent } from "@/components/hub/space-content";
@@ -234,7 +234,7 @@ function MobileSheetContent(): ReactNode {
           <div className="space-y-3">
             <AppCollections />
             <div className="-mx-3">
-              <AppStore />
+              <Web3Apps />
             </div>
           </div>
         )}

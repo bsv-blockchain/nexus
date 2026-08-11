@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 export function PublisherApp(): ReactNode {
   const app = getHubApp("publisher");
   const tiers = getMintTiers();
-  const { isInstalled, openAppStore } = useHub();
+  const { isInstalled, openWeb3Apps } = useHub();
   const connectEnabled = isInstalled("connect");
 
   return (
@@ -33,7 +33,7 @@ export function PublisherApp(): ReactNode {
         {!connectEnabled && (
           <button
             type="button"
-            onClick={openAppStore}
+            onClick={openWeb3Apps}
             className="focus-ring flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-accent-foreground hover:opacity-90"
           >
             Enable Connect

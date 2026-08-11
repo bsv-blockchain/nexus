@@ -1,13 +1,21 @@
 "use client";
 
-import { AppTile } from "@/components/hub/app-icon";
+import { AppTile, SiteTile } from "@/components/hub/app-icon";
 import { Favicon } from "@/components/hub/favicon";
 import {
   useHub,
-  type AppSlug,
   type RailEntry,
+  type RailRef,
 } from "@/components/hub/hub-provider";
-import { content, getHubApp, getMockPage, type BrowserTab } from "@/lib/data";
+import {
+  content,
+  getHubApps,
+  getMockPage,
+  type BrowserTab,
+  type HubApp,
+} from "@/lib/data";
+import { refKey } from "@/lib/rail/layout";
+import type { PinnedSite } from "@/lib/rail/sites";
 import { DEMO_SURFACES } from "@/lib/surfaces";
 import { useHostOverlay } from "@/lib/wallet-data";
 import {
@@ -126,15 +134,31 @@ function TabStack({
   );
 }
 
-/** Floating bottom bar: app-rail · new-tab pill · tab stack + page-options. */
+/**
+ * Floating bottom bar: app-rail · new-tab pill · tab stack + page-options.
+ *
+ * `site` strips it back to the app-like bar a pinned site opens with. The
+ * new-tab pill is a URL bar (it opens the address sheet) and the tab stack is a
+ * tab strip, and the spec says a site has neither; both go.
+ *
+ * What stays is the rail button and page-options, for two different reasons.
+ * The rail is the only way off a site on this form factor — there is no window
+ * chrome behind it and no tab strip to fall back to — so removing the whole bar
+ * would strand the user on the page. Page-options stays because Back, Forward,
+ * Copy link and Share have nowhere else to live here, and because it is chrome
+ * the user asks for rather than chrome the site opens with: the same bargain a
+ * standalone PWA makes with the platform's own overflow menu.
+ */
 function BottomBar({
   tabs,
+  site,
   onRail,
   onSwitcher,
   onAddress,
   onDetails,
 }: {
   tabs: BrowserTab[];
+  site: boolean;
   onRail: () => void;
   onSwitcher: () => void;
   onAddress: () => void;
@@ -160,16 +184,24 @@ function BottomBar({
       >
         <LayoutGrid className="size-5 text-foreground" aria-hidden="true" />
       </button>
-      <button
-        type="button"
-        onClick={onAddress}
-        aria-label={content.mobileBrowser.newTab}
-        className="focus-ring pointer-events-auto flex h-11 w-28 items-center justify-center justify-self-center rounded-full bg-surface-raised/95 shadow-lg ring-1 ring-border backdrop-blur transition-transform active:scale-95"
-      >
-        <Plus className="size-5 text-foreground" aria-hidden="true" />
-      </button>
+      {/* An empty cell, not a missing one: this is a three-column grid, and a
+          dropped child would let the right-hand group slide into the middle —
+          moving the two buttons a site DOES keep out from under the thumb that
+          already knows where they are. */}
+      {site ? (
+        <span aria-hidden="true" />
+      ) : (
+        <button
+          type="button"
+          onClick={onAddress}
+          aria-label={content.mobileBrowser.newTab}
+          className="focus-ring pointer-events-auto flex h-11 w-28 items-center justify-center justify-self-center rounded-full bg-surface-raised/95 shadow-lg ring-1 ring-border backdrop-blur transition-transform active:scale-95"
+        >
+          <Plus className="size-5 text-foreground" aria-hidden="true" />
+        </button>
+      )}
       <div className="pointer-events-auto flex items-center gap-3 justify-self-end">
-        <TabStack tabs={tabs} onOpen={onSwitcher} />
+        {!site && <TabStack tabs={tabs} onOpen={onSwitcher} />}
         <button
           type="button"
           onClick={onDetails}
@@ -1090,19 +1122,22 @@ function RailTile({
 
 /**
  * Collapsed app rail for mobile: a slim icon strip that slides in from the
- * left, mirroring the desktop rail (Profiles / Apps / Downloads + installed
- * apps). The live active app stays visible to the right, its tile highlighted.
+ * left, mirroring the desktop rail (Profiles / Web3 Apps / Downloads + the
+ * slots). The live page stays visible to the right, its tile highlighted.
  */
 function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
   const {
     railEntries,
-    activeApp,
+    activeRef,
     openApp,
     mainView,
     openProfilesManager,
-    openAppStore,
+    openWeb3Apps,
     setMobileSheetOpen,
     openShare,
+    pinnedSites,
+    activeSpaceId,
+    openLinkInBrowser,
   } = useHub();
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
 
@@ -1124,8 +1159,8 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
       id: "apps",
       label: content.library.apps.title,
       icon: LayoutGrid,
-      active: mainView === "store",
-      onClick: openAppStore,
+      active: mainView === "sites",
+      onClick: openWeb3Apps,
     },
     {
       id: "downloads",
@@ -1139,33 +1174,89 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
     },
   ];
 
-  const appTile = (slug: AppSlug): ReactNode => {
-    const app = getHubApp(slug);
-    if (!app) return null;
-    const active = activeApp === slug;
+  /*
+   * A rail slot holds a ref, and the two kinds resolve against different
+   * sources: an app against the catalog compiled into this build, a site against
+   * the list the user pinned. `undefined` from either is routine rather than a
+   * bug — a stored layout can name an app this build does not carry, or a site
+   * another tab has just unpinned — so both lookups fail to a skipped slot.
+   *
+   * The app half goes through the catalog rather than casting `ref.slug` into
+   * `AppSlug`, which is the same reason the desktop rail does: a string off
+   * localStorage is not a member of a compiled union just because it is spelled
+   * like one.
+   */
+  const appFor = (slug: string): HubApp | undefined =>
+    getHubApps().find((app) => app.slug === slug);
+  const siteFor = (id: string): PinnedSite | undefined =>
+    pinnedSites.find((site) => site.id === id);
+
+  /**
+   * One slot, whichever kind of ref it holds.
+   *
+   * Both branches close the rail on the way out: picking a slot IS the rail's
+   * whole purpose, so it has served it, and leaving it open buries what the user
+   * just asked for behind it.
+   */
+  const refTile = (ref: RailRef): ReactNode => {
+    if (ref.kind === "app") {
+      const app = appFor(ref.slug);
+      if (!app) return null;
+      const active = activeRef.kind === "app" && activeRef.slug === app.slug;
+      return (
+        <RailTile
+          key={refKey(ref)}
+          label={app.name}
+          active={active}
+          onClick={() => {
+            openApp(app.slug);
+            onClose();
+          }}
+        >
+          <AppTile app={app} size={38} className={active ? "" : "grayscale"} />
+        </RailTile>
+      );
+    }
+    const site = siteFor(ref.id);
+    if (!site) return null;
+    const active = activeRef.kind === "site" && activeRef.id === site.id;
     return (
       <RailTile
-        key={slug}
-        label={app.name}
+        key={refKey(ref)}
+        label={site.title}
         active={active}
         onClick={() => {
-          openApp(slug);
-          // Picking an app IS the rail's whole purpose, so it has served it. Leaving
-          // it open buries the app the user just asked for behind it.
+          /* A site is a tab, so it opens through the browser's own path — same
+             native tab layer and history as a URL typed into the address bar.
+             The ref is an argument because openLinkInBrowser ends by setting the
+             active ref, so setting it around the call is overwritten and the
+             origin chip never appears. */
+          openLinkInBrowser(activeSpaceId, site.url, ref);
           onClose();
         }}
       >
-        <AppTile
-          app={app}
-          size={38}
-          className={active ? "" : "grayscale"}
-        />
+        <SiteTile site={site} size={38} className={active ? "" : "grayscale"} />
       </RailTile>
     );
   };
 
+  /** The 2x2 peek inside a collapsed folder — tiles only, no slot chrome. */
+  const refThumb = (ref: RailRef): ReactNode => {
+    const key = refKey(ref);
+    if (ref.kind === "app") {
+      const app = appFor(ref.slug);
+      return app ? <AppTile key={key} app={app} size={16} /> : <span key={key} />;
+    }
+    const site = siteFor(ref.id);
+    return site ? (
+      <SiteTile key={key} site={site} size={16} />
+    ) : (
+      <span key={key} />
+    );
+  };
+
   const renderEntry = (entry: RailEntry): ReactNode => {
-    if (entry.type === "app") return appTile(entry.slug);
+    if (entry.type === "single") return refTile(entry.ref);
     const expanded = expandedGroup === entry.id;
     const tint = entry.color || undefined;
     return (
@@ -1192,20 +1283,13 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
               }`}
               style={tint ? { backgroundColor: tint } : undefined}
             >
-              {entry.apps.slice(0, 4).map((slug) => {
-                const app = getHubApp(slug);
-                return app ? (
-                  <AppTile key={slug} app={app} size={16} />
-                ) : (
-                  <span key={slug} />
-                );
-              })}
+              {entry.members.slice(0, 4).map(refThumb)}
             </span>
           )}
         </button>
         {expanded && (
           <div className="flex flex-col items-center gap-1 rounded-2xl bg-surface p-1">
-            {entry.apps.map((slug) => appTile(slug))}
+            {entry.members.map(refTile)}
           </div>
         )}
       </div>
@@ -1379,7 +1463,8 @@ export function MobileBrowser({
 }: {
   onDimChange: (dimmed: boolean) => void;
 }): ReactNode {
-  const { activeSpaceId, tabsBySpace, activeTabId, openTab } = useHub();
+  const { activeSpaceId, tabsBySpace, activeTabId, openTab, activeRef } =
+    useHub();
   const [sheet, setSheet] = useState<Sheet>("none");
   const [incognito, setIncognito] = useState(false);
   const tabs = tabsBySpace[activeSpaceId] ?? [];
@@ -1406,6 +1491,7 @@ export function MobileBrowser({
           <BottomBar
             key="bar"
             tabs={tabs}
+            site={activeRef.kind === "site"}
             onRail={() => setSheet("rail")}
             onSwitcher={() => setSheet("switcher")}
             onAddress={() => {

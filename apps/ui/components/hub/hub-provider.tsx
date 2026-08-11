@@ -48,8 +48,14 @@ import {
 
 export type AppSlug = HubApp["slug"];
 export type LibraryTab = "spaces" | "downloads" | "apps";
-/** What the main canvas shows, independent of which rail panel is open. */
-export type MainViewKind = "app" | "store" | "profiles" | "settings";
+/**
+ * What the main canvas shows, independent of which rail panel is open.
+ *
+ * `sites` is the Web3 Apps surface — the sites the user pinned. It was `store`,
+ * and the name went with the screen: nothing is distributed here, so there is
+ * nothing for a store id to describe.
+ */
+export type MainViewKind = "app" | "sites" | "profiles" | "settings";
 
 /**
  * The settings categories, in the narrow column.
@@ -245,7 +251,7 @@ interface HubState {
   renameGroup: (id: string, name: string) => void;
   setGroupColor: (id: string, color: string) => void;
 
-  /** App Store collection filter */
+  /** collections-column filter */
   appsCollection: CollectionId;
   setAppsCollection: (id: CollectionId) => void;
 
@@ -414,7 +420,8 @@ interface HubState {
   openAppPrompt: (slug: AppSlug, mode: AppPromptMode) => void;
   openCollectionPrompt: (id: CollectionId, mode: AppPromptMode) => void;
   closeAppPrompt: () => void;
-  openAppStore: () => void;
+  /** show the Web3 Apps surface — the sites the user pinned */
+  openWeb3Apps: () => void;
   openProfilesManager: () => void;
 
   activeSpaceId: string;
@@ -1528,8 +1535,8 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     setShareOpen(true);
   }, []);
 
-  const openAppStore = useCallback(() => {
-    setMainView("store");
+  const openWeb3Apps = useCallback(() => {
+    setMainView("sites");
     setLibraryTab("apps");
     setActivePage(null);
   }, []);
@@ -1568,7 +1575,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       setMainView,
       railCollapsed,
       toggleRail,
-      openAppStore,
+      openWeb3Apps,
       openProfilesManager,
       activeSpaceId,
       setActiveSpaceId,
@@ -1709,7 +1716,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       mainView,
       railCollapsed,
       toggleRail,
-      openAppStore,
+      openWeb3Apps,
       openProfilesManager,
       activeSpaceId,
       identityKeys,
