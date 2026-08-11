@@ -45,6 +45,28 @@ Store build numbers (`CFBundleVersion` / `versionCode`) come from EAS's remote
 counter with `autoIncrement`, which only works on cloud builds for the same reason.
 **Prefer cloud builds for anything you intend to submit.**
 
+## Rehearse the release, before spending a version number
+
+A tag cannot be un-cut. Both release workflows therefore accept a **branch** ref as a
+rehearsal: every leg builds and signs exactly as a release does, and nothing is
+published, submitted or attached.
+
+```bash
+gh workflow run release-desktop.yml --ref my-branch   # mac/win/linux, signed + notarized
+gh workflow run release-mobile.yml  --ref my-branch   # AAB, IPA, APK — no store submission
+```
+
+The binaries land in each run's **Artifacts** panel. What a rehearsal deliberately
+does NOT do: create or touch a GitHub release, submit to TestFlight, or push to Play
+internal testing. On mobile that matters twice over — a submitted TestFlight build
+consumes a build number and becomes visible to testers, and neither can be undone.
+
+Rehearse whenever the packaging, signing, certificate or store-credential path has
+changed. Both platforms have already spent a version number learning this the other
+way: `v0.1.0` died on desktop because `apps/desktop/build` had never been committed,
+and on mobile because a Google service account could not be set up non-interactively.
+A rehearsal costs runner minutes; a burnt version number costs a version number.
+
 ## Cutting a release
 
 `main` is protected — changes land through pull requests, and most of the team
