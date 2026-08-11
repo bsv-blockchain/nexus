@@ -126,27 +126,11 @@ export function getHubApps(): HubApp[] {
 export function getHubApp(slug: HubApp["slug"]): HubApp | undefined {
   return getHubApps().find((app) => app.slug === slug);
 }
-export function getDefaultInstalledAppSlugs(): HubApp["slug"][] {
-  return getHubApps()
-    .filter((app) => app.defaultInstalled)
-    .map((app) => app.slug);
-}
-/** Always-on apps that can't be removed (identity, pay & receive). */
-export function getEssentialAppSlugs(): HubApp["slug"][] {
-  return getHubApps()
-    .filter((app) => app.essential)
-    .map((app) => app.slug);
-}
 /** Apps in the "Web" system category (browse, web3 connect). */
 export function getSystemAppSlugs(): HubApp["slug"][] {
   return getHubApps()
     .filter((app) => app.category === "system")
     .map((app) => app.slug);
-}
-export function isEssentialApp(slug: HubApp["slug"]): boolean {
-  return getHubApps().some(
-    (app) => app.slug === slug && app.essential === true,
-  );
 }
 
 /* identity */
