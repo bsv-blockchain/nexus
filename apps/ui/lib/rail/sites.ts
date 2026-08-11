@@ -90,8 +90,10 @@ function parseSite(value: unknown): PinnedSite | null {
   // is dropped rather than repaired. This module owns its storage format
   // exclusively — every row is written by addPinnedSite in canonical absolute
   // form. An unparseable value is tampering or corruption. Repairing it by
-  // prefixing a scheme would let userinfo-bearing values like mailto:test@evil.com
-  // through the net that normalizeUrlInput exists to catch on the typed path.
+  // prefixing a scheme would let userinfo-bearing values like
+  // "trusted-bank.com@evil.com" through — becoming
+  // https://trusted-bank.com@evil.com/, host evil.com — the exact laundering
+  // that normalizeUrlInput exists to catch on the typed path.
   let url: string;
   try {
     url = new URL(typeof record.url === "string" ? record.url : "").href;

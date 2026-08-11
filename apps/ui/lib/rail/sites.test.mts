@@ -211,13 +211,17 @@ test("drops stored rows that are not absolute URLs, rather than repairing them",
   assert.equal(parsed?.[0]?.id, "s1");
 });
 
-test("drops mailto: URLs bearing @, which would launder userinfo if repaired", () => {
+test("drops a schemeless userinfo-bearing value rather than repairing it", () => {
   const raw = JSON.stringify([
     { id: "s1", title: "Valid", url: "https://example.com/", origin: "x", sortOrder: 0, createdAt: NOW },
-    { id: "s2", title: "Tampered", url: "mailto:test@evil.com", origin: "x", sortOrder: 1, createdAt: NOW },
+    { id: "s2", title: "Tampered", url: "trusted-bank.com@evil.com", origin: "x", sortOrder: 1, createdAt: NOW },
   ]);
   const parsed = parsePinnedSites(raw);
-  // The valid URL survives; the mailto: bearing @ is dropped to prevent userinfo laundering
+  // "trusted-bank.com@evil.com" has no scheme, so new URL() throws and it hits
+  // the catch this test defends. Repairing it with an https:// prefix instead
+  // of dropping it would produce https://trusted-bank.com@evil.com/ — host
+  // evil.com, with "trusted-bank.com" laundered into the username. The valid
+  // row beside it survives, so this assertion cannot pass vacuously.
   assert.equal(parsed?.length, 1);
   assert.equal(parsed?.[0]?.id, "s1");
 });
