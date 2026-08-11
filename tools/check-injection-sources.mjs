@@ -9,7 +9,6 @@
  * safe to hand to a WebView.
  */
 import { createRequire } from 'node:module'
-import { execSync } from 'node:child_process'
 
 const require = createRequire(import.meta.url)
 const failures = []
@@ -101,31 +100,42 @@ for (const dir of ['packages', 'apps/mobile/src', 'apps/desktop/src']) {
 // service hands a third party the hostname of every site the user has pinned,
 // every tab they have open and every favourite — from a wallet browser. This
 // was live once; see components/hub/favicon.tsx.
+//
+// Walks the tree directly (same idiom as the scan above) instead of shelling
+// out to grep: a shelled-out scan that swallows every execSync failure — grep
+// missing from PATH, a root path with a shell metacharacter — silently reports
+// "clean" having scanned nothing, which is worse than no guard at all.
 {
-  const roots = ['apps/ui/components', 'apps/ui/lib', 'apps/ui/app']
   // `favicon\.(ico|png)\?` matches a favicon-service query shape (e.g. some
   // favicon.ico?domain=... proxy) without matching the site's own bare
   // `/favicon.ico` (no query string), which apps/ui/lib/metadata.ts and
-  // apps/ui/lib/rail/origin.ts use legitimately.
-  const pattern =
-    's2/favicons|favicon\\.(ico|png)\\?|icons\\.duckduckgo\\.com|gstatic\\.com/faviconV2'
+  // apps/ui/lib/rail/origin.ts use legitimately. Case-insensitive so a
+  // reintroduction spelled with different casing doesn't slip past.
+  const FAVICON_SERVICE = /s2\/favicons|favicon\.(ico|png)\?|icons\.duckduckgo\.com|gstatic\.com\/faviconV2/i
   const offenders = []
-  for (const root of roots) {
-    const dir = join(ROOT, root)
-    let out = ''
+  let scanned = 0
+  for (const dir of ['apps/ui/components', 'apps/ui/lib', 'apps/ui/app']) {
+    let files
     try {
-      out = execSync(`grep -rn -E "${pattern}" ${dir} --include=*.ts --include=*.tsx 2>/dev/null || true`, {
-        encoding: 'utf8'
-      })
+      files = [...walk(join(ROOT, dir))]
     } catch {
-      /* grep exits non-zero when it matches nothing; the `|| true` covers it */
+      continue // directory may not exist in every checkout
     }
-    if (out.trim()) offenders.push(out.trim())
+    for (const file of files) {
+      if (!['.ts', '.tsx'].includes(ext(file))) continue
+      scanned++
+      const src = readFileSync(file, 'utf8')
+      src.split('\n').forEach((line, i) => {
+        if (FAVICON_SERVICE.test(line)) {
+          offenders.push(`${file.replace(ROOT, '')}:${i + 1}:${line.trim()}`)
+        }
+      })
+    }
   }
   if (offenders.length) {
     failures.push(`third-party favicon service referenced:\n${offenders.join('\n')}`)
   } else {
-    console.log('ok  no third-party favicon service')
+    console.log(`ok  no third-party favicon service (${scanned} files scanned)`)
   }
 }
 
