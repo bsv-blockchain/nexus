@@ -29,7 +29,7 @@ export function deriveOrigin(url: string): string | null {
 export function normalizeUrlInput(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
-  const candidate = /^[a-z][a-z0-9+.-]*:/i.test(trimmed)
+  const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)
     ? trimmed
     : `https://${trimmed}`;
   let parsed: URL;
@@ -71,7 +71,7 @@ export function isPinnableUrl(url: string): boolean {
  */
 export function faviconUrlFor(url: string): string | null {
   const origin = deriveOrigin(url);
-  return origin ? `${origin}/favicon.ico` : null;
+  return origin && origin !== "null" ? `${origin}/favicon.ico` : null;
 }
 
 /**

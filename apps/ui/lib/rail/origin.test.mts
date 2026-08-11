@@ -27,6 +27,11 @@ test("normalizeUrlInput adds https when a scheme is missing", () => {
   assert.equal(normalizeUrlInput("https://example.com/path"), "https://example.com/path");
 });
 
+test("normalizeUrlInput normalizes bare host:port with https", () => {
+  assert.equal(normalizeUrlInput("localhost:3000"), "https://localhost:3000/");
+  assert.equal(normalizeUrlInput("127.0.0.1:8080"), "https://127.0.0.1:8080/");
+});
+
 test("normalizeUrlInput rejects input that is not a host", () => {
   assert.equal(normalizeUrlInput(""), null);
   assert.equal(normalizeUrlInput("   "), null);
@@ -53,6 +58,12 @@ test("faviconUrlFor points at the site's own origin, never a third party", () =>
     "https://example.com/favicon.ico",
   );
   assert.equal(faviconUrlFor("garbage"), null);
+});
+
+test("faviconUrlFor returns null for opaque origins", () => {
+  assert.equal(faviconUrlFor("javascript:alert(1)"), null);
+  assert.equal(faviconUrlFor("data:text/html,<script>alert(1)</script>"), null);
+  assert.equal(faviconUrlFor("about:blank"), null);
 });
 
 test("displayOrigin drops the scheme and a leading www", () => {
