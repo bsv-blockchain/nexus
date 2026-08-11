@@ -17,7 +17,7 @@ import { VoteApp } from "@/components/apps/vote-app";
 import { WalletApp } from "@/components/apps/wallet-app";
 import { AppTile } from "@/components/hub/app-icon";
 import { SettingsApp } from "@/components/apps/settings-app";
-import { AppStore } from "@/components/hub/app-store";
+import { Web3Apps } from "@/components/apps/web3-apps";
 import { DetailPane } from "@/components/hub/detail-pane";
 import { GettingStartedPage } from "@/components/hub/getting-started-page";
 import { ProfilesManager } from "@/components/hub/profiles-manager";
@@ -81,12 +81,10 @@ function LauncherTile({
   app,
   onOpen,
   hint,
-  hintAccent = false,
 }: {
   app: HubApp;
   onOpen: () => void;
   hint: string;
-  hintAccent?: boolean;
 }): ReactNode {
   return (
     <button
@@ -98,22 +96,24 @@ function LauncherTile({
         <AppTile app={app} size={44} />
       </span>
       <span className="text-sm font-semibold">{app.shortName}</span>
-      <span
-        className={`-mt-1 h-4 text-xs opacity-0 transition-opacity group-hover:opacity-100 ${
-          hintAccent ? "font-semibold text-accent" : "text-muted-foreground"
-        }`}
-      >
+      <span className="-mt-1 h-4 text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
         {hint}
       </span>
     </button>
   );
 }
 
+/**
+ * The launcher, shown when the active ref names no app this build carries.
+ *
+ * One grid, holding every app compiled in. There is no second grid of apps to
+ * add: nothing here is installable, so the "more apps" section had nothing left
+ * to point at once the store went. Sites are absent on purpose — a pinned site
+ * is reached from the rail or from Web3 Apps, and putting them here would make
+ * this screen a directory.
+ */
 function EmptyState(): ReactNode {
-  const { installedApps, openApp, openAppPrompt } = useHub();
-  const all = getHubApps();
-  const installed = all.filter((app) => installedApps.includes(app.slug));
-  const available = all.filter((app) => !installedApps.includes(app.slug));
+  const { openApp } = useHub();
 
   return (
     <div className="flex h-full flex-col items-center justify-center overflow-y-auto p-6 sm:p-10">
@@ -126,7 +126,7 @@ function EmptyState(): ReactNode {
         </p>
 
         <div className="mt-8 grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 md:grid-cols-5">
-          {installed.map((app) => (
+          {getHubApps().map((app) => (
             <LauncherTile
               key={app.slug}
               app={app}
@@ -135,25 +135,6 @@ function EmptyState(): ReactNode {
             />
           ))}
         </div>
-
-        {available.length > 0 && (
-          <>
-            <h2 className="mt-10 mb-3 px-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-              {content.appStore.moreApps}
-            </h2>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 md:grid-cols-5">
-              {available.map((app) => (
-                <LauncherTile
-                  key={app.slug}
-                  app={app}
-                  hint={content.appStore.installHint}
-                  hintAccent
-                  onOpen={() => openAppPrompt(app.slug, "install")}
-                />
-              ))}
-            </div>
-          </>
-        )}
       </div>
     </div>
   );
@@ -161,9 +142,17 @@ function EmptyState(): ReactNode {
 
 /** Active-app content: optional header + the app view (or empty state). */
 function AppCanvas(): ReactNode {
-  const { activeApp } = useHub();
+  const { activeApp, activeRef } = useHub();
   const app = activeApp ? getHubApp(activeApp) : undefined;
-  const View = activeApp ? appViews[activeApp] : undefined;
+  /* A pinned site reads as no app being open — the canvas is a website at that
+     point — so it has to be routed to the browser explicitly. Without this a
+     tapped site lands on the launcher, which is where the rail's whole reason
+     for carrying sites quietly stops working. */
+  const View = activeApp
+    ? appViews[activeApp]
+    : activeRef.kind === "site"
+      ? BrowserApp
+      : undefined;
   // Signature apps inherit the active theme; anything else opts out of it
   // (theme-reset restores the base light/dark palette). The launcher/empty
   // state is always themed.
@@ -192,16 +181,30 @@ function AppCanvas(): ReactNode {
   );
 }
 
-/** The right-hand canvas: Getting Started, app store, Profiles manager, or the active app. */
+/** The right-hand canvas: Getting Started, Web3 Apps, Profiles manager, or the active app. */
 export function MainView(): ReactNode {
-  const { activeApp, activePage, mainView } = useHub();
-  const showStore = mainView === "store";
-  /* Settings paints on the app background, never the browser page's. Without
-     this it inherits `bg-canvas` whenever Browse happens to be the app behind
-     it, and renders dark-theme text on a white sheet. */
+  // `activeApp` and `activeRef` went with the background switch below: which app is
+  // behind this shell no longer changes what colour it is.
+  const { activePage, mainView } = useHub();
+  const showSites = mainView === "sites";
   const showSettings = mainView === "settings";
   const showProfiles = mainView === "profiles";
-  const canvasIsBrowser = activeApp === "browser" && !activePage;
+
+  /*
+   * THIS SHELL IS ALWAYS `bg-background`.
+   *
+   * It used to switch to `bg-canvas` when the app behind it was the browser, on
+   * the theory that the canvas is a web page and a web page is white. Two things
+   * were wrong with that. `--canvas` is #f2f1ef in the DARK theme as well as the
+   * light one, and every page renderer in browser-app.tsx already paints its own
+   * `bg-canvas` — so the switch never coloured a page, only the chrome around one:
+   * the origin chip's row and the corners `rounded-xl overflow-hidden` clips. On a
+   * dark build that was a near-white band and outline framing a dark page.
+   *
+   * It also needed a guard per surface that is NOT a page (Settings had one, with
+   * a comment about rendering dark text on a white sheet), and every new surface
+   * would have needed its own. One background, no exceptions, no guards.
+   */
 
   // Profiles manager: profile columns on the left, the active app on the right.
   if (showProfiles) {
@@ -212,9 +215,7 @@ export function MainView(): ReactNode {
         </div>
         <main
           id="main-content"
-          className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border shadow-xl ${
-            canvasIsBrowser ? "bg-canvas" : "bg-background"
-          }`}
+          className="flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background shadow-xl"
         >
           <AppCanvas />
         </main>
@@ -225,11 +226,7 @@ export function MainView(): ReactNode {
   return (
     <main
       id="main-content"
-      className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border shadow-xl ${
-        !showStore && !showSettings && canvasIsBrowser
-          ? "bg-canvas"
-          : "bg-background"
-      }`}
+      className="flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background shadow-xl"
     >
       {showSettings ? (
         /* Settings and its reference pane share the row, the same way an app and
@@ -244,9 +241,9 @@ export function MainView(): ReactNode {
         <div className="min-h-0 flex-1">
           <GettingStartedPage />
         </div>
-      ) : showStore ? (
+      ) : showSites ? (
         <div className="min-h-0 flex-1">
-          <AppStore />
+          <Web3Apps />
         </div>
       ) : (
         <AppCanvas />

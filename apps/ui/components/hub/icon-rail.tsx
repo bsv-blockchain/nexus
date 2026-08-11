@@ -1,6 +1,6 @@
 "use client";
 
-import { AppTile } from "@/components/hub/app-icon";
+import { AppTile, SiteTile } from "@/components/hub/app-icon";
 import { ShellVersion } from "@/components/hub/shell-version";
 import { GroupSettingsDialog } from "@/components/hub/group-settings-dialog";
 import {
@@ -8,14 +8,19 @@ import {
   type AppSlug,
   type LibraryTab,
   type RailEntry,
+  type RailRef,
 } from "@/components/hub/hub-provider";
 import {
   content,
   getChatThreads,
-  getHubApp,
+  getHubApps,
   getMailMessages,
   getUnreadCount,
+  type HubApp,
 } from "@/lib/data";
+import { refKey, sameRef } from "@/lib/rail/layout";
+import { displayOrigin } from "@/lib/rail/origin";
+import type { PinnedSite } from "@/lib/rail/sites";
 import {
   Folder,
   FolderMinus,
@@ -27,7 +32,11 @@ import {
 } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 
-const DRAG_MIME = "application/x-nexus-app";
+/**
+ * A drag carries the dragged slot's `refKey`, under a MIME type of our own so
+ * a file or a link dragged in from outside the rail cannot read as a slot.
+ */
+const DRAG_MIME = "application/x-nexus-rail-ref";
 const LONG_PRESS_MS = 500;
 /** Soft dark outer glow, a touch stronger at the bottom — inactive apps only. */
 const ICON_GLOW =
@@ -49,20 +58,113 @@ const systemTabs: {
     id: "apps",
     label: "Apps",
     icon: LayoutGrid,
-    desc: "Browse, install and manage the apps in your Nexus.",
+    desc: "The sites you have pinned to your rail.",
   },
 ];
 
 type Tip = { top: number; left: number; label: string; desc: string };
 type GroupSettings = { id: string; name: string; color?: string | undefined };
 
-/** Apps with fresh activity — surfaced as a dot on the left of the rail. */
-function getUnreadApps(): Set<AppSlug> {
-  const unread = new Set<AppSlug>();
+/**
+ * Slots with fresh activity — surfaced as a dot on the left of the rail.
+ *
+ * Keyed by `refKey` so the dot lookup is the same for both kinds of slot. Only
+ * apps ever land in here: a pinned site is a website, and nothing in this
+ * process knows whether it has news.
+ */
+function getUnreadRefs(): Set<string> {
+  const unread = new Set<string>();
+  const mark = (slug: AppSlug): void => {
+    unread.add(refKey({ kind: "app", slug }));
+  };
   if (getChatThreads().some((thread) => getUnreadCount(thread.id) > 0))
-    unread.add("messages");
-  if (getMailMessages().some((mail) => !mail.read)) unread.add("mail");
+    mark("messages");
+  if (getMailMessages().some((mail) => !mail.read)) mark("mail");
   return unread;
+}
+
+/**
+ * What a slot needs to draw itself, whichever kind of ref it holds.
+ *
+ * The chrome around a tile — label, tooltip, drag, drop, highlight — is the
+ * same for an app and for a site, so it is flattened here and the rendering
+ * code below asks the kind exactly once, when it picks the tile.
+ */
+type Resolved =
+  | { kind: "app"; label: string; name: string; desc: string; app: HubApp }
+  | {
+      kind: "site";
+      label: string;
+      name: string;
+      desc: string;
+      site: PinnedSite;
+    };
+
+/**
+ * Look a ref up in what actually exists, or null.
+ *
+ * Null is routine, not a bug: a stored layout can name an app this build does
+ * not carry, or a site another tab has just unpinned. The app half resolves
+ * through the catalog rather than casting the slug into it, for the same
+ * reason.
+ */
+function resolveRef(ref: RailRef, sites: PinnedSite[]): Resolved | null {
+  if (ref.kind === "app") {
+    const app = getHubApps().find((candidate) => candidate.slug === ref.slug);
+    return app
+      ? {
+          kind: "app",
+          label: app.shortName,
+          name: app.name,
+          desc: app.description,
+          app,
+        }
+      : null;
+  }
+  const site = sites.find((candidate) => candidate.id === ref.id);
+  return site
+    ? {
+        kind: "site",
+        label: site.title,
+        name: site.title,
+        desc: displayOrigin(site.url),
+        site,
+      }
+    : null;
+}
+
+/** The one place the two kinds of slot draw differently. */
+function RefTile({
+  resolved,
+  size,
+  className = "",
+}: {
+  resolved: Resolved;
+  size: number;
+  className?: string;
+}): ReactNode {
+  return resolved.kind === "app" ? (
+    <AppTile app={resolved.app} size={size} className={className} />
+  ) : (
+    <SiteTile site={resolved.site} size={size} className={className} />
+  );
+}
+
+/**
+ * `refKey`'s inverse, for reading a drop payload back.
+ *
+ * The key rather than JSON: it is the identity the rest of the rail already
+ * uses. A payload that will not parse is ignored rather than guessed at.
+ */
+function decodeRefKey(key: string): RailRef | null {
+  const separator = key.indexOf(":");
+  if (separator === -1) return null;
+  const kind = key.slice(0, separator);
+  const rest = key.slice(separator + 1);
+  if (!rest) return null;
+  if (kind === "app") return { kind: "app", slug: rest };
+  if (kind === "site") return { kind: "site", id: rest };
+  return null;
 }
 
 function RailShell({
@@ -125,12 +227,15 @@ export function IconRail(): ReactNode {
     setMainView,
     railCollapsed,
     openSettings,
-    activeApp,
+    activeRef,
     openApp,
+    activeSpaceId,
+    openLinkInBrowser,
+    pinnedSites,
     railEntries,
-    groupApps,
-    ungroupApp,
-    reorderRailApp,
+    groupRefs,
+    ungroupRef,
+    reorderRailRef,
     openShare,
   } = useHub();
 
@@ -139,12 +244,12 @@ export function IconRail(): ReactNode {
     id === "spaces"
       ? mainView === "profiles"
       : id === "apps"
-        ? mainView === "store"
+        ? mainView === "sites"
         : libraryTab === "downloads";
   // Clicking a tab sets both the panel (libraryTab) and the main view.
   const openTabView = (id: LibraryTab): void => {
     setLibraryTab(id);
-    if (id === "apps") setMainView("store");
+    if (id === "apps") setMainView("sites");
     else if (id === "spaces") setMainView("profiles");
     else setMainView("app");
   };
@@ -156,33 +261,60 @@ export function IconRail(): ReactNode {
       : railCollapsed
         ? "grayscale transition duration-200 group-hover:grayscale-0"
         : ICON_GLOW;
-  const unread = getUnreadApps();
-  const [dragging, setDragging] = useState<AppSlug | null>(null);
+  const unread = getUnreadRefs();
+  const [dragging, setDragging] = useState<RailRef | null>(null);
   const [overTarget, setOverTarget] = useState<string | null>(null);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [tip, setTip] = useState<Tip | null>(null);
   const [settings, setSettings] = useState<GroupSettings | null>(null);
   const pressTimer = useRef<number | null>(null);
 
+  const resolve = (ref: RailRef): Resolved | null =>
+    resolveRef(ref, pinnedSites);
+
+  /**
+   * Open a slot.
+   *
+   * An app takes over the canvas. A site is a tab, so it goes through the
+   * browser's own open path — same native tab layer, history and substrate as
+   * a URL typed into the address bar; the rail is a shortcut to that, not a
+   * second kind of tab. The ref goes in as an argument rather than being set
+   * afterwards because `openLinkInBrowser` ends by setting the active ref, so
+   * a `setActiveRef(ref)` around the call is overwritten and the origin chip
+   * never appears.
+   */
+  const openSlot = (ref: RailRef, resolved: Resolved): void => {
+    if (resolved.kind === "app") {
+      openApp(resolved.app.slug);
+      return;
+    }
+    openLinkInBrowser(activeSpaceId, resolved.site.url, ref);
+  };
+
   const entryUnread = (entry: RailEntry): boolean =>
-    entry.type === "app"
-      ? unread.has(entry.slug)
-      : entry.apps.some((slug) => unread.has(slug));
+    entry.type === "single"
+      ? unread.has(refKey(entry.ref))
+      : entry.members.some((member) => unread.has(refKey(member)));
 
-  // True while dragging an app that currently lives inside a folder — used to
+  // True while dragging a slot that currently lives inside a folder — used to
   // reveal the "remove from folder" drop zone.
-  const draggingFromGroup =
-    dragging !== null &&
-    railEntries.some(
-      (entry) => entry.type === "group" && entry.apps.includes(dragging),
-    );
+  const draggingFromGroup = railEntries.some(
+    (entry) =>
+      entry.type === "group" &&
+      entry.members.some(
+        (member) => dragging !== null && sameRef(member, dragging),
+      ),
+  );
 
-  const startDrag = (slug: AppSlug) => (event: React.DragEvent): void => {
-    event.dataTransfer.setData(DRAG_MIME, slug);
+  const startDrag = (ref: RailRef) => (event: React.DragEvent): void => {
+    event.dataTransfer.setData(DRAG_MIME, refKey(ref));
     event.dataTransfer.effectAllowed = "move";
-    setDragging(slug);
+    setDragging(ref);
     setTip(null);
   };
+  /** The slot being dragged, read back from the drop's own payload. */
+  const droppedRef = (event: React.DragEvent): RailRef | null =>
+    decodeRefKey(event.dataTransfer.getData(DRAG_MIME));
   const endDrag = (): void => {
     setDragging(null);
     setOverTarget(null);
@@ -264,23 +396,25 @@ export function IconRail(): ReactNode {
         <div className="my-2 h-px w-12 shrink-0 bg-border" aria-hidden="true" />
       )}
 
-      {/* Installed apps — scroll underneath the pinned tabs. */}
+      {/* Apps and pinned sites — scroll underneath the pinned tabs. */}
       <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-y-auto px-2 py-1">
         {railEntries.map((entry) => {
             const showUnread = entryUnread(entry);
-            if (entry.type === "app") {
-              const app = getHubApp(entry.slug);
-              if (!app) return null;
-              const prefix = `app:${entry.slug}:`;
+            if (entry.type === "single") {
+              const ref = entry.ref;
+              const resolved = resolve(ref);
+              if (!resolved) return null;
+              const isActive = sameRef(activeRef, ref);
+              const prefix = `${refKey(ref)}:`;
               const zone = overTarget?.startsWith(prefix)
                 ? overTarget.slice(prefix.length)
                 : null;
               return (
                 <div
-                  key={entry.slug}
+                  key={refKey(ref)}
                   className="relative"
                   onMouseEnter={(event) =>
-                    showTip(event, app.name, app.description)
+                    showTip(event, resolved.name, resolved.desc)
                   }
                   onMouseLeave={hideTip}
                 >
@@ -297,15 +431,18 @@ export function IconRail(): ReactNode {
                     />
                   )}
                   <RailShell
-                    label={app.shortName}
-                    active={activeApp === entry.slug}
+                    label={resolved.label}
+                    active={isActive}
                     compact={railCollapsed}
-                    onClick={() => openApp(entry.slug)}
+                    onClick={() => openSlot(ref, resolved)}
                     draggable
-                    onDragStart={startDrag(entry.slug)}
+                    onDragStart={startDrag(ref)}
                     onDragEnd={endDrag}
                     onDragOver={(event) => {
-                      if (canDrop(event) && dragging !== entry.slug) {
+                      if (
+                        canDrop(event) &&
+                        !(dragging && sameRef(dragging, ref))
+                      ) {
                         event.preventDefault();
                         setOverTarget(`${prefix}${dropZone(event)}`);
                       }
@@ -313,25 +450,23 @@ export function IconRail(): ReactNode {
                     onDragLeave={() => setOverTarget(null)}
                     onDrop={(event) => {
                       event.preventDefault();
-                      const slug = event.dataTransfer.getData(
-                        DRAG_MIME,
-                      ) as AppSlug;
-                      if (slug && slug !== entry.slug) {
+                      const dropped = droppedRef(event);
+                      if (dropped && !sameRef(dropped, ref)) {
                         const z = dropZone(event);
                         if (z === "before")
-                          reorderRailApp(slug, entry.slug, "before");
+                          reorderRailRef(dropped, ref, "before");
                         else if (z === "after")
-                          reorderRailApp(slug, entry.slug, "after");
-                        else groupApps(slug, { kind: "app", slug: entry.slug });
+                          reorderRailRef(dropped, ref, "after");
+                        else groupRefs(dropped, { kind: "ref", ref });
                       }
                       endDrag();
                     }}
                     className={zone === "mid" ? "ring-2 ring-accent" : ""}
                   >
-                    <AppTile
-                      app={app}
+                    <RefTile
+                      resolved={resolved}
                       size={36}
-                      className={tileTone(activeApp === entry.slug)}
+                      className={tileTone(isActive)}
                     />
                   </RailShell>
                   {zone === "after" && (
@@ -347,7 +482,6 @@ export function IconRail(): ReactNode {
             // group
             const isOver = overTarget === `group:${entry.id}`;
             const isExpanded = expandedGroup === entry.id;
-            const groupApp = (slug: AppSlug) => getHubApp(slug);
             const tint = entry.color || undefined;
             return (
               <div
@@ -381,10 +515,9 @@ export function IconRail(): ReactNode {
                     onDragLeave={() => setOverTarget(null)}
                     onDrop={(event) => {
                       event.preventDefault();
-                      const slug = event.dataTransfer.getData(
-                        DRAG_MIME,
-                      ) as AppSlug;
-                      if (slug) groupApps(slug, { kind: "group", id: entry.id });
+                      const dropped = droppedRef(event);
+                      if (dropped)
+                        groupRefs(dropped, { kind: "group", id: entry.id });
                       endDrag();
                     }}
                   >
@@ -405,36 +538,37 @@ export function IconRail(): ReactNode {
                         </span>
                       )}
                     </button>
-                    {entry.apps.map((slug) => {
-                      const app = groupApp(slug);
-                      if (!app) return null;
+                    {entry.members.map((member) => {
+                      const resolved = resolve(member);
+                      if (!resolved) return null;
+                      const isActive = sameRef(activeRef, member);
                       return (
                         <button
-                          key={slug}
+                          key={refKey(member)}
                           type="button"
                           draggable
-                          onDragStart={startDrag(slug)}
+                          onDragStart={startDrag(member)}
                           onDragEnd={endDrag}
-                          onClick={() => openApp(slug)}
+                          onClick={() => openSlot(member, resolved)}
                           onMouseEnter={(event) =>
-                            showTip(event, app.name, app.description)
+                            showTip(event, resolved.name, resolved.desc)
                           }
                           onMouseLeave={hideTip}
-                          aria-label={app.name}
+                          aria-label={resolved.name}
                           className={`focus-ring group flex flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-medium transition-colors ${
-                            activeApp === slug
+                            isActive
                               ? "bg-surface-raised text-foreground shadow-sm"
                               : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
                           }`}
                         >
-                          <AppTile
-                            app={app}
+                          <RefTile
+                            resolved={resolved}
                             size={34}
-                            className={tileTone(activeApp === slug)}
+                            className={tileTone(isActive)}
                           />
                           {!railCollapsed && (
                             <span className="max-w-full truncate">
-                              {app.shortName}
+                              {resolved.label}
                             </span>
                           )}
                         </button>
@@ -450,7 +584,9 @@ export function IconRail(): ReactNode {
                 ) : (
                   <RailShell
                     label={entry.name}
-                    active={entry.apps.includes(activeApp as AppSlug)}
+                    active={entry.members.some((member) =>
+                      sameRef(activeRef, member),
+                    )}
                     compact={railCollapsed}
                     onClick={() => setExpandedGroup(entry.id)}
                     onDragOver={(event) => {
@@ -462,10 +598,9 @@ export function IconRail(): ReactNode {
                     onDragLeave={() => setOverTarget(null)}
                     onDrop={(event) => {
                       event.preventDefault();
-                      const slug = event.dataTransfer.getData(
-                        DRAG_MIME,
-                      ) as AppSlug;
-                      if (slug) groupApps(slug, { kind: "group", id: entry.id });
+                      const dropped = droppedRef(event);
+                      if (dropped)
+                        groupRefs(dropped, { kind: "group", id: entry.id });
                       endDrag();
                     }}
                   >
@@ -475,12 +610,16 @@ export function IconRail(): ReactNode {
                       } ${isOver ? "nexus-shake ring-2 ring-accent" : ""}`}
                       style={tint ? { backgroundColor: tint } : undefined}
                     >
-                      {entry.apps.slice(0, 4).map((slug) => {
-                        const app = groupApp(slug);
-                        return app ? (
-                          <AppTile key={slug} app={app} size={16} />
+                      {entry.members.slice(0, 4).map((member) => {
+                        const resolved = resolve(member);
+                        return resolved ? (
+                          <RefTile
+                            key={refKey(member)}
+                            resolved={resolved}
+                            size={16}
+                          />
                         ) : (
-                          <span key={slug} />
+                          <span key={refKey(member)} />
                         );
                       })}
                     </span>
@@ -501,8 +640,8 @@ export function IconRail(): ReactNode {
               onDragLeave={() => setOverTarget(null)}
               onDrop={(event) => {
                 event.preventDefault();
-                const slug = event.dataTransfer.getData(DRAG_MIME) as AppSlug;
-                if (slug) ungroupApp(slug);
+                const dropped = droppedRef(event);
+                if (dropped) ungroupRef(dropped);
                 endDrag();
               }}
               className={`mt-1 flex flex-col items-center gap-1 rounded-xl border border-dashed px-1 py-2.5 text-center text-[10px] leading-tight transition-colors ${

@@ -17,6 +17,8 @@
 
 import { Choice, Group, Row } from "@/components/apps/settings-app";
 import {
+  canCreateBackupShares,
+  createBackupShares,
   logoutWallet,
   readSettings,
   revealBackup,
@@ -258,6 +260,17 @@ export function WalletSettingsPanel(): ReactNode {
   const [revealing, setRevealing] = useState(false);
   const [backupError, setBackupError] = useState<string | null>(null);
 
+  // Printed backup shares. Armed once before it commits, like the other two
+  // consequential controls on this screen: it puts a biometric prompt and then a print
+  // or share dialogue on screen, and it produces paper that IS the wallet.
+  const [sharesArmed, setSharesArmed] = useState(false);
+  const [sharesBusy, setSharesBusy] = useState(false);
+  const [sharesError, setSharesError] = useState<string | null>(null);
+  const [sharesDone, setSharesDone] = useState<string | null>(null);
+  // Read once: the capability comes from the shell's declaration at page load and
+  // cannot change while this document is alive.
+  const [sharesSupported] = useState(() => canCreateBackupShares());
+
   const [signOutArmed, setSignOutArmed] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
@@ -325,6 +338,41 @@ export function WalletSettingsPanel(): ReactNode {
       .writeText(words.join(" "))
       .then(() => toast.success("Copied"))
       .catch(() => toast.error("Could not copy to the clipboard"));
+  };
+
+  /**
+   * Split the wallet's entropy and let the OS print or share the pages.
+   *
+   * No share ever reaches this document — the shell renders the pages and hands them
+   * straight to the print dialogue or share sheet, and answers with counts. Any two of
+   * the three pages together are the wallet, and this is a browser chrome.
+   */
+  const makeShares = (): void => {
+    if (!sharesArmed) {
+      setSharesArmed(true);
+      return;
+    }
+    setSharesArmed(false);
+    setSharesBusy(true);
+    setSharesError(null);
+    setSharesDone(null);
+    createBackupShares()
+      .then((result) => {
+        // `printed`/`shared` only mean the OS dialogue closed without error. Cancelling
+        // is a decision, not a failure, so it reads as one.
+        const reached = result.printed ?? result.shared ?? false;
+        setSharesDone(
+          reached
+            ? `Any ${result.threshold} of ${result.totalShares} pages recover this wallet — store them apart.`
+            : "Nothing was printed. Your wallet is unchanged.",
+        );
+      })
+      .catch((err: unknown) => {
+        // Shown verbatim: the one refusal a real user can hit explains that their
+        // phrase carries no entropy and cannot be split at all.
+        setSharesError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => setSharesBusy(false));
   };
 
   const signOut = (): void => {
@@ -396,7 +444,7 @@ export function WalletSettingsPanel(): ReactNode {
 
       <Group
         title="Backup"
-        hint="The 12 words are the wallet; everything else on this device is replaceable."
+        hint="The words are the wallet; everything else on this device is replaceable."
       >
         <Row
           label="Reveal recovery phrase"
@@ -463,6 +511,43 @@ export function WalletSettingsPanel(): ReactNode {
               </>
             )}
           </div>
+        ) : null}
+        {/* Absent rather than dead on a shell that does not answer backup.shares —
+            the same rule the ARC and spend-limit rows follow above. */}
+        {sharesSupported ? (
+          <>
+            <button
+              type="button"
+              onClick={makeShares}
+              disabled={sharesBusy}
+              className="focus-ring hover:bg-surface-hover flex w-full items-center gap-3 px-3 py-2.5 text-left disabled:opacity-50"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">
+                  {sharesBusy
+                    ? "Preparing pages…"
+                    : sharesArmed
+                      ? "Print them now?"
+                      : "Create printed backup shares"}
+                </span>
+                <span className="text-muted-foreground mt-0.5 block text-[11px] text-pretty">
+                  {sharesArmed
+                    ? "Three pages will be printed. Any two of them together are this wallet, so store each one somewhere different — and take them off the printer."
+                    : "Three pages, any two of which recover this wallet — including its recovery phrase. For a phrase you would rather not keep written in one place."}
+                </span>
+              </span>
+            </button>
+            {sharesError ? (
+              <p role="alert" className="px-3 pb-2.5 text-xs text-negative text-pretty">
+                {sharesError}
+              </p>
+            ) : null}
+            {sharesDone ? (
+              <p role="status" className="text-muted-foreground px-3 pb-2.5 text-xs text-pretty">
+                {sharesDone}
+              </p>
+            ) : null}
+          </>
         ) : null}
         {settings.secure.method === "none" ? (
           <p role="alert" className="px-3 py-2.5 text-xs text-negative text-pretty">

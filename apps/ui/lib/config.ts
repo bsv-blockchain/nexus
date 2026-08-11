@@ -14,8 +14,8 @@ export const themeConfig = {
 
 /** localStorage keys for client-persisted UI state */
 export const storageKeys = {
-  installedApps: "nexus.installed-apps",
-  repositories: "nexus.app-repositories",
+  /** the sites the user pinned to the rail */
+  pinnedSites: "nexus.pinned-sites",
   /** what Messages anchors, globally and per conversation */
   chainPolicy: "nexus.chain-policy",
 } as const;

@@ -4,7 +4,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as LocalAuthentication from 'expo-local-authentication'
 import { METHODS } from '@nexus/bridge'
 import { createCwiHost, type CwiWallet } from '@nexus/substrate/src/browser/cwiHost'
-import { generateMnemonicWallet } from '@nexus/wallet-core/src/utils/mnemonicWallet'
+import {
+  generateMnemonicWallet,
+  parseMnemonic,
+  recoverMnemonicWallet
+} from '@nexus/wallet-core/src/utils/mnemonicWallet'
+import { isWordCount, type WordCount } from '@nexus/wallet-core/src/utils/entropy'
+import {
+  DEFAULT_THRESHOLD,
+  DEFAULT_TOTAL_SHARES,
+  generateEntropyShares,
+  generatePrintHTML,
+  parseShareSet,
+  recoverKeyFromShares,
+  recoverMnemonicFromShares
+} from '@nexus/wallet-core/src/utils/backupShares'
+import { shareFile } from '../native/shareFile'
 import { DEFAULT_MESSAGE_BOX_URL, MESSAGE_BOX_URL_KEY } from '@nexus/wallet-core/src/utils/pay/rails/handle'
 import {
   AUTO_APPROVE_STORAGE_KEY,
@@ -46,6 +61,40 @@ const LOOKS_LIKE_A_REFERENCE = /^[A-Za-z0-9+/]{16,}={0,2}$/
 function humanMemo(description: string | undefined): string {
   const text = (description ?? '').trim()
   return LOOKS_LIKE_A_REFERENCE.test(text) ? '' : text
+}
+
+/**
+ * The phrase gate, shared by both routes in and identical to the desktop host's.
+ *
+ * This was `words.length !== 12 && words.length !== 24` inline, which rejected the
+ * 15-, 18- and 21-word phrases BIP-39 defines and BRC-157 requires. It now defers to
+ * wallet-core's `parseMnemonic` — the SAME call the build path makes, so a phrase that
+ * passes here cannot fail there.
+ */
+function requirePhrase(raw: unknown): string {
+  const phrase = String(raw ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
+  const parsed = parseMnemonic(phrase)
+  if (!parsed.valid) throw new Error(parsed.error)
+  return phrase
+}
+
+/** A printed word count, or undefined so the trim falls back to BRC-157's heuristic. */
+function optionalWordCount(value: unknown): WordCount | undefined {
+  if (value === undefined || value === null || value === '') return undefined
+  const count = Number(value)
+  if (!isWordCount(count)) {
+    throw new Error(`a recovery phrase is 12, 15, 18, 21 or 24 words; got ${String(value)}`)
+  }
+  return count
+}
+
+/** Shares arrive as an array of strings from the chrome, and nothing else will do. */
+function requireShares(value: unknown): string[] {
+  if (!Array.isArray(value)) throw new Error('backup shares are a list of strings')
+  const shares = value.map((s) => String(s ?? '').trim()).filter(Boolean)
+  const { error } = parseShareSet(shares)
+  if (error) throw new Error(error)
+  return shares
 }
 
 /**
@@ -245,11 +294,7 @@ export function useWalletBridge(): WalletBridge {
        * operation. The create flow below is the same split in the other direction.
        */
       [METHODS.WALLET_RESTORE]: async (params: { mnemonic?: string } | null) => {
-        const phrase = (params?.mnemonic ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
-        const words = phrase ? phrase.split(' ') : []
-        if (words.length !== 12 && words.length !== 24) {
-          throw new Error(`a recovery phrase is 12 or 24 words; got ${words.length}`)
-        }
+        const phrase = requirePhrase(params?.mnemonic)
         await ref.current.buildWalletFromMnemonic(phrase)
         // buildWalletFromMnemonic swallows its own errors, so the honest report of
         // whether it worked is the state it left behind — once that state has had
@@ -289,8 +334,117 @@ export function useWalletBridge(): WalletBridge {
        */
       [METHODS.WALLET_BACKUP]: async () => {
         const mnemonic = await localRef.current.getMnemonic()
-        if (!mnemonic) throw new Error('no recovery phrase is stored on this device')
-        return { mnemonic }
+        if (!mnemonic) {
+          // A legacy share recovery has no phrase because it never had one. Telling
+          // the user to write down words that do not exist is worse than saying why.
+          if (await localRef.current.getRecoveredKey()) {
+            throw new Error(
+              'This wallet was recovered from pre-BRC-157 backup shares, which carry no ' +
+                'recovery phrase. Its backup is those shares; keep them.'
+            )
+          }
+          throw new Error('no recovery phrase is stored on this device')
+        }
+        // The word count travels with the words, so the reveal screen lays out 24 of
+        // them without counting and a share recovery can be told what to expect.
+        return { mnemonic, wordCount: parseMnemonic(mnemonic).wordCount }
+      },
+
+      /**
+       * The other way in: BRC-140 backup shares.
+       *
+       * Under BRC-157 the shares reconstruct the wallet's ENTROPY, so this path
+       * recovers the RECOVERY PHRASE and stores it through the ordinary
+       * `buildWalletFromMnemonic` — which is what makes a share-recovered wallet
+       * indistinguishable from a phrase-restored one, and what puts the words back in
+       * the user's hands. Before BRC-157 the shares split `m/0'/0'` and this was
+       * impossible; `buildWalletFromRecoveredKey` is that old world, kept for the
+       * pages it printed.
+       *
+       * Both builds swallow their own errors, so `settleBuilt()` is the only honest
+       * report — see its comment for the Android race that made this necessary.
+       */
+      [METHODS.WALLET_RESTORE_SHARES]: async (
+        params: { shares?: unknown; wordCount?: unknown; legacy?: boolean } | null
+      ) => {
+        if (ref.current.walletBuilt) {
+          throw new Error('a wallet already exists on this device — sign out first')
+        }
+
+        const shares = requireShares(params?.shares)
+        const wordCount = optionalWordCount(params?.wordCount)
+        const legacy = params?.legacy === true
+
+        // Recovered BEFORE the build starts, so a wrong or incomplete share set fails
+        // as a share error rather than as a build that quietly did nothing.
+        if (legacy) {
+          const key = recoverKeyFromShares(shares)
+          await ref.current.buildWalletFromRecoveredKey(key.toWif())
+          if (!(await settleBuilt())) throw new Error('the wallet could not be built from those shares')
+          return { ok: true, legacy: true, mnemonic: null }
+        }
+
+        const phrase = recoverMnemonicFromShares(shares, wordCount)
+        await ref.current.buildWalletFromMnemonic(phrase)
+        if (!(await settleBuilt())) throw new Error('the wallet could not be built from those shares')
+        return { ok: true, legacy: false, mnemonic: phrase }
+      },
+
+      /**
+       * Split this wallet's entropy into BRC-140 backup shares and hand the printable
+       * document to the OS share sheet.
+       *
+       * ── WHAT DOES NOT CROSS THE BRIDGE ──
+       *
+       * Shares. Any `threshold` of them together ARE the wallet, and the chrome is a
+       * WebView that also hosts arbitrary browsed pages. So this renders the document
+       * and shares it from here, and answers with counts.
+       *
+       * ── THE COST OF THE SHARE SHEET ──
+       *
+       * Unlike desktop, which prints from an in-memory data: URL, this writes the
+       * document to cache for the seconds the sheet is up (see ../native/shareFile.ts,
+       * which deletes it unconditionally afterwards). That file holds EVERY share, so
+       * a user who saves it to iCloud Drive has put the whole wallet in one place —
+       * which is the exact thing the 2-of-3 split exists to prevent. There is no API
+       * fix for that: the filename and the chrome's copy carry the warning.
+       */
+      [METHODS.BACKUP_SHARES]: async (params: { threshold?: number; totalShares?: number } | null) => {
+        const threshold = Math.round(Number(params?.threshold ?? DEFAULT_THRESHOLD))
+        const totalShares = Math.round(Number(params?.totalShares ?? DEFAULT_TOTAL_SHARES))
+
+        // getMnemonic sits behind LocalStorageProvider's biometric gate, so the OS
+        // prompt is the access control on this whole operation.
+        const mnemonic = await localRef.current.getMnemonic()
+        if (!mnemonic) {
+          if (await localRef.current.getRecoveredKey()) {
+            throw new Error(
+              'This wallet was recovered from pre-BRC-157 backup shares and has no entropy ' +
+                'to split. Its backup is the shares you already hold.'
+            )
+          }
+          throw new Error('no recovery phrase is stored on this device')
+        }
+
+        // Decoding the phrase produces the entropy and re-validates it, so a stored
+        // phrase that has somehow been corrupted fails here rather than printing
+        // shares of something that is not this wallet.
+        const { entropy, wordCount, identityKey: walletIdentityKey } = recoverMnemonicWallet(mnemonic)
+
+        // Throws with user-facing text for the one reachable refusal: a phrase whose
+        // entropy is all zeros ("abandon … about") is a good wallet that cannot be
+        // Shamir-split. The chrome shows the message verbatim.
+        const shares = generateEntropyShares(entropy, threshold, totalShares)
+        const html = await generatePrintHTML(shares, walletIdentityKey, { wordCount, threshold })
+
+        const stamp = new Date().toISOString().split('T')[0]
+        const result = await shareFile({
+          filename: `nexus-backup-shares-ALL-${threshold}-of-${totalShares}-${stamp}.html`,
+          contents: html,
+          mimeType: 'text/html'
+        })
+
+        return { ok: true, shared: result.shared, threshold, totalShares, wordCount }
       },
 
       [METHODS.WALLET_LOGOUT]: async () => {

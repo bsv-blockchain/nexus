@@ -50,3 +50,6 @@ native-*/target/
 credentials.json
 *.jks
 *.keystore
+
+# subagent-driven-development scratch (ledger, briefs, review packages)
+.superpowers/

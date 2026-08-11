@@ -2,8 +2,7 @@
 
 import { AppTile } from "@/components/hub/app-icon";
 import { ShellVersion } from "@/components/hub/shell-version";
-import { AppCollections } from "@/components/hub/app-collections";
-import { AppStore } from "@/components/hub/app-store";
+import { Web3Apps } from "@/components/apps/web3-apps";
 import { DownloadsPanel } from "@/components/hub/downloads-panel";
 import { useHub } from "@/components/hub/hub-provider";
 import { SpaceContent } from "@/components/hub/space-content";
@@ -68,18 +67,13 @@ export function MobileSheet(): ReactNode {
 }
 
 function MobileSheetContent(): ReactNode {
-  const {
-    setMobileSheetOpen,
-    installedApps,
-    openApp,
-    spaces,
-    openShare,
-    openSettings,
-  } = useHub();
+  const { setMobileSheetOpen, openApp, spaces, openShare, openSettings } =
+    useHub();
   const [view, setView] = useState<SheetView>({ kind: "root" });
-  const installed = getHubApps().filter((app) =>
-    installedApps.includes(app.slug),
-  );
+  // Every app this build carries. It used to be the installed subset of them,
+  // which is a distinction that no longer exists: the grid is the whole list,
+  // and the list is fixed when the binary is built.
+  const apps = getHubApps();
 
   const titles: Record<SheetView["kind"], string> = {
     root: content.brand.name,
@@ -152,13 +146,13 @@ function MobileSheetContent(): ReactNode {
               onClick={() => setView({ kind: "apps" })}
             />
 
-            {installed.length > 0 && (
+            {apps.length > 0 && (
               <div className="my-2 h-px bg-border" aria-hidden="true" />
             )}
 
-            {installed.length > 0 && (
+            {apps.length > 0 && (
               <div className="grid grid-cols-2 gap-2 py-1">
-                {installed.map((app) => (
+                {apps.map((app) => (
                   <button
                     key={app.slug}
                     type="button"
@@ -230,12 +224,11 @@ function MobileSheetContent(): ReactNode {
 
         {view.kind === "space" && <SpaceContent spaceId={view.spaceId} />}
         {view.kind === "downloads" && <DownloadsPanel />}
+        {/* The pinned-sites list is the whole of this view. The collections
+            column that used to sit above it was the store's filter. */}
         {view.kind === "apps" && (
-          <div className="space-y-3">
-            <AppCollections />
-            <div className="-mx-3">
-              <AppStore />
-            </div>
+          <div className="-mx-3">
+            <Web3Apps />
           </div>
         )}
       </div>

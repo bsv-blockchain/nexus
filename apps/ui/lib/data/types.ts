@@ -46,52 +46,14 @@ export interface IdentityCertificate {
   fields: { label: string; value: string }[];
 }
 
-export type AppCategory =
-  | "system"
-  | "core"
-  | "finance"
-  | "identity"
-  | "media"
-  | "social"
-  | "learning"
-  | "developer";
-
-/** table: app_collections — persona bundles that install several apps at once */
-export type CollectionId =
-  | "all"
-  | "core"
-  | "essentials"
-  | "consumer"
-  | "knowledge"
-  | "creator"
-  | "developer";
-
-export interface AppCollection {
-  id: CollectionId;
-  name: string;
-  description: string;
-  /** lucide icon name */
-  icon: string;
-  /** apps toggled by this collection ("all" ignores this and uses every app) */
-  apps: HubAppSlug[];
-  /** persona bundle: also installs the Web apps and folds them into its rail folder */
-  bundlesWeb?: boolean;
-}
-
-/** table: hub_apps — installable apps shown in the icon rail / Apps manager */
-/** Who publishes an app — surfaced as a verified badge and store filter. */
-export type AppDeveloper = "bsv-association" | "babbage" | "third-party";
-
-/** In-app purchase model surfaced in the install sheet. Absent ⇒ free. */
-export interface AppPricing {
-  /** short right-aligned tag, e.g. "Free to use", "Subscription" */
-  summary: string;
-  /** optional one-line note under the summary */
-  note?: string;
-  /** optional subscription tiers */
-  plans?: { name: string; price: string }[];
-}
-
+/**
+ * table: hub_apps — the app surfaces compiled into this build
+ *
+ * There is no `publisher` column, and no `category`, `version` or `createdAt`.
+ * A row here is a screen in this binary, not a listing: nobody publishes into
+ * this table, nothing sorts or filters it, and the build that carries a row is
+ * the only thing that dates it. See the note on `content.library.apps`.
+ */
 export interface HubApp {
   id: string;
   slug: HubAppSlug;
@@ -100,24 +62,10 @@ export interface HubApp {
   description: string;
   /** two or three word subtitle for tiles and tooltips */
   tagline: string;
-  /** publishing organisation category */
-  developer: AppDeveloper;
-  /** 0–100 popularity score used for store sorting */
-  popularity: number;
-  /** app tile image, served from /public (later: asset url column) */
+  /** app tile image, served from /public */
   iconSrc: string;
   /** accent used for badges and highlights */
   accent: string;
-  /** installed for new users by default */
-  defaultInstalled: boolean;
-  /** always-on app that can't be removed (shown as "Essential") */
-  essential?: boolean;
-  /** in-app purchases; omitted for the (majority) free apps */
-  pricing?: AppPricing;
-  category: AppCategory;
-  version: string;
-  publisher: string;
-  createdAt: string;
 }
 
 export type SpaceProfile = "personal" | "work" | "shared";

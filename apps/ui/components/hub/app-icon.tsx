@@ -1,6 +1,9 @@
 "use client";
 
+import { Favicon } from "@/components/hub/favicon";
 import type { HubApp } from "@/lib/data";
+import type { PinnedSite } from "@/lib/rail/sites";
+import { faviconColorFor } from "@/lib/tabs";
 import { Folder, Globe, Palette, Pin, type LucideIcon } from "lucide-react";
 
 /**
@@ -50,6 +53,39 @@ export function AppTile({
       height={size}
       className={`shrink-0 rounded-[22%] ${className}`}
       style={{ width: size, height: size }}
+    />
+  );
+}
+
+/**
+ * A pinned site's tile. Same geometry as AppTile so the rail reads as one row
+ * of icons, with the letter fallback for the many sites that serve no
+ * /favicon.ico — a normal outcome here, not an edge case.
+ *
+ * The fallback colour is the one the site's own tab uses, so a pinned site is
+ * the same colour wherever it appears. It is not `--color-surface-raised`:
+ * that is #ffffff in the light theme, and Favicon draws the letter in white.
+ */
+export function SiteTile({
+  site,
+  size,
+  className = "",
+}: {
+  site: Pick<PinnedSite, "title" | "url">;
+  size: number;
+  className?: string;
+}): React.ReactNode {
+  return (
+    <Favicon
+      url={site.url}
+      // Spread, not [0]: a page title starting with an emoji — and page titles
+      // are exactly what arrives here — indexes to half a surrogate pair, which
+      // draws as the replacement character.
+      letter={([...site.title.trim()][0] ?? "?").toUpperCase()}
+      color={faviconColorFor(site.url)}
+      size={size}
+      rounded="rounded-[22%]"
+      className={className}
     />
   );
 }

@@ -22,7 +22,6 @@ import {
   messagePeople,
   nexusBot,
 } from "./messages";
-import { appCollections } from "./collections";
 import { ecosystems } from "./ecosystems";
 import { tokenBalances, tokens } from "./tokens";
 import { attributeColors, collectibles } from "./collectibles";
@@ -33,7 +32,6 @@ import { hubApps } from "./hub-apps";
 import { identityCertificates, identityKeys } from "./identity";
 import { mailMessages } from "./mail";
 import { mintTiers, publications } from "./publications";
-import { defaultRepositories, type AppRepository } from "./repositories";
 import { signableDocuments, signEnvelopes, signingKeys } from "./documents";
 import {
   browserTabs,
@@ -44,14 +42,12 @@ import {
 } from "./spaces";
 import { chainTransactions } from "./transactions";
 import { walletAccounts, walletTransactions } from "./wallet";
-import { DEMO_SURFACES, shipsApp, shippedApps } from "../surfaces";
+import { DEMO_SURFACES, shippedApps } from "../surfaces";
 import type {
-  AppCollection,
   BrowserTab,
   ChainTransaction,
   ChatMessage,
   ChatThread,
-  CollectionId,
   Connection,
   Course,
   DownloadItem,
@@ -93,8 +89,6 @@ export {
   type Release,
   type ReleaseFeature,
 } from "./releases";
-export type { AppRepository } from "./repositories";
-export { suggestedRepositories } from "./repositories";
 export { content } from "./content";
 export {
   RARE_HAT,
@@ -107,46 +101,19 @@ export {
 } from "./collectibles";
 export { conversationNotes } from "./notes";
 
-/* app_repositories */
-export function getDefaultRepositories(): AppRepository[] {
-  return defaultRepositories;
-}
-
 /*
  * hub_apps
  *
  * Filtered through shippedApps() rather than returned raw. Every list the user can
- * reach — launcher, icon rail, app store, the ?app= URL — resolves through these
- * accessors, so narrowing here narrows all of them at once. In a demo build the
- * filter is the identity function. See lib/surfaces.ts for what "shipped" means.
+ * reach — launcher, icon rail, the ?app= URL — resolves through these accessors,
+ * so narrowing here narrows all of them at once. In a demo build the filter is the
+ * identity function. See lib/surfaces.ts for what "shipped" means.
  */
 export function getHubApps(): HubApp[] {
   return shippedApps(hubApps);
 }
 export function getHubApp(slug: HubApp["slug"]): HubApp | undefined {
   return getHubApps().find((app) => app.slug === slug);
-}
-export function getDefaultInstalledAppSlugs(): HubApp["slug"][] {
-  return getHubApps()
-    .filter((app) => app.defaultInstalled)
-    .map((app) => app.slug);
-}
-/** Always-on apps that can't be removed (identity, pay & receive). */
-export function getEssentialAppSlugs(): HubApp["slug"][] {
-  return getHubApps()
-    .filter((app) => app.essential)
-    .map((app) => app.slug);
-}
-/** Apps in the "Web" system category (browse, web3 connect). */
-export function getSystemAppSlugs(): HubApp["slug"][] {
-  return getHubApps()
-    .filter((app) => app.category === "system")
-    .map((app) => app.slug);
-}
-export function isEssentialApp(slug: HubApp["slug"]): boolean {
-  return getHubApps().some(
-    (app) => app.slug === slug && app.essential === true,
-  );
 }
 
 /* identity */
@@ -155,16 +122,6 @@ export function getIdentityKeys(): IdentityKey[] {
 }
 export function getIdentityCertificates(): IdentityCertificate[] {
   return identityCertificates;
-}
-
-/* app_collections */
-export function getAppCollections(): AppCollection[] {
-  return appCollections;
-}
-/** App slugs a collection installs — "all" expands to every app. */
-export function getCollectionAppSlugs(id: CollectionId): HubApp["slug"][] {
-  if (id === "all") return getHubApps().map((app) => app.slug);
-  return (appCollections.find((c) => c.id === id)?.apps ?? []).filter(shipsApp);
 }
 
 /* connections (Connect app) + output_baskets (Baskets app) */

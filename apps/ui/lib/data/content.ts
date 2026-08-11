@@ -21,15 +21,32 @@ export const content = {
       title: "Downloads",
       empty: "Nothing downloaded yet.",
     },
+    /*
+     * The rail's third-party half is a bookmark list, and every string here has
+     * to read like one. Nexus distributes nothing: there is no catalog, no
+     * publisher, no version and no grant, so there is no verb here that implies
+     * software arriving on the device. "Add to rail" is the whole promise.
+     */
     apps: {
-      title: "Apps",
-      installedSection: "Installed",
-      availableSection: "Available",
-      install: "Install",
-      uninstall: "Remove",
-      essential: "Essential",
-      installedBadge: "Installed",
-      empty: "No apps installed. Add one below.",
+      title: "Web3 Apps",
+      subtitle:
+        "Websites you've pinned to your rail. Opening one opens the website.",
+      onRail: "On your rail",
+      add: "Add to rail",
+      remove: "Remove from rail",
+      addPlaceholder: "example.com",
+      addLabel: "Add a site",
+      addInvalid: "That doesn't look like a web address.",
+      addDuplicate: "That site is already on your rail.",
+      /*
+       * This points at the field directly above it, because that field is the
+       * only thing in the build that pins a site. It used to say "Open a site in
+       * Browser, then add it to your rail", which taught a path that does not
+       * exist: there is no Add to rail in the browse chrome, in the page-options
+       * sheet, or on the origin chip. When one lands, this string changes with it.
+       */
+      empty: "Nothing here yet. Type a web address above to add your first site.",
+      rename: "Rename",
     },
   },
   wallet: {
@@ -1124,104 +1141,6 @@ export const content = {
     subtitle:
       "Baskets group your wallet's outputs by protocol for building apps.",
   },
-  appStore: {
-    collectionsTitle: "Collections",
-    reorderCollections: "Reorder collections",
-    enableAll: "Enable all",
-    disableAll: "Remove all",
-    installHint: "Install",
-    moreApps: "More apps",
-    searchPlaceholder: "Search apps",
-    sortLabel: "Sort",
-    sortNewest: "Newest",
-    sortOldest: "Oldest",
-    sortPopular: "Most popular",
-    sortTrending: "Trending",
-    filterLabel: "Filter",
-    devBsvAssociation: "BSV Association",
-    devBabbage: "Babbage",
-    devThirdParty: "Third-party",
-    devBsvAssociationApps: "BSV Association apps",
-    devBabbageApps: "Babbage apps",
-    devThirdPartyApps: "Third-party developers",
-    noResults: "No apps match your search.",
-    // install permission sheet
-    installSubtitle: "Install in your Nexus",
-    permsIntro: "If you add this app, it can:",
-    permsIntroCollapsed: "If you add this app, it can use",
-    permsIntroCollection: "If you enable these apps, they can:",
-    permsIntroCollectionCollapsed: "If you enable these apps, they can use",
-    learnMore: "Learn more",
-    perm1: "Verify your identity to sign you in",
-    perm2: "Request payments, small ones auto-approved, large ones ask you",
-    perm3: "Store and access data you share with it",
-    // one-word summaries shown when the permissions block is collapsed
-    permWords: ["Identity", "Payments", "Data"],
-    permsSummaryLabel: "Permissions",
-    // in-app purchases block
-    iapTitle: "In-app purchases",
-    iapFree: "Free",
-    iapFreeNote: "This app is free to use.",
-    installNote:
-      "You can remove this app any time from the App Store. Payments above $0.10 will ask for your confirmation.",
-    optIdentify: "Allow this app to identify you",
-    optIdentifyInfo:
-      "Shares your public identity so this app can recognise you and sign you in. It never sees your private keys.",
-    optOperate: "Allow this app to act without asking each time",
-    optOperateInfo:
-      "Lets this app request small payments and actions without prompting every time, always within the auto-approve limits you set below.",
-    advanced: "Advanced settings",
-    advancedNote:
-      "You stay in control. Change what this app can do any time from Connect.",
-    autoApprove: {
-      title: "Auto-approve settings",
-      notify: "Always notify me",
-      notifyDesc: "Ask for confirmation on every payment from this site",
-      perTx: "Per-transaction limit",
-      perTxDesc: "Payments under this are auto-approved",
-      perSession: "Per-session limit",
-      perSessionDesc: "Total spending before requiring approval",
-      rate: "Rate limit",
-      rateDesc: "Max payment requests per minute",
-      maxTx: "Max transactions per session",
-      maxTxDesc: "Total payments allowed per session before prompting",
-    },
-    cancel: "Cancel",
-    installConfirm: "Install app",
-    successAdded: "It's ready in your sidebar.",
-    successRemoved: "Removed from your Nexus.",
-    // uninstall confirmation sheet
-    uninstallSubtitle: "will be removed from your Nexus",
-    uninstallBody:
-      "This takes it out of your sidebar and revokes its permissions. Your data stays on-chain and you can add it back any time.",
-    uninstallConfirm: "Remove app",
-    // app detail side sheet
-    detail: {
-      close: "Collapse",
-      expand: "Expand",
-      open: "Open",
-      preview: "Preview",
-      version: "Version",
-      updated: "Last updated",
-      installs: "Installs",
-      stars: "GitHub stars",
-      follows: "Followers",
-      permissionsTitle: "Permissions",
-      permissionsExpand: "Show details",
-      permissionsCollapse: "Hide details",
-      reviewsTitle: "Reviews",
-      overallRating: "Overall rating",
-      writeReview: "Write a review",
-      allReviews: "All reviews",
-      usingApp: "using the app",
-      dayAgo: "day ago",
-      daysAgo: "days ago",
-      weekAgo: "week ago",
-      weeksAgo: "weeks ago",
-      monthAgo: "month ago",
-      monthsAgo: "months ago",
-    },
-  },
   vote: {
     title: "Proposals",
     submit: "New proposal",
@@ -1349,10 +1268,18 @@ export const content = {
     helpResources: "Help & Resources",
     helpUrl: "https://bsvassociation.org/education/blockchain-101/",
     steps: [
+      /*
+       * This step used to say "Open the Apps tab to install a wallet, publisher
+       * or explorer" — a promise of software arriving on the device, which is
+       * not what the tab does and not something Nexus offers. The Apps tab is a
+       * bookmark list: an address goes in, an icon appears on the rail, and the
+       * icon opens the website. Naming the address field is deliberate, because
+       * it is currently the only thing in the build that pins a site.
+       */
       {
         icon: "LayoutGrid",
-        title: "Add apps to your Nexus",
-        body: "Open the Apps tab to install a wallet, publisher or explorer. Installed apps live in your sidebar rail.",
+        title: "Pin a site to your rail",
+        body: "Open the Apps tab and type a web address. The site gets an icon on your rail, and tapping it opens the website.",
       },
       {
         icon: "Layers",
@@ -1367,7 +1294,7 @@ export const content = {
       {
         icon: "Wallet",
         title: "Make your first payment",
-        body: "Add the Pay & Receive app to send BSV, check your balance and browse your full transaction history.",
+        body: "Open Pay & Receive from the rail to send BSV, check your balance and browse your full transaction history.",
       },
     ],
     shortcutsTitle: "Essential shortcuts",
@@ -1526,41 +1453,6 @@ export const content = {
   hub: {
     collapsePanel: "Close this panel",
     expandPanel: "Open the panel",
-  },
-
-  repositories: {
-    button: "App repositories",
-    title: "App repositories",
-    official: "Official",
-    enable: "Enable",
-    disable: "Disable",
-    remove: "Remove",
-    suggested: "Add from a list",
-    urlPlaceholder: "Add repository URL…",
-    add: "Add",
-    invalidUrl: "Enter a valid repository URL.",
-    duplicate: "That repository is already added.",
-    commonSource: "Common Source",
-    commonSourceTag: "Mini app store",
-    commonSourceDesc: "One curated source for every app",
-    commonSourceToggle: "Common Source mode",
-    /* Suggestions offered from the URL field itself, so a reader who has never
-       seen a repository URL has something to try rather than a blank box. */
-    pickSuggested: "Try one of these",
-    pickHint: "Third-party stores. Adding one is a decision, not a setting.",
-    /*
-     * The warning in front of adding a store, per the design review.
-     *
-     * Deliberately not a toast after the fact: what a repository does is decide
-     * which code the hub is willing to offer you, so the moment to say who
-     * vouches for it is before it is added rather than after.
-     */
-    confirmTitle: "Add an unvetted repository?",
-    confirmBody:
-      "Nothing in this store has been reviewed by Nexus or the BSV Association. Its apps ask for the same permissions as any other — your keys, your wallet, your identity — and only the operator of this URL decides what appears in it.",
-    confirmSource: "Adding",
-    confirmCancel: "Cancel",
-    confirmAdd: "Add it anyway",
   },
 
   theme: {

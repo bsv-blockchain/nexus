@@ -103,7 +103,11 @@ function createWindow() {
     // A spend above the auto-approve limit needs a person, and the person is in
     // the chrome. Null is pushed too — that is how the sheet closes when the
     // queue drains.
-    onPermissionRequest: (request) => router?.emit('permission.request', request)
+    onPermissionRequest: (request) => router?.emit('permission.request', request),
+    // For backup.shares: the print dialogue is parented to this window so the OS
+    // sheet appears attached to the app rather than as an ownerless window. A getter
+    // rather than `win`, because the host outlives any single createWindow.
+    getParentWindow: () => win
   })
 
   router = createHostRouter({

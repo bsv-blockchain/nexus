@@ -85,7 +85,7 @@ export const tokens: Token[] = [
     color: "#4353ff",
     decimals: 2,
     protocol: "BSV-21",
-    blurb: "Hub credits for app-store purchases, storage plans and publishing fees.",
+    blurb: "Prepaid credits for on-chain publishing, storage and network fees.",
     usdPerUnit: 0.42,
     change24h: 3.1,
   },

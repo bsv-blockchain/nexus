@@ -143,6 +143,20 @@ const CREATE_HOST_CLIENT_SOURCE = `function createHostClient(options) {
       // Five minutes: BIP-39 → BIP-32 derivation is seconds of pure JS, and the
       // device then puts up a Face ID / passcode sheet that waits on a human.
       restore: function (mnemonic) { return call('wallet.restore', { mnemonic: mnemonic }, 300000) },
+      // The share route in. Same bound as restore and for the same two reasons — the
+      // derivation is seconds of pure JS and the device then puts up a Face ID sheet
+      // that waits on a human. No backticks in this file: everything from
+      // CREATE_HOST_CLIENT_SOURCE down is inside a template literal, and one backtick
+      // ends it. The opts argument carries the printed word count and the legacy flag;
+      // see METHODS.WALLET_RESTORE_SHARES for what each one decides.
+      restoreShares: function (shares, opts) {
+        var o = opts || {}
+        return call('wallet.restoreShares', {
+          shares: shares,
+          wordCount: o.wordCount,
+          legacy: o.legacy === true
+        }, 300000)
+      },
       // The same trust split in the other direction: the shell generates and
       // stores the words, the chrome shows them ONCE for writing down. Same
       // five-minute bound as restore, for the same two reasons.
@@ -163,9 +177,14 @@ const CREATE_HOST_CLIENT_SOURCE = `function createHostClient(options) {
       setAutoApprove: function (satoshis) { return call('settings.setAutoApprove', { satoshis: satoshis }) }
     },
     backup: {
-      // Deriving the primary key can put a biometric prompt on screen and the
-      // Shamir split is real work; neither belongs on a short timeout.
-      shares: function () { return call('backup.shares', null, 300000) },
+      // Reading the stored phrase can put a biometric prompt on screen, and the split
+      // plus three QR codes plus a print dialogue is a person deciding where paper
+      // comes out. Neither belongs on a short timeout. Answers with counts only —
+      // never a share.
+      shares: function (opts) {
+        var o = opts || {}
+        return call('backup.shares', { threshold: o.threshold, totalShares: o.totalShares }, 300000)
+      },
       // Both open a native file dialog and then move a whole database, which is a
       // person deciding where to put a file, not a round trip.
       exportDb: function () { return call('backup.exportDb', null, 600000) },

@@ -32,6 +32,26 @@
 #
 # No `--no-wait` anywhere: a queued-then-failed EAS build must fail THIS run, not
 # silently evaporate behind a green checkmark.
+#
+# ── REHEARSAL, THE SAME AS release-desktop.yml HAS ──
+#
+# Dispatching this on a BRANCH builds every leg for real and distributes nothing:
+# no --auto-submit, so no TestFlight build and no Play internal-testing release, and
+# nothing is attached to a GitHub release. The AAB and APK are uploaded to the run's
+# own Artifacts panel instead, so a rehearsal still hands you installable binaries.
+#
+#   gh workflow run release-mobile.yml --ref my-branch
+#
+# This used to refuse a branch outright, which meant the ONLY way to find out
+# whether the mobile release path worked was to cut a tag — and the desktop workflow
+# already records what that costs: "a tag cannot be un-cut", and v0.1.0 was spent
+# discovering that apps/desktop/build had never been committed. The mobile side had
+# its own version of that lesson (v0.1.0 died on a Google service-account prompt),
+# which a rehearsal would have caught for the price of runner minutes.
+#
+# The asymmetry mattered more here than on desktop, because these legs push to real
+# distribution channels: a submitted TestFlight build consumes a build number and is
+# visible to testers. Rehearsal is how you find a broken pipeline without doing that.
 name: release-mobile
 
 on:
@@ -49,15 +69,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      # workflow_dispatch is for RE-RUNNING a tag's release: dispatch it on the tag
-      # ref. Dispatched from a branch, GITHUB_REF_NAME is the branch name and no
-      # release semantics exist — refuse loudly instead of failing weirdly later.
+      # Two modes, decided by the ref — the same split release-desktop.yml makes:
+      #
+      #   a vX.Y.Z tag   a real release. Metadata must agree with the tag, the store
+      #                  legs auto-submit, and the artifacts land on the draft release.
+      #   any branch     a REHEARSAL. Every leg builds for real; nothing is submitted
+      #                  and nothing is attached.
+      #
+      # Dispatch a TAG ref to re-run a release; dispatch a branch to rehearse one.
       - run: |
-          if [[ "$GITHUB_REF" != refs/tags/v* ]]; then
-            echo "::error::this workflow releases tags — dispatch it on a vX.Y.Z tag, not '$GITHUB_REF_NAME'"
-            exit 1
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            node tools/version.mjs --check --tag "$GITHUB_REF_NAME"
+          else
+            echo "::notice title=Rehearsal::'$GITHUB_REF_NAME' is not a version tag — building every leg, submitting and attaching nothing."
+            node tools/version.mjs --check
           fi
-          node tools/version.mjs --check --tag "$GITHUB_REF_NAME"
 
   aab:
     needs: verify-version
@@ -95,16 +121,42 @@ jobs:
       # The AAB is STILL downloaded and attached to the draft release. Auto-submit sends
       # it to internal testing; the attachment is what you archive, hand to someone
       # without Play access, or upload by hand the day EAS is down.
-      - name: build AAB and submit to Play internal testing
+      # --auto-submit only on a tag. On a branch this is a rehearsal: the AAB is built
+      # and downloaded, and Play never hears about it.
+      #
+      # SLUG, not GITHUB_REF_NAME, in the filename: a branch ref can contain a slash
+      # ('feat/web3-apps'), and `curl -o Nexus-feat/web3-apps.aab` writes into a
+      # directory that does not exist. Tags never hit this, which is why it survived
+      # until branches became a legal ref here.
+      - name: build AAB (submit to Play internal testing on a tag)
         working-directory: apps/mobile
         run: |
-          eas build --platform android --profile production --non-interactive --auto-submit --json > build.json
+          SLUG="${GITHUB_REF_NAME//\//-}"
+          echo "SLUG=$SLUG" >> "$GITHUB_ENV"
+          SUBMIT=()
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            SUBMIT=(--auto-submit)
+          else
+            echo "::notice::rehearsal — building the production AAB without submitting it to Play"
+          fi
+          eas build --platform android --profile production --non-interactive "${SUBMIT[@]}" --json > build.json
           URL=$(node -p "JSON.parse(require('fs').readFileSync('build.json','utf8'))[0].artifacts.buildUrl")
-          curl -fL "$URL" -o "Nexus-${GITHUB_REF_NAME}.aab"
+          curl -fL "$URL" -o "Nexus-${SLUG}.aab"
+
+      # So a rehearsal still yields an installable binary, the way the desktop
+      # rehearsal does. Cheap on a tag run too, and it outlives the draft.
+      - name: upload AAB artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: android-aab
+          path: apps/mobile/Nexus-*.aab
 
       # Same draft-release protocol as the apk job and release-desktop.yml — see the
       # comment there. Three writers now share it; keep-OLDEST is what makes that safe.
       - name: attach AAB to the draft release
+        # Tags only: a rehearsal must not leave a draft behind for a version nobody
+        # cut. The AAB is in this run's Artifacts panel either way.
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -121,7 +173,7 @@ jobs:
               echo "removing duplicate draft $id (created after the survivor)"
               gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/$id"
             done
-          gh release upload "$TAG" "apps/mobile/Nexus-${GITHUB_REF_NAME}.aab" --clobber
+          gh release upload "$TAG" "apps/mobile/Nexus-${SLUG}.aab" --clobber
           echo "::notice::AAB attached. Upload it at Play Console → Internal testing → Create new release."
 
   stores-ios:
@@ -171,11 +223,23 @@ jobs:
       # anyway — the submit step authenticates separately and succeeded — but the
       # validation that would catch a bad profile before a 20-minute build was
       # silently skipped.
-      - name: build and submit to TestFlight (iOS)
+      # --auto-submit only on a tag, and this is the leg where that matters most: a
+      # submitted TestFlight build consumes a build number and becomes visible to
+      # testers, neither of which can be taken back. On a branch the IPA is built and
+      # signed exactly as a release build is — which is the part that actually breaks —
+      # and Apple never receives it.
+      - name: build IPA (submit to TestFlight on a tag)
         working-directory: apps/mobile
         env:
           EXPO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: eas build --platform ios --profile production --non-interactive --auto-submit
+        run: |
+          SUBMIT=()
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            SUBMIT=(--auto-submit)
+          else
+            echo "::notice::rehearsal — building and signing the production IPA without submitting it to TestFlight"
+          fi
+          eas build --platform ios --profile production --non-interactive "${SUBMIT[@]}"
 
   apk:
     needs: verify-version
@@ -204,12 +268,23 @@ jobs:
       - name: bundle the chrome
         run: npm run ui:bundle
 
+      # No --auto-submit here in either mode: the preview APK is for sideloading and
+      # was never a store artifact. So this leg is identical on a tag and a rehearsal
+      # apart from where the file ends up. SLUG for the same slash reason as the AAB.
       - name: build APK
         working-directory: apps/mobile
         run: |
+          SLUG="${GITHUB_REF_NAME//\//-}"
+          echo "SLUG=$SLUG" >> "$GITHUB_ENV"
           eas build --platform android --profile preview --non-interactive --json > build.json
           URL=$(node -p "JSON.parse(require('fs').readFileSync('build.json','utf8'))[0].artifacts.buildUrl")
-          curl -fL "$URL" -o "Nexus-${GITHUB_REF_NAME}.apk"
+          curl -fL "$URL" -o "Nexus-${SLUG}.apk"
+
+      - name: upload APK artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: android-apk
+          path: apps/mobile/Nexus-*.apk
 
       # Shared draft-release protocol with release-desktop.yml — BOTH sides must
       # follow it, or one side's artifacts get destroyed:
@@ -221,6 +296,8 @@ jobs:
       #      uploads
       #   4. upload with --clobber (reruns refresh their own assets in place)
       - name: attach APK to the draft release
+        # Tags only, same reason as the AAB leg.
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -237,4 +314,4 @@ jobs:
               echo "removing duplicate draft $id (created after the survivor)"
               gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/$id"
             done
-          gh release upload "$TAG" "apps/mobile/Nexus-${GITHUB_REF_NAME}.apk" --clobber
+          gh release upload "$TAG" "apps/mobile/Nexus-${SLUG}.apk" --clobber

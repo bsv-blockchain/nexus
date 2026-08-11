@@ -17,16 +17,38 @@ import type { WalletAccount, WalletTransaction } from "./data/types";
 import { walletAccounts as demoAccounts, walletTransactions as demoTransactions } from "./data/wallet";
 import { DEMO_DATA_COMPILED_IN, resolveDataMode, type DataMode } from "./data-mode";
 
+/** BIP-39's five lengths, which BRC-157 adopts wholesale. */
+export const WORD_COUNTS = [12, 15, 18, 21, 24] as const;
+export type WordCount = (typeof WORD_COUNTS)[number];
+
+export function isWordCount(value: number): value is WordCount {
+  return (WORD_COUNTS as readonly number[]).includes(value);
+}
+
 type NexusHost = {
   on?: (event: string, cb: (payload: unknown) => void) => () => void;
+  /** Which surfaces this shell actually answers; see packages/bridge/src/client.js. */
+  has?: (capability: string) => boolean;
   wallet?: {
     info: () => Promise<WalletInfo>;
     accounts: () => Promise<WalletAccount[]>;
     transactions: (opts?: { accountId?: string; limit?: number }) => Promise<WalletTransaction[]>;
     restore?: (mnemonic: string) => Promise<{ ok: boolean }>;
+    restoreShares?: (
+      shares: string[],
+      opts?: { wordCount?: WordCount; legacy?: boolean },
+    ) => Promise<{ ok: boolean; legacy: boolean; mnemonic: string | null }>;
     create?: () => Promise<{ ok: boolean; mnemonic: string }>;
-    backup?: () => Promise<{ mnemonic: string }>;
+    backup?: () => Promise<{ mnemonic: string; wordCount?: number }>;
     logout?: () => Promise<{ ok: boolean }>;
+  };
+  /**
+   * Backup beyond the words. `shares` never returns a share — any `threshold` of them
+   * together are the wallet, and this document is a browser renderer. The shell prints
+   * or shares the document itself and answers with counts.
+   */
+  backup?: {
+    shares?: (opts?: { threshold?: number; totalShares?: number }) => Promise<BackupSharesResult>;
   };
   settings?: {
     get: () => Promise<HostSettings>;
@@ -36,6 +58,23 @@ type NexusHost = {
   };
   setOverlay?: (open: boolean) => Promise<unknown>;
 };
+
+/**
+ * What the shell reports after printing or sharing a share set.
+ *
+ * Counts, not shares. `printed`/`shared` mean the OS dialogue ran and closed without
+ * error — a user who cancelled gets `false`, and neither value proves paper exists.
+ */
+export interface BackupSharesResult {
+  ok: boolean;
+  threshold: number;
+  totalShares: number;
+  wordCount: number;
+  /** Desktop: the print dialogue was not cancelled. */
+  printed?: boolean;
+  /** Mobile: the share sheet ran and closed. */
+  shared?: boolean;
+}
 
 export interface WalletInfo {
   /** False when the shell has no wallet wired at all — distinct from an empty wallet. */
@@ -209,15 +248,64 @@ export async function createWallet(): Promise<{ ok: boolean; mnemonic: string }>
 }
 
 /**
+ * Recover a wallet from BRC-140 backup shares.
+ *
+ * Under BRC-157 the shares reconstruct the wallet's entropy, so the shell hands back
+ * the recovery phrase itself — the words the user did not have a moment ago. Callers
+ * render them exactly as the create flow does and let go.
+ *
+ * `wordCount` is printed on the share page; without it the shell falls back to
+ * BRC-157's leading-zero heuristic. `legacy` is for pages printed by BSV Browser /
+ * metanet-mobile, which split the primary key instead: nothing in the share format
+ * distinguishes the two, so this is a question only the person holding the paper can
+ * answer, and a legacy recovery has no phrase at all.
+ */
+export async function restoreFromShares(
+  shares: string[],
+  opts?: { wordCount?: WordCount; legacy?: boolean },
+): Promise<{ ok: boolean; legacy: boolean; mnemonic: string | null }> {
+  const wallet = host()?.wallet;
+  if (!wallet?.restoreShares) throw new Error("this shell cannot restore from backup shares");
+  return wallet.restoreShares(shares, opts);
+}
+
+/**
  * The stored recovery phrase, for the backup screen.
  *
  * Gated by the platform's biometric prompt where there is one, so the call can
  * sit waiting on a human. Same rule as create: render, never persist.
  */
-export async function revealBackup(): Promise<{ mnemonic: string }> {
+export async function revealBackup(): Promise<{ mnemonic: string; wordCount?: number }> {
   const wallet = host()?.wallet;
   if (!wallet?.backup) throw new Error("this shell cannot reveal a recovery phrase");
   return wallet.backup();
+}
+
+/** True when this shell answers `backup.shares` at all, so the row can be absent rather than dead. */
+export function canCreateBackupShares(): boolean {
+  const h = host();
+  return Boolean(h?.backup?.shares && (h.has?.("backup") ?? true));
+}
+
+/**
+ * Split this wallet's entropy into printable backup shares.
+ *
+ * No share crosses this boundary and none ever will: any `threshold` of them together
+ * are the wallet, and this document is a renderer that also has browsed pages in it.
+ * The shell derives, splits, renders and hands the document straight to the OS — a
+ * print dialogue on desktop, a share sheet on mobile — and answers with counts.
+ *
+ * Throws with text meant to be shown verbatim. The one refusal a real user can hit is
+ * a recovery phrase whose entropy is all zeros ("abandon … about"): a working wallet
+ * that cannot be Shamir-split at all.
+ */
+export async function createBackupShares(opts?: {
+  threshold?: number;
+  totalShares?: number;
+}): Promise<BackupSharesResult> {
+  const backup = host()?.backup;
+  if (!backup?.shares) throw new Error("this shell cannot create backup shares");
+  return backup.shares(opts);
 }
 
 /**

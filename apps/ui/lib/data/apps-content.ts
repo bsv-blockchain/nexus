@@ -364,10 +364,10 @@ export const proposals: Proposal[] = [
     createdAt: "2026-06-28T09:00:00.000Z",
   },
   {
-    id: "prop-app-store",
-    title: "Open the App Store to third-party developers",
+    id: "prop-overlay-fees",
+    title: "Publish the overlay fee schedule a quarter in advance",
     summary:
-      "Let outside developers publish apps into the Nexus App Store, with an on-chain review and reputation system.",
+      "Require overlay operators to post their fee schedule three months before it takes effect, so a service can budget for a change rather than discover it.",
     status: "open",
     votesFor: 903,
     votesAgainst: 421,

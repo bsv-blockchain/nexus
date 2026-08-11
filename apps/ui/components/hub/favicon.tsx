@@ -1,18 +1,20 @@
 "use client";
 
+import { faviconUrlFor } from "@/lib/rail/origin";
 import { useState, type ReactNode } from "react";
 
-function hostOf(url: string): string | null {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return null;
-  }
-}
-
 /**
- * Shows a site's real favicon (via Google's favicon service), falling back to
- * a colored letter tile when there's no URL or the icon fails to load.
+ * Shows a site's real favicon, falling back to a coloured letter tile when
+ * there's no URL or the icon fails to load.
+ *
+ * The icon comes from the site's OWN origin. It used to come from Google's
+ * favicon-by-domain endpoint (google's domain, "s2" subpath), which handed
+ * Google the hostname of every pinned site, every open tab and every
+ * favourite, on every render, from a wallet browser. BSV Browser derives the
+ * same `origin + /favicon.ico` URL in components/browser/BookmarkList.tsx.
+ *
+ * Not every site serves /favicon.ico, and that is what `onError` is for — the
+ * letter tile is a normal outcome here, not an edge case.
  */
 export function Favicon({
   url,
@@ -29,10 +31,10 @@ export function Favicon({
   rounded?: string;
   className?: string;
 }): ReactNode {
-  const host = hostOf(url);
+  const src = faviconUrlFor(url);
   const [failed, setFailed] = useState(false);
 
-  if (!host || failed) {
+  if (!src || failed) {
     return (
       <span
         className={`flex shrink-0 items-center justify-center ${rounded} font-bold text-white ${className}`}
@@ -52,7 +54,7 @@ export function Favicon({
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`https://www.google.com/s2/favicons?domain=${host}&sz=64`}
+      src={src}
       alt=""
       aria-hidden="true"
       width={size}

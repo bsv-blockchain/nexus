@@ -1,7 +1,6 @@
 "use client";
 
 import { AppTile } from "@/components/hub/app-icon";
-import { useHub } from "@/components/hub/hub-provider";
 import { getHubApp, getMintTiers } from "@/lib/data";
 import { Settings2, Sparkles, Tag, Upload } from "lucide-react";
 import type { ReactNode } from "react";
@@ -10,8 +9,6 @@ import type { ReactNode } from "react";
 export function PublisherApp(): ReactNode {
   const app = getHubApp("publisher");
   const tiers = getMintTiers();
-  const { isInstalled, openAppStore } = useHub();
-  const connectEnabled = isInstalled("connect");
 
   return (
     <div className="relative h-full overflow-y-auto bg-background">
@@ -25,20 +22,9 @@ export function PublisherApp(): ReactNode {
       </div>
 
       {/* Product header — consistent with the other app headers */}
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-border bg-background/70 px-5 py-3 backdrop-blur-xl">
-        <div className="flex items-center gap-2">
-          {app && <AppTile app={app} size={24} />}
-          <h1 className="text-sm font-semibold">{app?.name ?? "Publish"}</h1>
-        </div>
-        {!connectEnabled && (
-          <button
-            type="button"
-            onClick={openAppStore}
-            className="focus-ring flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-accent-foreground hover:opacity-90"
-          >
-            Enable Connect
-          </button>
-        )}
+      <header className="sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-background/70 px-5 py-3 backdrop-blur-xl">
+        {app && <AppTile app={app} size={24} />}
+        <h1 className="text-sm font-semibold">{app?.name ?? "Publish"}</h1>
       </header>
 
       <div className="relative z-1 mx-auto max-w-6xl px-6 py-10">

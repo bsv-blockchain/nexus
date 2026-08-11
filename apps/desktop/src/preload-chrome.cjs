@@ -25,7 +25,11 @@ const client = createHostClient({
   // two rails (address and handle) are entirely network and wallet work: they are
   // the payments a desktop can actually make, and withholding the capability to
   // hide one cell would have hidden all six.
-  capabilities: ['tabs', 'wallet', 'settings', 'tx', 'pay'],
+  // 'backup' covers backup.shares only. exportDb/importDb are declared in the
+  // protocol and answered by nobody, so a chrome that finds the capability present
+  // must still expect those two to fail — which is why the Settings surface offers
+  // the share row and not a ledger export.
+  capabilities: ['tabs', 'wallet', 'settings', 'tx', 'pay', 'backup'],
   post: (msg) => ipcRenderer.send('nexus:host:out', msg)
 })
 

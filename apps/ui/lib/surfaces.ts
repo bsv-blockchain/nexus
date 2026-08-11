@@ -38,11 +38,6 @@ export const DEMO_SURFACES = process.env.NEXT_PUBLIC_DEMO_DATA !== "0";
  */
 const SHIPPED: ReadonlySet<string> = new Set(["browser", "wallet"]);
 
-/** Whether an app belongs in this build's launcher, rail and store. */
-export function shipsApp(slug: HubApp["slug"]): boolean {
-  return DEMO_SURFACES || SHIPPED.has(slug);
-}
-
 /** Narrow a catalog to what this build ships. */
 export function shippedApps<T extends { slug: HubApp["slug"] }>(apps: T[]): T[] {
   return DEMO_SURFACES ? apps : apps.filter((app) => SHIPPED.has(app.slug));

@@ -4,15 +4,19 @@ import {
   AppContextSidebar,
   hasContextSidebar,
 } from "@/components/hub/app-context-sidebar";
+import { SiteTile } from "@/components/hub/app-icon";
 import { BrowserNav } from "@/components/hub/browser-nav";
 import { useHub } from "@/components/hub/hub-provider";
 import { NewItemMenu } from "@/components/hub/new-item-menu";
+import { OriginLabel } from "@/components/hub/origin-label";
 import { SpaceContent } from "@/components/hub/space-content";
 import { SpaceIcon } from "@/components/hub/space-icon";
 import { ThemeButton } from "@/components/hub/theme-picker";
 import { SpaceMenu } from "@/components/hub/space-menu";
 import { panelContainer, panelItem } from "@/components/hub/panel-motion";
 import { content } from "@/lib/data";
+import { displayOrigin } from "@/lib/rail/origin";
+import type { PinnedSite } from "@/lib/rail/sites";
 import {
   ArrowLeft,
   ArrowRight,
@@ -30,6 +34,42 @@ const PROFILE_LABELS: Record<string, string> = {
   shared: "Shared",
 };
 
+/**
+ * What the address bar's row says when there is no address bar.
+ *
+ * A pinned site opens app-like — no address bar, no tab strip — so hiding
+ * `BrowserNav` leaves this column with a hole where the URL used to be, and with
+ * nothing anywhere in it naming which of your pinned entries the canvas belongs
+ * to. This fills the same slot, at the same size, so the column's rhythm does
+ * not change when you move between Browser and a site.
+ *
+ * It is a LABEL, not a control. The two things a site can do — Open in Browser,
+ * Remove from rail — already have two homes: the canvas chip's popover and the
+ * rail's long-press. A third copy here would be the put-a-button-on-every-
+ * surface instinct this whole change exists to remove.
+ *
+ * The title is the user's own label from the pinned row. The host is derived
+ * from the LIVE tab on every render, through the same `displayOrigin` and the
+ * same `OriginLabel` as the canvas chip and the spend-authorization dialog: if
+ * this row and that chip could disagree about what the page is called, one of
+ * them is lying. It falls back to the pinned url only when there is no tab yet.
+ */
+function SiteRow({ site }: { site: PinnedSite }): ReactNode {
+  const { activeTab } = useHub();
+  return (
+    <div className="flex items-center gap-2.5 rounded-lg bg-background px-3 py-2">
+      <SiteTile site={site} size={22} />
+      <span className="min-w-0 flex-1 leading-tight">
+        <span className="block truncate text-sm font-medium">{site.title}</span>
+        <OriginLabel
+          origin={displayOrigin(activeTab?.url ?? site.url)}
+          className="block text-[11px]"
+        />
+      </span>
+    </div>
+  );
+}
+
 /** Library-mode Spaces column, matching the multi-column mock. */
 export function SpacesPanel(): ReactNode {
   const {
@@ -38,11 +78,20 @@ export function SpacesPanel(): ReactNode {
     setActiveSpaceId,
     setLibraryTab,
     activeApp,
+    activeRef,
+    pinnedSites,
     goBack,
     goForward,
     canGoBack,
     canGoForward,
   } = useHub();
+  /* A site is the one ref with no app behind it, so `activeApp` cannot answer
+     this. Resolving the row rather than trusting the ref keeps the panel honest
+     if the site is unpinned from another tab mid-render. */
+  const activeSite =
+    activeRef.kind === "site"
+      ? pinnedSites.find((site) => site.id === activeRef.id)
+      : undefined;
   const [spaceMenuOpen, setSpaceMenuOpen] = useState(false);
   const [newItemMenuOpen, setNewItemMenuOpen] = useState(false);
   const activeSpace =
@@ -128,7 +177,7 @@ export function SpacesPanel(): ReactNode {
       </motion.div>
 
       <motion.div variants={panelItem} className="px-0.5 pb-1">
-        <BrowserNav />
+        {activeSite ? <SiteRow site={activeSite} /> : <BrowserNav />}
       </motion.div>
 
       <motion.div
