@@ -3,11 +3,15 @@
 import { SiteTile } from "@/components/hub/app-icon";
 import { PRIMARY_CTA } from "@/components/hub/cta";
 import { useHub } from "@/components/hub/hub-provider";
+import { OriginLabel } from "@/components/hub/origin-label";
 import { content } from "@/lib/data";
 import { displayOrigin } from "@/lib/rail/origin";
 import type { PinnedSite } from "@/lib/rail/sites";
 import { Globe, Minus, Plus } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+
+/** How long a revealed row stays highlighted. */
+const FLASH_MS = 1400;
 
 /**
  * One pinned site: its tile, an editable title, its origin, and the one verb.
@@ -19,27 +23,45 @@ import { useState, type ReactNode } from "react";
  * render puts the old character back. The draft lets the field go empty while
  * the user retypes, and only a non-blank value on blur or Enter is committed.
  *
- * Escape abandons the edit, and a rename from elsewhere (another tab, the
- * rail) is picked up because the draft is keyed to the row's current title.
+ * Escape abandons the edit. While a draft is open it wins over the store, so a
+ * rename arriving from another tab is not shown until this one blurs — the right
+ * way round: the half-typed name in front of you is the one you are looking at.
  */
 function SiteRow({
   site,
+  flash,
   onRemove,
 }: {
   site: PinnedSite;
+  flash: boolean;
   onRemove: () => void;
 }): ReactNode {
   const copy = content.library.apps;
   const [draft, setDraft] = useState<string | null>(null);
   const { renameSite } = useHub();
+  const row = useRef<HTMLLIElement>(null);
 
   const commit = (): void => {
     if (draft !== null && draft.trim()) renameSite(site.id, draft);
     setDraft(null);
   };
 
+  // Bring a revealed row into view. The highlight's lifetime is the parent's —
+  // one timer for the list, rather than one per row that any re-render restarts.
+  useEffect(() => {
+    if (flash) row.current?.scrollIntoView({ block: "nearest" });
+  }, [flash]);
+
   return (
-    <li className="flex items-center gap-3 rounded-2xl bg-surface p-3 ring-1 ring-transparent transition-colors hover:ring-border">
+    <li
+      ref={row}
+      /* items-start, not items-center: through OriginLabel a long host wraps
+         instead of being cut, so the row can grow — and when it does, the tile
+         and the verb belong against the title rather than floating mid-row. */
+      className={`flex items-start gap-3 rounded-2xl bg-surface p-3 ring-1 transition-shadow duration-300 ${
+        flash ? "ring-accent" : "ring-transparent hover:ring-border"
+      }`}
+    >
       <SiteTile site={site} size={36} />
       <div className="min-w-0 flex-1">
         <input
@@ -58,11 +80,19 @@ function SiteRow({
           aria-label={`${copy.rename} ${site.title}`}
           className="focus-ring w-full truncate rounded bg-transparent text-sm font-semibold outline-none"
         />
-        {/* The origin as stored, which is the origin the rail will open. The
-            live page's host is the canvas chip's job, not this list's. */}
-        <p className="truncate text-xs text-muted-foreground">
-          {displayOrigin(site.url)}
-        </p>
+        {/* The origin as stored, which is the origin the rail will open — the
+            live page's host is the canvas chip's job, not this list's.
+
+            Through OriginLabel, not `truncate`. This row is where somebody
+            decides which of two similar pins is the real one before pressing
+            Remove, and it renders at phone width from the mobile sheet.
+            `text-overflow` clips the TAIL of a host, and the tail is the
+            registrable domain, so truncation hides exactly the characters the
+            decision rests on and keeps the attacker-chosen padding. */}
+        <OriginLabel
+          origin={displayOrigin(site.url)}
+          className="block text-xs"
+        />
       </div>
       <button
         type="button"
@@ -92,21 +122,49 @@ function SiteRow({
  * different kind of thing from a bookmark.
  */
 export function Web3Apps(): ReactNode {
-  const { pinnedSites, pinSite, unpinSite, setActiveRef } = useHub();
+  const { pinnedSites, pinSite, unpinSite } = useHub();
   const copy = content.library.apps;
   const [draft, setDraft] = useState("");
-  const [invalid, setInvalid] = useState(false);
+  /** What the field has to say back: nothing, a rejection, or a duplicate. */
+  const [notice, setNotice] = useState<"invalid" | "duplicate" | null>(null);
+  /**
+   * A row to reveal — the one just added, or the one already there.
+   *
+   * A wrapper object rather than the bare id, so every reveal is a new value
+   * even when it names the row already highlighted. A bare id made re-adding the
+   * same URL a no-op state write: the effect below did not re-run, so the second
+   * reveal inherited the first one's remaining time.
+   */
+  const [flash, setFlash] = useState<{ id: string } | null>(null);
+
+  // One timer for the list, restarted by each reveal.
+  useEffect(() => {
+    if (flash === null) return;
+    const timer = window.setTimeout(() => setFlash(null), FLASH_MS);
+    return () => window.clearTimeout(timer);
+  }, [flash]);
 
   const submit = (): void => {
     if (!draft.trim()) return;
-    // Null means the input is not a web address. An already-pinned URL comes
-    // back as the existing row, so a duplicate is a no-op rather than an error.
-    if (!pinSite(draft)) {
-      setInvalid(true);
+    const site = pinSite(draft);
+    // Null is the only failure: not a web address.
+    if (!site) {
+      setNotice("invalid");
       return;
     }
+    /*
+     * `addPinnedSite` hands back the EXISTING row for a URL already pinned
+     * rather than duplicating it, so a second attempt used to clear the field
+     * and change nothing visible — indistinguishable from a silent failure.
+     * `pinnedSites` is this render's pre-submit list, so finding the returned id
+     * in it is what tells the two cases apart. Either way the row is revealed;
+     * only the duplicate says so in words, because a highlight is invisible to a
+     * screen reader and to anyone whose eye is still on the field.
+     */
+    const duplicate = pinnedSites.some((row) => row.id === site.id);
     setDraft("");
-    setInvalid(false);
+    setNotice(duplicate ? "duplicate" : null);
+    setFlash({ id: site.id });
   };
 
   return (
@@ -120,14 +178,14 @@ export function Web3Apps(): ReactNode {
             value={draft}
             onChange={(event) => {
               setDraft(event.target.value);
-              setInvalid(false);
+              setNotice(null);
             }}
             onKeyDown={(event) => {
               if (event.key === "Enter") submit();
             }}
             placeholder={copy.addPlaceholder}
             aria-label={copy.addLabel}
-            aria-invalid={invalid}
+            aria-invalid={notice === "invalid"}
             className="focus-ring min-w-52 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted-foreground"
           />
           <button
@@ -139,27 +197,26 @@ export function Web3Apps(): ReactNode {
             {copy.add}
           </button>
         </div>
-        {invalid && (
+        {notice === "invalid" && (
           <p role="alert" className="mt-2 text-xs text-negative">
             {copy.addInvalid}
           </p>
         )}
+        {notice === "duplicate" && (
+          <p role="status" className="mt-2 text-xs text-muted-foreground">
+            {copy.addDuplicate}
+          </p>
+        )}
 
         {pinnedSites.length === 0 ? (
-          /* The empty state teaches pinning. It is not a placeholder for a
-             list of sites Nexus would have suggested — there is no such list. */
+          /* The empty state points at the field above, which is the only thing
+             in this build that pins a site. It is not a placeholder for a list
+             of sites Nexus would have suggested — there is no such list. */
           <div className="flex flex-col items-center gap-3 py-20 text-center">
             <Globe className="size-10 text-muted-foreground" aria-hidden="true" />
             <p className="max-w-xs text-sm text-balance text-muted-foreground">
               {copy.empty}
             </p>
-            <button
-              type="button"
-              onClick={() => setActiveRef({ kind: "app", slug: "browser" })}
-              className={`focus-ring rounded-full px-4 py-2 text-sm font-semibold ${PRIMARY_CTA}`}
-            >
-              {copy.emptyAction}
-            </button>
           </div>
         ) : (
           <>
@@ -169,6 +226,7 @@ export function Web3Apps(): ReactNode {
                 <SiteRow
                   key={site.id}
                   site={site}
+                  flash={flash?.id === site.id}
                   onRemove={() => unpinSite(site.id)}
                 />
               ))}

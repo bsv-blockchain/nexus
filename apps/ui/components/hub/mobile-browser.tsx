@@ -1463,11 +1463,31 @@ export function MobileBrowser({
 }: {
   onDimChange: (dimmed: boolean) => void;
 }): ReactNode {
-  const { activeSpaceId, tabsBySpace, activeTabId, openTab, activeRef } =
-    useHub();
+  const {
+    activeSpaceId,
+    tabsBySpace,
+    activeTabId,
+    openTab,
+    activeRef,
+    mainView,
+    activePage,
+  } = useHub();
   const [sheet, setSheet] = useState<Sheet>("none");
   const [incognito, setIncognito] = useState(false);
   const tabs = tabsBySpace[activeSpaceId] ?? [];
+
+  /*
+   * What the CANVAS is showing, not what the ref names.
+   *
+   * `openWeb3Apps` changes only `mainView`, `libraryTab` and `activePage` — it
+   * leaves a pinned site as the active ref. Gating the bar on the ref alone
+   * meant tapping Web3 Apps from a site left the bookmark list wearing a site's
+   * stripped-down bar: no way to open a tab, no switcher. Settings, the Profiles
+   * manager and Getting Started all reach the same state. This is the predicate
+   * `MainView` already uses to decide the canvas is a browser page.
+   */
+  const siteCanvas =
+    activeRef.kind === "site" && mainView === "app" && !activePage;
 
   // Push the page back behind the matte while a bottom sheet is open.
   useEffect(() => {
@@ -1491,7 +1511,7 @@ export function MobileBrowser({
           <BottomBar
             key="bar"
             tabs={tabs}
-            site={activeRef.kind === "site"}
+            site={siteCanvas}
             onRail={() => setSheet("rail")}
             onSwitcher={() => setSheet("switcher")}
             onAddress={() => {

@@ -37,8 +37,15 @@ export const content = {
       addPlaceholder: "example.com",
       addLabel: "Add a site",
       addInvalid: "That doesn't look like a web address.",
-      empty: "Open a site in Browser, then add it to your rail.",
-      emptyAction: "Open Browser",
+      addDuplicate: "That site is already on your rail.",
+      /*
+       * This points at the field directly above it, because that field is the
+       * only thing in the build that pins a site. It used to say "Open a site in
+       * Browser, then add it to your rail", which taught a path that does not
+       * exist: there is no Add to rail in the browse chrome, in the page-options
+       * sheet, or on the origin chip. When one lands, this string changes with it.
+       */
+      empty: "Nothing here yet. Type a web address above to add your first site.",
       rename: "Rename",
     },
   },
