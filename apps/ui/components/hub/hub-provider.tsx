@@ -249,8 +249,15 @@ interface HubState {
   appsCollection: CollectionId;
   setAppsCollection: (id: CollectionId) => void;
 
-  /** what the rail shows as open: a builtin app or a pinned site */
-  activeRef: RailRef | null;
+  /**
+   * What the rail shows as open: a builtin app or a pinned site.
+   *
+   * Reading it always yields a ref — the fallback chain ends at Browser, and a
+   * ref naming something that has gone (an unpinned site, an app this build
+   * does not carry) is replaced rather than held. Passing `null` to the setter
+   * is how you say "back to that fallback"; it is not a state you can read.
+   */
+  activeRef: RailRef;
   setActiveRef: (ref: RailRef | null) => void;
   /**
    * Kept, and derived from `activeRef`, so the files that only care about
@@ -459,7 +466,8 @@ interface HubState {
   activeTab: BrowserTab | null;
   openTab: (tabId: string) => void;
   createTab: (input: string) => void;
-  openLinkInBrowser: (spaceId: string, url: string) => void;
+  /** `ref` is what the rail shows as open afterwards; defaults to Browser */
+  openLinkInBrowser: (spaceId: string, url: string, ref?: RailRef) => void;
   closeTab: (tabId: string) => void;
   clearTabs: (spaceId: string) => void;
   navigateActiveTab: (input: string) => void;
@@ -551,6 +559,10 @@ function writePinnedSites(sites: PinnedSite[]): void {
   const serialized = JSON.stringify(sites);
   try {
     window.localStorage.setItem(storageKeys.pinnedSites, serialized);
+    // A refusal can be transient (a quota that later clears), so a write that
+    // lands puts reads back on storage — otherwise one bad write costs the page
+    // its cross-tab sync for good.
+    sitesStored = true;
   } catch {
     // storage unavailable — the in-memory snapshot is the list from here on
     sitesStored = false;
@@ -870,16 +882,24 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
 
   // Nothing picked in this session means the address bar decides, and failing
   // that the browser — the fallback the hub has always had, as a ref.
-  const activeRef = useMemo<RailRef | null>(
-    () => selectedRef ?? (fromUrl ? { kind: "app", slug: fromUrl } : BROWSER_REF),
-    [selectedRef, fromUrl],
-  );
+  const activeRef = useMemo<RailRef>(() => {
+    // A pinned site can vanish from under the selection: another tab unpinned
+    // it, and the `storage` listener brought the shorter list here. Validate
+    // the site half of the ref the way activeApp validates the app half, or the
+    // origin chip is left looking up an id nothing answers to.
+    const selected =
+      selectedRef?.kind === "site" &&
+      !pinnedSites.some((site) => site.id === selectedRef.id)
+        ? null
+        : selectedRef;
+    return selected ?? (fromUrl ? { kind: "app", slug: fromUrl } : BROWSER_REF);
+  }, [selectedRef, fromUrl, pinnedSites]);
 
   // An app is only active while this build carries it, so a ref naming an app
   // that is not in the catalog reads as no app open — what the install check
   // used to do for an app that had been removed.
   const activeApp = useMemo<AppSlug | null>(() => {
-    if (activeRef?.kind !== "app") return null;
+    if (activeRef.kind !== "app") return null;
     return BUILTIN_APPS.find((slug) => slug === activeRef.slug) ?? null;
   }, [activeRef]);
 
@@ -905,7 +925,10 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         // absent, never explicitly undefined.
         ...(title === undefined ? {} : { title }),
         now: new Date().toISOString(),
-        id: `s_${crypto.randomUUID()}`,
+        // newId, not crypto.randomUUID: the latter is undefined outside a
+        // secure context, and http://<lan-ip>:3000 from a phone is exactly how
+        // pinning gets tested.
+        id: newId("s"),
       });
       if (!result) return null;
       writePinnedSites(result.sites);
@@ -1103,9 +1126,19 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     [activeSpaceId, setActiveRef],
   );
 
-  // Open a link in a specific profile's Browse and focus it (Profiles manager).
+  /**
+   * Open a link in a specific profile's Browse and focus it.
+   *
+   * `ref` is what the rail should show as open once the tab is up, and it is a
+   * parameter rather than something the caller sets afterwards because setting
+   * it afterwards is a rule nobody can see: minting the tab is how a pinned
+   * site comes on screen, so a `setActiveRef(siteRef)` before the call would be
+   * overwritten here and the origin chip would never appear. Defaulting to the
+   * browser keeps every existing caller — the Profiles manager, the command
+   * palette — exactly as it was.
+   */
   const openLinkInBrowser = useCallback(
-    (spaceId: string, url: string) => {
+    (spaceId: string, url: string, ref: RailRef = BROWSER_REF) => {
       /*
        * Reuse-or-build is decided out here, then written.
        *
@@ -1132,7 +1165,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         setActiveTabId(tab.id);
       }
       setActiveSpaceId(spaceId);
-      setActiveRef(BROWSER_REF);
+      setActiveRef(ref);
       setActivePage(null);
       setMainView("app");
     },
