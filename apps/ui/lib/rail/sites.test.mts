@@ -199,3 +199,25 @@ test("parsePinnedSites maintains contiguous sortOrder after dedup", () => {
   assert.equal(parsed?.[0]?.sortOrder, 0);
   assert.equal(parsed?.[1]?.sortOrder, 1);
 });
+
+test("drops stored rows that are not absolute URLs, rather than repairing them", () => {
+  const raw = JSON.stringify([
+    { id: "s1", title: "Valid", url: "https://example.com/", origin: "x", sortOrder: 0, createdAt: NOW },
+    { id: "s2", title: "Schemeless", url: "example.com/", origin: "x", sortOrder: 1, createdAt: NOW },
+  ]);
+  const parsed = parsePinnedSites(raw);
+  // Only the absolute URL survives; the schemeless one is dropped (tampering/corruption)
+  assert.equal(parsed?.length, 1);
+  assert.equal(parsed?.[0]?.id, "s1");
+});
+
+test("drops mailto: URLs bearing @, which would launder userinfo if repaired", () => {
+  const raw = JSON.stringify([
+    { id: "s1", title: "Valid", url: "https://example.com/", origin: "x", sortOrder: 0, createdAt: NOW },
+    { id: "s2", title: "Tampered", url: "mailto:test@evil.com", origin: "x", sortOrder: 1, createdAt: NOW },
+  ]);
+  const parsed = parsePinnedSites(raw);
+  // The valid URL survives; the mailto: bearing @ is dropped to prevent userinfo laundering
+  assert.equal(parsed?.length, 1);
+  assert.equal(parsed?.[0]?.id, "s1");
+});

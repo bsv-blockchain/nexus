@@ -85,6 +85,13 @@ function parseSite(value: unknown): PinnedSite | null {
   // Use new URL(...).href, not normalizeUrlInput, since the latter filters
   // typed input (no dots without localhost). This is already stored, and may
   // be a legitimate dotless host like https://intranet/
+  //
+  // A URL that will not parse, or lacks a scheme entirely (e.g. "example.com/")
+  // is dropped rather than repaired. This module owns its storage format
+  // exclusively — every row is written by addPinnedSite in canonical absolute
+  // form. An unparseable value is tampering or corruption. Repairing it by
+  // prefixing a scheme would let userinfo-bearing values like mailto:test@evil.com
+  // through the net that normalizeUrlInput exists to catch on the typed path.
   let url: string;
   try {
     url = new URL(typeof record.url === "string" ? record.url : "").href;
