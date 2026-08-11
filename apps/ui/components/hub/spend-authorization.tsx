@@ -21,6 +21,7 @@
  */
 
 import { Sheet } from "@/components/apps/messages/sheet";
+import { OriginLabel } from "@/components/hub/origin-label";
 import { displayOrigin } from "@/lib/rail/origin";
 import { SATS_PER_BSV, usd } from "@/lib/wallet";
 import { useBsvRate } from "@/lib/wallet-live";
@@ -60,7 +61,8 @@ function sats(n: number): string {
 }
 
 /**
- * The originator, written the way the origin chip writes it.
+ * The originator, written the way the origin chip writes it — or null when the
+ * shell did not name one.
  *
  * Same function, deliberately: a page cannot be one origin in the chip at the
  * top of the screen and another in the dialog that spends money. The scheme has
@@ -69,8 +71,8 @@ function sats(n: number): string {
  * `new URL` will parse, or it hands the string back untouched and the two
  * surfaces disagree about a leading `www.`.
  */
-function originatorLabel(originator: string): string {
-  if (!originator) return "an unnamed site";
+function originatorLabel(originator: string): string | null {
+  if (!originator) return null;
   return displayOrigin(
     /^[a-z][a-z0-9+.-]*:\/\//i.test(originator)
       ? originator
@@ -145,6 +147,7 @@ export function SpendAuthorization(): ReactNode {
 
   if (!request) return null;
 
+  const origin = originatorLabel(request.originator);
   const amount = request.authorizationAmount;
   const bsv = amount / SATS_PER_BSV;
   const fiat = rate === null ? null : bsv * rate;
@@ -159,9 +162,17 @@ export function SpendAuthorization(): ReactNode {
           </span>
           <div className="min-w-0">
             <h2 className="text-base font-bold">Approve this payment?</h2>
-            <p className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs">
-              <Globe className="size-3 shrink-0" aria-hidden="true" />
-              <span className="truncate font-mono">{originatorLabel(request.originator)}</span>
+            {/* items-start and no `truncate`: the tail of a hostname is the
+                registrable domain, and clipping it here is clipping the one fact
+                this dialog exists to state. OriginLabel wraps instead, and is
+                the same component the origin chip draws with. */}
+            <p className="text-muted-foreground mt-0.5 flex items-start gap-1.5 text-xs">
+              <Globe className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
+              {origin === null ? (
+                <span className="font-mono">an unnamed site</span>
+              ) : (
+                <OriginLabel origin={origin} />
+              )}
             </p>
           </div>
         </div>

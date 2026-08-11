@@ -1,5 +1,6 @@
 "use client";
 
+import { OriginLabel } from "@/components/hub/origin-label";
 import {
   MenuItem,
   MenuSeparator,
@@ -11,20 +12,54 @@ import { ExternalLink, Lock, ShieldAlert, Trash2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 /**
+ * Strip the userinfo before showing a URL to a person.
+ *
+ * `https://paypal.com@evil.com/` reaches this component, and the detail view
+ * whose whole job is exposing look-alikes would otherwise open with
+ * `paypal.com@`. Browsers drop userinfo from display for exactly this reason.
+ * Both halves have to be cleared: clearing the username alone leaves `:pass@`.
+ *
+ * The chip's own label was never affected — `displayOrigin` reads `URL.host`,
+ * which is `evil.com` here — but the popover printed the raw string.
+ */
+function withoutUserinfo(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.username = "";
+    parsed.password = "";
+    return parsed.href;
+  } catch {
+    return url;
+  }
+}
+
+/**
  * Who you are actually talking to.
  *
  * A site opened from the rail renders without an address bar, so this is the
- * only thing on screen naming the origin. The `url` it is handed is the LIVE
- * tab's, re-read on every navigation — never `PinnedSite.url`. A site that
- * redirects somewhere else has to show where it went; that is the whole reason
- * this exists.
+ * only thing on screen naming the origin. It is handed the active tab's `url`
+ * and derives from that on every render — never from `PinnedSite.url`.
  *
- * It does not currently protect a payment path, because there is not one yet:
+ * WHAT THIS DOES NOT YET DO. It follows the hub's tab RECORD, and that record
+ * does not yet follow the page. Nothing in `apps/ui` subscribes to the shell's
+ * navigation event, so an in-page redirect — the phishing case this component
+ * exists for — changes the native webview without changing the url here, and the
+ * chip keeps showing where the tab was opened. Only user-driven navigation
+ * (`navigateActiveTab`, Back/Forward via `stepHistory`) reaches it today. Closing
+ * that gap means listening to `tab.nav`, which the desktop shell already emits on
+ * `did-navigate` at `apps/desktop/src/tabManager.mjs:72` and which no chrome code
+ * consumes; note that writing the url back into the hub also requires
+ * `NativeSiteFrame` to stop being keyed by `tab.url`, or every navigation
+ * destroys and recreates the webview that just navigated.
+ *
+ * It does not protect a payment path either, because there is not one yet:
  * `window.nexus` is not bound to browsed tabs, and both shells still answer
- * `getPublicKey` with a spike constant and throw on `createAction`. This is the
- * constraint that has to already hold when that lands — which is why the string
- * comes from the same `displayOrigin` the spend-authorization dialog uses. If
- * the two can disagree, one of them is lying.
+ * `getPublicKey` with a spike constant and throw on `createAction`.
+ *
+ * So this is the surface and the constraint, not a working defence. What IS
+ * already true is that the string comes from the same `displayOrigin`, and is
+ * drawn by the same `OriginLabel`, as the spend-authorization dialog: if those
+ * two can disagree about what a page is called, one of them is lying.
  *
  * A ROW, not a floating overlay. Inside a shell the page is a native view that
  * paints above this entire document (see NativeSiteFrame here, and tabManager's
@@ -62,17 +97,22 @@ export function OriginChip({
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-label={`Site information for ${origin}`}
-        className="focus-ring bg-surface-raised/90 ring-border flex max-w-full min-w-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium shadow-sm ring-1 backdrop-blur"
+        /* items-start, not items-center: a long host wraps rather than being
+           truncated, and the padlock belongs against the first line. */
+        className="focus-ring bg-surface-raised/90 ring-border flex max-w-full min-w-0 items-start gap-1.5 rounded-2xl px-3 py-1.5 text-left text-xs font-medium shadow-sm ring-1 backdrop-blur"
       >
         {secure ? (
-          <Lock className="text-positive size-3 shrink-0" aria-hidden="true" />
+          <Lock
+            className="text-positive mt-0.5 size-3 shrink-0"
+            aria-hidden="true"
+          />
         ) : (
           <ShieldAlert
-            className="text-negative size-3 shrink-0"
+            className="text-negative mt-0.5 size-3 shrink-0"
             aria-hidden="true"
           />
         )}
-        <span className="truncate font-mono">{origin}</span>
+        <OriginLabel origin={origin} />
       </button>
 
       <PopoverMenu
@@ -82,9 +122,10 @@ export function OriginChip({
         className="top-full left-3 mt-1 max-w-[min(20rem,calc(100%-1.5rem))]"
       >
         {/* The whole URL, not only the origin the chip has room for: the path is
-            where a look-alike tends to give itself away. */}
+            where a look-alike tends to give itself away. Minus the userinfo,
+            which is where one tries to look like somebody else. */}
         <p className="text-muted-foreground px-2.5 pt-1.5 pb-2 text-xs break-all">
-          {url}
+          {withoutUserinfo(url)}
         </p>
         <MenuSeparator />
         <MenuItem

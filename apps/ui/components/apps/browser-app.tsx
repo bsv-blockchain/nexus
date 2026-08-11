@@ -302,29 +302,39 @@ export function BrowserApp(): ReactNode {
   }
 
   /*
-   * A site opened from the rail is app-like: the canvas carries no chrome of
-   * its own, so the chip is the only thing naming the origin.
+   * ONE root, whichever the active ref is, and the chip conditional INSIDE it.
    *
-   * `activeTab.url` is what it is given, never the pinned row's url. The rail
-   * mints the tab and then the tab is authoritative: a redirect, a link the
-   * user followed, a Back press — all of them land here, and the chip has to
-   * say where the page actually is rather than where it was opened from.
+   * Returning `<div>` for a site and `<BrowserCanvas>` otherwise looked
+   * equivalent and was not: React reconciles by element type, so switching
+   * between them unmounted the subtree, and NativeSiteFrame's cleanup fired
+   * `tabs.destroy` before anything created a replacement. The chip's own two
+   * actions — Open in Browser, Remove from rail — each reloaded the page they
+   * were acting on and lost whatever the user had typed into it, as did tapping
+   * a rail site whose tab was already open.
+   *
+   * The chip is a `&&` in a fixed-shape children list rather than a spliced-in
+   * element, so BrowserCanvas keeps the same child position whether or not the
+   * chip is there. A `null` slot still holds its place; a shifted index would
+   * remount for the same reason.
+   *
+   * A site gets the chip because it is app-like — no address bar anywhere on the
+   * canvas, so nothing else names the origin. It is handed `activeTab.url`,
+   * never the pinned row's url; see OriginChip for what that does and does not
+   * currently buy.
    */
-  if (activeRef.kind === "site") {
-    const siteId = activeRef.id;
-    return (
-      <div className="flex h-full min-h-0 w-full flex-col bg-canvas">
+  const siteId = activeRef.kind === "site" ? activeRef.id : null;
+  return (
+    <div className="flex h-full min-h-0 w-full flex-col bg-canvas">
+      {siteId !== null && (
         <OriginChip
           url={activeTab.url}
           onOpenInBrowser={() => setActiveRef({ kind: "app", slug: "browser" })}
           onRemove={() => unpinSite(siteId)}
         />
-        <div className="min-h-0 flex-1">
-          <BrowserCanvas tab={activeTab} hasShell={hasShell} />
-        </div>
+      )}
+      <div className="min-h-0 flex-1">
+        <BrowserCanvas tab={activeTab} hasShell={hasShell} />
       </div>
-    );
-  }
-
-  return <BrowserCanvas tab={activeTab} hasShell={hasShell} />;
+    </div>
+  );
 }
