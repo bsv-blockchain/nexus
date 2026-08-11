@@ -81,9 +81,17 @@ function parseSite(value: unknown): PinnedSite | null {
   const record = value as Record<string, unknown>;
   if (typeof record.id !== "string") return null;
 
-  // Canonicalize the stored URL — it may be from an older format or tampered
-  const url = typeof record.url === "string" ? normalizeUrlInput(record.url) : null;
-  if (!url || !isPinnableUrl(url)) return null;
+  // Canonicalize the stored URL without rejecting dotless intranet hosts.
+  // Use new URL(...).href, not normalizeUrlInput, since the latter filters
+  // typed input (no dots without localhost). This is already stored, and may
+  // be a legitimate dotless host like https://intranet/
+  let url: string;
+  try {
+    url = new URL(typeof record.url === "string" ? record.url : "").href;
+  } catch {
+    return null;
+  }
+  if (!isPinnableUrl(url)) return null;
   const origin = deriveOrigin(url);
   if (!origin) return null;
 
@@ -111,7 +119,8 @@ function parseSite(value: unknown): PinnedSite | null {
  * `origin` is re-derived from `url` rather than read back, so a tampered or
  * stale storage entry cannot make the chip claim one site while the tab loads
  * another. Renumber sortOrder to be contiguous so later calls to addPinnedSite
- * do not collide with existing rows.
+ * do not collide with existing rows. Dedupe by canonical URL so two rows
+ * canonicalising to the same string collapse to one (first occurrence wins).
  */
 export function parsePinnedSites(raw: string): PinnedSite[] | null {
   let parsed: unknown;
@@ -125,5 +134,12 @@ export function parsePinnedSites(raw: string): PinnedSite[] | null {
     .map(parseSite)
     .filter((site): site is PinnedSite => site !== null)
     .sort((a, b) => a.sortOrder - b.sortOrder)
+    .reduce((acc, site) => {
+      // Dedupe by canonical URL, first occurrence wins
+      if (!acc.some((s) => s.url === site.url)) {
+        acc.push(site);
+      }
+      return acc;
+    }, [] as PinnedSite[])
     .map((site, index) => ({ ...site, sortOrder: index }));
 }

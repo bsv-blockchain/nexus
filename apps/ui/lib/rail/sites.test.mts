@@ -141,34 +141,61 @@ test("parsePinnedSites treats missing or invalid sortOrder as 0 and renumbers", 
   assert.equal(parsed?.[2]?.sortOrder, 2);
 });
 
-test("parsePinnedSites canonicalizes stored URLs, deduping equivalent-but-different forms", () => {
-  // A stored row with www but not yet normalized
+test("parsePinnedSites canonicalizes stored URLs via new URL().href", () => {
+  // Two URLs that are equivalent but differ in formatting
   const raw = JSON.stringify([
-    { id: "s1", title: "Example", url: "https://www.example.com/", origin: "x", sortOrder: 0, createdAt: NOW },
+    { id: "s1", title: "Example", url: "https://example.com", origin: "x", sortOrder: 0, createdAt: NOW },
   ]);
   const parsed = parsePinnedSites(raw);
-  assert.equal(parsed?.[0]?.url, "https://www.example.com/");
+  // new URL().href adds a trailing slash, so "https://example.com" becomes "https://example.com/"
+  assert.equal(parsed?.[0]?.url, "https://example.com/");
 
-  // Now try to add the canonical form without www
+  // Now add a URL that already has the trailing slash
   const result = addPinnedSite(parsed || [], { url: "https://example.com/", now: NOW, id: "s2" });
   assert.ok(result);
-  // Both normalize to the same canonical form, so it should be deduplicated
-  // Actually, both keep their original form, but they should dedupe if normalized
-  // Let me reconsider: the stored one is https://www.example.com/, the new input is https://example.com/
-  // After normalizing both, they will both have their own form because normalizeUrlInput doesn't remove www
-  // So let me use a better example with a trailing slash difference
+  // Both canonicalize to "https://example.com/", so it should be deduplicated
+  assert.equal(result.site.id, "s1");
+  assert.equal(result.sites.length, 1);
+});
 
-  // Actually, let me test with scheme difference which normalizeUrlInput will handle
-  const raw2 = JSON.stringify([
-    { id: "s1", title: "Example", url: "example.com/", origin: "x", sortOrder: 0, createdAt: NOW },
+test("parsePinnedSites preserves a dotless intranet host like https://intranet/", () => {
+  const raw = JSON.stringify([
+    { id: "s1", title: "Intranet", url: "https://intranet/", origin: "x", sortOrder: 0, createdAt: NOW },
   ]);
-  const parsed2 = parsePinnedSites(raw2);
-  // The stored "example.com/" should be normalized to "https://example.com/"
-  assert.equal(parsed2?.[0]?.url, "https://example.com/");
+  const parsed = parsePinnedSites(raw);
+  assert.equal(parsed?.length, 1);
+  assert.equal(parsed?.[0]?.url, "https://intranet/");
+  assert.equal(parsed?.[0]?.title, "Intranet");
+});
 
-  // Adding the same URL in canonical form should dedupe
-  const result2 = addPinnedSite(parsed2 || [], { url: "https://example.com/", now: NOW, id: "s2" });
-  assert.ok(result2);
-  assert.equal(result2.site.id, "s1");
-  assert.equal(result2.sites.length, 1);
+test("parsePinnedSites preserves a loopback host like http://localhost:3000/", () => {
+  const raw = JSON.stringify([
+    { id: "s1", title: "Dev", url: "http://localhost:3000/", origin: "x", sortOrder: 0, createdAt: NOW },
+  ]);
+  const parsed = parsePinnedSites(raw);
+  assert.equal(parsed?.length, 1);
+  assert.equal(parsed?.[0]?.url, "http://localhost:3000/");
+});
+
+test("parsePinnedSites dedupes rows by canonical URL, first occurrence wins", () => {
+  const raw = JSON.stringify([
+    { id: "s1", title: "First", url: "https://example.com", origin: "x", sortOrder: 0, createdAt: NOW },
+    { id: "s2", title: "Second", url: "https://example.com/", origin: "x", sortOrder: 1, createdAt: NOW },
+  ]);
+  const parsed = parsePinnedSites(raw);
+  assert.equal(parsed?.length, 1);
+  assert.equal(parsed?.[0]?.id, "s1");
+  assert.equal(parsed?.[0]?.title, "First");
+});
+
+test("parsePinnedSites maintains contiguous sortOrder after dedup", () => {
+  const raw = JSON.stringify([
+    { id: "s1", title: "A", url: "https://a.com", origin: "x", sortOrder: 0, createdAt: NOW },
+    { id: "s2", title: "B", url: "https://a.com/", origin: "x", sortOrder: 1, createdAt: NOW },
+    { id: "s3", title: "C", url: "https://c.com", origin: "x", sortOrder: 2, createdAt: NOW },
+  ]);
+  const parsed = parsePinnedSites(raw);
+  assert.equal(parsed?.length, 2);
+  assert.equal(parsed?.[0]?.sortOrder, 0);
+  assert.equal(parsed?.[1]?.sortOrder, 1);
 });
