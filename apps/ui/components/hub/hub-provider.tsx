@@ -35,7 +35,7 @@ import {
   renamePinnedSite,
   type PinnedSite,
 } from "@/lib/rail/sites";
-import { buildTab } from "@/lib/tabs";
+import { buildTab, sameUrl } from "@/lib/tabs";
 import {
   createContext,
   useCallback,
@@ -1149,7 +1149,10 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
        * second tab id for the same URL.
        */
       const tabs = tabsBySpace[spaceId] ?? [];
-      const existing = tabs.find((tab) => tab.url === url);
+      // sameUrl, not ===: a pinned site's url is `new URL(...).href` and a tab
+      // typed into the address bar is not, so the two spellings of one site
+      // differ by a trailing slash and the reuse check used to miss.
+      const existing = tabs.find((tab) => sameUrl(tab.url, url));
       if (existing) {
         setActiveTabId(existing.id);
       } else {

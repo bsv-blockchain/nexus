@@ -21,6 +21,7 @@
  */
 
 import { Sheet } from "@/components/apps/messages/sheet";
+import { displayOrigin } from "@/lib/rail/origin";
 import { SATS_PER_BSV, usd } from "@/lib/wallet";
 import { useBsvRate } from "@/lib/wallet-live";
 import { useHostOverlay } from "@/lib/wallet-data";
@@ -56,6 +57,25 @@ function host(): PermissionHost | null {
 
 function sats(n: number): string {
   return `${n.toLocaleString("en-US")} sats`;
+}
+
+/**
+ * The originator, written the way the origin chip writes it.
+ *
+ * Same function, deliberately: a page cannot be one origin in the chip at the
+ * top of the screen and another in the dialog that spends money. The scheme has
+ * to go on first — the shell sends a bare host (`originatorForUrl` in the
+ * substrate returns `new URL(url).host`) and `displayOrigin` needs something
+ * `new URL` will parse, or it hands the string back untouched and the two
+ * surfaces disagree about a leading `www.`.
+ */
+function originatorLabel(originator: string): string {
+  if (!originator) return "an unnamed site";
+  return displayOrigin(
+    /^[a-z][a-z0-9+.-]*:\/\//i.test(originator)
+      ? originator
+      : `https://${originator}`,
+  );
 }
 
 export function SpendAuthorization(): ReactNode {
@@ -141,7 +161,7 @@ export function SpendAuthorization(): ReactNode {
             <h2 className="text-base font-bold">Approve this payment?</h2>
             <p className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs">
               <Globe className="size-3 shrink-0" aria-hidden="true" />
-              <span className="truncate font-mono">{request.originator || "an unnamed site"}</span>
+              <span className="truncate font-mono">{originatorLabel(request.originator)}</span>
             </p>
           </div>
         </div>

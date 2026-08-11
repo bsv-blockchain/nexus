@@ -50,6 +50,32 @@ export function faviconColorFor(url: string): string {
   return colorFor(hostnameOf(url));
 }
 
+/**
+ * Whether two URLs name the same page.
+ *
+ * The app has two canonicalisers and they disagree about a trailing slash:
+ * `normalizeUrlInput` (pinned sites) returns `new URL(...).href`, so
+ * `https://example.com/`, while `normalizeUrl` above returns what was typed, so
+ * `https://example.com`. Comparing the raw strings meant typing a URL and then
+ * tapping that same site on the rail opened a second tab for it.
+ *
+ * Nothing is re-STORED through this. Both spellings stay exactly as they are
+ * written today — this only decides whether an existing tab can be reused.
+ */
+export function sameUrl(a: string, b: string): boolean {
+  return canonicalUrl(a) === canonicalUrl(b);
+}
+
+function canonicalUrl(url: string): string {
+  try {
+    return new URL(url).href;
+  } catch {
+    // Not a URL either side of the comparison, so fall back to the text: the
+    // one thing this must never do is throw on the way to opening a tab.
+    return url.trim();
+  }
+}
+
 /** Builds a full tab record for a URL, reusing mock-page titles when known. */
 export function buildTab(
   input: string,
@@ -66,8 +92,13 @@ export function buildTab(
     spaceId,
     title,
     url,
-    favicon: (title[0] ?? "•").toUpperCase(),
-    faviconColor: colorFor(host),
+    // [...title][0], not title[0]: a title starting with an emoji indexes to a
+    // lone surrogate, which renders as the replacement character.
+    favicon: ([...title][0] ?? "•").toUpperCase(),
+    // Through the exported helper, so "a pinned site's rail tile and its tab
+    // are the same colour" is structural rather than two call sites happening
+    // to agree.
+    faviconColor: faviconColorFor(url),
     sortOrder,
     createdAt: new Date().toISOString(),
   };

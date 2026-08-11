@@ -1,7 +1,8 @@
 "use client";
 
 import { useHub } from "@/components/hub/hub-provider";
-import { getMockPage, type MockPage } from "@/lib/data";
+import { OriginChip } from "@/components/hub/origin-chip";
+import { getMockPage, type BrowserTab, type MockPage } from "@/lib/data";
 import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -64,6 +65,22 @@ function browseBarHeight(): number {
   return h > 0 ? Math.ceil(h) : BROWSE_BAR_FALLBACK;
 }
 
+/**
+ * Where the origin chip's row ends, or 0 when there is no chip.
+ *
+ * Measured for the same reason the browse bar is: the row only exists for a
+ * site opened from the rail, its height is not a constant, and a native layer
+ * whose rect started above it would paint over the one element saying which
+ * origin the page is. Only the narrow branch needs this — a wide layout gets
+ * the answer for free, because the pane's own rect already starts below the
+ * row.
+ */
+function originChipBottom(): number {
+  const chip = document.querySelector("[data-nexus-origin-chip]");
+  const bottom = chip?.getBoundingClientRect().bottom ?? 0;
+  return bottom > 0 ? Math.ceil(bottom) : 0;
+}
+
 function NativeSiteFrame({ url }: { url: string }): ReactNode {
   const boxRef = useRef<HTMLDivElement>(null);
   const tabIdRef = useRef<string | null>(null);
@@ -87,13 +104,17 @@ function NativeSiteFrame({ url }: { url: string }): ReactNode {
         // edge. Overriding the rect here keeps that decision local to browsing
         // instead of unpadding a container the whole UI shares.
         //
-        // The document already starts below the notch (the shell insets it), so the
-        // only thing to avoid is the floating bar at the bottom.
+        // The document already starts below the notch (the shell insets it), so
+        // the things to avoid are the floating bar at the bottom and — for a
+        // site opened from the rail — the origin chip's row at the top.
+        const top = originChipBottom();
         void host.tabs.setBounds(id, {
           x: 0,
-          y: 0,
+          y: top,
           width: Math.round(window.innerWidth),
-          height: Math.round(Math.max(0, window.innerHeight - browseBarHeight())),
+          height: Math.round(
+            Math.max(0, window.innerHeight - browseBarHeight() - top),
+          ),
         });
         return;
       }
@@ -128,6 +149,9 @@ function NativeSiteFrame({ url }: { url: string }): ReactNode {
     // mounted between this effect and the tab actually being created.
     const bar = document.querySelector("[data-nexus-browse-bar]");
     if (bar) ro.observe(bar);
+    // Same story for the chip's row: a long origin can wrap it to a second line.
+    const chip = document.querySelector("[data-nexus-origin-chip]");
+    if (chip) ro.observe(chip);
     const raf = requestAnimationFrame(pushBounds);
     window.addEventListener("resize", pushBounds);
     // Capture phase: any ancestor scrolling moves this pane without resizing it.
@@ -236,9 +260,35 @@ function SearchPage({ url }: { url: string }): ReactNode {
   );
 }
 
+/** The page itself, by whichever of the four routes this build can show it. */
+function BrowserCanvas({
+  tab,
+  hasShell,
+}: {
+  tab: BrowserTab;
+  hasShell: boolean;
+}): ReactNode {
+  if (tab.url.includes(INTERNAL_SEARCH_HOST)) {
+    return <SearchPage url={tab.url} />;
+  }
+
+  // Inside a shell every real URL goes to the native layer — the mock/localOnly
+  // fallbacks exist only because the web build cannot embed un-frameable hosts.
+  if (hasShell) {
+    return <NativeSiteFrame key={tab.url} url={tab.url} />;
+  }
+
+  const page = getMockPage(tab.url);
+  if (page?.localOnly) {
+    return <LocalPage page={page} />;
+  }
+
+  return <SiteFrame key={tab.url} url={tab.url} title={tab.title} />;
+}
+
 /** Renders the active tab's site in the canvas viewport. */
 export function BrowserApp(): ReactNode {
-  const { activeTab } = useHub();
+  const { activeTab, activeRef, setActiveRef, unpinSite } = useHub();
   const hasShell = useHasShell();
 
   if (!activeTab) {
@@ -251,26 +301,30 @@ export function BrowserApp(): ReactNode {
     );
   }
 
-  if (activeTab.url.includes(INTERNAL_SEARCH_HOST)) {
-    return <SearchPage url={activeTab.url} />;
+  /*
+   * A site opened from the rail is app-like: the canvas carries no chrome of
+   * its own, so the chip is the only thing naming the origin.
+   *
+   * `activeTab.url` is what it is given, never the pinned row's url. The rail
+   * mints the tab and then the tab is authoritative: a redirect, a link the
+   * user followed, a Back press — all of them land here, and the chip has to
+   * say where the page actually is rather than where it was opened from.
+   */
+  if (activeRef.kind === "site") {
+    const siteId = activeRef.id;
+    return (
+      <div className="flex h-full min-h-0 w-full flex-col bg-canvas">
+        <OriginChip
+          url={activeTab.url}
+          onOpenInBrowser={() => setActiveRef({ kind: "app", slug: "browser" })}
+          onRemove={() => unpinSite(siteId)}
+        />
+        <div className="min-h-0 flex-1">
+          <BrowserCanvas tab={activeTab} hasShell={hasShell} />
+        </div>
+      </div>
+    );
   }
 
-  // Inside a shell every real URL goes to the native layer — the mock/localOnly
-  // fallbacks exist only because the web build cannot embed un-frameable hosts.
-  if (hasShell) {
-    return <NativeSiteFrame key={activeTab.url} url={activeTab.url} />;
-  }
-
-  const page = getMockPage(activeTab.url);
-  if (page?.localOnly) {
-    return <LocalPage page={page} />;
-  }
-
-  return (
-    <SiteFrame
-      key={activeTab.url}
-      url={activeTab.url}
-      title={activeTab.title}
-    />
-  );
+  return <BrowserCanvas tab={activeTab} hasShell={hasShell} />;
 }

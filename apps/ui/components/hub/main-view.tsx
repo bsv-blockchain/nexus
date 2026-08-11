@@ -161,9 +161,17 @@ function EmptyState(): ReactNode {
 
 /** Active-app content: optional header + the app view (or empty state). */
 function AppCanvas(): ReactNode {
-  const { activeApp } = useHub();
+  const { activeApp, activeRef } = useHub();
   const app = activeApp ? getHubApp(activeApp) : undefined;
-  const View = activeApp ? appViews[activeApp] : undefined;
+  /* A pinned site reads as no app being open — the canvas is a website at that
+     point — so it has to be routed to the browser explicitly. Without this a
+     tapped site lands on the launcher, which is where the rail's whole reason
+     for carrying sites quietly stops working. */
+  const View = activeApp
+    ? appViews[activeApp]
+    : activeRef.kind === "site"
+      ? BrowserApp
+      : undefined;
   // Signature apps inherit the active theme; anything else opts out of it
   // (theme-reset restores the base light/dark palette). The launcher/empty
   // state is always themed.
@@ -194,14 +202,17 @@ function AppCanvas(): ReactNode {
 
 /** The right-hand canvas: Getting Started, app store, Profiles manager, or the active app. */
 export function MainView(): ReactNode {
-  const { activeApp, activePage, mainView } = useHub();
+  const { activeApp, activeRef, activePage, mainView } = useHub();
   const showStore = mainView === "store";
   /* Settings paints on the app background, never the browser page's. Without
      this it inherits `bg-canvas` whenever Browse happens to be the app behind
      it, and renders dark-theme text on a white sheet. */
   const showSettings = mainView === "settings";
   const showProfiles = mainView === "profiles";
-  const canvasIsBrowser = activeApp === "browser" && !activePage;
+  // A pinned site is the browser too — same tab, same canvas, just reached from
+  // the rail — so it takes the page background rather than the app one.
+  const canvasIsBrowser =
+    (activeApp === "browser" || activeRef.kind === "site") && !activePage;
 
   // Profiles manager: profile columns on the left, the active app on the right.
   if (showProfiles) {

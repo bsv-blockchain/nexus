@@ -78,7 +78,10 @@ export function SiteTile({
   return (
     <Favicon
       url={site.url}
-      letter={(site.title.trim()[0] ?? "?").toUpperCase()}
+      // Spread, not [0]: a page title starting with an emoji — and page titles
+      // are exactly what arrives here — indexes to half a surrogate pair, which
+      // draws as the replacement character.
+      letter={([...site.title.trim()][0] ?? "?").toUpperCase()}
       color={faviconColorFor(site.url)}
       size={size}
       rounded="rounded-[22%]"
