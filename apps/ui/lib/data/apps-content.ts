@@ -364,7 +364,7 @@ export const proposals: Proposal[] = [
     createdAt: "2026-06-28T09:00:00.000Z",
   },
   {
-    id: "prop-app-store",
+    id: "prop-overlay-fees",
     title: "Publish the overlay fee schedule a quarter in advance",
     summary:
       "Require overlay operators to post their fee schedule three months before it takes effect, so a service can budget for a change rather than discover it.",

@@ -21,15 +21,7 @@ export function PublisherApp(): ReactNode {
         <div className="absolute top-[5%] right-[-10%] size-[40vw] rounded-full bg-[#22d3ee]/20 blur-[120px]" />
       </div>
 
-      {/*
-        Product header — consistent with the other app headers.
-
-        There was an "Enable Connect" button here, shown while the Connect app
-        was not installed. Nothing installs an app any more: the apps in this
-        build are all present, and one that is not in the build cannot be
-        obtained, so a button offering to switch one on had nothing to do and
-        was the acquisition framing this screen no longer carries.
-      */}
+      {/* Product header — consistent with the other app headers */}
       <header className="sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-background/70 px-5 py-3 backdrop-blur-xl">
         {app && <AppTile app={app} size={24} />}
         <h1 className="text-sm font-semibold">{app?.name ?? "Publish"}</h1>

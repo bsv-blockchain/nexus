@@ -46,17 +46,14 @@ export interface IdentityCertificate {
   fields: { label: string; value: string }[];
 }
 
-export type AppCategory =
-  | "system"
-  | "core"
-  | "finance"
-  | "identity"
-  | "media"
-  | "social"
-  | "learning"
-  | "developer";
-
-/** table: hub_apps — the app surfaces compiled into this build */
+/**
+ * table: hub_apps — the app surfaces compiled into this build
+ *
+ * There is no `publisher` column, and no `category`, `version` or `createdAt`.
+ * A row here is a screen in this binary, not a listing: nobody publishes into
+ * this table, nothing sorts or filters it, and the build that carries a row is
+ * the only thing that dates it. See the note on `content.library.apps`.
+ */
 export interface HubApp {
   id: string;
   slug: HubAppSlug;
@@ -69,9 +66,6 @@ export interface HubApp {
   iconSrc: string;
   /** accent used for badges and highlights */
   accent: string;
-  category: AppCategory;
-  publisher: string;
-  createdAt: string;
 }
 
 export type SpaceProfile = "personal" | "work" | "shared";

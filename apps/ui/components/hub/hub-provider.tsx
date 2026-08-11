@@ -221,9 +221,8 @@ function normalizeGroups(entries: RailEntry[]): RailEntry[] {
 
 interface HubState {
   /**
-   * The apps compiled into this build. Not user state: nothing removes them,
-   * which is why non-removability needs no `essential` flag once the rail stops
-   * treating apps and sites as the same kind of thing.
+   * The apps compiled into this build. Not user state: nothing removes them, so
+   * non-removability is a property of the list rather than a flag on a row.
    */
   builtinApps: AppSlug[];
   /** the sites the user pinned to the rail — Nexus ships none */
@@ -242,7 +241,6 @@ interface HubState {
     targetRef: RailRef,
     position: "before" | "after",
   ) => void;
-  presetGroup: (name: string, refs: RailRef[]) => void;
   renameGroup: (id: string, name: string) => void;
   setGroupColor: (id: string, color: string) => void;
 
@@ -1001,22 +999,6 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     [],
   );
 
-  const presetGroup = useCallback((name: string, refs: RailRef[]) => {
-    if (refs.length < 2) return;
-    const present = presentRefs(getPinnedSitesSnapshot());
-    setRailLayout((prev) => {
-      let base = reconcileRail(prev, present);
-      for (const ref of refs) base = withoutRef(base, ref);
-      base = normalizeGroups(base).filter(
-        (entry) => !(entry.type === "group" && entry.name === name),
-      );
-      return [
-        ...base,
-        { type: "group", id: newGroupId(), name, members: refs },
-      ];
-    });
-  }, []);
-
   const renameGroup = useCallback((id: string, name: string) => {
     const present = presentRefs(getPinnedSitesSnapshot());
     setRailLayout((prev) =>
@@ -1535,7 +1517,6 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       groupRefs,
       ungroupRef,
       reorderRailRef,
-      presetGroup,
       renameGroup,
       setGroupColor,
       activeRef,
@@ -1676,7 +1657,6 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       groupRefs,
       ungroupRef,
       reorderRailRef,
-      presetGroup,
       renameGroup,
       setGroupColor,
       activeRef,

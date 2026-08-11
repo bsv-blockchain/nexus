@@ -15,9 +15,6 @@ export const hubApps: HubApp[] = [
     tagline: "Encrypted messaging",
     iconSrc: "/icons/chat.png",
     accent: "#7c3aed",
-    category: "social",
-    publisher: "Nexus",
-    createdAt: "2026-03-02T09:00:00.000Z",
   },
   {
     id: "app-wallet",
@@ -29,9 +26,6 @@ export const hubApps: HubApp[] = [
     tagline: "Payments & balance",
     iconSrc: "/icons/spend.png",
     accent: "#16a34a",
-    category: "core",
-    publisher: "Nexus",
-    createdAt: "2026-01-10T09:00:00.000Z",
   },
   {
     id: "app-identity",
@@ -43,9 +37,6 @@ export const hubApps: HubApp[] = [
     tagline: "Keys & certificates",
     iconSrc: "/icons/identity.png",
     accent: "#7c3aed",
-    category: "core",
-    publisher: "Nexus",
-    createdAt: "2026-01-10T09:00:00.000Z",
   },
   {
     id: "app-browser",
@@ -57,9 +48,6 @@ export const hubApps: HubApp[] = [
     tagline: "Browse the BSV web",
     iconSrc: "/icons/browse.png",
     accent: "#4353ff",
-    category: "system",
-    publisher: "Nexus",
-    createdAt: "2026-01-10T09:00:00.000Z",
   },
   {
     id: "app-connect",
@@ -71,9 +59,6 @@ export const hubApps: HubApp[] = [
     tagline: "Manage connections",
     iconSrc: "/icons/connect.png",
     accent: "#0ea5e9",
-    category: "system",
-    publisher: "Nexus",
-    createdAt: "2026-01-10T09:00:00.000Z",
   },
   {
     id: "app-signer",
@@ -85,9 +70,6 @@ export const hubApps: HubApp[] = [
     tagline: "Sign documents",
     iconSrc: "/icons/sign.png",
     accent: "#d97706",
-    category: "identity",
-    publisher: "Nexus",
-    createdAt: "2026-01-10T09:00:00.000Z",
   },
   {
     id: "app-publisher",
@@ -99,9 +81,6 @@ export const hubApps: HubApp[] = [
     tagline: "Publish on-chain",
     iconSrc: "/icons/publish.png",
     accent: "#db2777",
-    category: "media",
-    publisher: "Nexus",
-    createdAt: "2026-01-10T09:00:00.000Z",
   },
   {
     id: "app-tx-viewer",
@@ -113,9 +92,6 @@ export const hubApps: HubApp[] = [
     tagline: "Inspect transactions",
     iconSrc: "/icons/explore.png",
     accent: "#0891b2",
-    category: "developer",
-    publisher: "Nexus",
-    createdAt: "2026-01-10T09:00:00.000Z",
   },
   {
     id: "app-mail",
@@ -127,9 +103,6 @@ export const hubApps: HubApp[] = [
     tagline: "Encrypted email",
     iconSrc: "/icons/mail.png",
     accent: "#2563eb",
-    category: "social",
-    publisher: "Nexus",
-    createdAt: "2026-03-02T09:00:00.000Z",
   },
   {
     id: "app-learn",
@@ -141,9 +114,6 @@ export const hubApps: HubApp[] = [
     tagline: "Courses & guides",
     iconSrc: "/icons/learn.png",
     accent: "#0ea5e9",
-    category: "learning",
-    publisher: "Nexus",
-    createdAt: "2026-03-02T09:00:00.000Z",
   },
   {
     id: "app-market",
@@ -155,9 +125,6 @@ export const hubApps: HubApp[] = [
     tagline: "Buy & sell ordinals",
     iconSrc: "/icons/market.png",
     accent: "#f59e0b",
-    category: "finance",
-    publisher: "Nexus",
-    createdAt: "2026-04-15T09:00:00.000Z",
   },
   {
     id: "app-vault",
@@ -169,9 +136,6 @@ export const hubApps: HubApp[] = [
     tagline: "Encrypted storage",
     iconSrc: "/icons/vault.png",
     accent: "#64748b",
-    category: "identity",
-    publisher: "Nexus",
-    createdAt: "2026-04-15T09:00:00.000Z",
   },
   {
     id: "app-vote",
@@ -183,9 +147,6 @@ export const hubApps: HubApp[] = [
     tagline: "On-chain governance",
     iconSrc: "/icons/vote.png",
     accent: "#dc2626",
-    category: "social",
-    publisher: "Nexus",
-    createdAt: "2026-05-20T09:00:00.000Z",
   },
   {
     id: "app-baskets",
@@ -197,9 +158,6 @@ export const hubApps: HubApp[] = [
     tagline: "Manage UTXOs",
     iconSrc: "/icons/baskets.png",
     accent: "#7c3aed",
-    category: "developer",
-    publisher: "Nexus",
-    createdAt: "2026-06-01T09:00:00.000Z",
   },
   {
     id: "app-attestations",
@@ -211,8 +169,5 @@ export const hubApps: HubApp[] = [
     tagline: "Vouch on-chain",
     iconSrc: "/icons/prove.png",
     accent: "#6366f1",
-    category: "developer",
-    publisher: "Nexus",
-    createdAt: "2026-06-18T09:00:00.000Z",
   },
 ];

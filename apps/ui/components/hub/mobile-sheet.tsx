@@ -71,8 +71,8 @@ function MobileSheetContent(): ReactNode {
     useHub();
   const [view, setView] = useState<SheetView>({ kind: "root" });
   // Every app this build carries. It used to be the installed subset of them,
-  // which is a distinction that no longer exists: nothing installs or removes an
-  // app, so the grid is the catalog and the catalog is what shipped.
+  // which is a distinction that no longer exists: the grid is the whole list,
+  // and the list is fixed when the binary is built.
   const apps = getHubApps();
 
   const titles: Record<SheetView["kind"], string> = {

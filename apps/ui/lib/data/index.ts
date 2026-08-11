@@ -115,12 +115,6 @@ export function getHubApps(): HubApp[] {
 export function getHubApp(slug: HubApp["slug"]): HubApp | undefined {
   return getHubApps().find((app) => app.slug === slug);
 }
-/** Apps in the "Web" system category (browse, web3 connect). */
-export function getSystemAppSlugs(): HubApp["slug"][] {
-  return getHubApps()
-    .filter((app) => app.category === "system")
-    .map((app) => app.slug);
-}
 
 /* identity */
 export function getIdentityKeys(): IdentityKey[] {
