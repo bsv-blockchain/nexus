@@ -7,8 +7,9 @@
  * change the reachability policy the whole app reports.
  *
  * Module-level store read through `useSyncExternalStore`, matching how the hub
- * already reads the sites the user pinned. Nothing here is written to disk:
- * these are the effects of the current session's commands.
+ * already reads what each profile has connected — both the apps and the sites.
+ * Nothing here is written to disk: these are the effects of the current
+ * session's commands.
  */
 import { storageKeys } from "@/lib/config";
 import { getChatMessages, mediaItems } from "@/lib/data";
