@@ -110,6 +110,54 @@ shows up in the export, not in `next dev`:
 npm run ui:build:demo && npm run serve
 ```
 
+## Working on the shipping UX
+
+The demo runs in any browser. **The shipping UX does not**, and the reason is not
+a missing flag: `resolveDataMode()` goes live when `window.nexusHost.has('wallet')`,
+which is a thing only a shell provides. In a plain browser there is no wallet to
+ask, and `lib/wallet-data.ts` refuses to fall back to fixtures — so a live-mode
+page in Chrome is an empty screen, correctly. Layout and copy can be worked on
+there. A balance cannot.
+
+Two terminals. The first serves the chrome with fixtures compiled out and the app
+list narrowed to what you are working on; the second is Electron, pointed at it:
+
+```bash
+npm run dev:wallet
+```
+
+```bash
+npm run dev:shell
+```
+
+You get hot reload and a real wallet at the same time — the shell holds
+`@nexus/wallet-core`, so the balance, the ledger and Send/Receive over the address
+and handle rails are all live. Only `nearby` (BLE/AWDL) is mobile-only.
+
+### Focusing on one surface
+
+`NEXT_PUBLIC_SURFACES` narrows a build to the apps you name:
+
+```bash
+NEXT_PUBLIC_DEMO_DATA=0 NEXT_PUBLIC_SURFACES=wallet,browser npm run ui:dev
+```
+
+**It can only narrow.** It is applied after the build's own set rather than in
+place of it, so no value of it puts a demo surface into a live build — naming
+`messages` in a live build removes nothing and adds nothing. `dev:wallet` is this
+line with `wallet,browser` already in it.
+
+Keep `browser` in the list unless you mean to test its absence: `BROWSER_REF` is
+the fallback the rail returns to, and MainView routes connected sites through
+`BrowserApp`.
+
+### A wallet with nothing in it
+
+A fresh shell has no keys and no coins, so the first run is an empty balance and
+an empty ledger — which is the correct live state, not a bug. **Settings › Wallet**
+is where you create or restore one and pick the network. Fund a testnet wallet
+before working on Send.
+
 ## Gates — what the spike must show
 
 | Gate | Criterion |

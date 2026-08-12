@@ -38,7 +38,43 @@ export const DEMO_SURFACES = process.env.NEXT_PUBLIC_DEMO_DATA !== "0";
  */
 const SHIPPED: ReadonlySet<string> = new Set(["browser", "wallet"]);
 
-/** Narrow a catalog to what this build ships. */
+/**
+ * A development build narrowed to the surfaces somebody is working on.
+ *
+ * `NEXT_PUBLIC_SURFACES=wallet,browser` carries those and nothing else. It exists
+ * because working on one app inside the whole shell means every change is judged
+ * against fifteen screens that are not the one being changed — and because a rail
+ * of two icons is the honest picture of what v1 is, which is easy to forget while
+ * looking at seventeen.
+ *
+ * **It can only ever narrow.** It is applied after the build's own set rather
+ * than in place of it, so naming a slug the build does not carry gets you
+ * nothing: there is no value of this variable that puts a demo surface into a
+ * live build. That is the same rule DEMO_SURFACES enforces and the reason this
+ * file exists — a switch that can widen is a switch somebody eventually widens.
+ *
+ * Unset, or empty, means no focus: the build carries its normal set.
+ */
+const FOCUS = (process.env.NEXT_PUBLIC_SURFACES ?? "")
+  .split(",")
+  .map((slug) => slug.trim())
+  .filter(Boolean);
+
+/**
+ * Narrow a catalog to what this build ships.
+ *
+ * Two filters, applied in order, and the order is the whole point. What the build
+ * carries is decided first — every app in a demo build, the SHIPPED set in a live
+ * one — and the focus list narrows that. A focus naming an app the build does not
+ * carry removes it from nothing, which is exactly what should happen.
+ */
 export function shippedApps<T extends { slug: HubApp["slug"] }>(apps: T[]): T[] {
-  return DEMO_SURFACES ? apps : apps.filter((app) => SHIPPED.has(app.slug));
+  const carried = DEMO_SURFACES
+    ? apps
+    : apps.filter((app) => SHIPPED.has(app.slug));
+  if (!FOCUS.length) return carried;
+  return carried.filter((app) => FOCUS.includes(app.slug));
 }
+
+/** What a focus build is narrowed to, for a startup line. Empty means no focus. */
+export const FOCUSED: readonly string[] = FOCUS;
