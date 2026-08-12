@@ -4,10 +4,7 @@ import { Favicon } from "@/components/hub/favicon";
 import { IdentitySigil } from "@/components/hub/identity-sigil";
 import { QrBlock } from "@/components/hub/qr-block";
 import { useCustomTheme } from "@/components/hub/theme-provider";
-import {
-  useHub,
-  type SettingsCategory,
-} from "@/components/hub/hub-provider";
+import { useHub, type SettingsCategory } from "@/components/hub/hub-provider";
 import {
   getEffects,
   getEffectsServerSnapshot,
@@ -82,7 +79,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useState, useSyncExternalStore, type ReactNode } from "react";
+import {
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 
 /** The accent every profile falls back to; see app/globals.css. */
 const DEFAULT_ACCENT = "#4353ff";
@@ -191,7 +193,7 @@ const LIVE_CATEGORY_IDS: ReadonlySet<SettingsCategory> = new Set([
 ]);
 
 export const SETTINGS_CATEGORIES = ALL_SETTINGS_CATEGORIES.filter((category) =>
-  (DEMO_SURFACES ? DEMO_CATEGORY_IDS : LIVE_CATEGORY_IDS).has(category.id),
+  (DEMO_SURFACES ? DEMO_CATEGORY_IDS : LIVE_CATEGORY_IDS).has(category.id)
 );
 
 /**
@@ -234,7 +236,7 @@ export function SettingsSidebar(): ReactNode {
           type="button"
           onClick={toggleRail}
           aria-label={content.hub.collapsePanel}
-          className="focus-ring -ml-0.5 shrink-0 rounded-md p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+          className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground -ml-0.5 shrink-0 rounded-md p-1"
         >
           <PanelLeftClose className="size-4" aria-hidden="true" />
         </button>
@@ -255,7 +257,7 @@ export function SettingsSidebar(): ReactNode {
                  words. These rows carry a label and a sentence under it, and
                  turning both accent-coloured made the selected category the
                  least readable thing in the column. */
-              className={`focus-ring flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left text-foreground ${
+              className={`focus-ring text-foreground flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left ${
                 active ? "bg-accent/15" : "hover:bg-surface-hover"
               }`}
             >
@@ -299,7 +301,7 @@ export function PrivacyPanel(): ReactNode {
   const effects = useSyncExternalStore(
     subscribeEffects,
     getEffects,
-    getEffectsServerSnapshot,
+    getEffectsServerSnapshot
   );
   const { openDetailPane } = useHub();
   const generalToll = effects.tolls.find((rule) => !rule.personId)?.sats ?? 0;
@@ -343,8 +345,16 @@ export function PrivacyPanel(): ReactNode {
                 </InfoPopover>
               ),
             },
-            { id: "contacts", label: copy.reachContacts, hint: copy.reachContactsHint },
-            { id: "ecosystem", label: copy.reachEcosystem, hint: copy.reachEcosystemHint },
+            {
+              id: "contacts",
+              label: copy.reachContacts,
+              hint: copy.reachContactsHint,
+            },
+            {
+              id: "ecosystem",
+              label: copy.reachEcosystem,
+              hint: copy.reachEcosystemHint,
+            },
             { id: "toll", label: copy.reachToll, hint: copy.reachTollHint },
           ]}
         />
@@ -405,7 +415,11 @@ export function PrivacyPanel(): ReactNode {
           value={settings.cookies}
           onPick={(next) => setSetting("cookies", next)}
           options={[
-            { id: "third-party", label: copy.cookiesThird, hint: copy.cookiesHint },
+            {
+              id: "third-party",
+              label: copy.cookiesThird,
+              hint: copy.cookiesHint,
+            },
             { id: "allow", label: copy.cookiesAllow, hint: "" },
             { id: "block", label: copy.cookiesBlock, hint: "" },
           ]}
@@ -656,7 +670,7 @@ export function GeneralPanel(): ReactNode {
           onChange={(next) => {
             setSetting("defaultBrowser", next);
             toast.success(
-              next ? mobile.setDefaultToast : mobile.setDefaultUndone,
+              next ? mobile.setDefaultToast : mobile.setDefaultUndone
             );
           }}
         />
@@ -824,12 +838,15 @@ function ModePicker(): ReactNode {
    * hands it back to the operating system.
    */
   const current = profileMode(activeSpaceId) ?? "system";
-  const modes: { id: "light" | "dark" | "system"; label: string; icon: LucideIcon }[] =
-    [
-      { id: "light", label: copy.modeLight, icon: Sun },
-      { id: "dark", label: copy.modeDark, icon: Moon },
-      { id: "system", label: copy.modeAuto, icon: Monitor },
-    ];
+  const modes: {
+    id: "light" | "dark" | "system";
+    label: string;
+    icon: LucideIcon;
+  }[] = [
+    { id: "light", label: copy.modeLight, icon: Sun },
+    { id: "dark", label: copy.modeDark, icon: Moon },
+    { id: "system", label: copy.modeAuto, icon: Monitor },
+  ];
   return (
     <div
       role="radiogroup"
@@ -838,7 +855,7 @@ function ModePicker(): ReactNode {
              colour, so a muted track on a raised card had no edge at all.
              Surface is a step darker than the card in dark and a step greyer
              in light, which is what an inset track should be in both. */
-          className="bg-surface ring-border/60 m-3 grid grid-cols-3 gap-0.5 rounded-lg p-0.5 ring-1"
+      className="bg-surface ring-border/60 m-3 grid grid-cols-3 gap-0.5 rounded-lg p-0.5 ring-1"
     >
       {modes.map((mode) => {
         const active = current === mode.id;
@@ -851,7 +868,10 @@ function ModePicker(): ReactNode {
             aria-label={mode.label}
             title={mode.label}
             onClick={() =>
-              setProfileMode(activeSpaceId, mode.id === "system" ? null : mode.id)
+              setProfileMode(
+                activeSpaceId,
+                mode.id === "system" ? null : mode.id
+              )
             }
             /* Tint behind, glyph unchanged — the house rule. */
             className={`focus-ring flex items-center justify-center rounded-md py-2 transition-colors ${
@@ -873,7 +893,7 @@ export function AppearancePanel(): ReactNode {
   const { spaces, setSpaceThemeColor } = useHub();
   const brandMode = useBrandMode();
   const custom = spaces.filter(
-    (space) => space.themeColor && space.themeColor !== DEFAULT_ACCENT,
+    (space) => space.themeColor && space.themeColor !== DEFAULT_ACCENT
   );
 
   return (
@@ -891,7 +911,7 @@ export function AppearancePanel(): ReactNode {
                 value: copy.themeReset,
                 onClick: () => {
                   custom.forEach((space) =>
-                    setSpaceThemeColor(space.id, DEFAULT_ACCENT),
+                    setSpaceThemeColor(space.id, DEFAULT_ACCENT)
                   );
                   toast.success(copy.themeResetDone);
                 },
@@ -924,12 +944,86 @@ export function AppearancePanel(): ReactNode {
     </>
   );
 }
+
+/**
+ * The version the shell is actually running, for a build that has one.
+ *
+ * `currentRelease` is the fixture release list — the design repository's own
+ * numbering, and it describes a different artifact from the binary somebody
+ * installed. The number worth quoting in a bug report is the shell manifest's,
+ * which tools/version.mjs stamps across every platform from one value per
+ * release, so it is asked over the bridge rather than baked into this bundle.
+ *
+ * Same check-then-subscribe as components/hub/shell-version.tsx, and for the
+ * same reason: Android's WebView injects the host client asynchronously (the
+ * documented react-native-webview onPageStarted race), so `nexusHost` can turn
+ * up after this mounts. A mount-only check leaves the version permanently blank
+ * whenever injection loses that race.
+ */
+type HostInfo = { version?: string; shell?: string; platform?: string };
+
+function HostVersionBlock(): ReactNode {
+  const [info, setInfo] = useState<HostInfo | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const ask = (): boolean => {
+      const host = (
+        window as unknown as { nexusHost?: { info?: () => Promise<HostInfo> } }
+      ).nexusHost;
+      if (!host?.info) return false;
+      host
+        .info()
+        .then((next) => {
+          if (alive) setInfo(next);
+        })
+        .catch(() => {
+          // Better a blank version than a wrong one.
+        });
+      return true;
+    };
+    if (ask()) {
+      return () => {
+        alive = false;
+      };
+    }
+    const onReady = (): void => void ask();
+    window.addEventListener("nexushost:ready", onReady, { once: true });
+    return () => {
+      alive = false;
+      window.removeEventListener("nexushost:ready", onReady);
+    };
+  }, []);
+
+  return (
+    <div className="flex items-center gap-3 px-3 py-3">
+      <IdentitySigil
+        value={info?.version ?? content.brand.name}
+        size={44}
+        className="shrink-0 rounded-xl"
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">
+          {content.brand.name}
+          {info?.version ? ` v${info.version}` : ""}
+        </span>
+        <span className="text-muted-foreground mt-0.5 block text-[11px] text-pretty">
+          {info
+            ? `${info.shell ?? "?"} · ${info.platform ?? "?"}`
+            : "no shell connected"}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 /**
  * About: which build this is, and the way into what changed.
  *
- * The version comes from the release list rather than from a constant, so there
- * is one place a release is recorded and no way for the number shown here to
- * disagree with the notes behind it.
+ * In demo the version comes from the release list rather than from a constant,
+ * so there is one place a release is recorded and no way for the number shown
+ * here to disagree with the notes behind it. A live build shows the shell's
+ * version instead — the fixture number would describe a different artifact.
  */
 export function AboutPanel(): ReactNode {
   const copy = content.settings.about;
@@ -939,36 +1033,42 @@ export function AboutPanel(): ReactNode {
   return (
     <>
       <Group title={copy.versionTitle}>
-        {/* Straight to this release's own notes, not the list of every release:
+        {!DEMO_SURFACES ? (
+          <HostVersionBlock />
+        ) : (
+          /* Straight to this release's own notes, not the list of every release:
             somebody clicking the build they are running is asking what is in it,
-            and the list is one row below if they wanted the others. */}
-        <button
-          type="button"
-          onClick={() =>
-            openDetailPane({ kind: "release", id: currentRelease.version })
-          }
-          className="focus-ring hover:bg-surface-hover flex w-full items-center gap-3 px-3 py-3 text-left"
-        >
-          <IdentitySigil
-            value={currentRelease.version}
-            size={44}
-            className="shrink-0 rounded-xl"
-          />
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold">
-              {content.brand.name} v{currentRelease.version}
+            and the list is one row below if they wanted the others. */
+          <button
+            type="button"
+            onClick={() =>
+              openDetailPane({ kind: "release", id: currentRelease.version })
+            }
+            className="focus-ring hover:bg-surface-hover flex w-full items-center gap-3 px-3 py-3 text-left"
+          >
+            <IdentitySigil
+              value={currentRelease.version}
+              size={44}
+              className="shrink-0 rounded-xl"
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold">
+                {content.brand.name} v{currentRelease.version}
+              </span>
+              <span className="text-muted-foreground mt-0.5 block text-[11px] text-pretty">
+                {copy.released}{" "}
+                <time dateTime={currentRelease.date}>
+                  {currentRelease.date}
+                </time>{" "}
+                · {currentRelease.headline}
+              </span>
             </span>
-            <span className="text-muted-foreground mt-0.5 block text-[11px] text-pretty">
-              {copy.released}{" "}
-              <time dateTime={currentRelease.date}>{currentRelease.date}</time>{" "}
-              · {currentRelease.headline}
-            </span>
-          </span>
-          <ChevronRight
-            className="text-muted-foreground size-4 shrink-0"
-            aria-hidden="true"
-          />
-        </button>
+            <ChevronRight
+              className="text-muted-foreground size-4 shrink-0"
+              aria-hidden="true"
+            />
+          </button>
+        )}
         <Row
           label={copy.whatsNew}
           hint={copy.whatsNewHint}
@@ -1157,7 +1257,7 @@ export function SettingsApp(): ReactNode {
   const { settingsCategory: requestedCategory } = useHub();
   const settingsCategory = resolveCategory(requestedCategory);
   const category = SETTINGS_CATEGORIES.find(
-    (entry) => entry.id === settingsCategory,
+    (entry) => entry.id === settingsCategory
   );
 
   return (
