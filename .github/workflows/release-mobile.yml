@@ -98,8 +98,12 @@ jobs:
         with:
           node-version: '24'
 
+      # v9, not v8: v8 targets Node 20, which GitHub has deprecated on its runners
+      # and is already force-running on Node 24 with a warning on every release. A
+      # deprecation warning today is a hard failure the day the shim is removed, and
+      # that day should not be a release day.
       - name: setup EAS
-        uses: expo/expo-github-action@v8
+        uses: expo/expo-github-action@v9
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
@@ -112,17 +116,19 @@ jobs:
       - name: bundle the chrome
         run: npm run ui:bundle
 
-      # --auto-submit is back: the Google service account exists now
-      # (play-store-service-account@bsva-469618), its key is in EAS credentials, and a
-      # submission of build 4c1933cd proved the path end to end before this landed.
-      # Its Play permissions deliberately exclude "Release to production", so the worst
-      # this key can do is put a build in front of internal testers.
+      # --auto-submit ON A TAG ONLY; on a branch this is a rehearsal and Play never
+      # hears about the build.
       #
-      # The AAB is STILL downloaded and attached to the draft release. Auto-submit sends
-      # it to internal testing; the attachment is what you archive, hand to someone
-      # without Play access, or upload by hand the day EAS is down.
-      # --auto-submit only on a tag. On a branch this is a rehearsal: the AAB is built
-      # and downloaded, and Play never hears about it.
+      # The credential behind it: play-store-service-account@bsva-469618, key held in
+      # EAS credentials. Its Play permissions deliberately exclude "Release to
+      # production", so the worst it can do is put a build in front of internal
+      # testers — promotion stays a human act in Play Console, by design and by
+      # permission. (v0.1.0 died here on "Google Service Account Keys cannot be set up
+      # in --non-interactive mode", before that account existed.)
+      #
+      # The AAB is downloaded and attached to the draft release either way. Auto-submit
+      # sends it to internal testing; the attachment is what you archive, hand to
+      # someone without Play access, or upload by hand the day EAS is down.
       #
       # SLUG, not GITHUB_REF_NAME, in the filename: a branch ref can contain a slash
       # ('feat/web3-apps'), and `curl -o Nexus-feat/web3-apps.aab` writes into a
@@ -140,14 +146,15 @@ jobs:
             echo "::notice::rehearsal — building the production AAB without submitting it to Play"
           fi
           eas build --platform android --profile production --non-interactive "${SUBMIT[@]}" --json > build.json
-          # tools/eas-artifact-url.mjs, not an inline node -p: with --auto-submit the
-          # --json payload carries submissions alongside builds, so the old
-          # `[0].artifacts.buildUrl` read undefined and `node -p` printed the STRING
-          # "undefined" with exit 0. curl then failed on a host called "undefined" and
-          # took this job red on v0.2.0 — after the build and the Play submission had
-          # both succeeded. The script handles either shape and exits non-zero if it
-          # finds no URL, so a shape change fails here with a diagnosis instead of two
-          # steps later with a DNS error.
+          # tools/eas-artifact-url.mjs, not an inline node -p. With --auto-submit
+          # eas-cli emits `artifacts.applicationArchiveUrl` and drops the legacy
+          # `artifacts.buildUrl`, which is the only key the old line named — so it
+          # evaluated to undefined, `node -p` printed the STRING "undefined" with exit
+          # 0, and curl failed on a host called "undefined". That took this job red on
+          # v0.2.0 AFTER the build and the Play submission had both succeeded.
+          # The script tries both keys, tolerates either envelope, and exits non-zero
+          # with the shape it saw when it finds nothing — so the next eas-cli change
+          # fails here with a diagnosis instead of two steps later as a DNS error.
           URL=$(node "$GITHUB_WORKSPACE/tools/eas-artifact-url.mjs" build.json)
           curl -fL "$URL" -o "Nexus-${SLUG}.aab"
 
@@ -195,8 +202,12 @@ jobs:
         with:
           node-version: '24'
 
+      # v9, not v8: v8 targets Node 20, which GitHub has deprecated on its runners
+      # and is already force-running on Node 24 with a warning on every release. A
+      # deprecation warning today is a hard failure the day the shim is removed, and
+      # that day should not be a release day.
       - name: setup EAS
-        uses: expo/expo-github-action@v8
+        uses: expo/expo-github-action@v9
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
@@ -262,8 +273,12 @@ jobs:
         with:
           node-version: '24'
 
+      # v9, not v8: v8 targets Node 20, which GitHub has deprecated on its runners
+      # and is already force-running on Node 24 with a warning on every release. A
+      # deprecation warning today is a hard failure the day the shim is removed, and
+      # that day should not be a release day.
       - name: setup EAS
-        uses: expo/expo-github-action@v8
+        uses: expo/expo-github-action@v9
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
@@ -285,9 +300,10 @@ jobs:
           SLUG="${GITHUB_REF_NAME//\//-}"
           echo "SLUG=$SLUG" >> "$GITHUB_ENV"
           eas build --platform android --profile preview --non-interactive --json > build.json
-          # Same extractor as the AAB leg. This leg never auto-submits so it always saw
-          # the array shape and always worked — which is precisely why the bug hid: the
-          # two call sites were identical and only one of them was ever wrong.
+          # Same extractor as the AAB leg. This leg never auto-submits, so its payload
+          # still carried the legacy buildUrl and the old line always worked here —
+          # which is precisely why the bug hid: two identical call sites, and only the
+          # one that submits was ever wrong.
           URL=$(node "$GITHUB_WORKSPACE/tools/eas-artifact-url.mjs" build.json)
           curl -fL "$URL" -o "Nexus-${SLUG}.apk"
 

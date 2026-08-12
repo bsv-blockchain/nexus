@@ -13,15 +13,33 @@
  * undefined" and took the job red — AFTER the build had succeeded and AFTER the Play
  * submission had gone through. The release was fine; the bookkeeping was not.
  *
- * Two things made that possible, and this file fixes both:
+ * ── THE ACTUAL CAUSE, NARROWED BY THE SYMPTOM ──
  *
- *   1. `eas build --json` does not always emit a bare array. With `--auto-submit` the
- *      payload carries submissions alongside builds, so `[0].artifacts.buildUrl` reads
- *      a property off the wrong object and yields undefined. The rehearsal path runs
- *      WITHOUT --auto-submit, so it exercises the other shape and cannot catch this —
- *      which is exactly why the extractor has to be shape-agnostic rather than
- *      rehearsed. That is what `findArtifactUrl` below is for, and what
- *      test/eas-artifact-url.test.mjs pins.
+ * The envelope did NOT change. Only one shape can produce what was observed, and the
+ * observation is precise enough to identify it: `node -p` printed the STRING
+ * "undefined" and curl then ran. Walk the alternatives —
+ *
+ *   [{artifacts:{applicationArchiveUrl}}]   -> undefined      ← what happened
+ *   {builds:[{artifacts:{buildUrl}}]}       -> TypeError
+ *   [{artifacts:{buildUrl}}]                -> the URL
+ *
+ * If the top level had become an object, `[0]` would be undefined and `[0].artifacts`
+ * would THROW; `node -p` would exit non-zero and `set -e` would have killed the step
+ * BEFORE curl. curl ran, so the top level was still an array whose element still had
+ * an `artifacts` object — and that object simply had no `buildUrl`.
+ *
+ * So: with `--auto-submit`, eas-cli emits `artifacts.applicationArchiveUrl` and drops
+ * the legacy `artifacts.buildUrl`. `eas build:view --json` on the very same build
+ * carries BOTH keys, which is how a hand-check of the released artifact still worked
+ * while the pipeline did not.
+ *
+ * Two things made it possible to ship, and this file fixes both:
+ *
+ *   1. The old line named ONE key. It now tries `applicationArchiveUrl` first (the
+ *      current name) and `buildUrl` second (the legacy one), and tolerates either
+ *      envelope besides — because the rehearsal path never passes --auto-submit, so no
+ *      amount of rehearsing exercises the payload that broke. A test can, and
+ *      test/eas-artifact-url.test.mjs does.
  *
  *   2. `node -p undefined` exits 0. Any failure to find the URL has to be LOUD, or a
  *      broken download reappears as a confusing curl error a step later. This exits 1
@@ -41,7 +59,8 @@ import { readFileSync } from 'node:fs'
  * place.
  *
  * `applicationArchiveUrl` is preferred over `buildUrl` because it is the current field
- * name; `buildUrl` is the older one and both have been seen in the wild.
+ * name and the one `--auto-submit` emits; `buildUrl` is the legacy name that a plain
+ * `eas build --json` still carries. Naming only the legacy one is what broke v0.2.0.
  */
 export function findArtifactUrl(json) {
   const builds = Array.isArray(json)
