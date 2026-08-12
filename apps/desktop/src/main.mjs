@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import bridgePkg from '@nexus/bridge'
 import { createTabManager } from './tabManager.mjs'
 import { createWalletHost } from './wallet/host.mjs'
+import { createUpdater } from './updater.mjs'
 
 // @nexus/bridge is CommonJS; destructure off the default import rather than using
 // named ESM imports so this doesn't depend on cjs-module-lexer correctly tracing the
@@ -70,6 +71,19 @@ let tabManager = null
 let router = null
 let walletHost = null
 
+/**
+ * The auto-updater, constructed once for the process.
+ *
+ * Outside createWindow because it outlives any window and is not owned by one:
+ * closing the last window on macOS does not quit the app, and an update that
+ * finished downloading while no window was open still has to be there when one
+ * opens again. Its events go out on the same router the wallet's state does, so
+ * the chrome learns about them the same way.
+ */
+const updater = createUpdater({
+  onEvent: (state) => router?.emit('update.state', state)
+})
+
 function createWindow() {
   boot('createWindow')
   win = new BrowserWindow({
@@ -112,6 +126,12 @@ function createWindow() {
 
   router = createHostRouter({
     methods: {
+      [METHODS.UPDATE_STATE]: () => updater.get(),
+      [METHODS.UPDATE_CHECK]: () => updater.check(),
+      [METHODS.UPDATE_INSTALL]: () => {
+        updater.install()
+        return { ok: true }
+      },
       [METHODS.HOST_INFO]: () => ({
         shell: 'electron',
         platform: process.platform,
@@ -293,6 +313,9 @@ app.whenReady().then(() => {
     console.error('[fatal] createWindow:', err && (err.stack || err.message))
     app.exit(1)
   }
+  // After the window, and never before it: the first check is deferred ten
+  // seconds anyway, and a failure here must not be able to cost somebody the app.
+  updater.start()
 })
 
 // Spec calls out darwin as the exception: mac apps conventionally stay resident
@@ -309,6 +332,7 @@ app.on('window-all-closed', () => {
  * promise the exiting process never returns to.
  */
 app.on('before-quit', () => {
+  updater.stop()
   walletHost?.shutdown()
 })
 

@@ -1923,6 +1923,27 @@ export const content = {
       whatsNew: "What's new",
       whatsNewHint: "Every release, and what shipped in it.",
       channelTitle: "Updates",
+      /* The live updater's copy. Deliberately states what the app is DOING
+         rather than offering a choice: an update downloads on its own, and the
+         only decision here is when to restart into it. */
+      updateHint: "Nexus keeps itself on the latest release.",
+      updateCurrent: "You're on the latest version",
+      updateChecking: "Checking for updates…",
+      updateFound: "Update available:",
+      updateDownloading: "Downloading update…",
+      updateReady: "Ready to install:",
+      updateRestart: "Restart",
+      updateCheck: "Check now",
+      updateChecked: "Last checked",
+      updateNeverChecked: "Not checked yet",
+      updateError: "Couldn't check for updates",
+      /* A distro package. electron-updater cannot replace a file apt owns, so
+         this half of the panel links out rather than pretending to watch. */
+      updateManualHint:
+        "This copy was installed by your package manager, so Nexus can't update itself.",
+      updateManualLabel: "Get the latest version",
+      updateManualRow: "Downloads from GitHub releases.",
+      updateOpen: "Open",
       channelStable: "Stable",
       channelBeta: "Beta",
       channelHint: "Beta gets releases early, and gets the ones we get wrong.",

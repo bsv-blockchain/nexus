@@ -188,6 +188,7 @@ jobs:
           path: |
             apps/desktop/out/*.dmg
             apps/desktop/out/*.zip
+            apps/desktop/out/latest-mac.yml
 
       # ── Linux ──────────────────────────────────────────────────────────────
       - name: build (Linux)
@@ -233,6 +234,7 @@ jobs:
             apps/desktop/out/*.deb
             apps/desktop/out/SHA256SUMS
             apps/desktop/out/SHA256SUMS.asc
+            apps/desktop/out/latest-linux.yml
 
       # ── Windows ────────────────────────────────────────────────────────────
       - name: decode DigiCert client certificate
@@ -259,33 +261,38 @@ jobs:
         shell: cmd
         run: smctl windows certsync
 
-      # This step signs MORE than it was written to. `smctl windows certsync` above
-      # installs the KeyLocker certificate into the Windows certificate store, and
-      # electron-builder's automatic signtool discovery then finds it with no
-      # configuration at all. The v0.1.0 log is unambiguous:
+      # ── Windows signing happens INSIDE electron-builder ──────────────────
       #
-      #   • signing with signtool.exe  path=out\win-unpacked\Nexus.exe
-      #   • signing with signtool.exe  path=out\win-unpacked\resources\elevate.exe
-      #   • signing with signtool.exe  path=out\Nexus-Setup-0.1.0.__uninstaller.exe
-      #   • signing with signtool.exe  path=out\Nexus-Setup-0.1.0.exe
+      # build/win-sign.cjs is wired as `win.signtoolOptions.sign`, so signtool runs
+      # on each artifact as part of packaging and BEFORE electron-builder computes
+      # the sha512 that goes into latest.yml.
       #
-      # An earlier comment here claimed the opposite — that nothing was configured, so
-      # only the outer installer got signed and the inner binaries shipped unsigned,
-      # inherited from bsv-desktop. That was never true of this pipeline. It is
-      # recorded because the belief would have sent someone to "fix" a signing path
-      # that already works, and the fix would have been to configure the certificate
-      # a second way.
+      # It used to be a step after this one, re-signing every .exe in out/. That
+      # was harmless while nothing published update metadata and became a bug the
+      # moment something did: signing changes bytes, so latest.yml would have
+      # carried the hash of the pre-re-sign installer and every Windows client
+      # would have aborted with "sha512 checksum mismatch". bsv-desktop shipped
+      # precisely that in v2.6.x and v2.7.x and had to write a script to repair the
+      # metadata of releases already in the wild — see its
+      # scripts/repair-published-update-metadata.mjs. The hook is how that class of
+      # fault is made unreachable rather than merely avoided.
       #
-      # Caveat discovered by adding a check for it: signtool cannot find a signature
-      # on out\win-unpacked\Nexus.exe afterwards, despite the line above saying it was
-      # signed. The verify step below reports that status without failing on it —
-      # the reasoning, and what would settle it, are written out there.
-      - name: build (Windows)
+      # The certificate reaches signtool the same way it always has: `smctl windows
+      # certsync` above puts it in the Windows store and the hook selects it by
+      # thumbprint. The hook refuses to produce unsigned artifacts when CI is set,
+      # so a rotated or missing secret fails the build instead of publishing an
+      # installer nobody can verify.
+      - name: build and sign (Windows)
         if: matrix.platform == 'windows-2022'
         working-directory: apps/desktop
+        env:
+          WIN_SIGN_SHA1: ${{ secrets.DIGICERT_CODE_SIGNING_SHA1_HASH }}
         run: npx electron-builder --win --x64 --publish never
 
-      - name: sign and verify Windows installers
+      # A gate, not a diagnostic. The installer is the artifact users run and the
+      # one latest.yml names, so an unverifiable signature on it must stop the
+      # release here rather than surface as a SmartScreen warning on a desktop.
+      - name: verify Windows signature and update metadata
         if: matrix.platform == 'windows-2022'
         shell: pwsh
         run: |
@@ -294,61 +301,32 @@ jobs:
           $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
           if (-not $signtool) { throw "signtool.exe not found." }
 
-          $targets = Get-ChildItem -Path "apps/desktop/out" -Include *.exe -Depth 0 | Select-Object -ExpandProperty FullName
-          if (-not $targets) { throw "No .exe files found under apps/desktop/out" }
+          $installer = Get-ChildItem "apps/desktop/out/*.exe" | Select-Object -First 1
+          if (-not $installer) { throw "no installer produced" }
+          & $signtool verify /pa $installer.FullName
+          if ($LASTEXITCODE -ne 0) { throw "signature verification failed for $($installer.Name)" }
 
-          foreach ($file in $targets) {
-            Write-Host "--- Signing: $file ---"
-            & $signtool sign /tr http://timestamp.digicert.com /td SHA256 /fd SHA256 /sha1 "${{ secrets.DIGICERT_CODE_SIGNING_SHA1_HASH }}" "$file"
-            if ($LASTEXITCODE -ne 0) { throw "Signing failed for $file" }
-
-            Write-Host "--- Verifying: $file ---"
-            & $signtool verify /pa "$file"
-            if ($LASTEXITCODE -ne 0) { throw "Verification failed for $file" }
+          # The whole point of moving signing into the build: prove that what
+          # latest.yml describes is the file we are about to publish. This is the
+          # check that would have caught bsv-desktop's mismatch before release
+          # rather than on users' machines.
+          $yml = "apps/desktop/out/latest.yml"
+          if (-not (Test-Path $yml)) { throw "latest.yml was not produced — auto-update would ship nothing" }
+          $declared = (Select-String -Path $yml -Pattern '^\s+sha512:\s*(.+)$' | Select-Object -First 1).Matches.Groups[1].Value.Trim()
+          $actual = [Convert]::ToBase64String([System.Security.Cryptography.SHA512]::Create().ComputeHash([System.IO.File]::ReadAllBytes($installer.FullName)))
+          if ($declared -ne $actual) {
+            throw "latest.yml sha512 does not match $($installer.Name) — auto-update would abort on every client"
           }
-
-          # Diagnostic, NOT a gate — see why below.
-          #
-          # electron-builder logs that it signs the inner binaries during packaging:
-          #
-          #   • updating asar integrity executable resource  executablePath=out\win-unpacked\Nexus.exe
-          #   • signing with signtool.exe                    path=out\win-unpacked\Nexus.exe
-          #
-          # yet `signtool verify /pa` on that same path afterwards reports "No
-          # signature found". This was equally true of v0.1.0; it is the state the
-          # pipeline has always been in, not a regression introduced with the check.
-          #
-          # What is NOT established is which of these is happening:
-          #   a) the signing attempt fails quietly and the inner binaries really do
-          #      ship unsigned, or
-          #   b) win-unpacked is rewritten by the NSIS step after signing — note that
-          #      elevate.exe is signed there mid-build, so the directory is still
-          #      being mutated — and the leftover on the runner is not what went into
-          #      the installer.
-          #
-          # (b) is plausible enough that failing on it would block a leg whose
-          # INSTALLER verifies correctly, on a premise nobody has checked. Settling it
-          # needs a Windows machine: install the exe, then
-          #   Get-AuthenticodeSignature "$env:LOCALAPPDATA\Programs\Nexus\Nexus.exe"
-          # Until then this reports and does not block. Authenticode status says more
-          # than signtool's exit code: HashMismatch would prove (b), NotSigned (a).
-          $inner = "apps/desktop/out/win-unpacked/Nexus.exe"
-          if (Test-Path $inner) {
-            $status = (Get-AuthenticodeSignature $inner).Status
-            Write-Host "--- Inner Nexus.exe Authenticode status: $status ---"
-            if ($status -ne "Valid") {
-              Write-Host "::warning title=Inner binary signature::win-unpacked/Nexus.exe reports '$status'. The installer itself is signed and verified; see the note in this workflow for what remains unknown."
-            }
-          } else {
-            Write-Host "::warning::apps/desktop/out/win-unpacked/Nexus.exe not found - packaging layout changed"
-          }
+          Write-Host "latest.yml matches $($installer.Name)"
 
       - name: upload Windows artifacts
         if: matrix.platform == 'windows-2022'
         uses: actions/upload-artifact@v6
         with:
           name: windows-artifacts
-          path: apps/desktop/out/*.exe
+          path: |
+            apps/desktop/out/*.exe
+            apps/desktop/out/latest.yml
 
   release:
     needs: build

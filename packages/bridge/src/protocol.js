@@ -10,6 +10,13 @@ const CHANNEL = 'nexus.host.v1'
 
 const METHODS = {
   HOST_INFO: 'host.info',
+  /* Auto-update. Read-only but for two verbs, and both are the user's: `check`
+     because "is there one" should be askable, and `install` because applying an
+     update restarts the app and that is never ours to decide. Downloading needs
+     no method — it happens on its own. */
+  UPDATE_STATE: 'update.state',
+  UPDATE_CHECK: 'update.check',
+  UPDATE_INSTALL: 'update.install',
   TAB_CREATE: 'tabs.create',
   TAB_DESTROY: 'tabs.destroy',
   TAB_NAVIGATE: 'tabs.navigate',
