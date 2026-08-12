@@ -1,6 +1,7 @@
 "use client";
 
 import { IdentitySigil } from "@/components/hub/identity-sigil";
+import { StepMark } from "@/components/hub/step-mark";
 import { useHub } from "@/components/hub/hub-provider";
 import { content, getRelease, releases } from "@/lib/data";
 import { ChevronRight } from "lucide-react";
@@ -43,7 +44,7 @@ export function ReleaseList(): ReactNode {
       </p>
 
       <ul className="divide-border/60 mt-2 divide-y">
-        {latest.features.map((feature) => (
+        {latest.features.map((feature, index) => (
           <li key={feature.id}>
             <button
               type="button"
@@ -52,13 +53,11 @@ export function ReleaseList(): ReactNode {
               }
               className="focus-ring hover:bg-surface-hover flex w-full items-center gap-3 rounded-lg px-1 py-2.5 text-left"
             >
-              {/* The feature's own sigil, so two rows in one release are still
-                  telling apart at a glance. */}
-              <IdentitySigil
-                value={`${latest.version}:${feature.id}`}
-                size={40}
-                className="shrink-0 rounded-lg"
-              />
+              {/* Its place in the release, not its identity — the same mark the
+                  app explainers use, so a numbered row means one thing across
+                  the product. A release keeps its sigil; an update inside one
+                  does not need to be identifiable on its own. */}
+              <StepMark step={index + 1} size={40} disclosure={false} />
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-semibold text-pretty">
                   {feature.title}
@@ -158,13 +157,23 @@ export function ReleaseDetail({ version }: { version: string }): ReactNode {
       </p>
 
       <div className="divide-border/60 mt-1 divide-y">
-        {release.features.map((feature) => (
+        {release.features.map((feature, index) => (
           <section key={feature.id} className="p-4">
-            <div className="flex items-start gap-3">
-              <IdentitySigil
-                value={`${release.version}:${feature.id}`}
-                size={32}
-                className="mt-0.5 shrink-0 rounded-lg"
+            {/* One line of text next to a 32px mark looks dropped unless it is
+                centred against it; two lines fill the height and want to start
+                at the top. So the alignment follows whether there is a
+                reference line rather than being fixed either way. */}
+            <div
+              className={`flex gap-3 ${
+                feature.reference ? "items-start" : "items-center"
+              }`}
+            >
+              {/* Numbered rather than sigilled, and always showing its number:
+                  nothing here collapses, so there is no closed state to mark. */}
+              <StepMark
+                step={index + 1}
+                disclosure={false}
+                className={feature.reference ? "mt-0.5" : ""}
               />
               <div className="min-w-0 flex-1">
                 <h4 className="text-sm font-bold text-pretty">

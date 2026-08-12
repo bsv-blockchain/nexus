@@ -20,13 +20,11 @@ import {
   Folder,
   FolderSync,
   Image as ImageIcon,
-  Palette,
   Pencil,
   Settings2,
   Share,
   Star,
   Trash2,
-  UserRound,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
@@ -44,21 +42,33 @@ export function SpaceMenu({
   onClose,
   spaceId,
   className = "",
+  initialView = "root",
+  initialDialog = null,
 }: {
   open: boolean;
   onClose: () => void;
   spaceId: string;
   className?: string;
+  /**
+   * Open straight onto a panel instead of the root list.
+   *
+   * For callers that already know what is being asked — clicking a profile's
+   * icon is a request for the icon picker, not for a menu with the picker
+   * somewhere in it. Read once, so the caller remounts (a `key`) to change it.
+   */
+  initialView?: View;
+  /** Same, for the dialogs, which render whether or not the menu is open. */
+  initialDialog?: DialogKind;
 }): ReactNode {
   const hub = useHub();
   const copy = content.spaceMenu;
-  const [view, setView] = useState<View>("root");
-  const [dialog, setDialog] = useState<DialogKind>(null);
+  const [view, setView] = useState<View>(initialView);
+  const [dialog, setDialog] = useState<DialogKind>(initialDialog);
 
   const space = hub.spaces.find((s) => s.id === spaceId);
 
   const close = (): void => {
-    setView("root");
+    setView(initialView);
     onClose();
   };
   const openDialog = (kind: DialogKind): void => {
@@ -97,18 +107,6 @@ export function SpaceMenu({
               icon={Pencil}
               label={copy.rename}
               onClick={() => openDialog("rename")}
-            />
-            <MenuItem
-              icon={Palette}
-              label={copy.editTheme}
-              hasSubmenu
-              onClick={() => setView("theme")}
-            />
-            <MenuItem
-              icon={UserRound}
-              label={copy.setProfile}
-              hasSubmenu
-              onClick={() => setView("profile")}
             />
             <MenuSeparator />
             <MenuItem

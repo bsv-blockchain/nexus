@@ -3,6 +3,7 @@
 import { Handle } from "@/components/apps/messages/ecosystem-tag";
 import { MemberAvatar } from "@/components/apps/messages/member-avatar";
 import { Sheet } from "@/components/apps/messages/sheet";
+import { TokenPicker } from "@/components/apps/wallet/token-picker";
 import { TokenMark, formatUnits } from "@/components/apps/wallet/token-mark";
 import { VerifiedHandle } from "@/components/apps/wallet/wallet-views";
 import {
@@ -16,56 +17,12 @@ import {
   type Token,
 } from "@/lib/data";
 import { handleOf } from "@/lib/messages";
-import { holdingOf, holdings, usd } from "@/lib/wallet";
+import { holdingOf, usd } from "@/lib/wallet";
 import { ArrowDown, Check, Copy, Search } from "lucide-react";
 import { toast } from "sonner";
 import { useState, type ReactNode } from "react";
 
 /** Token picker row list, shared by send and exchange. */
-function TokenPicker({
-  selected,
-  onSelect,
-  label,
-}: {
-  selected: string;
-  onSelect: (tokenId: string) => void;
-  label: string;
-}): ReactNode {
-  const rows = holdings();
-  return (
-    <div>
-      <p className="mb-1.5 text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
-        {label}
-      </p>
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {rows.map(({ token, units }) => {
-          const active = token.id === selected;
-          return (
-            <button
-              key={token.id}
-              type="button"
-              onClick={() => onSelect(token.id)}
-              className={`focus-ring flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-left transition-colors ${
-                active
-                  ? "border-accent bg-accent/10"
-                  : "border-border hover:bg-surface-hover"
-              }`}
-            >
-              <TokenMark token={token} size={20} />
-              <span>
-                <span className="block text-xs font-bold">{token.symbol}</span>
-                <span className="block text-[10px] text-muted-foreground">
-                  {formatUnits(units, token.decimals)}
-                </span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 /**
  * Send: pick an asset, an amount, and a recipient.
  *

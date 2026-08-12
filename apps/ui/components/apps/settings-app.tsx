@@ -1,7 +1,9 @@
 "use client";
 
+import { Favicon } from "@/components/hub/favicon";
 import { IdentitySigil } from "@/components/hub/identity-sigil";
-import { ThemeButton } from "@/components/hub/theme-picker";
+import { QrBlock } from "@/components/hub/qr-block";
+import { useCustomTheme } from "@/components/hub/theme-provider";
 import {
   useHub,
   type SettingsCategory,
@@ -16,24 +18,88 @@ import {
   type ChainPolicy,
   type Reach,
 } from "@/lib/command-effects";
-import { content, currentRelease, releases } from "@/lib/data";
-import { formatSats } from "@/lib/messages";
-import { DEMO_SURFACES } from "@/lib/surfaces";
-import { WalletSettingsPanel } from "@/components/apps/settings-wallet";
 import {
+  content,
+  currentRelease,
+  getDownloads,
+  getLanguage,
+  getSearchEngine,
+  licence,
+  releases,
+  searchEngines,
+} from "@/lib/data";
+import { Sheet } from "@/components/apps/messages/sheet";
+import {
+  Choice,
+  Group,
+  Row,
+  SatsAmount,
+  Steps,
+  Toggle,
+} from "@/components/apps/settings/blocks";
+import { WalletSettingsPanel } from "@/components/apps/settings-wallet";
+import { DEMO_SURFACES } from "@/lib/surfaces";
+import { AutofillPanel } from "@/components/apps/settings/autofill-panel";
+import { BetaDialog } from "@/components/apps/settings/beta-dialog";
+import { PermissionsPanel } from "@/components/apps/settings/permissions-panel";
+import { ShortcutsPanel } from "@/components/apps/settings/shortcuts-panel";
+import {
+  setSetting,
+  useSettings,
+  type ArchiveAfter,
+  type ClearOnQuit,
+  type CookiePolicy,
+  type OpenLinksIn,
+  type StartupBehaviour,
+} from "@/lib/settings-store";
+import { InfoPopover } from "@/components/apps/roadmap/info-popover";
+import { PerSenderTolls } from "@/components/apps/settings/per-sender-tolls";
+import {
+  BRANDS,
+  setBrandMode,
+  useBrand,
+  useBrandMode,
+  type BrandMode,
+} from "@/lib/brand";
+import {
+  Check,
+  ChevronRight,
   Globe,
+  Moon,
+  Heart,
   Info,
+  KeyRound,
+  Keyboard,
   Link2Off,
   Monitor,
   PanelLeftClose,
   ReceiptText,
+  ShieldAlert,
   ShieldCheck,
   Sliders,
+  Sun,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
+
+/** The accent every profile falls back to; see app/globals.css. */
+const DEFAULT_ACCENT = "#4353ff";
+
+/**
+ * The alternate marks Nexus can wear on a home screen or dock.
+ *
+ * Four, not a gallery. An icon set is a maintenance cost per entry and the
+ * point of the setting is that somebody with two profiles can tell their
+ * windows apart, which four colours do as well as twenty.
+ */
+const APP_ICONS: { id: string; label: string }[] = [
+  { id: "default", label: content.mobileBrowser.settings.iconDefault },
+  { id: "mono", label: content.mobileBrowser.settings.iconMono },
+  { id: "retro", label: content.mobileBrowser.settings.iconRetro },
+  { id: "dragon", label: content.mobileBrowser.settings.iconDragon },
+];
 
 const ALL_SETTINGS_CATEGORIES: {
   id: SettingsCategory;
@@ -62,10 +128,28 @@ const ALL_SETTINGS_CATEGORIES: {
     icon: ShieldCheck,
   },
   {
+    id: "permissions",
+    label: content.settings.permissions.title,
+    hint: content.settings.permissions.hint,
+    icon: ShieldAlert,
+  },
+  {
+    id: "autofill",
+    label: content.settings.autofill.title,
+    hint: content.settings.autofill.hint,
+    icon: KeyRound,
+  },
+  {
     id: "browsing",
     label: content.settings.browsing.title,
     hint: content.settings.browsing.hint,
     icon: Globe,
+  },
+  {
+    id: "shortcuts",
+    label: content.settings.shortcuts.title,
+    hint: content.settings.shortcuts.hint,
+    icon: Keyboard,
   },
   {
     id: "appearance",
@@ -82,16 +166,21 @@ const ALL_SETTINGS_CATEGORIES: {
 ];
 
 /**
+ * Which categories a build actually offers.
+ *
  * Same split as WALLET_SECTIONS in wallet-app.tsx: the demo keeps the
- * designer's five categories untouched, while a shipping build offers only
+ * designer's eight categories untouched, while a shipping build offers only
  * what a real shell can answer — its wallet, its theme, and what build it is.
  * The demo panels are wired to fixtures and `soon` toasts, which on a live
- * build would be seventeen controls that lie.
+ * build would be several dozen controls that lie.
  */
 const DEMO_CATEGORY_IDS: ReadonlySet<SettingsCategory> = new Set([
   "general",
   "privacy",
+  "permissions",
+  "autofill",
   "browsing",
+  "shortcuts",
   "appearance",
   "about",
 ]);
@@ -109,9 +198,9 @@ export const SETTINGS_CATEGORIES = ALL_SETTINGS_CATEGORIES.filter((category) =>
  * The category to show for a request this build does not carry.
  *
  * The hub's default is `general`, which a live build drops — and hub state can
- * also arrive from an older session. Falling back to the first entry beats
- * rendering a header with no panel under it; same reasoning as the
- * WALLET_SECTIONS fallback in wallet-app.tsx.
+ * also arrive from an older session, or from a deep link. Falling back to the
+ * first entry beats rendering a header with no panel under it; same reasoning
+ * as the WALLET_SECTIONS fallback in wallet-app.tsx.
  */
 function resolveCategory(requested: SettingsCategory): SettingsCategory {
   return SETTINGS_CATEGORIES.some((entry) => entry.id === requested)
@@ -134,8 +223,10 @@ export function SettingsSidebar(): ReactNode {
   } = useHub();
   const settingsCategory = resolveCategory(requestedCategory);
   return (
-    <div className="flex h-full min-h-0 flex-col px-1.5 pt-0.5">
-      <div className="flex items-center gap-2 pb-3">
+    <div className="flex h-full min-h-0 flex-col">
+      {/* Padding matches the app sidebars' header, which sits inset from the
+          panel's own p-3 while the rows below it run flush. */}
+      <div className="flex items-center gap-2 px-1.5 pt-0.5 pb-3">
         {/* The same panel icon the app sidebars use. It was a slider here,
             which is the General category's own mark — two different things
             wearing one icon a few pixels apart. */}
@@ -188,136 +279,6 @@ export function SettingsSidebar(): ReactNode {
   );
 }
 
-/* ------------------------------------------------------------- building blocks */
-
-export function Group({
-  title,
-  hint,
-  children,
-}: {
-  title: string;
-  hint?: string;
-  children: ReactNode;
-}): ReactNode {
-  return (
-    <section className="mt-6 first:mt-0">
-      <h3 className="text-sm font-bold">{title}</h3>
-      {hint && (
-        <p className="text-muted-foreground mt-0.5 text-xs text-pretty">
-          {hint}
-        </p>
-      )}
-      <div className="border-border divide-border/60 mt-2.5 divide-y overflow-hidden rounded-xl border">
-        {children}
-      </div>
-    </section>
-  );
-}
-
-/** A row that states a setting and its current value. */
-export function Row({
-  label,
-  hint,
-  value,
-  onClick,
-}: {
-  label: string;
-  hint?: string;
-  value?: string;
-  onClick?: () => void;
-}): ReactNode {
-  const body = (
-    <>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-medium">{label}</span>
-        {hint && (
-          <span className="text-muted-foreground mt-0.5 block text-[11px] text-pretty">
-            {hint}
-          </span>
-        )}
-      </span>
-      {value && (
-        <span className="text-muted-foreground shrink-0 text-xs">{value}</span>
-      )}
-    </>
-  );
-  if (!onClick) {
-    return <div className="flex items-center gap-3 px-3 py-2.5">{body}</div>;
-  }
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="focus-ring hover:bg-surface-hover flex w-full items-center gap-3 px-3 py-2.5 text-left"
-    >
-      {body}
-    </button>
-  );
-}
-
-/**
- * An exclusive choice, one row per option.
- *
- * The same shape as the on-chain popover in Messages, because it is the same
- * kind of decision: a handful of mutually exclusive settings whose consequences
- * differ enough that each one needs a sentence rather than a label.
- */
-export function Choice<T extends string>({
-  value,
-  options,
-  onPick,
-}: {
-  value: T;
-  options: { id: T; label: string; hint: string; icon?: ReactNode }[];
-  onPick: (next: T) => void;
-}): ReactNode {
-  return (
-    <div role="radiogroup" className="p-1">
-      {options.map((option) => {
-        const selected = option.id === value;
-        return (
-          <button
-            key={option.id}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            onClick={() => onPick(option.id)}
-            className={`focus-ring flex w-full items-start gap-2.5 rounded-lg p-2.5 text-left transition-colors ${
-              selected ? "bg-accent/10" : "hover:bg-surface-hover"
-            }`}
-          >
-            <span
-              className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border ${
-                selected
-                  ? "border-accent bg-accent text-accent-foreground"
-                  : "border-muted-foreground"
-              }`}
-              aria-hidden="true"
-            >
-              {selected && <span className="bg-current size-1.5 rounded-full" />}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-1.5 text-sm font-medium">
-                {/* The radio dot is the only accent in a row: the leading icon
-                    is a label for the option, not a second selection marker. */}
-                {option.icon && (
-                  <span className="text-muted-foreground" aria-hidden="true">
-                    {option.icon}
-                  </span>
-                )}
-                {option.label}
-              </span>
-              <span className="text-muted-foreground mt-0.5 block text-[11px] text-pretty">
-                {option.hint}
-              </span>
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 const soon = (): void => {
   toast.info(content.settings.soon);
 };
@@ -332,13 +293,15 @@ const soon = (): void => {
  * that only exists as a command is a policy nobody who has not read the grammar
  * will ever find.
  */
-function PrivacyPanel(): ReactNode {
+export function PrivacyPanel(): ReactNode {
   const copy = content.settings.privacy;
+  const settings = useSettings();
   const effects = useSyncExternalStore(
     subscribeEffects,
     getEffects,
     getEffectsServerSnapshot,
   );
+  const { openDetailPane } = useHub();
   const generalToll = effects.tolls.find((rule) => !rule.personId)?.sats ?? 0;
   const overrides = Object.keys(effects.conversationChainPolicy).length;
 
@@ -352,7 +315,34 @@ function PrivacyPanel(): ReactNode {
             toast.success(`${copy.reachSaved} ${next}`);
           }}
           options={[
-            { id: "everyone", label: copy.reachEveryone, hint: copy.reachEveryoneHint },
+            {
+              id: "everyone",
+              label: copy.reachEveryone,
+              hint: copy.reachEveryoneHint,
+              info: (
+                <InfoPopover
+                  label={copy.reachExplainLabel}
+                  trigger={
+                    <Info
+                      className="text-muted-foreground size-3.5"
+                      aria-hidden="true"
+                    />
+                  }
+                >
+                  <span className="block text-xs font-bold">
+                    {copy.reachExplainLabel}
+                  </span>
+                  {copy.reachExplain.map((para) => (
+                    <span
+                      key={para.slice(0, 24)}
+                      className="text-muted-foreground mt-1.5 block text-[11px] leading-relaxed text-pretty"
+                    >
+                      {para}
+                    </span>
+                  ))}
+                </InfoPopover>
+              ),
+            },
             { id: "contacts", label: copy.reachContacts, hint: copy.reachContactsHint },
             { id: "ecosystem", label: copy.reachEcosystem, hint: copy.reachEcosystemHint },
             { id: "toll", label: copy.reachToll, hint: copy.reachTollHint },
@@ -361,34 +351,21 @@ function PrivacyPanel(): ReactNode {
       </Group>
 
       <Group title={copy.tollTitle} hint={copy.tollHint}>
-        <div className="flex flex-wrap items-center gap-1.5 p-2.5">
-          {[0, 300, 1000, 5000].map((sats) => {
-            const selected = generalToll === sats;
-            return (
-              <button
-                key={sats}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => {
-                  setToll(undefined, sats === 0 ? null : sats);
-                  toast.success(sats === 0 ? copy.tollLifted : copy.tollSet);
-                }}
-                /* Selected is the border and the tint; the amount itself stays
-                   readable rather than turning accent-coloured. */
-                className={`focus-ring rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-                  selected
-                    ? "border-accent bg-accent/15 text-foreground"
-                    : "border-border text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {sats === 0 ? copy.tollOff : formatSats(sats)}
-              </button>
-            );
-          })}
+        <div className="p-2.5">
+          <SatsAmount
+            label={copy.tollTitle}
+            value={generalToll}
+            presets={[218, 2180]}
+            offLabel={copy.tollOff}
+            onPick={(sats) => {
+              setToll(undefined, sats === 0 ? null : sats);
+              toast.success(sats === 0 ? copy.tollLifted : copy.tollSet);
+            }}
+          />
         </div>
         {/* Said here because lifting the general toll is the one change people
             assume is total. BRC-218 §5.10(3) requires saying so out loud. */}
-        <Row label={copy.tollPerSender} hint={copy.tollPerSenderHint} />
+        <PerSenderTolls />
       </Group>
 
       <Group title={copy.chainTitle} hint={copy.chainHint}>
@@ -423,52 +400,51 @@ function PrivacyPanel(): ReactNode {
         />
       </Group>
 
+      <Group title={copy.trackingTitle}>
+        <Choice<CookiePolicy>
+          value={settings.cookies}
+          onPick={(next) => setSetting("cookies", next)}
+          options={[
+            { id: "third-party", label: copy.cookiesThird, hint: copy.cookiesHint },
+            { id: "allow", label: copy.cookiesAllow, hint: "" },
+            { id: "block", label: copy.cookiesBlock, hint: "" },
+          ]}
+        />
+        <Toggle
+          label={copy.trackers}
+          hint={copy.trackersHint}
+          value={settings.blockTrackers}
+          onChange={(next) => setSetting("blockTrackers", next)}
+        />
+        <Toggle
+          label={copy.doNotTrack}
+          hint={copy.doNotTrackHint}
+          value={settings.sendDoNotTrack}
+          onChange={(next) => setSetting("sendDoNotTrack", next)}
+        />
+      </Group>
+
+      <Group title={copy.quitTitle}>
+        <Choice<ClearOnQuit>
+          value={settings.clearOnQuit}
+          onPick={(next) => setSetting("clearOnQuit", next)}
+          options={[
+            { id: "nothing", label: copy.clearNothing, hint: "" },
+            { id: "history", label: copy.clearHistory, hint: "" },
+            { id: "everything", label: copy.clearEverything, hint: "" },
+          ]}
+        />
+      </Group>
+
       <Group title={copy.dataTitle}>
         <Row
           label={content.mobileBrowser.settings.clearData}
           hint={copy.clearDataHint}
-          onClick={soon}
+          onClick={() => openDetailPane({ kind: "clear-data", id: "" })}
         />
       </Group>
     </>
   );
-}
-
-/** A version-1 QR's module count, so the finder patterns land where they do. */
-const QR_SIZE = 21;
-
-/**
- * Whether one module of the decorative pairing code is dark.
- *
- * Not a real encoder — nothing here has anything to encode yet — but the three
- * finder squares are drawn properly, because those are what makes a block of
- * noise read as a QR rather than as a barcode. The rest is a hash of the
- * coordinates: deterministic, so the code does not reshuffle on every render and
- * look like a live token expiring while you line up your camera.
- */
-function qrCell(row: number, col: number): boolean {
-  const inFinder = (top: number, left: number): boolean =>
-    row >= top && row < top + 7 && col >= left && col < left + 7;
-  for (const [top, left] of [
-    [0, 0],
-    [0, QR_SIZE - 7],
-    [QR_SIZE - 7, 0],
-  ] as const) {
-    if (!inFinder(top, left)) continue;
-    const r = row - top;
-    const c = col - left;
-    const ring = r === 0 || r === 6 || c === 0 || c === 6;
-    const core = r >= 2 && r <= 4 && c >= 2 && c <= 4;
-    return ring || core;
-  }
-  // The one-module gap that separates a finder from the data around it.
-  const nearFinder =
-    (row < 8 && col < 8) ||
-    (row < 8 && col >= QR_SIZE - 8) ||
-    (row >= QR_SIZE - 8 && col < 8);
-  if (nearFinder) return false;
-  const hash = (row * 73856093) ^ (col * 19349663) ^ ((row + col) * 83492791);
-  return ((hash >>> 4) & 7) < 4;
 }
 
 /**
@@ -480,31 +456,17 @@ function qrCell(row: number, col: number): boolean {
  * decorative in a prototype — same trick the wallet's receive panel uses — but
  * the shape is the real one, so the steps beside it are the actual steps.
  */
+
 function SyncPanel(): ReactNode {
   const copy = content.settings.sync;
   return (
-    <section className="border-border mb-6 rounded-xl border p-6">
+    <section className="border-border bg-surface-raised mb-6 rounded-xl border p-6">
       <div className="flex flex-col items-center gap-4">
-        <div className="relative">
-          <div
-            className="grid size-44 grid-cols-21 gap-px rounded-2xl bg-white p-2.5"
-            role="img"
-            aria-label={copy.codeLabel}
-          >
-            {Array.from({ length: QR_SIZE * QR_SIZE }, (_, index) => (
-              <span
-                key={index}
-                className={
-                  qrCell(Math.floor(index / QR_SIZE), index % QR_SIZE)
-                    ? "bg-black"
-                    : "bg-transparent"
-                }
-              />
-            ))}
-          </div>
-          {/* The mark sits in the middle, as it does on every pairing code
-              people have already been trained by. */}
-          <span className="absolute inset-0 flex items-center justify-center">
+        {/* Flips up into place rather than fading in — see `.nexus-flip-in`.
+            The whole block turns together, mark included, so the code stays one
+            object instead of a card with a badge sliding about on it. */}
+        <div className="nexus-flip-in">
+          <QrBlock value="nexus-pairing" label={copy.codeLabel}>
             <span className="grid size-11 place-items-center rounded-xl bg-white ring-4 ring-white">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -514,7 +476,7 @@ function SyncPanel(): ReactNode {
                 className="size-9 rounded-lg object-contain"
               />
             </span>
-          </span>
+          </QrBlock>
         </div>
 
         <h3 className="text-center text-base font-bold text-pretty">
@@ -540,197 +502,473 @@ function SyncPanel(): ReactNode {
           onClick={soon}
           className="focus-ring text-accent rounded-md px-2 py-1 text-sm font-semibold hover:underline"
         >
-          {copy.byCode}
+          {copy.hasApp}
         </button>
       </div>
     </section>
   );
 }
 
-function GeneralPanel(): ReactNode {
+/**
+ * Which engine the address bar asks.
+ *
+ * A row that opens the list rather than a row that says "coming soon", because
+ * this is the one setting in a browser that decides who watches you type. Each
+ * entry carries a line on what it costs you, which is the part a name alone
+ * never says: "DuckDuckGo" and "Google" look like the same kind of choice until
+ * somebody tells you they are not.
+ */
+function SearchEnginePicker(): ReactNode {
+  const mobile = content.mobileBrowser.settings;
+  const [open, setOpen] = useState(false);
+  const [engineId, setEngineId] = useState(searchEngines[0]!.id);
+  const engine = getSearchEngine(engineId) ?? searchEngines[0]!;
+
+  return (
+    <>
+      <Row
+        label={mobile.searchEngine}
+        value={engine.name}
+        onClick={() => setOpen(true)}
+      />
+      <Sheet
+        open={open}
+        onClose={() => setOpen(false)}
+        label={mobile.searchEngine}
+      >
+        <div className="p-1.5">
+          {searchEngines.map((option) => {
+            const active = option.id === engine.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => {
+                  setEngineId(option.id);
+                  setOpen(false);
+                }}
+                className={`focus-ring flex w-full items-start gap-3 rounded-lg p-2.5 text-left transition-colors ${
+                  active ? "bg-accent/15" : "hover:bg-surface-hover"
+                }`}
+              >
+                {/* Its own mark, fetched from the engine's own host. A row of
+                    hand-drawn approximations of other people's logos is worse
+                    than no logos at all. */}
+                {option.iconSrc ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={option.iconSrc}
+                    alt=""
+                    aria-hidden="true"
+                    width={22}
+                    height={22}
+                    className="mt-0.5 size-5.5 shrink-0 rounded"
+                  />
+                ) : (
+                  <Favicon
+                    url={`https://${option.host}`}
+                    letter={option.name.slice(0, 1)}
+                    color={option.color}
+                    size={22}
+                    rounded="rounded"
+                    className="mt-0.5"
+                  />
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">
+                    {option.name}
+                  </span>
+                  <span className="text-muted-foreground mt-0.5 block text-[11px] text-pretty">
+                    {option.hint}
+                  </span>
+                </span>
+                {active && (
+                  <Check
+                    className="text-foreground mt-1 size-4 shrink-0"
+                    aria-hidden="true"
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+export function GeneralPanel(): ReactNode {
   const copy = content.settings.general;
   const mobile = content.mobileBrowser.settings;
+  const settings = useSettings();
+  const { openDetailPane } = useHub();
   return (
     <>
       <SyncPanel />
-      <Group title={copy.searchTitle}>
-        <Row
-          label={mobile.searchEngine}
-          value={mobile.searchEngineValue}
-          onClick={soon}
+      <Group title={mobile.startupTitle}>
+        <Choice<StartupBehaviour>
+          value={settings.startup}
+          onPick={(next) => setSetting("startup", next)}
+          options={[
+            { id: "continue", label: mobile.startupContinue, hint: "" },
+            { id: "new-tab", label: mobile.startupNewTab, hint: "" },
+            { id: "home", label: mobile.startupHome, hint: "" },
+          ]}
         />
-        <Row label={mobile.languages} onClick={soon} />
+        <Toggle
+          label={mobile.restoreProfile}
+          hint={mobile.restoreProfileHint}
+          value={settings.restoreProfile}
+          onChange={(next) => setSetting("restoreProfile", next)}
+        />
+      </Group>
+      <Group title={copy.searchTitle}>
+        <SearchEnginePicker />
+        <Row
+          label={mobile.languages}
+          hint={mobile.languagesHint}
+          value={getLanguage(settings.language)?.name ?? settings.language}
+          onClick={() => openDetailPane({ kind: "languages", id: "" })}
+        />
       </Group>
       <Group title={copy.linksTitle}>
-        <Row
-          label={mobile.openLinksIn}
-          value={mobile.openLinksInValue}
-          onClick={soon}
+        <Choice<OpenLinksIn>
+          value={settings.openLinksIn}
+          onPick={(next) => setSetting("openLinksIn", next)}
+          options={[
+            {
+              id: "nexus",
+              label: mobile.openLinksNexus,
+              hint: mobile.openLinksInHint,
+            },
+            { id: "native", label: mobile.openLinksNative, hint: "" },
+          ]}
         />
-        <Row label={mobile.setDefault} onClick={soon} />
+        {/* A toggle rather than a button that says "Set…": the state it puts
+            you in is one you can be in already, and a button offering to do
+            what is already done is the commonest lie in a settings page. */}
+        <Toggle
+          label={mobile.setDefault}
+          hint={mobile.setDefaultHint}
+          value={settings.defaultBrowser}
+          onChange={(next) => {
+            setSetting("defaultBrowser", next);
+            toast.success(
+              next ? mobile.setDefaultToast : mobile.setDefaultUndone,
+            );
+          }}
+        />
       </Group>
       {/* No "Sync with Nexus Desktop" row: the panel at the top of this page is
           that, and a link to the thing you are already looking at is furniture. */}
       <Group title={copy.deviceTitle}>
-        <Row label={mobile.changeIcon} onClick={soon} />
-        <Row label={mobile.addToHome} onClick={soon} />
-        <Row label={mobile.autoKeyboard} onClick={soon} />
+        <Choice<string>
+          value={settings.appIcon}
+          onPick={(next) => {
+            setSetting("appIcon", next);
+            toast.success(mobile.iconToast, {
+              description: APP_ICONS.find((icon) => icon.id === next)?.label,
+            });
+          }}
+          options={APP_ICONS.map((icon) => ({
+            id: icon.id,
+            label: icon.label,
+            hint: icon.id === settings.appIcon ? mobile.changeIconHint : "",
+          }))}
+        />
+        <Toggle
+          label={mobile.autoKeyboard}
+          value={settings.autoKeyboard}
+          onChange={(next) => setSetting("autoKeyboard", next)}
+        />
+        {/* Steps rather than a button: nothing in a web app can put an icon on
+            a home screen, and a control that cannot do what it says is worse
+            than an instruction that admits it. */}
+        <Row label={mobile.addToHome} hint={mobile.addToHomeNote} />
       </Group>
     </>
   );
 }
 
-function BrowsingPanel(): ReactNode {
+export function BrowsingPanel(): ReactNode {
   const copy = content.settings.browsing;
+  const settings = useSettings();
   const mobile = content.mobileBrowser.settings;
-  const { setLibraryTab } = useHub();
+  const { openDetailPane } = useHub();
   return (
     <>
       <Group title={copy.sitesTitle}>
-        <Row label={mobile.globalSiteSettings} onClick={soon} />
+        <Row
+          label={mobile.globalSiteSettings}
+          hint={content.settings.sites.title}
+          onClick={() => openDetailPane({ kind: "sites", id: "" })}
+        />
       </Group>
       <Group title={copy.tabsTitle}>
-        <Row
+        <Steps
           label={mobile.archiveInactive}
-          value={mobile.archiveInactiveValue}
-          onClick={soon}
+          value={settings.archiveAfter}
+          options={[0, 1, 7, 30]}
+          format={(n) =>
+            n === 0
+              ? mobile.archiveNever
+              : n === 1
+                ? mobile.archiveDay
+                : n === 7
+                  ? mobile.archiveWeek
+                  : mobile.archiveMonth
+          }
+          onPick={(next) => setSetting("archiveAfter", next as ArchiveAfter)}
         />
-        <Row label={mobile.archive} onClick={soon} />
+        <Row label={mobile.archive} hint={mobile.archiveEmptyHint} value="0" />
       </Group>
       <Group title={copy.filesTitle}>
-        {/* Goes where the thing itself is rather than reimplementing it here:
-            the downloads panel already exists in the rail. */}
+        {/* Its own pane rather than a jump to the rail's panel: the question
+            that brings somebody here is "where did that file go", and the rail
+            only ever shows the profile you are browsing in. */}
         <Row
           label={mobile.downloads}
           hint={copy.downloadsHint}
-          onClick={() => setLibraryTab("downloads")}
+          value={`${getDownloads().length}`}
+          onClick={() => openDetailPane({ kind: "downloads", id: "" })}
+        />
+      </Group>
+      <Group title={copy.readingTitle}>
+        {/* Steps rather than a slider: a slider invites a value nobody wants,
+            and these are the sizes a page is actually readable at. */}
+        <Steps
+          label={copy.zoom}
+          value={settings.zoom}
+          options={[80, 90, 100, 110, 125, 150]}
+          format={(n) => `${n}%`}
+          onPick={(next) => setSetting("zoom", next)}
+        />
+        <Steps
+          label={copy.fontSize}
+          value={settings.fontSize}
+          options={[14, 16, 18, 20]}
+          format={(n) => `${n}px`}
+          onPick={(next) => setSetting("fontSize", next)}
+        />
+        <Toggle
+          label={copy.pdfs}
+          hint={copy.pdfsHint}
+          value={settings.openPdfsInNexus}
+          onChange={(next) => setSetting("openPdfsInNexus", next)}
+        />
+        <Toggle
+          label={copy.translate}
+          hint={copy.translateHint}
+          value={settings.translateOffer}
+          onChange={(next) => setSetting("translateOffer", next)}
+        />
+      </Group>
+
+      {/* Off by default, and grouped as its own thing rather than mixed in with
+          tabs and files: every switch in here widens what a page is allowed to
+          see, which is a different kind of decision from where downloads go. */}
+      <Group title={copy.devTitle} hint={copy.devHint}>
+        <Toggle
+          label={copy.devToolsLabel}
+          hint={copy.devToolsHint}
+          value={settings.devTools}
+          badge={copy.devToolsShortcut}
+          onChange={(next) => {
+            setSetting("devTools", next);
+            toast.success(next ? copy.devToolsOn : copy.devToolsOff, {
+              ...(next ? { description: copy.devWarn } : {}),
+            });
+          }}
+        />
+        <Toggle
+          label={copy.devOverlayLabel}
+          hint={copy.devOverlayHint}
+          value={settings.overlayInspector}
+          onChange={(next) => setSetting("overlayInspector", next)}
+        />
+        <Toggle
+          label={copy.devUnsafeLabel}
+          hint={copy.devUnsafeHint}
+          value={settings.unsignedRepos}
+          onChange={(next) => setSetting("unsignedRepos", next)}
         />
       </Group>
     </>
   );
 }
 
-function AppearancePanel(): ReactNode {
+/**
+ * Light, dark, or whatever the device says.
+ *
+ * Icons alone. Three words next to three unmistakable pictures is the kind of
+ * label that only adds width, and this control is the same in every product a
+ * reader has used.
+ */
+function ModePicker(): ReactNode {
   const copy = content.settings.appearance;
   const { activeSpaceId } = useHub();
+  const { profileMode, setProfileMode } = useCustomTheme();
+  /*
+   * Sets the profile's mode, not the document's.
+   *
+   * This called next-themes directly, which looks right for one frame and is
+   * then undone: the theme provider forces the active profile's saved mode
+   * whenever it changes, so the picker was fighting a rule that always won and
+   * the control simply appeared not to work. Modes belong to a profile here —
+   * that is the whole reason a profile can look different from the one next to
+   * it — so the picker has to say which profile it is talking about.
+   *
+   * Auto clears the profile's mode rather than storing "system", which is what
+   * hands it back to the operating system.
+   */
+  const current = profileMode(activeSpaceId) ?? "system";
+  const modes: { id: "light" | "dark" | "system"; label: string; icon: LucideIcon }[] =
+    [
+      { id: "light", label: copy.modeLight, icon: Sun },
+      { id: "dark", label: copy.modeDark, icon: Moon },
+      { id: "system", label: copy.modeAuto, icon: Monitor },
+    ];
   return (
-    <Group title={copy.themeTitle} hint={copy.themeHint}>
-      <div className="flex items-center gap-3 p-3">
-        {/* The picker the browser chrome already uses, so there is one theme
-            editor in the product rather than two that can disagree. Themes are
-            per profile, which is why it needs to be told which one. */}
-        <ThemeButton
-          spaceId={activeSpaceId}
-          className="focus-ring border-border hover:bg-surface-hover inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold"
-        />
-        <span className="text-muted-foreground text-[11px] text-pretty">
-          {copy.themeProfile}
-        </span>
-      </div>
-    </Group>
-  );
-}
-
-type HostInfo = { version?: string; shell?: string; platform?: string };
-
-/**
- * The shell's version, for the About panel of a shipping build.
- *
- * The fixture release list describes the design repo, not the binary the user
- * is running: the number worth quoting in a bug report is the shell
- * manifest's, asked over the bridge. Same check-then-subscribe as
- * components/hub/shell-version.tsx — the host client can be injected after
- * this mounts (the react-native-webview onPageStarted race), and a mount-only
- * check would leave the version permanently blank when injection loses it.
- */
-function HostVersionBlock(): ReactNode {
-  const [info, setInfo] = useState<HostInfo | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    const ask = (): boolean => {
-      const host = (
-        window as unknown as { nexusHost?: { info?: () => Promise<HostInfo> } }
-      ).nexusHost;
-      if (!host?.info) return false;
-      host
-        .info()
-        .then((next) => {
-          if (alive) setInfo(next);
-        })
-        .catch(() => {
-          // Better a blank version than a wrong one.
-        });
-      return true;
-    };
-    if (ask()) {
-      return () => {
-        alive = false;
-      };
-    }
-    const onReady = (): void => void ask();
-    window.addEventListener("nexushost:ready", onReady, { once: true });
-    return () => {
-      alive = false;
-      window.removeEventListener("nexushost:ready", onReady);
-    };
-  }, []);
-
-  return (
-    <div className="flex items-center gap-3 px-3 py-3">
-      <IdentitySigil
-        value={info?.version ?? content.brand.name}
-        size={44}
-        className="shrink-0 rounded-xl"
-      />
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold">
-          {content.brand.name}
-          {info?.version ? ` v${info.version}` : ""}
-        </span>
-        <span className="text-muted-foreground mt-0.5 block text-[11px] text-pretty">
-          {info ? `${info.shell ?? "?"} · ${info.platform ?? "?"}` : "no shell connected"}
-        </span>
-      </span>
+    <div
+      role="radiogroup"
+      aria-label={copy.themeTitle}
+      /* `surface`, not `muted`: in dark those two tokens are the same
+             colour, so a muted track on a raised card had no edge at all.
+             Surface is a step darker than the card in dark and a step greyer
+             in light, which is what an inset track should be in both. */
+          className="bg-surface ring-border/60 m-3 grid grid-cols-3 gap-0.5 rounded-lg p-0.5 ring-1"
+    >
+      {modes.map((mode) => {
+        const active = current === mode.id;
+        return (
+          <button
+            key={mode.id}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            aria-label={mode.label}
+            title={mode.label}
+            onClick={() =>
+              setProfileMode(activeSpaceId, mode.id === "system" ? null : mode.id)
+            }
+            /* Tint behind, glyph unchanged — the house rule. */
+            className={`focus-ring flex items-center justify-center rounded-md py-2 transition-colors ${
+              active
+                ? "bg-accent/20 text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <mode.icon className="size-4" aria-hidden="true" />
+          </button>
+        );
+      })}
     </div>
   );
 }
 
+export function AppearancePanel(): ReactNode {
+  const copy = content.settings.appearance;
+  const { spaces, setSpaceThemeColor } = useHub();
+  const brandMode = useBrandMode();
+  const custom = spaces.filter(
+    (space) => space.themeColor && space.themeColor !== DEFAULT_ACCENT,
+  );
+
+  return (
+    <>
+      <Group title={copy.themeTitle} hint={copy.themeHint}>
+        <ModePicker />
+        {/* One look across every profile. Per-profile palettes were a way to
+            tell them apart at a glance, and the profile's own name and mark
+            already do that without giving each one its own idea of what an
+            accent means. */}
+        <Row
+          label={copy.themeDefault}
+          {...(custom.length > 0
+            ? {
+                value: copy.themeReset,
+                onClick: () => {
+                  custom.forEach((space) =>
+                    setSpaceThemeColor(space.id, DEFAULT_ACCENT),
+                  );
+                  toast.success(copy.themeResetDone);
+                },
+              }
+            : {})}
+        />
+      </Group>
+
+      {/* What the reader wants the chain called. The scope note is not
+          decoration: a setting that says it renames something had better say
+          what it will not rename, or the first person to open the licence and
+          find the old name will think it is broken. */}
+      <Group title={copy.brandTitle} hint={copy.brandHint}>
+        <Choice<BrandMode>
+          value={brandMode}
+          onPick={setBrandMode}
+          options={[
+            { id: "bsv", label: BRANDS.bsv.label, hint: BRANDS.bsv.hint },
+            {
+              id: "bitcoinsv",
+              label: BRANDS.bitcoinsv.label,
+              hint: BRANDS.bitcoinsv.hint,
+            },
+          ]}
+        />
+        <p className="text-muted-foreground border-border/60 border-t px-3 py-2.5 text-[11px] text-pretty">
+          {copy.brandScope}
+        </p>
+      </Group>
+    </>
+  );
+}
 /**
  * About: which build this is, and the way into what changed.
  *
- * In demo the version comes from the release list rather than from a constant,
- * so there is one place a release is recorded and no way for the number shown
- * here to disagree with the notes behind it. A live build shows the shell's
- * version instead — the fixture number would describe a different artifact.
+ * The version comes from the release list rather than from a constant, so there
+ * is one place a release is recorded and no way for the number shown here to
+ * disagree with the notes behind it.
  */
-function AboutPanel(): ReactNode {
+export function AboutPanel(): ReactNode {
   const copy = content.settings.about;
+  const settings = useSettings();
+  const [betaAsk, setBetaAsk] = useState(false);
   const { openDetailPane } = useHub();
   return (
     <>
       <Group title={copy.versionTitle}>
-        {DEMO_SURFACES ? (
-          <div className="flex items-center gap-3 px-3 py-3">
-            <IdentitySigil
-              value={currentRelease.version}
-              size={44}
-              className="shrink-0 rounded-xl"
-            />
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold">
-                {content.brand.name} v{currentRelease.version}
-              </span>
-              <span className="text-muted-foreground mt-0.5 block text-[11px] text-pretty">
-                {copy.released}{" "}
-                <time dateTime={currentRelease.date}>{currentRelease.date}</time>{" "}
-                · {currentRelease.headline}
-              </span>
+        {/* Straight to this release's own notes, not the list of every release:
+            somebody clicking the build they are running is asking what is in it,
+            and the list is one row below if they wanted the others. */}
+        <button
+          type="button"
+          onClick={() =>
+            openDetailPane({ kind: "release", id: currentRelease.version })
+          }
+          className="focus-ring hover:bg-surface-hover flex w-full items-center gap-3 px-3 py-3 text-left"
+        >
+          <IdentitySigil
+            value={currentRelease.version}
+            size={44}
+            className="shrink-0 rounded-xl"
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold">
+              {content.brand.name} v{currentRelease.version}
             </span>
-          </div>
-        ) : (
-          <HostVersionBlock />
-        )}
+            <span className="text-muted-foreground mt-0.5 block text-[11px] text-pretty">
+              {copy.released}{" "}
+              <time dateTime={currentRelease.date}>{currentRelease.date}</time>{" "}
+              · {currentRelease.headline}
+            </span>
+          </span>
+          <ChevronRight
+            className="text-muted-foreground size-4 shrink-0"
+            aria-hidden="true"
+          />
+        </button>
         <Row
           label={copy.whatsNew}
           hint={copy.whatsNewHint}
@@ -738,7 +976,173 @@ function AboutPanel(): ReactNode {
           onClick={() => openDetailPane({ kind: "releases", id: "" })}
         />
       </Group>
+
+      <Group title={copy.channelTitle} hint={copy.channelHint}>
+        {/* Stable is one click; Beta asks first. The asymmetry is the point —
+            going back is free and going forward is the decision. */}
+        <Choice<"stable" | "beta">
+          value={settings.updateChannel}
+          onPick={(next) => {
+            if (next === settings.updateChannel) return;
+            if (next === "beta") {
+              setBetaAsk(true);
+              return;
+            }
+            setSetting("updateChannel", next);
+            /* Coming back gets a line too, so the safe choice is not the
+               silent one. A lock rather than a tick: what you are getting is
+               not confirmation, it is the build we have hammered on longest. */
+            toast.success(copy.stableDone, {
+              icon: <span aria-hidden="true">🔒</span>,
+            });
+          }}
+          options={[
+            { id: "stable", label: copy.channelStable, hint: "" },
+            { id: "beta", label: copy.channelBeta, hint: "" },
+          ]}
+        />
+      </Group>
+
+      {betaAsk && (
+        <BetaDialog
+          onCancel={() => setBetaAsk(false)}
+          onConfirm={() => {
+            setSetting("updateChannel", "beta");
+            setBetaAsk(false);
+            /* The dialog's rocket carries through to the confirmation, in
+               place of the tick every other toast gets: the tick says a thing
+               worked, and this one is going somewhere. */
+            toast.success(copy.betaDone, {
+              icon: <span aria-hidden="true">🚀</span>,
+            });
+          }}
+        />
+      )}
     </>
+  );
+}
+
+/** The Swiss flag: red square, white cross. Small enough to be a word. */
+function SwissFlag(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      className="inline size-3.5 rounded-[3px]"
+      aria-hidden="true"
+    >
+      <rect width="32" height="32" fill="#DA291C" />
+      <rect x="13" y="6" width="6" height="20" fill="#fff" />
+      <rect x="6" y="13" width="20" height="6" fill="#fff" />
+    </svg>
+  );
+}
+
+/**
+ * Who made this, at the foot of About.
+ *
+ * The same line the landing page signs off with, so the product and the page
+ * that sells it say it the same way. About only: this is the category that is
+ * already about provenance, and repeating a colophon under the theme picker
+ * makes it furniture rather than a signature.
+ *
+ * The reds are fixed hex rather than tokens: a Swiss flag and a heart are the
+ * colours they are, and re-tinting them per theme would make them something
+ * else.
+ */
+function SettingsFooter(): ReactNode {
+  const copy = content.settings.footer;
+  const { openDetailPane } = useHub();
+  const brand = useBrand();
+  const link =
+    "hover:text-foreground underline decoration-transparent transition-colors hover:decoration-current";
+  return (
+    /* Stacked and centred rather than split left and right: the landing page has
+       a full page width to put those two ends of, and in a 2xl settings column
+       they collide and wrap mid-phrase. Centring holds the block together as one
+       colophon instead of four ragged lines against the left edge. */
+    <footer className="border-border/60 text-muted-foreground mt-8 flex flex-col items-center gap-1.5 border-t pt-5 text-center text-[11px]">
+      <p className="flex flex-wrap items-center justify-center gap-x-1.5">
+        <span>{copy.creed}</span>
+        <span aria-hidden="true">·</span>
+        <span className="inline-flex items-center gap-1.5">
+          {copy.madeWith}
+          {/* `fill` as a prop, not a utility: lucide ships `fill="none"` on the
+              svg, and a solid heart is the point of it. */}
+          <Heart
+            className="size-3 text-[#DA291C]"
+            fill="currentColor"
+            aria-hidden="true"
+          />
+          {copy.madeIn} <SwissFlag /> {copy.country}
+        </span>
+      </p>
+      <p className="flex flex-wrap items-center justify-center gap-x-1.5">
+        {/* The lockup, under the promise it is making. What the product is for
+            is worth more of the reader's attention than what it is called. */}
+        <span className="text-foreground font-semibold">
+          {content.brand.name}
+        </span>
+        <span aria-hidden="true">/</span>
+        <span>{content.brand.slogan}</span>
+        <span aria-hidden="true">·</span>
+        {/* In the app, not out to GitHub: the terms that bind you are the ones
+            shipped with the copy you are running, and a page on a server can
+            change after you install. The pane links out to the canonical copy
+            for anybody who wants to check the two agree. */}
+        <button
+          type="button"
+          onClick={() => openDetailPane({ kind: "licence", id: "" })}
+          className={`focus-ring rounded ${link}`}
+        >
+          {copy.copyright} {licence.short}
+        </button>
+      </p>
+      {/* Both credits on their own row: the lockup line is this product's own
+          signature, and who it is from is a separate claim. */}
+      <p className="flex flex-wrap items-center justify-center gap-x-1.5">
+        <a
+          href={copy.associationUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`inline-flex items-center gap-1.5 ${link}`}
+        >
+          {/* The association's own favicon rather than a generic verified tick:
+              a mark somebody else controls says who this is, where a check we
+              draw ourselves only says we approve of them. */}
+          <Favicon
+            url={copy.associationUrl}
+            letter="B"
+            color="#1d9bf0"
+            size={14}
+          />
+          {copy.association}
+        </a>
+        <span aria-hidden="true">·</span>
+        <a
+          href={copy.networkUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={link}
+        >
+          {copy.poweredBy} {brand.name}
+        </a>
+      </p>
+      {/* The BRC authors get their own line rather than a clause on the end of
+          somebody else's. Nothing in this client is its own invention: every
+          verb it speaks is a standard somebody else wrote down first. */}
+      <p>
+        {copy.thanksBefore}{" "}
+        <a
+          href={copy.thanksUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={link}
+        >
+          {copy.thanksLink}
+        </a>
+        {copy.thanksAfter}
+      </p>
+    </footer>
   );
 }
 
@@ -750,43 +1154,17 @@ function AboutPanel(): ReactNode {
  * rest of the product.
  */
 export function SettingsApp(): ReactNode {
-  const { settingsCategory: requestedCategory, setSettingsCategory } = useHub();
+  const { settingsCategory: requestedCategory } = useHub();
   const settingsCategory = resolveCategory(requestedCategory);
   const category = SETTINGS_CATEGORIES.find(
     (entry) => entry.id === settingsCategory,
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col">
-      {/* Mobile category tabs; the sidebar carries these at md+ — same split as
-          the wallet's section nav. Without them a phone (which never sees the
-          panel column) lands on one category with no way to the others. */}
-      <nav
-        aria-label={content.settings.title}
-        className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-3 py-2 md:hidden"
-      >
-        {SETTINGS_CATEGORIES.map(({ id, label, icon: Icon }) => {
-          const active = id === settingsCategory;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setSettingsCategory(id)}
-              aria-current={active ? "page" : undefined}
-              className={`focus-ring flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                active
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:bg-surface-hover"
-              }`}
-            >
-              <Icon className="size-3.5" aria-hidden="true" />
-              {label}
-            </button>
-          );
-        })}
-      </nav>
-
-      <div className="min-h-0 flex-1 overflow-y-auto">
+    /* `overscroll-contain` so a flick that reaches the end of settings does not
+       carry on and scroll the shell behind it — the usual annoyance on a phone,
+       where the two scrollers are the same gesture. */
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
       <div className="mx-auto max-w-2xl px-5 py-6 sm:px-8">
         <header className="mb-5">
           <h1 className="text-lg font-bold">{category?.label}</h1>
@@ -794,13 +1172,22 @@ export function SettingsApp(): ReactNode {
             {category?.hint}
           </p>
         </header>
+        {/* Ours, and the one panel here that is live rather than drawn: keys,
+            network and BRC-157 backup all reach @nexus/wallet-core. It sits
+            first because on a shipping build it is the only reason to open
+            Settings at all. */}
         {settingsCategory === "wallet" && <WalletSettingsPanel />}
         {settingsCategory === "general" && <GeneralPanel />}
         {settingsCategory === "privacy" && <PrivacyPanel />}
+        {settingsCategory === "permissions" && <PermissionsPanel />}
+        {settingsCategory === "autofill" && <AutofillPanel />}
         {settingsCategory === "browsing" && <BrowsingPanel />}
+        {settingsCategory === "shortcuts" && <ShortcutsPanel />}
         {settingsCategory === "appearance" && <AppearancePanel />}
         {settingsCategory === "about" && <AboutPanel />}
-      </div>
+        {/* About only: the colophon belongs with provenance, not under the
+            theme picker. */}
+        {settingsCategory === "about" && <SettingsFooter />}
       </div>
     </div>
   );

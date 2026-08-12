@@ -44,6 +44,7 @@ import {
   ChainPolicyMark,
   usePermanenceGate,
 } from "@/components/apps/messages/chain-policy";
+import { AppMenu } from "@/components/hub/app-menu";
 import { ArrowLeft, Settings } from "lucide-react";
 import {
   useEffect,
@@ -301,6 +302,11 @@ export function GroupThread({
             <Settings className="size-5" aria-hidden="true" />
           </button>
         </Tooltip>
+
+        {/* Messages draws its own chrome, so it never got the pane header that
+            carries this everywhere else — which left it the one app you could
+            not open a split from. */}
+        <AppMenu slug="messages" className="p-2" />
         </div>
 
         <ChatTabs

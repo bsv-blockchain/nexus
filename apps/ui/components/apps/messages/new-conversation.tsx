@@ -57,7 +57,14 @@ export function NewConversation({
     (person) =>
       !needle ||
       person.name.toLowerCase().includes(needle) ||
-      handleOf(person).toLowerCase().includes(needle),
+      handleOf(person).toLowerCase().includes(needle) ||
+      /* Attested accounts are searchable too: people are far likelier to know
+         somebody by the name they use on X than by a Nexus handle they have
+         never seen. Only attested ones, so a search cannot be gamed by
+         claiming a name you have not proved. */
+      (person.socials ?? []).some((social) =>
+        social.handle.toLowerCase().includes(needle),
+      ),
   );
 
   const grouping = mode === "group";

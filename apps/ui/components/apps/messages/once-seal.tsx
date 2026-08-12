@@ -367,7 +367,7 @@ function Addressees({
                 </>
               ) : (
                 <>
-                  <Lock className="text-accent size-3" aria-hidden="true" />
+                  <Lock className="size-3" aria-hidden="true" />
                   {copy.waitingShort}
                 </>
               )}
@@ -438,7 +438,13 @@ export function OnceSeal({
       ) : (
         <div className="bg-surface flex items-center gap-2 rounded-lg px-2 py-1.5">
           <span
-            className={state === "sealed" ? "text-accent" : "text-muted-foreground"}
+            /* Sealed is the ordinary state of a seal, not a highlight. The
+               accent here made every unopened /once compete with the accent
+               that means "act on this", and the lock already says which state
+               it is in. */
+            className={
+              state === "sealed" ? "text-foreground" : "text-muted-foreground"
+            }
             aria-hidden="true"
           >
             {state === "sealed" ? (

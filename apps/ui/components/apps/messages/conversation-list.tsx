@@ -28,7 +28,14 @@ import {
   type MessagePerson,
 } from "@/lib/data";
 import { firstName, formatMessageDate } from "@/lib/messages";
-import { BellOff, Bookmark, BookmarkX, Paperclip, Search } from "lucide-react";
+import {
+  BellOff,
+  Bookmark,
+  BookmarkX,
+  Info,
+  Paperclip,
+  Search,
+} from "lucide-react";
 import {
   useMemo,
   useState,
@@ -328,11 +335,20 @@ function SavedRow({ entry }: { entry: SavedMessage }): ReactNode {
  * same question — where do I go next — and only one of them is ever wanted.
  */
 export function ConversationList(): ReactNode {
-  const { messagesUnreadOnly, conversationFlags } = useHub();
+  const {
+    messagesUnreadOnly,
+    conversationFlags,
+    detailPane,
+    openDetailPane,
+    closeDetailPane,
+  } = useHub();
   const [query, setQuery] = useState("");
   const [showSaved, setShowSaved] = useState(false);
   const rows = useConversationRows();
   const copy = content.messages;
+  /** The pane is already showing this app's help, so the button closes it. */
+  const helpOpen =
+    detailPane?.kind === "onboarding" && detailPane.id === "messages";
   const saved = useSyncExternalStore(
     subscribeEffects,
     getEffects,
@@ -467,7 +483,7 @@ export function ConversationList(): ReactNode {
           title={copy.saved.title}
           className={`focus-ring inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-semibold transition-colors ${
             showSaved
-              ? "bg-accent/15 text-accent"
+              ? "bg-accent/15 text-foreground"
               : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
           }`}
         >
@@ -479,7 +495,35 @@ export function ConversationList(): ReactNode {
           )}
           {showSaved && <span>{copy.saved.showing}</span>}
         </button>
-        <ChainPolicyButton />
+        <span className="flex items-center gap-0.5">
+          <ChainPolicyButton />
+          {/*
+            Messages draws its own chrome, so it never gets the app header that
+            carries this button everywhere else — without one here the app with
+            the most to explain is the only one you cannot ask.
+
+            A toggle rather than an open: the pane takes width from the thread,
+            so the control that opened it has to be the one that gives it back.
+          */}
+          <button
+            type="button"
+            onClick={() =>
+              helpOpen
+                ? closeDetailPane()
+                : openDetailPane({ kind: "onboarding", id: "messages" })
+            }
+            aria-pressed={helpOpen}
+            aria-label={content.onboarding.button}
+            title={content.onboarding.button}
+            className={`focus-ring rounded-md p-1.5 transition-colors ${
+              helpOpen
+                ? "bg-accent/15 text-foreground"
+                : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+            }`}
+          >
+            <Info className="size-4" aria-hidden="true" />
+          </button>
+        </span>
       </div>
       </div>
     </div>

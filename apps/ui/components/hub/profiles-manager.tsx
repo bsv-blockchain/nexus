@@ -3,6 +3,11 @@
 import { PRIMARY_CTA } from "@/components/hub/cta";
 import { useHub } from "@/components/hub/hub-provider";
 import { SpaceContent } from "@/components/hub/space-content";
+import {
+  SpaceDragProvider,
+  useSpaceDrag,
+} from "@/components/hub/space-drag";
+import { ProfileConnections } from "@/components/hub/profile-connections";
 import { SpaceIcon } from "@/components/hub/space-icon";
 import { SpaceMenu } from "@/components/hub/space-menu";
 import { ThemeButton } from "@/components/hub/theme-picker";
@@ -54,9 +59,17 @@ function columnTheme(
  * with an edit affordance, a drag handle to reorder, and an options menu.
  */
 export function ProfilesManager(): ReactNode {
-  const { spaces, activeSpaceId, moveSpace, createSpace } = useHub();
-  // The active profile is shown in the left sidebar, so omit it here.
-  const columns = spaces.filter((space) => space.id !== activeSpaceId);
+  const { spaces, moveSpace, createSpace } = useHub();
+  /*
+   * Every profile, the active one included.
+   *
+   * It used to be held back because the left column was showing it, which made
+   * the manager a view of "the others" — you could not compare the profile you
+   * were in against the ones you were not, which is the only reason to open
+   * this screen. It is a column like the rest now, marked by a ring rather than
+   * by absence.
+   */
+  const columns = spaces;
   const [dragId, setDragId] = useState<string | null>(null);
   const [over, setOver] = useState<{
     id: string;
@@ -75,6 +88,7 @@ export function ProfilesManager(): ReactNode {
   };
 
   return (
+    <SpaceDragProvider>
     <div className="flex h-full items-stretch gap-3 py-4 pr-2 pl-4">
       {columns.map((space) => (
         <ProfileColumn
@@ -113,6 +127,7 @@ export function ProfilesManager(): ReactNode {
         </button>
       </div>
     </div>
+    </SpaceDragProvider>
   );
 }
 
@@ -135,25 +150,38 @@ function ProfileColumn({
   onDragLeave: () => void;
   onDrop: (event: React.DragEvent) => void;
 }): ReactNode {
-  const { activeSpaceId, setActiveSpaceId, setMainView } = useHub();
+  const { activeSpaceId, setActiveSpaceId } = useHub();
   const { profileTheme, previewFor } = useCustomTheme();
-  const [menu, setMenu] = useState<null | "top" | "bottom">(null);
+  const [menu, setMenu] = useState<
+    null | "top" | "bottom" | "icon" | "rename"
+  >(null);
+  const [tab, setTab] = useState<"connections" | "browsing">("connections");
+  const { drag } = useSpaceDrag();
   const isActive = space.id === activeSpaceId;
   // While this column's theme picker is open, show its unsaved edit live.
   const liveTheme = previewFor(space.id) ?? profileTheme(space.id);
   const scopedTheme = columnTheme(liveTheme, isActive);
 
-  const activate = () => {
-    setActiveSpaceId(space.id);
-    setMainView("app");
-  };
+  /*
+   * Makes it the active profile and stays put.
+   *
+   * It used to jump to the app canvas, which meant the only way to look at a
+   * profile was to stop looking at the others — and the click that was supposed
+   * to say "this one" also said "and take me somewhere else". The ring and the
+   * left column both move; nothing navigates.
+   */
+  const activate = () => setActiveSpaceId(space.id);
 
   return (
     <div
       style={scopedTheme}
       className={`relative flex h-full w-72 shrink-0 flex-col rounded-2xl bg-surface p-3 text-foreground transition-opacity ${
         isDragging ? "opacity-40" : ""
-      } ${isActive ? "" : "cursor-pointer"}`}
+      } ${
+        isActive
+          ? "ring-accent ring-2"
+          : "ring-border/60 cursor-pointer ring-1"
+      }`}
       onClick={
         isActive
           ? undefined
@@ -165,7 +193,24 @@ function ProfileColumn({
               }
             }
       }
-      onDragOver={onDragOver}
+      onDragOver={(event) => {
+        /*
+         * Reveal the list a drop would land in.
+         *
+         * A column showing Connections has nowhere visible to put a bookmark,
+         * so dragging over it looked like a refusal. Switching to Browsing on
+         * hover shows the target and the drop line in it — the alternative is
+         * asking somebody to click a tab with something already in their hand.
+         *
+         * Only for a drag that came from another column, and only towards
+         * Browsing: nothing here ever switches a column back, because that
+         * would undo a tab somebody chose while they were merely passing over.
+         */
+        if (drag && drag.fromSpaceId !== space.id && tab !== "browsing") {
+          setTab("browsing");
+        }
+        onDragOver(event);
+      }}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
@@ -182,18 +227,30 @@ function ProfileColumn({
         />
       )}
 
-      {/* Header: icon + name (opens the profile) + edit menu */}
-      <div className="relative flex items-center gap-2 px-1.5 pb-2">
+      {/*
+        Header: the icon and the name are each the control for themselves.
+        Clicking the icon asks for an icon and clicking the name asks to
+        rename — both were a pencil two elements away, which is a menu standing
+        in for the two things people actually point at. Activating the profile
+        is the column's own click, which already works anywhere else on it.
+      */}
+      <div className="relative flex items-center gap-1 px-1.5 pb-2">
         <button
           type="button"
-          onClick={activate}
-          aria-label={`Open ${space.name}`}
-          className="focus-ring flex min-w-0 flex-1 items-center gap-2 rounded-md p-1 text-left transition-colors hover:bg-surface-hover"
+          onClick={() => setMenu("icon")}
+          aria-label={`${space.name} icon`}
+          title={content.spaceMenu.iconPanelTitle}
+          className="focus-ring hover:bg-surface-hover shrink-0 rounded-md p-1 transition-colors"
         >
           <SpaceIcon value={space.emoji} size={18} />
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-            {space.name}
-          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMenu("rename")}
+          aria-label={`Rename ${space.name}`}
+          className="focus-ring hover:bg-surface-hover min-w-0 flex-1 truncate rounded-md p-1 text-left text-sm font-semibold transition-colors"
+        >
+          {space.name}
         </button>
         <button
           type="button"
@@ -203,21 +260,62 @@ function ProfileColumn({
         >
           <Pencil className="size-3.5" aria-hidden="true" />
         </button>
+        {/* Keyed by intent so each opens on the panel it was asked for; the
+            view is read once per mount. */}
         <SpaceMenu
-          open={menu === "top"}
+          key={menu ?? "closed"}
+          open={menu === "top" || menu === "icon"}
           onClose={() => setMenu(null)}
           spaceId={space.id}
+          initialView={menu === "icon" ? "icon" : "root"}
+          initialDialog={menu === "rename" ? "rename" : null}
           className="top-9 right-0"
         />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <SpaceContent spaceId={space.id} managerSpaceId={space.id} />
+      {/* Connections first: what a profile *is* comes before what it has
+          open. Browsing keeps the tabs and bookmarks, which is also what makes
+          them draggable between columns. */}
+      <div
+        role="tablist"
+        aria-label={space.name}
+        className="bg-surface-raised ring-border/60 mb-2 grid grid-cols-2 gap-0.5 rounded-lg p-0.5 ring-1"
+      >
+        {(["connections", "browsing"] as const).map((id) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+            className={`focus-ring rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
+              tab === id
+                ? "bg-accent/20 text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {id === "connections"
+              ? content.profiles.tabConnections
+              : content.profiles.tabBrowsing}
+          </button>
+        ))}
       </div>
 
-      {/* Footer: theme palette + drag handle (reorder) + options menu, right-aligned */}
-      <div className="relative flex items-center justify-end gap-1 pt-2">
-        <ThemeButton spaceId={space.id} />
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {tab === "connections" ? (
+          <ProfileConnections spaceId={space.id} />
+        ) : (
+          <SpaceContent spaceId={space.id} managerSpaceId={space.id} />
+        )}
+      </div>
+
+      {/* Footer: theme palette + drag handle (reorder) + options menu. Left,
+          like every other column's controls — a row of icons pinned to the
+          right of one column and the left of the next is two conventions. */}
+      <div className="border-border/60 relative flex items-center gap-1 border-t pt-2">
+        {/* Handle first, then the palette: the one that moves the column comes
+            before the one that paints it. The menu sits at the far end, where
+            an overflow of everything else belongs. */}
         <button
           type="button"
           draggable
@@ -232,11 +330,12 @@ function ProfileColumn({
         >
           <Move className="size-4" aria-hidden="true" />
         </button>
+        <ThemeButton spaceId={space.id} />
         <button
           type="button"
           aria-label={`${space.name} options`}
           onClick={() => setMenu("bottom")}
-          className="focus-ring rounded-md p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+          className="focus-ring ml-auto rounded-md p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
         >
           <MoreHorizontal className="size-4" aria-hidden="true" />
         </button>

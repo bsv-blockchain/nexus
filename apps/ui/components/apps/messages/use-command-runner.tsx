@@ -1280,6 +1280,25 @@ export function useCommandRunner({
             };
           }
 
+          /* Nothing moves and nothing is sent to a wallet: this shares a
+             card. The one thing it must get right is that the card points at a
+             real feature, which the parser has already checked. */
+          case "roadmap": {
+            const feature = command.feature;
+            if (!feature) return null;
+            commandToast({
+              verb: "roadmap",
+              title: `Shared ${feature.title}`,
+              detail: "Read-only in the thread. Funding happens in Roadmap.",
+            });
+            return {
+              verb: "roadmap",
+              status: "sent",
+              featureId: feature.id,
+              ...(command.text ? { memo: command.text } : {}),
+            };
+          }
+
           case "renounce": {
             if (!first) return null;
             const isPublic = Boolean(command.public);

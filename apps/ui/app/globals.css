@@ -408,6 +408,69 @@ html.theme-animate {
 }
 
 /*
+ * A funding bar filling.
+ *
+ * Grown from nothing rather than painted at its final width, and staggered down
+ * a column so the board reads as filling up. `--fund-delay` is the card's place
+ * in its column; the width is a custom property so the keyframe can end at
+ * whatever this particular feature has raised.
+ *
+ * `width` rather than a transform because the bar has a rounded cap: scaling it
+ * horizontally would squash the radius into an oval on the way.
+ */
+@keyframes nexus-fund-fill {
+  from {
+    width: 0%;
+  }
+  to {
+    width: var(--fund-width, 0%);
+  }
+}
+
+.nexus-fund-fill {
+  width: var(--fund-width, 0%);
+  animation: nexus-fund-fill 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--fund-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nexus-fund-fill {
+    animation: none;
+  }
+}
+
+/*
+ * A code laid down in front of you: hinged below its centre and swung up flat.
+ *
+ * Vela's treatment for its QR codes, and used here for the same reason — a
+ * pairing code is a physical-feeling object you hold up to a phone, and a plain
+ * fade gives it no weight. The origin below centre is what makes it read as
+ * being placed on a surface rather than spun on an axle, and the easing
+ * overshoots slightly so it lands rather than stopping.
+ */
+@keyframes nexus-flip-in {
+  from {
+    transform: perspective(900px) rotateX(58deg);
+    opacity: 0;
+  }
+  to {
+    transform: perspective(900px) rotateX(0deg);
+    opacity: 1;
+  }
+}
+
+.nexus-flip-in {
+  transform-origin: center 80%;
+  animation: nexus-flip-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nexus-flip-in {
+    animation: none;
+  }
+}
+
+/*
  * Hover marquee: a truncated title scrolls left to reveal its full length,
  * pausing at each end, then bounces back. --marquee-shift is the negative
  * overflow width, set inline once the text is measured as overflowing.

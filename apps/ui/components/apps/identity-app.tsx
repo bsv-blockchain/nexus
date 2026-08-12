@@ -1,5 +1,8 @@
 "use client";
 
+import { HandlesPanel } from "@/components/apps/identity/handles-panel";
+import { WalletMark } from "@/components/apps/wallet/wallet-switcher";
+import { allWallets, labelOf } from "@/lib/wallets-store";
 import { Dialog } from "@/components/hub/dialog";
 import { IdentitySigil } from "@/components/hub/identity-sigil";
 import { useHub } from "@/components/hub/hub-provider";
@@ -21,6 +24,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import { toast } from "sonner";
 import { useState, type ReactNode } from "react";
 
 /** Middle-truncate a key to first 5 … last 5 characters. */
@@ -180,7 +184,9 @@ export function IdentityApp(): ReactNode {
   return (
     <div className="h-full overflow-y-auto p-6 sm:p-10">
       <div className="mx-auto max-w-2xl">
-        {section === "certificates" ? (
+        {section === "handles" ? (
+          <HandlesPanel />
+        ) : section === "certificates" ? (
           <>
             <h2 className="text-lg font-bold">{copy.certificatesTitle}</h2>
             <p className="mt-1 text-sm text-balance text-muted-foreground">
@@ -278,6 +284,47 @@ export function IdentityApp(): ReactNode {
                   <span className="text-sm font-medium">{copy.newBadge}</span>
                 </button>
               </li>
+            </ul>
+
+            {/*
+              Wallets are identifiers too.
+
+              A wallet key names you to whoever you paid as surely as a signing
+              key names you to whoever you wrote to, and leaving it out of the
+              one page called Identifiers meant the page was not the answer to
+              its own question. Read-only on purpose: the label above it is
+              yours to change and this is not, which is the whole distinction
+              between what a thing is called and what it is.
+            */}
+            <h3 className="mt-8 text-sm font-bold">{copy.walletKeysTitle}</h3>
+            <p className="text-muted-foreground mt-0.5 text-xs text-pretty">
+              {copy.walletKeysHint}
+            </p>
+            <ul className="border-border divide-border/60 bg-surface-raised mt-2.5 divide-y overflow-hidden rounded-xl border">
+              {allWallets().map((wallet) => (
+                <li key={wallet.id} className="flex items-center gap-3 px-4 py-3">
+                  <WalletMark wallet={wallet} size={32} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">
+                      {labelOf(wallet)}
+                    </span>
+                    <span className="text-muted-foreground block truncate font-mono text-[11px]">
+                      {wallet.identifier}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      copyToClipboard(wallet.identifier);
+                      toast.success(copy.copyKey);
+                    }}
+                    aria-label={`${copy.copyKey}: ${labelOf(wallet)}`}
+                    className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground shrink-0 rounded-md p-1.5"
+                  >
+                    <Copy className="size-3.5" aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
             </ul>
           </>
         )}

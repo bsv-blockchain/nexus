@@ -13,14 +13,34 @@ import { Handle } from "@/components/apps/messages/ecosystem-tag";
 import { MemberAvatar } from "@/components/apps/messages/member-avatar";
 import { VouchFacepile } from "@/components/apps/messages/whois-inline";
 import { WhoisCard } from "@/components/apps/messages/whois-card";
-import { useHub } from "@/components/hub/hub-provider";
+import {
+  AppOnboardingFooter,
+  AppOnboardingPane,
+} from "@/components/hub/app-onboarding";
+import { FeatureDetail } from "@/components/apps/roadmap/feature-detail";
+import { DownloadsPane } from "@/components/hub/downloads-pane";
+import { SiteSettingsPane } from "@/components/hub/site-settings-pane";
+import { currentFeature } from "@/lib/roadmap-effects";
+import {
+  LicencePane,
+  LicencePaneFooter,
+} from "@/components/hub/licence-pane";
+import { useHub, type AppSlug } from "@/components/hub/hub-provider";
 import { SidePane } from "@/components/hub/side-pane";
 import { ChevronRight } from "lucide-react";
+import {
+  ClearDataPane,
+  LanguagesPane,
+} from "@/components/hub/settings-panes";
 import { groupIconOf } from "@/lib/group-icon";
 import {
   content,
+  getAppOnboarding,
   getChatThread,
+  getHubApp,
   getMessagePerson,
+  licence,
+  type OnboardingSlug,
 } from "@/lib/data";
 import { toast } from "sonner";
 import type { ReactNode } from "react";
@@ -63,6 +83,101 @@ export function DetailPane(): ReactNode {
 
   if (detailPane?.kind === "new") {
     return <NewConversation open onClose={closeDetailPane} />;
+  }
+
+  if (detailPane?.kind === "onboarding") {
+    const slug = detailPane.id as OnboardingSlug;
+    const app = getHubApp(detailPane.id as AppSlug);
+    /* Not every guide is about a mod — the store has one too, and it has no
+       store entry to take a name from. Open on the guide rather than on the
+       mod, so the one surface without a mod behind it still opens. */
+    const guide = getAppOnboarding(slug);
+    return (
+      <SidePane
+        open={Boolean(guide)}
+        title={`${content.onboarding.title} ${app?.name ?? guide?.title ?? ""}`.trim()}
+        onClose={closeDetailPane}
+        /* Docked below the scroll area, so the way into the app is there from
+           the moment the pane opens rather than at the end of a scroll. */
+        footer={<AppOnboardingFooter slug={slug} />}
+      >
+        <AppOnboardingPane slug={slug} />
+      </SidePane>
+    );
+  }
+
+  if (detailPane?.kind === "feature") {
+    const feature = currentFeature(detailPane.id);
+    return (
+      <SidePane
+        open={Boolean(feature)}
+        title={content.roadmap.title}
+        onClose={closeDetailPane}
+      >
+        {feature && <FeatureDetail feature={feature} />}
+      </SidePane>
+    );
+  }
+
+  if (detailPane?.kind === "sites") {
+    return (
+      <SidePane
+        open
+        title={content.settings.sites.title}
+        onClose={closeDetailPane}
+      >
+        <SiteSettingsPane />
+      </SidePane>
+    );
+  }
+
+  if (detailPane?.kind === "languages") {
+    return (
+      <SidePane
+        open
+        title={content.mobileBrowser.settings.languages}
+        onClose={closeDetailPane}
+      >
+        <LanguagesPane />
+      </SidePane>
+    );
+  }
+
+  if (detailPane?.kind === "clear-data") {
+    return (
+      <SidePane
+        open
+        title={content.settings.privacy.clearTitle}
+        onClose={closeDetailPane}
+      >
+        <ClearDataPane />
+      </SidePane>
+    );
+  }
+
+  if (detailPane?.kind === "downloads") {
+    return (
+      <SidePane
+        open
+        title={content.library.downloads.title}
+        onClose={closeDetailPane}
+      >
+        <DownloadsPane />
+      </SidePane>
+    );
+  }
+
+  if (detailPane?.kind === "licence") {
+    return (
+      <SidePane
+        open
+        title={`${licence.name} ${licence.version}`}
+        onClose={closeDetailPane}
+        footer={<LicencePaneFooter />}
+      >
+        <LicencePane />
+      </SidePane>
+    );
   }
 
   if (detailPane?.kind === "releases" || detailPane?.kind === "release") {

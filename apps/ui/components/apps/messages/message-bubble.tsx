@@ -1,5 +1,6 @@
 "use client";
 
+import { RoadmapCard } from "@/components/apps/messages/roadmap-card";
 import { CommandPill } from "@/components/apps/messages/command-pill";
 import { EscrowCard } from "@/components/apps/messages/escrow-card";
 import { TransferCard } from "@/components/apps/messages/transfer-card";
@@ -349,6 +350,11 @@ export function MessageBubble({
 
         {/* What moved, under the line that moved it. */}
         {card?.verb === "send" && card.assetId && <TransferCard card={card} />}
+
+        {/* What somebody wants built, and how far off it is. */}
+        {card?.verb === "roadmap" && card.featureId && (
+          <RoadmapCard featureId={card.featureId} />
+        )}
 
         {/* What has not moved yet, and who has to decide. */}
         {card?.verb === "escrow" && card.escrowId && (

@@ -27,10 +27,13 @@ export function BrowserSettingsMenu({
   open,
   onClose,
   className = "",
+  anchor,
 }: {
   open: boolean;
   onClose: () => void;
   className?: string;
+  /** the trigger's rect; portals the menu clear of the sidebar's clip */
+  anchor?: { top: number; left: number; right: number; bottom: number };
 }): ReactNode {
   const copy = content.browserSettings;
   const { setTheme, resolvedTheme } = useTheme();
@@ -50,6 +53,7 @@ export function BrowserSettingsMenu({
       open={open}
       onClose={onClose}
       label="Browser settings"
+      {...(anchor ? { anchor } : {})}
       className={`w-72 p-3 ${className}`}
     >
       <div className="flex gap-2">

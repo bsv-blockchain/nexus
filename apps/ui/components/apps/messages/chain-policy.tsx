@@ -126,10 +126,9 @@ function PolicyRows({
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5 text-xs font-semibold">
-                <span
-                  className={selected ? "text-accent" : "text-muted-foreground"}
-                  aria-hidden="true"
-                >
+                {/* The radio dot is the only accent in a row: the leading icon
+                    labels the option rather than marking the selection. */}
+                <span className="text-muted-foreground" aria-hidden="true">
                   {option.icon}
                 </span>
                 {option.label}

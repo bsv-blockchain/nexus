@@ -56,9 +56,9 @@ const systemTabs: {
   },
   {
     id: "apps",
-    label: "Apps",
+    label: content.library.apps.title,
     icon: LayoutGrid,
-    desc: "The sites you have pinned to your rail.",
+    desc: "Browse, connect and manage the apps in your Nexus.",
   },
 ];
 
@@ -244,12 +244,12 @@ export function IconRail(): ReactNode {
     id === "spaces"
       ? mainView === "profiles"
       : id === "apps"
-        ? mainView === "sites"
+        ? mainView === "store"
         : libraryTab === "downloads";
   // Clicking a tab sets both the panel (libraryTab) and the main view.
   const openTabView = (id: LibraryTab): void => {
     setLibraryTab(id);
-    if (id === "apps") setMainView("sites");
+    if (id === "apps") setMainView("store");
     else if (id === "spaces") setMainView("profiles");
     else setMainView("app");
   };
@@ -386,7 +386,15 @@ export function IconRail(): ReactNode {
               compact={railCollapsed}
               onClick={() => openTabView(tab.id)}
             >
-              <tab.icon className="size-6" aria-hidden="true" />
+              {/* The icon keeps its size; the box around it takes the 36px an
+                  app tile below occupies. Bare, a 24px glyph sat six pixels
+                  inside the column of tiles under it, and the top of the rail
+                  read as indented. Growing the glyph would have fixed the
+                  alignment by making these icons louder than the artwork they
+                  sit above, which is the wrong half to change. */}
+              <span className="grid size-9 place-items-center">
+                <tab.icon className="size-6" aria-hidden="true" />
+              </span>
             </RailShell>
           </div>
         ))}

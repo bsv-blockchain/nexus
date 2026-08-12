@@ -1,5 +1,6 @@
 "use client";
 
+import { AppMenu } from "@/components/hub/app-menu";
 import { getSignEnvelopes, type SignEnvelope } from "@/lib/data";
 import {
   ChevronLeft,
@@ -60,6 +61,7 @@ export function SignerApp(): ReactNode {
           <span className="flex size-8 items-center justify-center rounded-full bg-[#9dddf0] text-xs font-bold text-[#08343f]">
             JI
           </span>
+          <AppMenu slug="signer" />
         </div>
       </header>
 

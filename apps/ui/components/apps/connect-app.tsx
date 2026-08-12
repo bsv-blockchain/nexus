@@ -1,5 +1,6 @@
 "use client";
 
+import { toggleConnection, useSettings } from "@/lib/settings-store";
 import { Favicon } from "@/components/hub/favicon";
 import { useHub } from "@/components/hub/hub-provider";
 import { content, getConnections } from "@/lib/data";
@@ -21,6 +22,8 @@ export function ConnectApp(): ReactNode {
   const conn =
     connections.find((c) => c.id === connectSelected) ?? connections[0] ?? null;
   const copy = content.connect;
+  const settings = useSettings();
+  const revoked = conn ? settings.revokedConnections.includes(conn.id) : false;
 
   if (!conn) {
     return (
@@ -48,11 +51,19 @@ export function ConnectApp(): ReactNode {
                 {conn.origin.replace(/^https?:\/\//, "")}
               </p>
             </div>
+            {/* Writes to the same list Site settings reads, so the two views
+                cannot disagree about who is connected. It had no handler at
+                all before: the button existed and disconnected nothing. */}
             <button
               type="button"
-              className="focus-ring shrink-0 rounded-full bg-muted px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-negative/15 hover:text-negative"
+              onClick={() => toggleConnection(conn.id)}
+              className={`focus-ring shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${
+                revoked
+                  ? "bg-accent text-accent-foreground hover:opacity-90"
+                  : "bg-muted text-muted-foreground hover:bg-negative/15 hover:text-negative"
+              }`}
             >
-              {copy.disconnect}
+              {revoked ? copy.reconnect : copy.disconnect}
             </button>
           </div>
 

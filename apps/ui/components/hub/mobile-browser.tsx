@@ -2,7 +2,10 @@
 
 import { AppTile, SiteTile } from "@/components/hub/app-icon";
 import { Favicon } from "@/components/hub/favicon";
+import { MobileSettings } from "@/components/hub/mobile-settings";
 import { OriginChip } from "@/components/hub/origin-chip";
+import { useScrollDirection } from "@/lib/scroll-direction";
+import { useIsDesktop } from "@/lib/use-is-desktop";
 import {
   useHub,
   type RailEntry,
@@ -10,6 +13,7 @@ import {
 } from "@/components/hub/hub-provider";
 import {
   content,
+  getHubApp,
   getHubApps,
   getMockPage,
   type BrowserTab,
@@ -21,34 +25,23 @@ import { DEMO_SURFACES } from "@/lib/surfaces";
 import { useHostOverlay } from "@/lib/wallet-data";
 import {
   AlignLeft,
-  AppWindow,
-  Archive,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
   Download,
-  ExternalLink,
   Folder,
   Gift,
-  Globe,
-  Keyboard,
-  Languages,
   Layers,
   LayoutGrid,
   Link2,
   Mic,
   Monitor,
-  MonitorSmartphone,
-  Palette,
   Pin,
   Plus,
   RotateCw,
-  Search,
   Settings,
   Share,
-  Smartphone,
   TextSearch,
-  Trash2,
   Type,
   VenetianMask,
   X,
@@ -69,6 +62,17 @@ const spring = { type: "spring", damping: 32, stiffness: 340 } as const;
 
 /** Pointer travel that turns a tap on the tab switcher into a scrub, in px. */
 const TAP_SLOP = 8;
+
+/**
+ * A URL with the parts nobody reads removed.
+ *
+ * The scheme and a trailing slash are noise in a pill that has room for about
+ * forty characters, and dropping them buys back eight of them without dropping
+ * anything that identifies the page.
+ */
+function bareUrl(url: string): string {
+  return url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+}
 
 function hostOf(url: string): string {
   try {
@@ -232,6 +236,79 @@ function BottomBar({
           <ChevronUp className="size-5 text-foreground" aria-hidden="true" />
         </button>
       </div>
+    </motion.div>
+  );
+}
+
+/**
+ * What the bottom bar shrinks to once you start reading.
+ *
+ * A bar with five targets is worth its height when somebody is navigating and
+ * is in the way when they are reading, which is most of the time. So it leaves
+ * on the way down and this takes its place: one line saying where you are, at
+ * a size that answers the question the bar was answering incidentally and
+ * nothing else.
+ *
+ * It is a button rather than a label because a thing that replaced your
+ * navigation has to be able to give it back — scrolling up works too, but that
+ * is a gesture somebody has to guess at, and this is the one that is visible.
+ *
+ * Browse gets the tab it is on rather than the word "Browse": a browser's
+ * answer to "where am I" is the page, and the mod name is the one thing on
+ * screen already.
+ */
+function ContextPill({
+  onExpand,
+  tabs,
+}: {
+  onExpand: () => void;
+  tabs: BrowserTab[];
+}): ReactNode {
+  const { activeApp, activeTabId } = useHub();
+  const tab = tabs.find((entry) => entry.id === activeTabId) ?? null;
+  const app = activeApp ? getHubApp(activeApp) : undefined;
+  const onBrowser = activeApp === "browser" && Boolean(tab);
+
+  return (
+    <motion.div
+      initial={{ y: 64, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 64, opacity: 0 }}
+      transition={spring}
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
+    >
+      <button
+        type="button"
+        onClick={onExpand}
+        aria-label={content.mobileBrowser.showBar}
+        className="focus-ring bg-surface-raised/95 ring-border pointer-events-auto flex max-w-[80%] items-center gap-2 rounded-full py-2 pr-4 pl-2 shadow-lg ring-1 backdrop-blur transition-transform active:scale-95"
+      >
+        {onBrowser && tab ? (
+          <>
+            <Favicon
+              url={tab.url}
+              letter={tab.favicon}
+              color={tab.faviconColor}
+              size={22}
+              rounded="rounded-md"
+            />
+            <span className="text-foreground min-w-0 truncate text-[13px] font-medium">
+              {bareUrl(tab.url)}
+            </span>
+          </>
+        ) : (
+          <>
+            {app ? (
+              <AppTile app={app} size={22} />
+            ) : (
+              <LayoutGrid className="size-5.5" aria-hidden="true" />
+            )}
+            <span className="text-foreground min-w-0 truncate text-[13px] font-medium">
+              {app?.name ?? content.library.apps.title}
+            </span>
+          </>
+        )}
+      </button>
     </motion.div>
   );
 }
@@ -773,7 +850,21 @@ function TabSwitcher({
         className="relative min-h-0 flex-1"
         style={{ perspective: 1200 }}
       >
-        <div className="absolute inset-0 flex items-center justify-center">
+        {/*
+          The deck is a picture, not a control.
+
+          Cards carry a z-index up to 100 so they stack in depth order, which
+          put the centred one above the drag surface below — so a swipe started
+          on the card it was aimed at hit the card instead, and dragging a
+          paragraph is how a browser starts selecting text. Both complaints
+          were the same bug. Input belongs to one layer; `select-none` means a
+          long press on a headline does nothing rather than something wrong.
+
+          The ref stays on the outer element: the tap-to-scrub hit test measures
+          against the deck's own box, and that box is the one with perspective
+          on it.
+        */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center select-none">
           {tabs.map((tab, i) => (
             <SwitcherCard
               key={tab.id}
@@ -806,7 +897,7 @@ function TabSwitcher({
          */}
         {tabs.length > 0 && (
           <motion.div
-            className="absolute inset-0 z-[200]"
+            className="absolute inset-0 z-200 touch-pan-y select-none"
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.9}
@@ -904,204 +995,6 @@ function TabSwitcher({
   );
 }
 
-function SettingRow({
-  icon: Icon,
-  tone,
-  label,
-  value,
-  toggle,
-  toggled,
-  chevron,
-  onClick,
-}: {
-  icon: LucideIcon;
-  tone: string;
-  label: string;
-  value?: string;
-  toggle?: boolean;
-  toggled?: boolean;
-  chevron?: boolean;
-  onClick?: () => void;
-}): ReactNode {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="focus-ring flex w-full items-center gap-3 px-4 py-3 text-left"
-    >
-      <span
-        className="flex size-8 shrink-0 items-center justify-center rounded-lg text-white"
-        style={{ backgroundColor: tone }}
-      >
-        <Icon className="size-4.5" aria-hidden="true" />
-      </span>
-      <span className="flex-1 text-[15px] font-medium">{label}</span>
-      {value && <span className="text-sm text-muted-foreground">{value}</span>}
-      {toggle && (
-        <span
-          className={`flex h-6 w-10 items-center rounded-full p-0.5 transition-colors ${
-            toggled ? "bg-green-500" : "bg-muted"
-          }`}
-          aria-hidden="true"
-        >
-          <span
-            className={`size-5 rounded-full bg-white shadow transition-transform ${
-              toggled ? "translate-x-4" : ""
-            }`}
-          />
-        </span>
-      )}
-      {chevron && (
-        <ChevronRight
-          className="size-4 text-muted-foreground"
-          aria-hidden="true"
-        />
-      )}
-    </button>
-  );
-}
-
-/** Full-screen browser settings sheet. */
-function SettingsSheet({ onClose }: { onClose: () => void }): ReactNode {
-  const s = content.mobileBrowser.settings;
-  const [autoKeyboard, setAutoKeyboard] = useState(true);
-  const notify = (label: string) => () => toast.info(`${label}: coming soon`);
-
-  return (
-    <motion.div
-      initial={{ y: "100%" }}
-      animate={{ y: 0 }}
-      exit={{ y: "100%" }}
-      transition={spring}
-      className="fixed inset-0 z-60 flex flex-col bg-background md:hidden"
-    >
-      <header className="flex items-center px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-3">
-        <div className="w-12" aria-hidden="true" />
-        <h2 className="flex-1 text-center text-base font-bold">{s.title}</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="focus-ring w-12 text-right text-[15px] font-semibold text-accent"
-        >
-          {s.done}
-        </button>
-      </header>
-
-      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-4 pb-10">
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={notify(s.downloads)}
-            className="focus-ring flex items-center justify-center gap-2 rounded-2xl bg-surface-raised py-3 text-sm font-medium ring-1 ring-border"
-          >
-            {s.downloads}
-          </button>
-          <button
-            type="button"
-            onClick={notify(s.archive)}
-            className="focus-ring flex items-center justify-center gap-2 rounded-2xl bg-surface-raised py-3 text-sm font-medium ring-1 ring-border"
-          >
-            {s.archive}
-          </button>
-        </div>
-
-        <div className="overflow-hidden rounded-2xl bg-surface-raised ring-1 ring-border">
-          <SettingRow
-            icon={Globe}
-            tone="#111827"
-            label={s.globalSiteSettings}
-            chevron
-            onClick={notify(s.globalSiteSettings)}
-          />
-        </div>
-
-        <div className="divide-y divide-border/60 overflow-hidden rounded-2xl bg-surface-raised ring-1 ring-border">
-          <SettingRow
-            icon={AppWindow}
-            tone="#4353ff"
-            label={s.setDefault}
-            chevron
-            onClick={notify(s.setDefault)}
-          />
-          <SettingRow
-            icon={Palette}
-            tone="#2563eb"
-            label={s.changeIcon}
-            chevron
-            onClick={notify(s.changeIcon)}
-          />
-          <SettingRow
-            icon={Smartphone}
-            tone="#9333ea"
-            label={s.addToHome}
-            chevron
-            onClick={notify(s.addToHome)}
-          />
-        </div>
-
-        <div className="divide-y divide-border/60 overflow-hidden rounded-2xl bg-surface-raised ring-1 ring-border">
-          <SettingRow
-            icon={Search}
-            tone="#2563eb"
-            label={s.searchEngine}
-            value={s.searchEngineValue}
-            chevron
-            onClick={notify(s.searchEngine)}
-          />
-          <SettingRow
-            icon={Languages}
-            tone="#16a34a"
-            label={s.languages}
-            chevron
-            onClick={notify(s.languages)}
-          />
-        </div>
-
-        <div className="divide-y divide-border/60 overflow-hidden rounded-2xl bg-surface-raised ring-1 ring-border">
-          <SettingRow
-            icon={Keyboard}
-            tone="#eab308"
-            label={s.autoKeyboard}
-            toggle
-            toggled={autoKeyboard}
-            onClick={() => setAutoKeyboard((v) => !v)}
-          />
-          <SettingRow
-            icon={Archive}
-            tone="#a855f7"
-            label={s.archiveInactive}
-            value={s.archiveInactiveValue}
-            onClick={notify(s.archiveInactive)}
-          />
-          <SettingRow
-            icon={ExternalLink}
-            tone="#3b82f6"
-            label={s.openLinksIn}
-            value={s.openLinksInValue}
-            onClick={notify(s.openLinksIn)}
-          />
-          <SettingRow
-            icon={Trash2}
-            tone="#ef4444"
-            label={s.clearData}
-            onClick={notify(s.clearData)}
-          />
-        </div>
-
-        <div className="overflow-hidden rounded-2xl bg-surface-raised ring-1 ring-border">
-          <SettingRow
-            icon={MonitorSmartphone}
-            tone="#6366f1"
-            label={s.syncDesktop}
-            chevron
-            onClick={notify(s.syncDesktop)}
-          />
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
 /** A single icon tile in the mobile rail (system tab or app). */
 function RailTile({
   icon,
@@ -1153,7 +1046,7 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
     openApp,
     mainView,
     openProfilesManager,
-    openWeb3Apps,
+    openAppStore,
     setMobileSheetOpen,
     openShare,
     pinnedSites,
@@ -1180,8 +1073,8 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
       id: "apps",
       label: content.library.apps.title,
       icon: LayoutGrid,
-      active: mainView === "sites",
-      onClick: openWeb3Apps,
+      active: mainView === "store",
+      onClick: openAppStore,
     },
     {
       id: "downloads",
@@ -1499,6 +1392,14 @@ export function MobileBrowser({
   const [sheet, setSheet] = useState<Sheet>("none");
   const [incognito, setIncognito] = useState(false);
   const tabs = tabsBySpace[activeSpaceId] ?? [];
+  /* Only while the bar is the thing on screen. A sheet scrolling its own body
+     is not the canvas moving, and hiding a bar that is already covered would
+     only show it again, from underneath, on the way back. */
+  /* Never on desktop. This component renders at every width and is merely
+     hidden by CSS above `md`, so without the guard every desktop scroll would
+     be re-rendering mobile chrome nobody can see. */
+  const isDesktop = useIsDesktop();
+  const { hidden, reveal } = useScrollDirection(!isDesktop && sheet === "none");
 
   /*
    * What the CANVAS is showing, not what the ref names.
@@ -1551,22 +1452,31 @@ export function MobileBrowser({
 
   return (
     <>
-      <AnimatePresence>
-        {sheet === "none" && (
-          <BottomBar
-            key="bar"
-            tabs={tabs}
-            site={siteCanvas}
-            origin={originChip}
-            onRail={() => setSheet("rail")}
-            onSwitcher={() => setSheet("switcher")}
-            onAddress={() => {
-              setIncognito(false);
-              setSheet("address");
-            }}
-            onDetails={() => setSheet("details")}
-          />
-        )}
+      {/*
+        One or the other, never both and never neither. Sharing an
+        `AnimatePresence` means the pill is arriving while the bar is still
+        leaving, which is what makes it read as one thing changing size rather
+        than two things taking turns.
+      */}
+      <AnimatePresence initial={false}>
+        {sheet === "none" &&
+          (hidden ? (
+            <ContextPill key="pill" tabs={tabs} onExpand={reveal} />
+          ) : (
+            <BottomBar
+              key="bar"
+              tabs={tabs}
+              site={siteCanvas}
+              origin={originChip}
+              onRail={() => setSheet("rail")}
+              onSwitcher={() => setSheet("switcher")}
+              onAddress={() => {
+                setIncognito(false);
+                setSheet("address");
+              }}
+              onDetails={() => setSheet("details")}
+            />
+          ))}
       </AnimatePresence>
 
       <AnimatePresence>
@@ -1614,11 +1524,11 @@ export function MobileBrowser({
           />
         )}
         {/* Gated at the render too, not only at the two buttons above. With
-            DEMO_SURFACES folded to a literal false the branches are dead code and
-            both components leave the bundle, so "is it reachable" stops depending
-            on nobody adding a second route to them later. */}
+            DEMO_SURFACES folded to a literal false the branch is dead code and
+            the component leaves the bundle, so "is it reachable" stops depending
+            on nobody adding a second route to it later. */}
         {DEMO_SURFACES && sheet === "settings" && (
-          <SettingsSheet key="settings" onClose={() => setSheet("switcher")} />
+          <MobileSettings key="settings" onClose={() => setSheet("switcher")} />
         )}
         {DEMO_SURFACES && sheet === "sync" && <SyncScreen key="sync" onClose={close} />}
       </AnimatePresence>

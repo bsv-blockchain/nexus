@@ -60,6 +60,12 @@ export function BrowserNav(): ReactNode {
     createTab,
   } = useHub();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsAnchor, setSettingsAnchor] = useState<{
+    top: number;
+    left: number;
+    right: number;
+    bottom: number;
+  } | null>(null);
   const [favoritesDragOver, setFavoritesDragOver] = useState(false);
   const [favoritesHintDismissed, setFavoritesHintDismissed] = useState(false);
 
@@ -124,7 +130,16 @@ export function BrowserNav(): ReactNode {
             type="button"
             aria-label="Site settings"
             aria-expanded={settingsOpen}
-            onClick={() => setSettingsOpen(true)}
+            onClick={(event) => {
+              const box = event.currentTarget.getBoundingClientRect();
+              setSettingsAnchor({
+                top: box.top,
+                left: box.left,
+                right: box.right,
+                bottom: box.bottom,
+              });
+              setSettingsOpen(true);
+            }}
             className="focus-ring shrink-0 rounded p-1 text-muted-foreground hover:text-foreground"
           >
             <SlidersHorizontal className="size-3.5" aria-hidden="true" />
@@ -133,7 +148,7 @@ export function BrowserNav(): ReactNode {
         <BrowserSettingsMenu
           open={settingsOpen}
           onClose={() => setSettingsOpen(false)}
-          className="top-full right-0 mt-2"
+          {...(settingsAnchor ? { anchor: settingsAnchor } : {})}
         />
       </div>
 

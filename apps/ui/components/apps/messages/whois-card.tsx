@@ -28,6 +28,7 @@ import {
   getMessagePerson,
   getUnreadCount,
   getThreadsWithPerson,
+  socialProviders,
   type MessagePerson,
 } from "@/lib/data";
 import {
@@ -289,6 +290,44 @@ export function WhoisCard({
           )}
         </p>
       </Section>
+
+      {/* Attested accounts, above the vouches. A vouch is somebody's opinion of
+          a person; this is proof that an account you already know is the same
+          key — the cheaper check, and the one a reader can make for themselves
+          by going and looking. */}
+      {person.socials && person.socials.length > 0 && (
+        <Section title={copy.whois.attested}>
+          <ul className="divide-border/60 bg-surface -mx-3 divide-y overflow-hidden rounded-lg">
+            {person.socials.map((social) => {
+              const meta = socialProviders.find(
+                (entry) => entry.id === social.provider,
+              );
+              if (!meta) return null;
+              return (
+                <li
+                  key={social.provider}
+                  className="flex items-center gap-2.5 px-3 py-2"
+                >
+                  <span
+                    className="grid size-6 shrink-0 place-items-center rounded-md text-[10px] font-bold text-white"
+                    style={{ backgroundColor: meta.colour }}
+                    aria-hidden="true"
+                  >
+                    {meta.mark}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-xs">
+                    {social.handle}
+                  </span>
+                  <BadgeCheck
+                    className="text-positive size-3.5 shrink-0"
+                    aria-hidden="true"
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        </Section>
+      )}
 
       {/* The same facepile the /whois card leaves in the thread. Reputation is
           the one thing on this pane a reader is likely to want to interrogate,

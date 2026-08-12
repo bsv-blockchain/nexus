@@ -1,11 +1,21 @@
 "use client";
 
 import { ChevronRight, type LucideIcon } from "lucide-react";
+import { createPortal } from "react-dom";
 import { useEffect, type ReactNode } from "react";
+
+/** The widest menu this renders; used to keep one on screen near an edge. */
+const MENU_WIDTH = 288;
 
 /**
  * Lightweight anchored popover: render inside a `relative` wrapper next to
  * the trigger. A fixed backdrop handles click-outside; Escape closes.
+ *
+ * Pass `anchor` where the trigger sits inside a column that clips — the browser
+ * sidebar is `overflow-hidden`, so an absolutely-positioned menu wider than the
+ * column gets sliced off no matter what its z-index says. With an anchor the
+ * menu is portalled to the body and placed from the trigger's own rect, which
+ * takes it out of every clip and stacking context on the way up.
  */
 export function PopoverMenu({
   open,
@@ -13,12 +23,24 @@ export function PopoverMenu({
   children,
   className = "",
   label,
+  anchor,
+  align = "end",
 }: {
   open: boolean;
   onClose: () => void;
   children: ReactNode;
   className?: string;
   label: string;
+  /**
+   * The trigger's rect, captured at click. Portals the menu when given.
+   *
+   * A rect rather than a ref, because measuring in an effect means setting
+   * state during render's aftermath — the pattern the rail and the theme picker
+   * already avoid for the same reason.
+   */
+  anchor?: { top: number; left: number; right: number; bottom: number };
+  /** which edge of the trigger the menu lines up with */
+  align?: "start" | "end";
 }): ReactNode {
   useEffect(() => {
     if (!open) return;
@@ -29,9 +51,23 @@ export function PopoverMenu({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
 
+  /* Placed from the trigger's own rect, flush with the chosen edge and nudged
+     back inside the viewport if that would overflow it. */
+  const rect = anchor
+    ? {
+        top: anchor.bottom + 8,
+        left: Math.max(
+          8,
+          align === "end"
+            ? Math.min(anchor.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8)
+            : anchor.left,
+        ),
+      }
+    : null;
+
   if (!open) return null;
 
-  return (
+  const body = (
     <>
       <div
         className="fixed inset-0 z-40"
@@ -41,12 +77,17 @@ export function PopoverMenu({
       <div
         role="menu"
         aria-label={label}
-        className={`absolute z-50 min-w-56 rounded-2xl border border-border bg-surface-raised p-1.5 shadow-2xl ${className}`}
+        style={rect ? { top: rect.top, left: rect.left } : undefined}
+        className={`${
+          rect ? "fixed" : "absolute"
+        } z-50 min-w-56 rounded-2xl border border-border bg-surface-raised p-1.5 shadow-2xl ${className}`}
       >
         {children}
       </div>
     </>
   );
+
+  return anchor ? createPortal(body, document.body) : body;
 }
 
 export function MenuItem({

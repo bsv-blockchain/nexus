@@ -1,13 +1,17 @@
 "use client";
 
 import { ConversationList } from "@/components/apps/messages/conversation-list";
+import { RoadmapSidebar } from "@/components/apps/roadmap/roadmap-sidebar";
+import { SuggestFeature } from "@/components/apps/roadmap/suggest-feature";
 import { WALLET_SECTIONS } from "@/components/apps/wallet-app";
 import { Tooltip } from "@/components/hub/tooltip";
 import { PRIMARY_CTA } from "@/components/hub/cta";
 import { Favicon } from "@/components/hub/favicon";
+import { AppHelpBar } from "@/components/hub/app-help-bar";
 import { useHub, type AppSlug } from "@/components/hub/hub-provider";
 import {
   content,
+  getAppOnboarding,
   getConnections,
   getCourses,
   getHubApp,
@@ -25,6 +29,7 @@ import {
 import {
   Archive,
   ArchiveX,
+  AtSign,
   ArrowDownLeft,
   ArrowUpRight,
   BadgeCheck,
@@ -69,6 +74,7 @@ const CONTEXTUAL: AppSlug[] = [
   "baskets",
   "identity",
   "attestations",
+  "roadmap",
 ];
 
 export function hasContextSidebar(slug: AppSlug | null): boolean {
@@ -109,7 +115,9 @@ function Header({ slug }: { slug: AppSlug }): ReactNode {
         <>
           {/* A filter, not a mode: it hides rows rather than changing what a
               row means, so it reads as a switch and keeps its label. */}
-          <Tooltip label={content.messages.newChat.unreadHint}>
+          {/* Downwards: these sit on the panel's top edge, where an upward
+              tooltip has no room and gets clipped by the column. */}
+          <Tooltip label={content.messages.newChat.unreadHint} side="bottom">
             <button
               type="button"
               role="switch"
@@ -117,7 +125,7 @@ function Header({ slug }: { slug: AppSlug }): ReactNode {
               onClick={() => setMessagesUnreadOnly(!messagesUnreadOnly)}
               className={`focus-ring flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold transition-colors ${
                 messagesUnreadOnly
-                  ? "border-accent bg-accent/15 text-accent"
+                  ? "border-accent bg-accent/15 text-foreground"
                   : "border-border text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -130,7 +138,7 @@ function Header({ slug }: { slug: AppSlug }): ReactNode {
               {content.messages.newChat.unread}
             </button>
           </Tooltip>
-          <Tooltip label={content.messages.newChat.open}>
+          <Tooltip label={content.messages.newChat.open} side="bottom">
             <button
               type="button"
               onClick={openNewConversation}
@@ -193,7 +201,7 @@ function MailSidebar(): ReactNode {
               onClick={() => setMailFolder(folder.label)}
               className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm ${
                 active
-                  ? "bg-accent/15 font-medium text-accent"
+                  ? "bg-accent/15 font-medium text-foreground"
                   : "text-foreground hover:bg-surface-hover"
               }`}
             >
@@ -268,7 +276,7 @@ function VaultSidebar(): ReactNode {
             onClick={() => setVaultKind(kind.id)}
             className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm ${
               active
-                ? "bg-accent/15 font-medium text-accent"
+                ? "bg-accent/15 font-medium text-foreground"
                 : "text-foreground hover:bg-surface-hover"
             }`}
           >
@@ -454,7 +462,7 @@ function VoteSidebar(): ReactNode {
             onClick={() => setVoteStatus(option.id)}
             className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm ${
               active
-                ? "bg-accent/15 font-medium text-accent"
+                ? "bg-accent/15 font-medium text-foreground"
                 : "text-foreground hover:bg-surface-hover"
             }`}
           >
@@ -569,7 +577,7 @@ function SignSidebar(): ReactNode {
                   onClick={() => setSignSection(item.label)}
                   className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm ${
                     active
-                      ? "bg-accent/15 font-medium text-accent"
+                      ? "bg-accent/15 font-medium text-foreground"
                       : "text-foreground hover:bg-surface-hover"
                   }`}
                 >
@@ -603,7 +611,7 @@ function PublishSidebar(): ReactNode {
           <div
             key={step.label}
             className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm ${
-              index === 0 ? "bg-accent/15 font-medium text-accent" : "text-foreground"
+              index === 0 ? "bg-accent/15 font-medium text-foreground" : "text-foreground"
             }`}
           >
             <step.icon className="size-4 shrink-0" aria-hidden="true" />
@@ -670,7 +678,7 @@ function SpendSidebar(): ReactNode {
               aria-current={active ? "page" : undefined}
               className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm ${
                 active
-                  ? "bg-accent/15 font-medium text-accent"
+                  ? "bg-accent/15 font-medium text-foreground"
                   : "text-foreground hover:bg-surface-hover"
               }`}
             >
@@ -698,7 +706,7 @@ function SpendSidebar(): ReactNode {
                 }
                 className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm ${
                   active
-                    ? "bg-accent/15 font-medium text-accent"
+                    ? "bg-accent/15 font-medium text-foreground"
                     : "text-foreground hover:bg-surface-hover"
                 }`}
               >
@@ -719,6 +727,15 @@ function SpendSidebar(): ReactNode {
 function AppContextFooter({ slug }: { slug: AppSlug }): ReactNode {
   const copy = content.wallet;
   const { setWalletIntent } = useHub();
+  if (slug === "roadmap") {
+    /* Suggesting a feature is the one thing on this board you do rather than
+       read, so it gets the docked slot the wallet's CTAs use. */
+    return (
+      <div className="border-border mt-2 shrink-0 border-t pt-3">
+        <SuggestFeature />
+      </div>
+    );
+  }
   if (slug === "wallet") {
     return (
       <div className="mt-2 flex shrink-0 gap-2 border-t border-border pt-3">
@@ -828,11 +845,19 @@ function IdentitySidebar(): ReactNode {
   const { identitySection, setIdentitySection, identityKeys } = useHub();
   const retiredCount = identityKeys.filter((key) => key.retired).length;
   const sections: {
-    id: "keys" | "retired" | "certificates";
+    id: "handles" | "keys" | "retired" | "certificates";
     label: string;
     icon: LucideIcon;
     count: number;
   }[] = [
+    /* First, and the default. A handle is the part of an identity other people
+       use; keys are the part only this client does. */
+    {
+      id: "handles",
+      label: content.identity.handles.title,
+      icon: AtSign,
+      count: 0,
+    },
     {
       id: "keys",
       label: content.identity.keysTitle,
@@ -868,15 +893,19 @@ function IdentitySidebar(): ReactNode {
             onClick={() => setIdentitySection(section.id)}
             className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm ${
               active
-                ? "bg-accent/15 font-medium text-accent"
+                ? "bg-accent/15 font-medium text-foreground"
                 : "text-foreground hover:bg-surface-hover"
             }`}
           >
             <section.icon className="size-4 shrink-0" aria-hidden="true" />
             <span className="flex-1 text-left">{section.label}</span>
-            <span className="text-xs text-muted-foreground">
-              {section.count}
-            </span>
+            {/* Handles has no count worth showing — you have one. A zero
+                beside it would read as "none". */}
+            {section.count > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {section.count}
+              </span>
+            )}
           </button>
         );
       })}
@@ -907,7 +936,7 @@ function AttestationsSidebar(): ReactNode {
             onClick={() => setAttestationFilter(option.id)}
             className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm ${
               active
-                ? "bg-accent/15 font-medium text-accent"
+                ? "bg-accent/15 font-medium text-foreground"
                 : "text-foreground hover:bg-surface-hover"
             }`}
           >
@@ -952,6 +981,8 @@ export function AppContextBody({ slug }: { slug: AppSlug }): ReactNode {
       return <IdentitySidebar />;
     case "attestations":
       return <AttestationsSidebar />;
+    case "roadmap":
+      return <RoadmapSidebar />;
     default:
       return null;
   }
@@ -959,11 +990,55 @@ export function AppContextBody({ slug }: { slug: AppSlug }): ReactNode {
 
 /** Full contextual sidebar column: header, scrolling body, docked CTAs. */
 export function AppContextSidebar({ slug }: { slug: AppSlug }): ReactNode {
+  /* Messages carries its own bar, with two controls this one has no business
+     showing. Anything with nothing written about it gets no button rather than
+     a button onto an empty pane. */
+  const helped = slug !== "messages" && Boolean(getAppOnboarding(slug));
+
+  if (!helped) {
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <Header slug={slug} />
+        <AppContextBody slug={slug} />
+        <AppContextFooter slug={slug} />
+      </div>
+    );
+  }
+
+  /*
+    The docked block floats over the body rather than sitting under it, so the
+    list scrolls behind it the way the conversation list does. The body's own
+    root is the scroller in most of these columns, so the reserve space goes
+    there: a translucent strip with nothing reserved behind it leaves the last
+    row permanently half-covered, which reads as a rendering fault.
+
+    The reserve is per-shape rather than measured. Wallet's column ends in a
+    pair of CTAs and everything else ends in the bar alone, and being a few
+    pixels generous costs nothing — it is empty space below the last row.
+  */
+  const hasCta = slug === "wallet" || slug === "roadmap";
   return (
     <div className="flex h-full min-h-0 flex-col">
       <Header slug={slug} />
-      <AppContextBody slug={slug} />
-      <AppContextFooter slug={slug} />
+      <div
+        className={`relative flex min-h-0 flex-1 flex-col ${
+          hasCta ? "[&>*:first-child]:pb-28" : "[&>*:first-child]:pb-12"
+        }`}
+      >
+        <AppContextBody slug={slug} />
+        {/* Fades the list out into the bar, so the strip reads as the bottom of
+            the column rather than as a footer parked on top of a list. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-surface to-transparent"
+        />
+        <div className="bg-surface absolute inset-x-0 bottom-0">
+          {/* CTAs first, then the bar: the help button is the least urgent
+              thing in the column and belongs furthest from the content. */}
+          <AppContextFooter slug={slug} />
+          <AppHelpBar slug={slug} />
+        </div>
+      </div>
     </div>
   );
 }
