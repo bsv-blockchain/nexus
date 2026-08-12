@@ -86,6 +86,32 @@ describe('findArtifactUrl', () => {
    * The exact failure, as a test. Every one of these used to become the string
    * "undefined" (or worse) on the command line and reach curl as a hostname.
    */
+  /*
+   * The payload that cost v0.2.1.
+   *
+   * `eas build --json` under --auto-submit emits the build record before the
+   * artifact is published: every field the build has, an `artifacts` object, and
+   * nothing in it. The extractor was already right to refuse — it exited 1 and
+   * printed what it saw, which is how the cause was found in one log read rather
+   * than one release later. What was wrong was asking that payload at all, so the
+   * workflow now resolves the URL from `eas build:view` and this case is here to
+   * keep the refusal honest if anyone ever tries to make it "tolerant".
+   */
+  it('refuses the --auto-submit snapshot, whose artifacts object is empty', () => {
+    const snapshot = [
+      {
+        id: '1adba054-8046-4b1a-a798-0758e5b68660',
+        status: 'FINISHED',
+        platform: 'ANDROID',
+        artifacts: {},
+        appVersion: '0.2.1',
+        appBuildVersion: '7',
+        submissions: [{ status: 'FINISHED' }]
+      }
+    ]
+    assert.equal(findArtifactUrl(snapshot), null)
+  })
+
   it('returns null rather than a non-URL, for every shape that has no artifact', () => {
     for (const payload of [
       [],

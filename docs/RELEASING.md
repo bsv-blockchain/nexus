@@ -112,17 +112,23 @@ The tag then drives CI:
   installer (DigiCert), GPG-signed Linux AppImage/deb → attached to a **draft**
   GitHub release `vX.Y.Z`
 - **release-mobile.yml** — production builds for both stores on EAS (credentials
-  and build numbers live there). **iOS auto-submits to TestFlight.** **Android
-  does not**: the AAB is attached to the same draft GitHub release, and you upload
-  it at Play Console → Internal testing → Create new release. A signed sideloadable
-  APK is attached alongside it.
+  and build numbers live there). **iOS auto-submits to TestFlight**, and **Android
+  now auto-submits to Play's internal testing track** — the service account exists
+  and its key is in EAS credentials, scoped so that "Release to production" is not
+  granted. The AAB and a signed sideloadable APK are attached to the draft GitHub
+  release as well.
 
-  Android is manual by choice. Auto-submitting needs a Google *service account* — a
-  robot account whose JSON key holds standing upload rights to the store — and we
-  decided one drag-and-drop per release was the better trade. To change that, put
-  `--auto-submit` back on the `aab` job and assign the key at expo.dev →
-  credentials → Android → Google Service Account Key for Play Store Submissions;
-  `eas.json` already carries `submit.production.android.track: internal` for it.
+  Promotion out of internal testing stays a human act, by design and now also by
+  permission: the service account cannot release to production even if asked.
+
+  **The artifact URL comes from `eas build:view`, not from `eas build --json`.**
+  Under `--auto-submit` the streaming command emits its build record before the
+  artifact is published — every field present, `artifacts` empty — while the very
+  same build queried afterwards carries both `buildUrl` and
+  `applicationArchiveUrl`. This took the `aab` job red on v0.2.0 and again on
+  v0.2.1, both times *after* the build and the store submission had succeeded, so
+  what failed was the attach step and not the release. Both legs now read the id
+  out of `build.json` and ask for the finished build.
 
 Publishing the draft GitHub release stays a human act. So does promotion out of
 internal testing / TestFlight. Store review flows are watched on the EAS, App Store
@@ -133,7 +139,7 @@ and Play dashboards, not in Actions.
 | | |
 |---|---|
 | merge the roll-forward PR | every release |
-| upload the AAB to Play | every release |
+| ~~upload the AAB to Play~~ | now automatic — lands in internal testing |
 | publish the draft GitHub release | every release |
 | promote out of internal testing / TestFlight | when you want testers on it |
 
