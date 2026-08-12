@@ -1653,25 +1653,40 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     setMobileSheetOpen(false);
   }, [setActiveRef]);
 
+  /*
+   * Open a URL in a new tab and focus it.
+   *
+   * The tab is built HERE, not inside the updater, for the same reason
+   * openLinkInBrowser below builds its own outside: `buildTab` invents a random
+   * id, React invokes updaters twice in development, and the id the second run
+   * focused was not the id the first run kept. The tab appeared in the list with
+   * nothing selected — a browser pane on an empty address bar showing no page,
+   * which is what "Open in explorer" did from the wallet.
+   *
+   * Calling setActiveTabId and setHistoryByTab from inside another setter's
+   * updater was the other half of it. An updater has to be pure; these are
+   * effects, and they belong out here where they run once.
+   */
   const createTab = useCallback(
     (input: string) => {
-      setTabsBySpace((current) => {
-        const tabs = current[activeSpaceId] ?? [];
-        const tab = buildTab(input, activeSpaceId, tabs.length);
-        setActiveTabId(tab.id);
-        setHistoryByTab((h) => ({
-          ...h,
-          [tab.id]: { stack: [tab.url], index: 0 },
-        }));
-        return { ...current, [activeSpaceId]: [...tabs, tab] };
-      });
+      const tabs = tabsBySpace[activeSpaceId] ?? [];
+      const tab = buildTab(input, activeSpaceId, tabs.length);
+      setTabsBySpace((current) => ({
+        ...current,
+        [activeSpaceId]: [...(current[activeSpaceId] ?? []), tab],
+      }));
+      setHistoryByTab((h) => ({
+        ...h,
+        [tab.id]: { stack: [tab.url], index: 0 },
+      }));
+      setActiveTabId(tab.id);
       setActiveRef(BROWSER_REF);
       setActivePage(null);
       setMainView("app");
       setMobileSheetOpen(false);
       setCommandPaletteOpen(false);
     },
-    [activeSpaceId, setActiveRef],
+    [activeSpaceId, tabsBySpace, setActiveRef],
   );
 
   /*
