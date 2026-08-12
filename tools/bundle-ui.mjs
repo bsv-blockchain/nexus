@@ -132,6 +132,32 @@ const DEMO_ASSET_FILES = [
   'images/creative.webp',
   'images/dev.webp',
   'christian-regg-FNaFLvbLFuk-unsplash.jpg',
+  // The search-engine picker's still. Its panel is Settings › Browsing, which a
+  // live build does not carry (LIVE_CATEGORY_IDS in settings-app.tsx).
+  'search/metasearch.png',
+  /*
+   * App onboarding guides, minus the two for apps that actually ship.
+   *
+   * public/onboarding/ is NOT prunable as a directory: browser.png and
+   * wallet.png are read by the guides for Browse and Pay & Get paid, and those
+   * two are the SHIPPED set in apps/ui/lib/surfaces.ts. The rest belong to apps
+   * a live build has no route to, so they are named one by one — and this list
+   * is what has to change if SHIPPED ever does.
+   */
+  'onboarding/attestations.png',
+  'onboarding/baskets.png',
+  'onboarding/connect.png',
+  'onboarding/identity.png',
+  'onboarding/learn.png',
+  'onboarding/mail.png',
+  'onboarding/market.png',
+  'onboarding/messages.png',
+  'onboarding/publisher.png',
+  'onboarding/roadmap.png',
+  'onboarding/signer.png',
+  'onboarding/tx-viewer.png',
+  'onboarding/vault.png',
+  'onboarding/vote.png',
 ]
 
 function prune(dest) {

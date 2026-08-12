@@ -44,13 +44,13 @@ function RootRow({
     <button
       type="button"
       onClick={onClick}
-      className="focus-ring flex w-full items-center gap-3 rounded-xl px-3 py-3.5 text-left text-sm font-medium hover:bg-surface-hover"
+      className="focus-ring hover:bg-surface-hover flex w-full items-center gap-3 rounded-xl px-3 py-3.5 text-left text-sm font-medium"
     >
-      <Icon className="size-5 text-muted-foreground" aria-hidden="true" />
+      <Icon className="text-muted-foreground size-5" aria-hidden="true" />
       <span className="flex-1">{label}</span>
       {drilldown && (
         <ChevronRight
-          className="size-4 text-muted-foreground"
+          className="text-muted-foreground size-4"
           aria-hidden="true"
         />
       )}
@@ -95,18 +95,18 @@ function MobileSheetContent(): ReactNode {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col bg-background md:hidden"
+      className="bg-background fixed inset-0 z-50 flex flex-col md:hidden"
       role="dialog"
       aria-modal="true"
       aria-label="Hub menu"
     >
-      <header className="flex items-center gap-2 border-b border-border px-3 py-3">
+      <header className="border-border flex items-center gap-2 border-b px-3 py-3">
         {view.kind !== "root" ? (
           <button
             type="button"
             onClick={() => setView(parent[view.kind])}
             aria-label={content.mobile.backLabel}
-            className="focus-ring flex items-center gap-0.5 rounded-md p-1.5 text-sm text-muted-foreground hover:text-foreground"
+            className="focus-ring text-muted-foreground hover:text-foreground flex items-center gap-0.5 rounded-md p-1.5 text-sm"
           >
             <ChevronLeft className="size-5" aria-hidden="true" />
             {content.mobile.backLabel}
@@ -121,7 +121,7 @@ function MobileSheetContent(): ReactNode {
           type="button"
           onClick={() => setMobileSheetOpen(false)}
           aria-label="Close menu"
-          className="focus-ring rounded-md p-1.5 text-muted-foreground hover:text-foreground"
+          className="focus-ring text-muted-foreground hover:text-foreground rounded-md p-1.5"
         >
           <X className="size-5" aria-hidden="true" />
         </button>
@@ -147,7 +147,7 @@ function MobileSheetContent(): ReactNode {
             />
 
             {apps.length > 0 && (
-              <div className="my-2 h-px bg-border" aria-hidden="true" />
+              <div className="bg-border my-2 h-px" aria-hidden="true" />
             )}
 
             {apps.length > 0 && (
@@ -157,7 +157,7 @@ function MobileSheetContent(): ReactNode {
                     key={app.slug}
                     type="button"
                     onClick={() => openApp(app.slug)}
-                    className="focus-ring flex flex-col items-center gap-2 rounded-xl p-3 text-center hover:bg-surface-hover"
+                    className="focus-ring hover:bg-surface-hover flex flex-col items-center gap-2 rounded-xl p-3 text-center"
                   >
                     <AppTile app={app} size={40} />
                     <span className="text-xs font-medium">{app.name}</span>
@@ -166,7 +166,7 @@ function MobileSheetContent(): ReactNode {
               </div>
             )}
 
-            <div className="my-2 h-px bg-border" aria-hidden="true" />
+            <div className="bg-border my-2 h-px" aria-hidden="true" />
 
             {/* The desktop rail's gear does not exist below md, and Settings is
                 where backup and sign-out live — a phone without this row has no
@@ -186,9 +186,12 @@ function MobileSheetContent(): ReactNode {
                 setMobileSheetOpen(false);
                 openShare();
               }}
-              className="focus-ring flex w-full items-center gap-3 rounded-xl px-3 py-3.5 text-left text-sm font-medium hover:bg-surface-hover"
+              className="focus-ring hover:bg-surface-hover flex w-full items-center gap-3 rounded-xl px-3 py-3.5 text-left text-sm font-medium"
             >
-              <Gift className="size-5 text-muted-foreground" aria-hidden="true" />
+              <Gift
+                className="text-muted-foreground size-5"
+                aria-hidden="true"
+              />
               Share Nexus
             </button>
             <div className="px-1 pt-1">
@@ -196,7 +199,7 @@ function MobileSheetContent(): ReactNode {
             </div>
             {/* Phones never see the desktop rail, and this number is what a bug
                 report needs — so it lives here too. */}
-            <div className="flex justify-center px-1 pb-1 pt-2">
+            <div className="flex justify-center px-1 pt-2 pb-1">
               <ShellVersion />
             </div>
           </div>
@@ -209,12 +212,12 @@ function MobileSheetContent(): ReactNode {
                 key={space.id}
                 type="button"
                 onClick={() => setView({ kind: "space", spaceId: space.id })}
-                className="focus-ring flex w-full items-center gap-3 rounded-xl px-3 py-3.5 text-left text-sm font-medium hover:bg-surface-hover"
+                className="focus-ring hover:bg-surface-hover flex w-full items-center gap-3 rounded-xl px-3 py-3.5 text-left text-sm font-medium"
               >
                 <SpaceIcon value={space.emoji} size={18} />
                 <span className="flex-1">{space.name}</span>
                 <ChevronRight
-                  className="size-4 text-muted-foreground"
+                  className="text-muted-foreground size-4"
                   aria-hidden="true"
                 />
               </button>
@@ -224,8 +227,10 @@ function MobileSheetContent(): ReactNode {
 
         {view.kind === "space" && <SpaceContent spaceId={view.spaceId} />}
         {view.kind === "downloads" && <DownloadsPanel />}
-        {/* The pinned-sites list is the whole of this view. The collections
-            column that used to sit above it was the store's filter. */}
+        {/* The connected-sites list, not the store. The store is a three-column
+            catalogue and belongs on the canvas — the mobile rail's Apps tab
+            opens it there. What a phone sheet is good for is the other half of
+            the question: what already has a grant, and how do I take it back. */}
         {view.kind === "apps" && (
           <div className="-mx-3">
             <Web3Apps />

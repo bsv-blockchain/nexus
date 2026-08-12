@@ -3,6 +3,7 @@
 import { AppDetailPanel } from "@/components/hub/app-detail-panel";
 import { AppTile } from "@/components/hub/app-icon";
 import { PRIMARY_CTA } from "@/components/hub/cta";
+import { DEMO_SURFACES } from "@/lib/surfaces";
 import { DevBadge } from "@/components/hub/dev-badge";
 import { useBrandMode, withBrand } from "@/lib/brand";
 import { useHub } from "@/components/hub/hub-provider";
@@ -85,12 +86,26 @@ const CARD_ITEM = {
 
 type SortKey = "newest" | "oldest" | "popular" | "trending";
 
-const SORTS: { id: SortKey; label: string }[] = [
-  { id: "trending", label: content.appStore.sortTrending },
-  { id: "popular", label: content.appStore.sortPopular },
+/*
+ * How the listings are ordered.
+ *
+ * Trending and Most popular are rankings, and a ranking is a claim about what
+ * other people did — which needs a registry counting them. Newest and Oldest
+ * are dates on rows this build ships with, which is a fact about the build. So
+ * a live build keeps the two that are true and drops the two that are not,
+ * rather than dropping the whole control and leaving a catalogue with no order
+ * anybody chose.
+ */
+const ALL_SORTS: { id: SortKey; label: string; needsRegistry?: boolean }[] = [
+  { id: "trending", label: content.appStore.sortTrending, needsRegistry: true },
+  { id: "popular", label: content.appStore.sortPopular, needsRegistry: true },
   { id: "newest", label: content.appStore.sortNewest },
   { id: "oldest", label: content.appStore.sortOldest },
 ];
+
+const SORTS = DEMO_SURFACES
+  ? ALL_SORTS
+  : ALL_SORTS.filter((sort) => !sort.needsRegistry);
 
 /*
  * The publisher facet is gone, folded into Sources.
@@ -173,16 +188,22 @@ function AppCard({
                 </span>
               )}
             </span>
-            <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
-              <span className="truncate">v{app.version}</span>
-              <span className="flex shrink-0 items-center gap-0.5">
-                <Star
-                  className="size-3 fill-[#FFAF00] text-[#FFAF00]"
-                  aria-hidden="true"
-                />
-                <span className="tabular-nums">{app.rating.toFixed(1)}</span>
-              </span>
-            </p>
+            {/* A version and a star, both of which need a registry behind them
+                to mean anything. Demo builds have one; a shipped binary does
+                not, and a rating nobody collected is worse than no rating.
+                See docs/SPEC-design-catchup.md §1. */}
+            {DEMO_SURFACES && (
+              <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                <span className="truncate">v{app.version}</span>
+                <span className="flex shrink-0 items-center gap-0.5">
+                  <Star
+                    className="size-3 fill-[#FFAF00] text-[#FFAF00]"
+                    aria-hidden="true"
+                  />
+                  <span className="tabular-nums">{app.rating.toFixed(1)}</span>
+                </span>
+              </p>
+            )}
             <DevBadge developer={app.developer} className="mt-0.5" />
           </div>
         </div>
@@ -439,7 +460,10 @@ export function AppStore(): ReactNode {
   const slugSet = new Set(getCollectionAppSlugs(appsCollection));
 
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<SortKey>("trending");
+  /* The first sort this build offers, which is Trending in demo and Newest in
+     a live build — not the literal "trending", which would leave a live build
+     ordered by a ranking whose control it does not show. */
+  const [sort, setSort] = useState<SortKey>(SORTS[0]!.id);
   const [filters, setFilters] = useState<StoreFilters>(NO_FILTERS);
   const [sortOpen, setSortOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);

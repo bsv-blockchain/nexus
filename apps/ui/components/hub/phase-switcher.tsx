@@ -67,7 +67,7 @@ export function PhaseSwitcher(): ReactNode {
   const mounted = useSyncExternalStore(
     () => () => {},
     () => true,
-    () => false,
+    () => false
   );
 
   useEffect(() => {
@@ -95,7 +95,15 @@ export function PhaseSwitcher(): ReactNode {
   const groups = [rank, ...PHASES.map((_, i) => i).filter((i) => i < rank)];
 
   return (
-    <div ref={box} className="fixed right-4 bottom-4 z-[70]">
+    /* Clear of the phone's bottom bar, which owns the last ~84px of the screen
+       plus its safe-area inset. At `bottom-4` the chip sat on top of the tab
+       switcher — the one control somebody reaching for it is most likely to hit
+       by accident. Desktop has nothing down there, so the offset only applies
+       below the breakpoint where the bar exists. */
+    <div
+      ref={box}
+      className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-[70] md:bottom-4"
+    >
       <AnimatePresence>
         {open && (
           <motion.div
@@ -151,7 +159,7 @@ export function PhaseSwitcher(): ReactNode {
               {groups.map((index) => {
                 const group = PHASES[index]!;
                 const features = PHASE_FEATURES.filter(
-                  (feature) => feature.phase === group,
+                  (feature) => feature.phase === group
                 );
                 if (features.length === 0) return null;
                 return (

@@ -1,6 +1,7 @@
 "use client";
 
 import { PhaseSwitcher } from "@/components/hub/phase-switcher";
+import { DEMO_SURFACES } from "@/lib/surfaces";
 import { AppCollections } from "@/components/hub/app-collections";
 import { AppPermissionSheet } from "@/components/hub/app-permission-sheet";
 import { CommandPalette } from "@/components/hub/command-palette";
@@ -130,8 +131,13 @@ function Shell(): ReactNode {
       <ShareModal />
       <WalletGate />
       <AppPermissionSheet />
-      {/* A control for whoever is running the demo, not part of the product. */}
-      <PhaseSwitcher />
+      {/* A control for whoever is running the demo, and it says so — "here is
+          what we would ship first" is a conversation, not a feature. A shipped
+          binary has one product state, so the chip has nothing to switch and the
+          panel behind it lists features nobody in that build can reach. Gated
+          here rather than inside the component so that with the flag folded to
+          a literal false the whole thing leaves the bundle. */}
+      {DEMO_SURFACES && <PhaseSwitcher />}
     </div>
   );
 }

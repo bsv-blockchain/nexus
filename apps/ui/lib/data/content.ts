@@ -49,11 +49,15 @@ export const content = {
       essential: "Essential",
       installedBadge: "Connected",
       empty: "No apps connected. Add one below.",
-      /* The pinned-site half of the same surface. A listing whose `web` field is
-         set connects as a site rather than as a screen, and these are the strings
-         that half needs — see docs/SPEC-design-catchup.md §1. */
+      /*
+       * The connected-sites list — the phone's version of the same surface, and
+       * the affordance every wallet ships: the sites you have connected, and a
+       * way to disconnect each one. Coinbase calls it Dapp Connections,
+       * MetaMask calls it Connected sites. See docs/SPEC-design-catchup.md §1.
+       */
+      sitesTitle: "Connected sites",
       subtitle:
-        "Websites you've pinned to your rail. Opening one opens the website.",
+        "Websites you've connected to this profile. Opening one opens the website.",
       onRail: "On your rail",
       add: "Add to rail",
       remove: "Remove from rail",
@@ -634,7 +638,8 @@ export const content = {
       /* The `/once` caveat only appears where "Messages on chain" can be
          chosen, which is the conversation pane — a caveat about an option that
          is not on screen is a sentence a reader has to hold for nothing. */
-      noteConversation: "Applies from here on. A sealed /once is never anchored.",
+      noteConversation:
+        "Applies from here on. A sealed /once is never anchored.",
       /* The conversation-level pane, where the global setting is the fallback. */
       forConversation: "This conversation",
       usingDefault: "Following your default",
@@ -649,7 +654,8 @@ export const content = {
         "Messages in this conversation are anchored. Once it is written nobody can delete it, you included, and anyone can read the record forever.",
       ackConfirm: "Post it permanently",
       ackCancel: "Not yet",
-      ackAgain: "Asked once per conversation, and again if the setting changes.",
+      ackAgain:
+        "Asked once per conversation, and again if the setting changes.",
       bothSides: "Everyone here sees this, and it applies to what you send.",
     },
     /** the saved-messages list, swapped in under the conversation list */
@@ -1014,7 +1020,8 @@ export const content = {
           member: "Member",
         },
         powers: {
-          admin: "Everything a mod can, plus banning mods, changing the room and closing it",
+          admin:
+            "Everything a mod can, plus banning mods, changing the room and closing it",
           mod: "Everything a member can, plus deleting messages and banning members",
           member: "Read the room and post in it",
         },
@@ -1179,12 +1186,14 @@ export const content = {
       unlist: "Take off the market",
       listedFor: "Listed for",
       sellTitle: "Ask for",
-      sellHint: "Somebody buying it pays this, and the name transfers with the key.",
+      sellHint:
+        "Somebody buying it pays this, and the name transfers with the key.",
       listDone: "is on the market",
       unlisted: "is off the market",
       buyFor: "Buy for {price}",
       forSaleBy: "For sale by {seller}",
-      bought: "Bought. It is yours, and the profile you were on now answers to it.",
+      bought:
+        "Bought. It is yours, and the profile you were on now answers to it.",
       onNexus: "On Nexus, and anywhere your handle resolves",
       change: "Change",
       cancel: "Cancel",
@@ -1200,7 +1209,8 @@ export const content = {
       claimFor: "Claim for {price}",
       claimed: "Your handle is changed. The old one is free for somebody else.",
       graceTitle: "Your old handle",
-      graceBody: "is held for you for another {seconds}s. After that anybody can take it.",
+      graceBody:
+        "is held for you for another {seconds}s. After that anybody can take it.",
       reclaim: "Take it back",
       reclaimed: "Yours again. The other one is in its own grace window now.",
       recoveryTitle: "Getting back in",
@@ -1726,7 +1736,7 @@ export const content = {
       reachExplainLabel: "What reachability means",
       reachExplain: [
         "A handle under BRC-169 resolves from more than one place. Somebody on Treechat, Twetch or HandCash can address @you without either of you sharing a server, which is the point of it and also the part people do not expect.",
-        "So \"everyone\" is wider than it sounds: it is every ecosystem your handle is registered through, not only the one you are reading this in. Narrowing it does not un-register the handle — it decides who gets through once they have found it.",
+        'So "everyone" is wider than it sounds: it is every ecosystem your handle is registered through, not only the one you are reading this in. Narrowing it does not un-register the handle — it decides who gets through once they have found it.',
       ],
       reachContacts: "Contacts only",
       reachContactsHint: "People already in your address book.",
@@ -1758,12 +1768,14 @@ export const content = {
         "Set from a conversation's settings, where the room is in front of you. Anchoring whole messages is only offered there.",
       trackingTitle: "Tracking",
       cookies: "Cookies",
-      cookiesHint: "Third-party cookies are the ones that follow you between sites.",
+      cookiesHint:
+        "Third-party cookies are the ones that follow you between sites.",
       cookiesAllow: "Allow all",
       cookiesThird: "Block third-party",
       cookiesBlock: "Block all",
       trackers: "Block known trackers",
-      trackersHint: "A list, not magic. It stops the ones that have been named.",
+      trackersHint:
+        "A list, not magic. It stops the ones that have been named.",
       doNotTrack: "Send a Do Not Track request",
       doNotTrackHint: "Politely asked, freely ignored. Costs nothing to send.",
       quitTitle: "When you quit",
@@ -2013,9 +2025,15 @@ export const content = {
     complexityHint:
       "Risk and unknowns rather than lines of code. High means the shape of it could change once it is started.",
     complexityLevels: [
-      { label: "Low", body: "Understood work. A week or so, and few ways to be surprised." },
+      {
+        label: "Low",
+        body: "Understood work. A week or so, and few ways to be surprised.",
+      },
       { label: "Medium", body: "Known shape, unknown corners. Up to a month." },
-      { label: "High", body: "Could change shape once it is started. Months, and the estimate is the least reliable part." },
+      {
+        label: "High",
+        body: "Could change shape once it is started. Months, and the estimate is the least reliable part.",
+      },
     ],
     devNoteTitle: "From whoever scoped it",
     status: "Status",

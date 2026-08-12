@@ -63,6 +63,11 @@ cost is that every dependency bump is a merge against a patch file.
 longer the upstream. Design work contributes to this repository directly, so there is one
 source of truth and no divergence to reconcile.
 
+*Amended 2026-08-11.* That was the intent, not yet the fact: design work continued in
+`vincemedia/bsvnexus` for five days after the fork, and 66 commits were merged back on
+`feat/design-catchup`. See `docs/SPEC-design-catchup.md`. The rule stands going forward,
+and the reconciliation cost of five days is the argument for it.
+
 ## 8. The Hermes `toString` question
 
 BSV Browser is treated as **correct as shipped**. Where the same pattern misbehaves under
@@ -77,3 +82,43 @@ constant is a Nexus-side fix.)
 
 `main` is the trunk. The `spike/a-prime-shells` branch was promoted and deleted — it stopped
 being a spike some time ago. No other contributors yet, so no protection rules for now.
+
+## 10. Apps, and what "Nexus distributes nothing" means
+
+Decided 2026-08-11, replacing the reading recorded in `53e6e00`.
+
+There **is** an Apps surface, and it is a store in every way a person would recognise:
+search, sort, filter, listings grouped by whoever serves them. What Nexus does not do is
+**operate a distribution channel or make claims about software it did not build**. Those
+are different sentences, and only the second one is a principle.
+
+Concretely:
+
+- A **built-in app** is a screen compiled into this binary. Connecting one adds it to the
+  active profile's rail. Nothing is downloaded, because it was already there.
+- A **web app** is a listing with a `web` field — somebody else's website. Connecting one
+  pins its URL to the rail as a `{ kind: "site" }` ref and records an origin-scoped grant
+  against that profile's wallet. Disconnecting revokes both. This is the web3 convention
+  (Coinbase's dapp connections, MetaMask's connected sites, CAIP-25 session scopes) and
+  our own: BRC-100 for the interface, BRC-43 for what a grant covers, BRC-73 for grouping
+  the approval.
+- **Ratings, review counts, catalogue versions and freshness are demo-only.** They are
+  derived from a hash of the slug and there is no registry behind them. Under
+  `NEXT_PUBLIC_DEMO_DATA=0` they do not render, and the sort control drops Trending and
+  Most popular while keeping Newest and Oldest — those are dates on rows the build ships
+  with, which is a fact about the build rather than a claim about other people.
+
+The rail's two kinds stay distinct in the type (`lib/rail/layout.ts`). That is what stops a
+website reaching code that assumes a screen, and it is the line the permission model rests
+on.
+
+## 11. Getting a demo surface shipped
+
+Seventeen of nineteen app surfaces are drawn against fixtures and reachable only under
+`NEXT_PUBLIC_DEMO_DATA`. `docs/PROMOTING-DEMO-SURFACES.md` is the process that gets one
+out: four stages (drawn → validated → built → shipped) and two exits — into the binary, or
+onto the web as a site a user connects.
+
+**Prefer the web.** It is the cheaper mistake, it ships on its own schedule, and it proves
+the `window.nexus` seam by using it. Reach for the binary when the answer to "why can this
+not be a website?" is a key, an offline requirement, or the OS.
