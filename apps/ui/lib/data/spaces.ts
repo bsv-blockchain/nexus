@@ -35,14 +35,20 @@ export const spaces: Space[] = [
     id: "space-my-hub",
     name: "My Profile",
     // "hub" renders the Nexus brand mark via SpaceIcon (default profile icon).
-    emoji: "hub",
+    /* One of the picker's own, like every other profile. The brand mark
+       said "this is Nexus" on a thing that is one profile among several, and
+       nobody could pick it again after changing it. */
+    emoji: "lucide:House",
     sortOrder: 0,
     createdAt: "2026-02-01T10:00:00.000Z",
   },
   {
     id: "space-work",
     name: "Work",
-    emoji: "💼",
+    /* One of the picker's own icons rather than an emoji. A seeded profile
+       wearing something the picker cannot produce is a profile nobody can
+       recreate, and it renders at a different weight from every other one. */
+    emoji: "lucide:Briefcase",
     sortOrder: 1,
     createdAt: "2026-02-14T10:00:00.000Z",
   },

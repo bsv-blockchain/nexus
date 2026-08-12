@@ -5,6 +5,8 @@
 export const content = {
   brand: {
     name: "Nexus",
+    /** the short one, for a lockup where a full sentence will not fit */
+    slogan: "All the net you need",
     tagline: "Your apps, your keys, your Nexus.",
     description:
       "Nexus is a workspace that bundles a browser, wallet, signing, publishing and transaction tools into one place.",
@@ -19,16 +21,37 @@ export const content = {
     },
     downloads: {
       title: "Downloads",
-      empty: "Nothing downloaded yet.",
+      empty: "Nothing downloaded in this profile.",
+      profile: "Profile",
+      failed: "Stopped before it finished",
+      retry: "Try again",
     },
     /*
-     * The rail's third-party half is a bookmark list, and every string here has
-     * to read like one. Nexus distributes nothing: there is no catalog, no
-     * publisher, no version and no grant, so there is no verb here that implies
-     * software arriving on the device. "Add to rail" is the whole promise.
+     * Two halves of one surface, and the verbs have to keep them apart.
+     *
+     * "Connect" is the web3 word — the same act Coinbase calls a dapp connection
+     * and MetaMask calls a connected site — and it means a grant against this
+     * profile's wallet. It is never a synonym for downloading: a built-in app was
+     * already in the binary, and a web app stays on somebody else's server.
+     *
+     * So nothing here says install, purchase or update. "Add to rail" is the whole
+     * promise on the site side, and "Connect" is the whole promise on the app side.
      */
     apps: {
-      title: "Web3 Apps",
+      title: "Apps",
+      /* What the store is, in the line under its heading. */
+      storeSubtitle:
+        "Connect apps to your Nexus. Connected apps appear in the sidebar rail.",
+      installedSection: "Connected",
+      availableSection: "Available",
+      install: "Connect",
+      uninstall: "Disconnect",
+      essential: "Essential",
+      installedBadge: "Connected",
+      empty: "No apps connected. Add one below.",
+      /* The pinned-site half of the same surface. A listing whose `web` field is
+         set connects as a site rather than as a screen, and these are the strings
+         that half needs — see docs/SPEC-design-catchup.md §1. */
       subtitle:
         "Websites you've pinned to your rail. Opening one opens the website.",
       onRail: "On your rail",
@@ -45,11 +68,46 @@ export const content = {
        * exist: there is no Add to rail in the browse chrome, in the page-options
        * sheet, or on the origin chip. When one lands, this string changes with it.
        */
-      empty: "Nothing here yet. Type a web address above to add your first site.",
+      emptySites:
+        "Nothing here yet. Type a web address above to add your first site.",
       rename: "Rename",
     },
   },
   wallet: {
+    /* The multi-wallet switcher, shared by the wallet app and Profiles. */
+    switcher: {
+      title: "Wallets",
+      active: "Spending from this",
+      use: "Use",
+      switched: "Now spending from this wallet",
+      locked: "Locked",
+      sealed: "Locked",
+      unlock: "Unlock",
+      unlocked: "Unlocked, and now active",
+      unlockTitle: "Password",
+      unlockPlaceholder: "Your wallet password",
+      unlockNote:
+        "Nothing here checks it. A prototype that pretended to would be teaching a habit it cannot keep.",
+      addTitle: "Add a wallet",
+      addCreate: "Create a wallet",
+      addCreateHint: "A new key, made here and held by you.",
+      addPhrase: "Import a recovery phrase",
+      addPhraseHint: "Twelve or twenty-four words from another wallet.",
+      addKey: "Import a private key",
+      addKeyHint: "A single key, in WIF or hex.",
+      nameLabel: "Name",
+      namePlaceholder: "Everyday, Savings, Shop float…",
+      phraseLabel: "Recovery phrase",
+      phrasePlaceholder: "word word word…",
+      keyLabel: "Private key",
+      keyPlaceholder: "L1aW4aubDFB7yfras2S1mN3bqg9…",
+      importWarning:
+        "Anything typed here can spend everything it holds. Nothing in this prototype is sent anywhere, but that is a habit worth keeping outside it.",
+      importAction: "Import",
+      added: "Added, and active in this profile",
+      scopeNote:
+        "Picking one connects it to this profile. A profile uses one wallet at a time.",
+    },
     balanceLabel: "Total balance",
     totalValue: "Portfolio value",
     change24h: "past 24 hours",
@@ -869,6 +927,7 @@ export const content = {
       toll: "Message toll",
       tollPerMessage: "per message, paid to them",
       attestations: "Attestations",
+      attested: "Attested accounts",
       reputation: "Reputation",
       renounced: "Renounced",
       vouches: "people vouch for them",
@@ -1103,20 +1162,105 @@ export const content = {
     encryptedNote: "End-to-end encrypted with your identity key.",
   },
   identity: {
-    keysTitle: "Identity Badges",
+    handles: {
+      title: "Handles",
+      yoursTitle: "Your handles",
+      yoursHint:
+        "The names people reach you by. Up to five, and each profile answers to one of them.",
+      active: "Active here",
+      useHere: "Use here",
+      addTitle: "Claim another",
+      marketTitle: "Handles for sale",
+      marketHint:
+        "Names other people hold and have put a price on. Buying one transfers it to your key.",
+      full: "You hold five, which is the limit. Give one up or sell one to make room.",
+      giveUp: "Give up",
+      sell: "Sell",
+      unlist: "Take off the market",
+      listedFor: "Listed for",
+      sellTitle: "Ask for",
+      sellHint: "Somebody buying it pays this, and the name transfers with the key.",
+      listDone: "is on the market",
+      unlisted: "is off the market",
+      buyFor: "Buy for {price}",
+      forSaleBy: "For sale by {seller}",
+      bought: "Bought. It is yours, and the profile you were on now answers to it.",
+      onNexus: "On Nexus, and anywhere your handle resolves",
+      change: "Change",
+      cancel: "Cancel",
+      placeholder: "newhandle",
+      checkAvailable: "Available.",
+      checkTaken: "Somebody already has that one.",
+      checkOwned: "You already hold that one.",
+      checkShort: "Four characters or more.",
+      checkInvalid: "Letters, numbers and underscores only.",
+      checkCurrent: "That is already yours.",
+      priceNote:
+        "Changing costs {price}. The price is why good names are still going: without one, a script takes them all on the first day.",
+      claimFor: "Claim for {price}",
+      claimed: "Your handle is changed. The old one is free for somebody else.",
+      graceTitle: "Your old handle",
+      graceBody: "is held for you for another {seconds}s. After that anybody can take it.",
+      reclaim: "Take it back",
+      reclaimed: "Yours again. The other one is in its own grace window now.",
+      recoveryTitle: "Getting back in",
+      recoveryHint: "Who could vouch you back if you lost this device.",
+      recoveryNone:
+        "Nobody is named yet. Until somebody is, losing this device loses the handle with it.",
+      recoveryPending:
+        "Social recovery is funded and not built. These are the people it would ask.",
+      recoveryOpen: "See it on the roadmap",
+      linkedTitle: "Linked accounts",
+      linkedHint:
+        "Prove an account people already know you by belongs to the same key. Nothing else is shared.",
+      link: "Link",
+      notLinked: "Not linked",
+      verifying: "Verifying…",
+      attested: "Attested",
+      linkedToast: "{service} is linked to your key",
+      consentTitle: "Let Nexus verify your {service} account?",
+      consentBody:
+        "Nexus receives your username and nothing else. A signed attestation links it to your identity key, and anybody can check it without asking us.",
+      allow: "Allow",
+      avatarLabel: "Your picture",
+      avatarUpload: "Upload",
+      avatarReplace: "Replace",
+      avatarRemove: "Remove",
+      avatarSaved: "Picture updated",
+      avatarRemoved: "Back to the generated one",
+      avatarTooBig:
+        "That file is {size} kB. Keep it under {max} kB — it is shown at 96 pixels.",
+      shareTitle: "Share your handle",
+      shareHint: "Anybody can pay you or start a conversation from this.",
+      shareAttested: "Backed by {count} attested account{s}",
+      shareNone: "No linked accounts yet.",
+      copyLink: "Copy link",
+      copied: "Link copied",
+      /* the full-screen sheet the code opens into */
+      sheetOpen: "Show code",
+      sheetLabel: "Share your handle",
+      sheetSubhead: "Point a camera at it, or send the link.",
+      sheetCodeLabel: "Code for {handle}",
+      sheetScan: "Scan to pay {handle} or open a conversation.",
+      sheetNoAvatar: "Add a picture and it appears in the middle.",
+    },
+    keysTitle: "Identifiers",
+    walletKeysTitle: "Wallet keys",
+    walletKeysHint:
+      "One per wallet, set when it was made and never again. The name above it is yours to change; this is not.",
     certificatesTitle: "Certificates",
     keysHint:
-      "Your identity badges sign your messages and prove who you are on-chain.",
-    newBadge: "New badge",
-    retiredTitle: "Retired Badges",
+      "Your identifiers sign your messages and prove who you are on-chain.",
+    newBadge: "New identifier",
+    retiredTitle: "Retired identifiers",
     retiredLabel: "Retired",
     retiredHint:
-      "Retired badges are kept for your records but no longer sign or identify you.",
+      "Retired identifiers are kept for your records but no longer sign or identify you.",
     makePrimary: "Make primary",
     retire: "Retire",
     restore: "Restore",
     rename: "Rename",
-    renameTitle: "Rename badge",
+    renameTitle: "Rename identifier",
     renameSave: "Save",
     renameCancel: "Cancel",
     certificatesHint:
@@ -1124,7 +1268,7 @@ export const content = {
     certificatesEmpty:
       "No certificates found. Register with identity certifiers to receive certificates.",
     primaryBadge: "Primary",
-    copyKey: "Copy badge id",
+    copyKey: "Copy identifier",
     registerAction: "Find certifiers",
   },
   connect: {
@@ -1133,6 +1277,7 @@ export const content = {
     permissionsLabel: "Permissions",
     lastUsed: "Last used",
     disconnect: "Disconnect",
+    reconnect: "Reconnect",
   },
   baskets: {
     title: "Output baskets",
@@ -1140,6 +1285,144 @@ export const content = {
     newBasket: "New basket",
     subtitle:
       "Baskets group your wallet's outputs by protocol for building apps.",
+  },
+  appStore: {
+    collectionsTitle: "Collections",
+    reorderCollections: "Reorder collections",
+    enableAll: "Connect all",
+    disableAll: "Disconnect all",
+    installHint: "Connect",
+    moreApps: "More apps",
+    searchPlaceholder: "Search apps",
+    sortLabel: "Sort",
+    sortNewest: "Newest",
+    sortOldest: "Oldest",
+    sortPopular: "Most popular",
+    sortTrending: "Trending",
+    filterLabel: "Filter",
+
+    /* The filter pane. Its two headings name what is being narrowed rather
+       than what a filter is — "Sources" and "Categories" are answers to
+       "narrow by what", which is the only question a reader has here. */
+    filterTitle: "Filter apps",
+    filterSources: "Sources",
+    filterCategories: "Categories",
+    filterSourcesHint:
+      "Repos you have switched on. Narrowing here hides listings without unsubscribing.",
+    filterClear: "Clear filters",
+    filterEmptyCategory: "Nothing here yet",
+    filterShowing: "{shown} of {total} apps",
+
+    devNexus: "Nexus",
+    devBsvAssociation: "BSV Association",
+    devOpl: "Open Protocol Labs",
+    devHandcash: "HandCash",
+    devThirdParty: "Third-party",
+    devNexusApps: "Nexus apps",
+    devBsvAssociationApps: "BSV Association apps",
+    devOplApps: "Open Protocol Labs apps",
+    devHandcashApps: "HandCash apps",
+    devThirdPartyApps: "Third-party developers",
+    noResults: "No apps match your search.",
+
+    /* The repository header the catalogue is grouped under. */
+    repoApps: "{n} apps",
+    repoReviews: "({n})",
+    repoLatest: "latest",
+    repoVersion: "Catalogue version",
+    repoCollapse: "Collapse",
+    repoExpand: "Expand",
+    repoHasNew: "Something new since you last looked",
+    repoPinned:
+      "Showing this source as it stood at {version}. Anything published since is hidden.",
+    repoToday: "updated today",
+    repoYesterday: "updated yesterday",
+    repoDays: "updated {n} days ago",
+    repoWeeks: "updated {n} weeks ago",
+    repoMonths: "updated {n} months ago",
+    repoEmpty: "Nothing in this source matches.",
+    newLabel: "New",
+    // install permission sheet
+    installSubtitle: "Connect to your Nexus",
+    permsIntro: "If you add this app, it can:",
+    permsIntroCollapsed: "If you add this app, it can use",
+    permsIntroCollection: "If you enable these apps, they can:",
+    permsIntroCollectionCollapsed: "If you enable these apps, they can use",
+    learnMore: "Learn more",
+    perm1: "Verify your identity to sign you in",
+    perm2: "Request payments, small ones auto-approved, large ones ask you",
+    perm3: "Store and access data you share with it",
+    // one-word summaries shown when the permissions block is collapsed
+    permWords: ["Identity", "Payments", "Data"],
+    permsSummaryLabel: "Permissions",
+    // in-app purchases block
+    iapTitle: "In-app purchases",
+    iapFree: "Free",
+    iapFreeNote: "This app is free to use.",
+    installNote:
+      "You can disconnect this app any time from Apps. Payments above $0.10 will ask for your confirmation.",
+    optIdentify: "Allow this app to identify you",
+    optIdentifyInfo:
+      "Shares your public identity so this app can recognise you and sign you in. It never sees your private keys.",
+    optOperate: "Allow this app to act without asking each time",
+    optOperateInfo:
+      "Lets this app request small payments and actions without prompting every time, always within the auto-approve limits you set below.",
+    advanced: "Advanced settings",
+    advancedNote:
+      "You stay in control. Change what this app can do any time from Connect.",
+    autoApprove: {
+      title: "Auto-approve settings",
+      notify: "Always notify me",
+      notifyDesc: "Ask for confirmation on every payment from this site",
+      perTx: "Per-transaction limit",
+      perTxDesc: "Payments under this are auto-approved",
+      perSession: "Per-session limit",
+      perSessionDesc: "Total spending before requiring approval",
+      rate: "Rate limit",
+      rateDesc: "Max payment requests per minute",
+      maxTx: "Max transactions per session",
+      maxTxDesc: "Total payments allowed per session before prompting",
+    },
+    cancel: "Cancel",
+    /* Both carry the name, so the button says what it is about to do and to
+       what. A sheet can be opened from a grid of sixteen cards. */
+    installConfirm: "Connect {name}",
+    successAdded: "It's ready in your sidebar.",
+    /* The verb in the confirmation headline, beside the app's name. */
+    doneAdded: "connected",
+    doneRemoved: "disconnected",
+    successRemoved: "Disconnected from your Nexus.",
+    // uninstall confirmation sheet
+    uninstallSubtitle: "will be disconnected from your Nexus",
+    uninstallBody:
+      "This takes it out of your sidebar and revokes its permissions. Your data stays on-chain and you can add it back any time.",
+    uninstallConfirm: "Disconnect {name}",
+    // app detail side sheet
+    detail: {
+      close: "Collapse",
+      expand: "Expand",
+      open: "Open",
+      preview: "Preview",
+      version: "Version",
+      updated: "Last updated",
+      installs: "Installs",
+      stars: "GitHub stars",
+      follows: "Followers",
+      permissionsTitle: "Permissions",
+      permissionsExpand: "Show details",
+      permissionsCollapse: "Hide details",
+      reviewsTitle: "Reviews",
+      overallRating: "Overall rating",
+      writeReview: "Write a review",
+      allReviews: "All reviews",
+      usingApp: "using the app",
+      dayAgo: "day ago",
+      daysAgo: "days ago",
+      weekAgo: "week ago",
+      weeksAgo: "weeks ago",
+      monthAgo: "month ago",
+      monthsAgo: "months ago",
+    },
   },
   vote: {
     title: "Proposals",
@@ -1247,17 +1530,20 @@ export const content = {
     },
   },
   share: {
-    // gift toggle ON — the $0.10 BSV hook leads
-    giftHeadline: "Gift a friend\n$0.10 in BSV",
+    /* gift toggle ON — the BSV hook leads. `{amount}` is the sender's own
+       figure, so every line that quotes it stays in step with the input. */
+    giftHeadline: "Gift a friend\n{amount} in BSV",
     giftSubhead: "They join Nexus, you both get rewarded.",
     giftMessage:
-      "Here's $0.10 in BSV to try Nexus, the browser and wallet in one. Claim it here:",
+      "Here's {amount} in BSV to try Nexus, the browser and wallet in one. Claim it here:",
     // gift toggle OFF — plain referral
     plainHeadline: "Share Nexus\nwith a friend",
     plainSubhead: "Send them the browser and wallet in one.",
     plainMessage:
       "Here's Nexus, the browser and wallet I keep telling you about:",
-    toggleLabel: "Gift $0.10 in BSV to get them started",
+    toggleLead: "Gift",
+    toggleTrail: "in BSV",
+    amountLabel: "Amount to gift, in dollars",
     copy: "Copy link",
     copied: "Copied!",
   },
@@ -1278,8 +1564,8 @@ export const content = {
        */
       {
         icon: "LayoutGrid",
-        title: "Pin a site to your rail",
-        body: "Open the Apps tab and type a web address. The site gets an icon on your rail, and tapping it opens the website.",
+        title: "Add apps to your Nexus",
+        body: "Open the Apps tab to connect a wallet, publisher or explorer. Connected apps live in your sidebar rail.",
       },
       {
         icon: "Layers",
@@ -1294,7 +1580,7 @@ export const content = {
       {
         icon: "Wallet",
         title: "Make your first payment",
-        body: "Open Pay & Receive from the rail to send BSV, check your balance and browse your full transaction history.",
+        body: "Open Pay & Get paid from the rail to send BSV, check your balance and browse your full transaction history.",
       },
     ],
     shortcutsTitle: "Essential shortcuts",
@@ -1313,6 +1599,8 @@ export const content = {
 
   mobileBrowser: {
     appRail: "Apps",
+    /* The pill that stands in for the bottom bar while you are reading. */
+    showBar: "Show the bar",
     openTabs: "Open tabs",
     newTab: "New tab",
     urlDetails: "Page options",
@@ -1347,7 +1635,7 @@ export const content = {
       changeIcon: "Change App Icon",
       addToHome: "Add to Home Screen",
       searchEngine: "Search Engine",
-      searchEngineValue: "Google",
+      searchEngineValue: "MetaSearch",
       languages: "Languages",
       autoKeyboard: "Auto-Open Keyboard",
       archiveInactive: "Archive Inactive Tabs",
@@ -1356,6 +1644,51 @@ export const content = {
       openLinksInValue: "Native App",
       clearData: "Clear Browsing Data…",
       syncDesktop: "Sync with Nexus Desktop",
+      startupTitle: "On launch",
+      startupNewTab: "A new tab",
+      startupContinue: "Where you left off",
+      startupHome: "Your home page",
+      restoreProfile: "Reopen the profile you were last in",
+      restoreProfileHint: "Off always starts in your first profile.",
+
+      /* Rows that used to toast "coming soon". Each is a real setting now, so
+         each needs the words for what it does. */
+      languagesHint: "What pages are asked for, when they offer a choice.",
+      openLinksInHint:
+        "A link from another app opens here, or in whatever the system picks.",
+      openLinksNexus: "Nexus",
+      openLinksNative: "The system's browser",
+      setDefaultHint: "Links from anywhere open in Nexus.",
+      setDefaultDone: "Nexus is your default browser",
+      setDefaultUndo: "Hand it back",
+      setDefaultToast: "Nexus is the default browser",
+      setDefaultUndone: "No longer the default browser",
+      changeIconHint: "The icon on your home screen.",
+      iconDefault: "Nexus",
+      iconMono: "Monochrome",
+      iconRetro: "Retro",
+      iconDragon: "Dragon",
+      iconToast: "Home screen icon changed",
+      addToHomeHint: "Nexus opens full screen, without browser chrome.",
+      addToHomeStep1: "Open the share menu in your system browser.",
+      addToHomeStep2: "Choose Add to Home Screen.",
+      addToHomeStep3: "Confirm the name, and it lands on your home screen.",
+      addToHomeNote:
+        "Nothing here can do this for you. Adding to a home screen is the operating system's decision, and a button claiming otherwise would be a button that does nothing.",
+      archiveInactiveHint:
+        "A tab you have not touched for this long is filed away rather than closed.",
+      archiveNever: "Never",
+      archiveDay: "After a day",
+      archiveWeek: "After a week",
+      archiveMonth: "After a month",
+      archiveEmpty: "Nothing archived yet.",
+      archiveEmptyHint:
+        "Tabs you stop using appear here rather than disappearing.",
+
+      /* Root list of the mobile sheet. */
+      sectionBrowser: "This device",
+      sectionSettings: "Settings",
+      back: "Back",
     },
   },
 
@@ -1370,7 +1703,9 @@ export const content = {
       step1: "Open Nexus on your phone",
       step2: "Go to Settings › Devices › Add device",
       step3: "Point your phone at this screen to confirm",
-      byCode: "Sync with a pairing code instead",
+      /* The way past the QR for somebody who already has the app open and
+         would rather type a code than hold a phone up to a screen. */
+      hasApp: "I have already downloaded Nexus mobile",
     },
     general: {
       title: "General",
@@ -1386,7 +1721,13 @@ export const content = {
       reachHint:
         "Enforced at your messagebox rather than by the sender's client, so somebody who ignores it still gets nowhere. Same setting as /scope.",
       reachEveryone: "Everyone",
-      reachEveryoneHint: "Anyone who knows your handle.",
+      reachEveryoneHint:
+        "Anyone who knows your handle, on any ecosystem it resolves through.",
+      reachExplainLabel: "What reachability means",
+      reachExplain: [
+        "A handle under BRC-169 resolves from more than one place. Somebody on Treechat, Twetch or HandCash can address @you without either of you sharing a server, which is the point of it and also the part people do not expect.",
+        "So \"everyone\" is wider than it sounds: it is every ecosystem your handle is registered through, not only the one you are reading this in. Narrowing it does not un-register the handle — it decides who gets through once they have found it.",
+      ],
       reachContacts: "Contacts only",
       reachContactsHint: "People already in your address book.",
       reachEcosystem: "Your ecosystem",
@@ -1400,6 +1741,12 @@ export const content = {
       tollOff: "No toll",
       tollSet: "Toll set",
       tollLifted: "Toll lifted",
+      tollPerSenderAdd: "Charge someone",
+      tollPerSenderSearch: "Search a name or @handle",
+      tollPerSenderNone: "Nobody is being charged individually.",
+      tollPerSenderRemove: "Stop charging",
+      tollPerSenderRemoved: "no longer pays to reach you",
+      tollPerSenderSet: "now pays to reach you",
       tollPerSender: "Tolls you set for one person",
       tollPerSenderHint:
         "Unaffected by the general toll. Lifting this one leaves those exactly as they were.",
@@ -1409,8 +1756,112 @@ export const content = {
       chainPerConversation: "Conversations set on their own",
       chainPerConversationHint:
         "Set from a conversation's settings, where the room is in front of you. Anchoring whole messages is only offered there.",
+      trackingTitle: "Tracking",
+      cookies: "Cookies",
+      cookiesHint: "Third-party cookies are the ones that follow you between sites.",
+      cookiesAllow: "Allow all",
+      cookiesThird: "Block third-party",
+      cookiesBlock: "Block all",
+      trackers: "Block known trackers",
+      trackersHint: "A list, not magic. It stops the ones that have been named.",
+      doNotTrack: "Send a Do Not Track request",
+      doNotTrackHint: "Politely asked, freely ignored. Costs nothing to send.",
+      quitTitle: "When you quit",
+      clearNothing: "Keep everything",
+      clearHistory: "Clear history",
+      clearEverything: "Clear everything",
       dataTitle: "Data",
       clearDataHint: "History, cookies and cached files on this device.",
+      /* the pane the Data row opens, on both surfaces */
+      clearTitle: "Clear browsing data",
+      clearHint: "This device only, and it cannot be undone.",
+      clearHistoryHint: "Pages you visited and what you typed to find them.",
+      clearEverythingHint:
+        "History, cookies, cached files and every site's saved permission.",
+      clearNow: "Clear now",
+      clearDone: "Cleared",
+    },
+    sites: {
+      title: "Site settings",
+      search: "Search sites",
+      empty: "No site has anything set.",
+      changed: "changed",
+      revoked: "access withdrawn",
+      byDefault: "default",
+      walletTitle: "Wallet access",
+      revoke: "Withdraw access",
+      restore: "Restore access",
+    },
+    permissions: {
+      title: "Permissions",
+      hint: "What pages and apps are allowed to do.",
+      pageTitle: "What a page may ask for",
+      pageHint: "The default when a site asks. Ask means you decide each time.",
+      walletTitle: "What a page may ask the wallet for",
+      walletHint:
+        "Sharper than the rest of this page: these spend money and disclose who you are.",
+      capAsk: "Ask",
+      capAllow: "Allow",
+      capBlock: "Block",
+      oneClick: "One-click pay",
+      oneClickHint:
+        "Skip the confirm step for paying actions like likes and branches. The cap below still applies.",
+      spendCap: "Most a page may spend without asking again",
+      spendCapHint:
+        "Only applies once you have allowed a page to spend. Set it to nothing and every payment asks.",
+      exceptionsTitle: "Sites you have answered for",
+      exceptionsHint: "These override the defaults above.",
+      exceptionsNone: "Nothing overridden.",
+      exceptionRemove: "Return to the default",
+      exceptionRemoved: "back to the default",
+      capabilities: {
+        camera: "Camera",
+        microphone: "Microphone",
+        location: "Location",
+        notifications: "Notifications",
+        clipboard: "Read the clipboard",
+        downloads: "Download files",
+        midi: "MIDI devices",
+      },
+      walletCapabilities: {
+        spend: "Spend satoshis",
+        identity: "Read your handle and certificates",
+        baskets: "Read your output baskets",
+        certificates: "Ask you to sign a certificate",
+      },
+    },
+    autofill: {
+      title: "Autofill & sign-in",
+      hint: "What gets filled in for you, and how you prove who you are.",
+      keyTitle: "Signing in",
+      keyHint: "A key you hold beats a password somebody else stores.",
+      preferKey: "Sign in with your identity key where a site offers it",
+      preferKeyHint:
+        "Nothing to remember, nothing to leak. Sites that only take passwords still take passwords.",
+      savePasswords: "Offer to save passwords",
+      savePasswordsHint:
+        "Off by default. A saved password is a copy of a secret this browser then has to defend.",
+      fillTitle: "Filling forms",
+      addresses: "Addresses",
+      addressesHint: "Name, postal address and phone number.",
+      cards: "Payment cards",
+      cardsHint:
+        "Off by default. You have a wallet; a card number in a browser is the older, worse way to pay.",
+      vaultRow: "Manage what is stored",
+      vaultRowHint: "Opens the Vault, which is where these actually live.",
+    },
+    shortcuts: {
+      title: "Shortcuts",
+      hint: "Every key this client answers to.",
+      search: "Search shortcuts",
+      noResults: "No shortcut matches that.",
+      note: "⌘ on this Mac, Ctrl elsewhere. Typed shortcuts like / go in the message box rather than being held down.",
+      recording: "Press the keys you want. Escape to leave it as it was.",
+      pressKeys: "Listening",
+      reset: "Back to the original",
+      conflict: "Another shortcut already answers to this.",
+      conflictSummary:
+        "Two shortcuts share a binding. Whichever the client reaches first wins, so the other will look broken until one of them changes.",
     },
     browsing: {
       title: "Browsing",
@@ -1418,7 +1869,30 @@ export const content = {
       sitesTitle: "Sites",
       tabsTitle: "Tabs",
       filesTitle: "Files",
-      downloadsHint: "Opens the downloads panel.",
+      downloadsHint: "What each profile has downloaded.",
+      devTitle: "Developer",
+      devHint: "Off by default. These change what pages can see and do.",
+      devToolsLabel: "Developer tools",
+      devToolsHint:
+        "Inspect a page, read its console, and watch what it asks the wallet for.",
+      devToolsOn: "Developer tools are on",
+      devToolsOff: "Developer tools are off",
+      devToolsShortcut: "⌥⌘I",
+      devOverlayLabel: "Overlay network inspector",
+      devOverlayHint:
+        "Shows every BRC lookup a page makes, and which overlay answered.",
+      devUnsafeLabel: "Allow unsigned app repositories",
+      devUnsafeHint:
+        "Lets a repository serve apps with no signature to check. Nothing vets them, including us.",
+      devWarn:
+        "A page with developer tools open can be told things by somebody reading over your shoulder. Turn them off when you are done.",
+      readingTitle: "Reading",
+      zoom: "Page zoom",
+      fontSize: "Base font size",
+      pdfs: "Open PDFs in Nexus",
+      pdfsHint: "Off sends them to whatever your device opens PDFs with.",
+      translate: "Offer to translate pages",
+      translateHint: "The offer is local; nothing is sent until you accept it.",
     },
     about: {
       title: "About",
@@ -1428,14 +1902,61 @@ export const content = {
       released: "Released",
       whatsNew: "What's new",
       whatsNewHint: "Every release, and what shipped in it.",
+      channelTitle: "Updates",
+      channelStable: "Stable",
+      channelBeta: "Beta",
+      channelHint: "Beta gets releases early, and gets the ones we get wrong.",
+      betaTitle: "Go where\nnobody has been",
+      betaSubhead: "Beta builds ship the moment they are ready.",
+      betaBody:
+        "You will see /once, gates and whatever comes next weeks before anybody else, and you will be the reason the rest of them work. Some builds will be rough.",
+      betaWarning:
+        "Beta is not tested to the standard Stable is. Keep anything you cannot lose somewhere else.",
+      betaConfirm: "Take me up",
+      betaCancel: "Stay on Stable",
+      betaDone: "You are on Beta, buckle up.",
+      stableDone: "Back on Stable, the build we test hardest.",
+    },
+    footer: {
+      copyright: "© 2026",
+      association: "BSV Association",
+      associationUrl: "https://bsvassociation.org/",
+      /* The chain's name comes from the brand setting, so only the lead-in
+         lives here. */
+      poweredBy: "Powered by",
+      networkUrl: "https://bsvblockchain.org/",
+      creed: "Free and open source. Your keys, your data.",
+      madeWith: "Made with",
+      madeIn: "in",
+      country: "Switzerland",
+      thanksBefore: "Thanks to the",
+      thanksLink: "BRC contributors",
+      thanksAfter: ".",
+      thanksUrl: "https://beersy.dev",
     },
     appearance: {
-      title: "Appearance",
-      hint: "Theme and colour.",
+      title: "Preferences",
+      hint: "Theme, colour and what things are called.",
       themeTitle: "Theme",
       themeHint: "Light, dark, or whatever this device is set to.",
-      themeProfile: "Themes belong to the active profile, so each one can look like itself.",
+      modeLight: "Light",
+      modeDark: "Dark",
+      modeAuto: "Match this device",
+      themeDefault: "Every profile uses the default styling.",
+      themeReset: "Reset profile colours",
+      themeResetDone: "Every profile is back to the default styling",
+      brandTitle: "Name for the chain",
+      brandHint: "Two names for one network. Pick the one you use.",
+      brandScope:
+        "Not the licence, not BSV Association, and not the BSV ticker.",
     },
+  },
+
+  /** the per-app onboarding pane, read from lib/data/onboarding.ts */
+  onboarding: {
+    title: "Getting started with",
+    button: "What this app does",
+    open: "Open",
   },
 
   /** the What's new pane, read from lib/data/releases.ts */
@@ -1449,10 +1970,205 @@ export const content = {
     updates: "updates",
   },
 
+  /** the one roadmap: what is wanted, what is paid for, what shipped */
+  roadmap: {
+    title: "Roadmap",
+    fundable: "Fundable",
+    fundableHint: "Wanted. Nobody has paid for it yet.",
+    funded: "Funded",
+    fundedHint: "Paid for. Not built yet.",
+    shipped: "Shipped",
+    shippedHint: "In your hands, in a numbered release.",
+    emptyColumn: "Nothing here.",
+    all: "Everything",
+    allHint: "All three columns, side by side.",
+    search: "Search features",
+    sortTitle: "Sort",
+    sortTopFunded: "Most funded",
+    sortClosest: "Closest to its goal",
+    sortNewest: "Newest",
+    sortDiscussed: "Most discussed",
+    totalsTitle: "This roadmap",
+    totalPledged: "Pledged",
+    totalGoal: "Asked for",
+    totalBackers: "Backers",
+    yoursTitle: "Yours",
+    yoursHint: "Features you have put satoshis behind.",
+    yoursEmpty: "You have not funded anything yet.",
+    cancel: "Cancel",
+    suggest: "Suggest a feature",
+    suggestHint: "Costs 1,000 sats, so the board stays worth reading.",
+    fund: "Fund this feature",
+    fundCaveat:
+      "A signal, not an order. Funding weighs on what gets picked up next; it does not buy the work.",
+    fundShort: "Fund",
+    fundedAlready: "Fully funded",
+    fundAgain: "Add to this",
+    amount: "Amount",
+    custom: "Another amount",
+    complexity: "Complexity",
+    complexityLow: "Low",
+    complexityMedium: "Medium",
+    complexityHigh: "High",
+    complexityHint:
+      "Risk and unknowns rather than lines of code. High means the shape of it could change once it is started.",
+    complexityLevels: [
+      { label: "Low", body: "Understood work. A week or so, and few ways to be surprised." },
+      { label: "Medium", body: "Known shape, unknown corners. Up to a month." },
+      { label: "High", body: "Could change shape once it is started. Months, and the estimate is the least reliable part." },
+    ],
+    devNoteTitle: "From whoever scoped it",
+    status: "Status",
+    created: "Asked for",
+    funded_: "Funded",
+    shipped_: "Shipped",
+    inRelease: "Shipped in",
+    backers: "Backers",
+    noBackers: "Nobody yet.",
+    comments: "Discussion",
+    commentPlaceholder: "Say why this matters",
+    commentSend: "Post",
+    commentCost: "1,000 sats to post, which is what keeps this readable.",
+    commentBackersOnly: "Only backers can post here.",
+    commentBackersWhy:
+      "Put something behind this feature and the thread opens. Money is a cheap filter and a fair one: it costs the same whether you agree or object.",
+    noComments: "Nothing said yet.",
+    remaining: "still needed",
+    ofGoal: "of",
+    openInRoadmap: "Open in Roadmap",
+    pledged: "You put {amount} behind this",
+    movedTo: "Moved to {column}",
+    prototypeMove:
+      "Dragged, not funded. On a real board a card reaches Funded by being paid for.",
+  },
+
+  /** the developer panel docked under a page */
+  inspector: {
+    title: "Developer tools",
+    console: "Console",
+    network: "Network",
+    lookups: "Lookups",
+    outputs: "outputs",
+    mock: "Seeded, not live",
+    collapse: "Collapse",
+    close: "Close developer tools",
+    lookupsOff:
+      "Switch on the overlay network inspector in Settings › Browsing to see what a page asks the overlays for.",
+  },
+
+  /** the terms this software is granted under */
+  licence: {
+    grantedBy: "Granted by",
+    viewSource: "View the canonical copy",
+    row: "Licence",
+  },
+
+  /** the ellipsis every app carries, and the second pane it can open */
+  appMenu: {
+    label: "More",
+    openSplit: "Open beside this",
+    closeSplit: "Close the second pane",
+    pickApp: "Choose an app",
+    pickerTitle: "Pick an app for this pane",
+    pickerSearch: "Search your apps",
+    pickerNoMatch: "Nothing matches that.",
+    noneToSplit: "No other app is connected to this profile.",
+    disconnect: "Disconnect from this profile",
+    disconnected: "Disconnected from",
+  },
+
+  /** the profiles manager: what each profile is connected to */
+  profiles: {
+    sidebar: {
+      title: "Profiles",
+      statProfiles: "profiles",
+      statHandles: "handles",
+      statWallets: "wallets",
+      allProfiles: "All profiles",
+      current: "You are here",
+      rowSummary: "{handle} · {wallet}",
+      sharedTitle: "Shared across profiles",
+      sharedHint:
+        "Not a mistake, but worth knowing about if you are keeping these apart.",
+    },
+    tabConnections: "Connections",
+    tabBrowsing: "Browsing",
+    picker: {
+      search: "Filter…",
+      recent: "Most recent",
+      noMatch: "Nothing matches.",
+    },
+    connections: {
+      handle: "Handle",
+      wallet: "Wallet",
+      connectHandle: "Connect a handle",
+      connectWallet: "Connect a wallet",
+      pickHandle: "Handle for this profile",
+      pickWallet: "Wallet for this profile",
+      newHandle: "Claim another handle",
+      newWallet: "Add a wallet",
+      nowWallet: "Now the wallet for",
+      apps: "Apps",
+      connectedApps: "Connected apps",
+      /* The trigger is a watermark in a 288px column; the popover's label is
+         where the whole sentence belongs. */
+      addApp: "Connect an app",
+      addAppLabel: "Connect an app from another profile",
+      connectedTo: "Connected to",
+      morePile: "+{n} more",
+      locked: "Locked",
+      essential: "Essential",
+      unknownRepo: "Unknown source",
+      nowOn: "Now the handle for",
+      disconnected: "Disconnected from",
+      noApps: "No apps connected.",
+      /* Apps are still connected for the whole Nexus rather than per profile,
+         and the note says so rather than letting the surrounding switches imply
+         otherwise. */
+      footnote: "Permissions are scoped to this profile's wallet.",
+    },
+  },
+
   /** shell chrome that is not any one app's */
   hub: {
     collapsePanel: "Close this panel",
     expandPanel: "Open the panel",
+    undo: "Undo",
+  },
+
+  repositories: {
+    button: "App repositories",
+    title: "App repositories",
+    official: "Official",
+    enable: "Enable",
+    disable: "Disable",
+    remove: "Remove",
+    suggested: "Add from a list",
+    urlPlaceholder: "Add repository URL…",
+    add: "Add",
+    invalidUrl: "Enter a valid repository URL.",
+    duplicate: "That repository is already added.",
+    commonSource: "Common Source",
+    commonSourceTag: "Mini app store",
+    commonSourceDesc: "app.common-source.org",
+    commonSourceToggle: "Common Source mode",
+    /* Suggestions offered from the URL field itself, so a reader who has never
+       seen a repository URL has something to try rather than a blank box. */
+    pickSuggested: "Try one of these",
+    pickHint: "Third-party stores. Adding one is a decision, not a setting.",
+    /*
+     * The warning in front of adding a store, per the design review.
+     *
+     * Deliberately not a toast after the fact: what a repository does is decide
+     * which code the hub is willing to offer you, so the moment to say who
+     * vouches for it is before it is added rather than after.
+     */
+    confirmTitle: "Add an unvetted repository?",
+    confirmBody:
+      "Nothing in this store has been reviewed by Nexus or the BSV Association. Its apps ask for the same permissions as any other — your keys, your wallet, your identity — and only the operator of this URL decides what appears in it.",
+    confirmSource: "Adding",
+    confirmCancel: "Cancel",
+    confirmAdd: "Add it anyway",
   },
 
   theme: {
@@ -1468,6 +2184,9 @@ export const content = {
     mode: "Light or dark",
     light: "Light",
     dark: "Dark",
+    /* Said on the way past, because picking a mode also drops a custom
+       palette and somebody who spent a minute on theirs deserves the word. */
+    modeReset: "Default palette, for this profile",
     ofTheme: "theme",
     savedTitle: "Saved themes",
     delete: "Delete",

@@ -25,6 +25,21 @@ export interface ReleaseFeature {
 }
 
 export interface Release {
+  /**
+   * Calendar version, `YYYY.SERIES.N` — the year, the series within it, then
+   * which release of that series it was. Stored without the `v`, which every
+   * surface adds when it prints one.
+   *
+   * Series `0` is everything before the first stable one, so the whole history
+   * so far is `2026.0.N` counting up from the first release. That is the honest
+   * reading of where this is: five builds into a year, none of them a `.1` yet.
+   *
+   * A number that says when rather than how much: nobody has to decide whether
+   * a change is major, and a reader can tell how old a build is without a table
+   * to look it up in. It follows that `N` restarts when the series does and
+   * that the sequence carries no promise about compatibility — the notes do
+   * that.
+   */
   version: string;
   /** ISO date, so the pane can order and format it */
   date: string;
@@ -35,7 +50,7 @@ export interface Release {
 
 export const releases: Release[] = [
   {
-    version: "0.9.0",
+    version: "2026.0.5",
     date: "2026-08-05",
     headline: "Secrets that do not stay in the transcript.",
     features: [
@@ -78,7 +93,7 @@ export const releases: Release[] = [
     ],
   },
   {
-    version: "0.8.0",
+    version: "2026.0.4",
     date: "2026-08-04",
     headline: "Deciding what outlives a conversation.",
     features: [
@@ -108,7 +123,7 @@ export const releases: Release[] = [
     ],
   },
   {
-    version: "0.7.0",
+    version: "2026.0.3",
     date: "2026-08-01",
     headline: "Moving a thing, and holding both halves of a trade.",
     features: [
@@ -129,7 +144,7 @@ export const releases: Release[] = [
     ],
   },
   {
-    version: "0.6.0",
+    version: "2026.0.2",
     date: "2026-07-31",
     headline: "Rooms with doors, and roles nobody appoints.",
     features: [
@@ -156,7 +171,7 @@ export const releases: Release[] = [
     ],
   },
   {
-    version: "0.5.0",
+    version: "2026.0.1",
     date: "2026-07-29",
     headline: "Standing behind somebody, and withdrawing it.",
     features: [

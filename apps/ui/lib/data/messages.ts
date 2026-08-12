@@ -144,6 +144,10 @@ export const messagePeople: MessagePerson[] = [
     bio: "Teranode. Mostly the parts that fail under load.\n\nThroughput was never a Bitcoin problem. It is a distributed systems problem wearing a Bitcoin hat, and it yields to the same boring things it always has: do less work, do it in fewer places, and stop making the nodes talk to each other.",
     organization: "BSV Association",
     city: "Reykjavik",
+    socials: [
+      { provider: "x", handle: "@icellan" },
+      { provider: "github", handle: "icellan" },
+    ],
     photo: null,
     avatarColors: ["#0ea5e9", "#4353ff", "#16a34a"],
     registeredAt: "2019-06-11T09:00:00.000Z",
@@ -160,6 +164,7 @@ export const messagePeople: MessagePerson[] = [
     bio: "I build the bit developers actually touch — SDKs, libraries, the doorway rather than the building.\n\nMy whole argument is this: a protocol nobody can call is a protocol nobody has. If someone has to read the spec to send a payment, I wrote the library wrong. Come and tell me when I have.",
     organization: "BSV Association",
     city: "Zurich",
+    socials: [{ provider: "github", handle: "deggen" }],
     photo: null,
     avatarColors: ["#f59e0b", "#db2777", "#7c3aed"],
     registeredAt: "2020-02-19T09:00:00.000Z",
@@ -192,6 +197,10 @@ export const messagePeople: MessagePerson[] = [
     bio: "Governance, advocacy, and the long argument about why the rules should not move.\n\nI spent the civil war making the case that a protocol you can change at will is not a protocol, it is a product with a committee. People who joined afterwards read that as stubbornness, which I understand — nobody thanks you for a fire that did not happen. But every guarantee anyone builds on rests on the set not moving, and somebody has to keep saying so after it stops being interesting.",
     organization: "BSV Association",
     city: "Austin",
+    socials: [
+      { provider: "x", handle: "@nonlocalize" },
+      { provider: "linkedin", handle: "connor-murray" },
+    ],
     photo: null,
     avatarColors: ["#dc2626", "#f59e0b", "#7c3aed"],
     registeredAt: "2019-11-27T09:00:00.000Z",
@@ -274,6 +283,7 @@ export const messagePeople: MessagePerson[] = [
     bio: "Building resilient food systems through mass participation. Connects cities, regions, farmers and innovators.",
     organization: "Common Source",
     city: "Utrecht",
+    socials: [{ provider: "linkedin", handle: "markfrederiks" }],
     photo: "/members/mark-frederiks.jpg",
     avatarColors: ["#00b34c", "#0074b4", "#ffd41f"],
     registeredAt: "2023-02-15T09:00:00.000Z",
@@ -409,6 +419,7 @@ export const messagePeople: MessagePerson[] = [
     bio: "Posts on monetary history and why a unit of account matters more than a store of value.",
     organization: null,
     city: "Lisbon",
+    socials: [{ provider: "github", handle: "thoth" }],
     photo: "/avatars/treechat/img-thoth.jpeg",
     avatarColors: ["#16a34a", "#0891b2", "#4353ff"],
     registeredAt: "2021-06-02T09:00:00.000Z",
@@ -689,6 +700,7 @@ export const messagePeople: MessagePerson[] = [
     bio: "The very first account. Traces outputs for fun and occasionally for hire.",
     organization: null,
     city: "Unknown",
+    socials: [{ provider: "x", handle: "@utxo" }],
     photo: "/avatars/twetch/1.jpg",
     avatarColors: ["#dc2626", "#7c3aed", "#0891b2"],
     registeredAt: "2019-11-02T09:00:00.000Z",
@@ -955,7 +967,11 @@ export const chatThreads: ChatThread[] = [
   },
 
   /* Treechat */
-  { id: "dm-tc-kuro", personId: "tc-kuro", createdAt: "2026-07-02T10:00:00.000Z" },
+  {
+    id: "dm-tc-kuro",
+    personId: "tc-kuro",
+    createdAt: "2026-07-02T10:00:00.000Z",
+  },
   {
     id: "dm-tc-treechad",
     personId: "tc-treechad",
@@ -981,7 +997,6 @@ export const chatThreads: ChatThread[] = [
     createdAt: "2026-06-20T10:00:00.000Z",
   },
 
-
   /* BSV Association colleagues */
   {
     id: "dm-siggi",
@@ -1003,14 +1018,26 @@ export const chatThreads: ChatThread[] = [
     personId: "connor-murray",
     createdAt: "2026-07-17T10:00:00.000Z",
   },
-  { id: "dm-mo", personId: "mohammad-jaber", createdAt: "2026-07-18T10:00:00.000Z" },
+  {
+    id: "dm-mo",
+    personId: "mohammad-jaber",
+    createdAt: "2026-07-18T10:00:00.000Z",
+  },
   {
     id: "dm-austin",
     personId: "austin-rappaport",
     createdAt: "2026-07-19T10:00:00.000Z",
   },
-  { id: "dm-dylan", personId: "dylan-murray", createdAt: "2026-07-20T10:00:00.000Z" },
-  { id: "dm-oli", personId: "oli-oskarsson", createdAt: "2026-07-21T10:00:00.000Z" },
+  {
+    id: "dm-dylan",
+    personId: "dylan-murray",
+    createdAt: "2026-07-20T10:00:00.000Z",
+  },
+  {
+    id: "dm-oli",
+    personId: "oli-oskarsson",
+    createdAt: "2026-07-21T10:00:00.000Z",
+  },
   {
     id: "group-bitcoin",
     group: {
@@ -1025,7 +1052,11 @@ export const chatThreads: ChatThread[] = [
         timelock: { on: true, assetId: "bsv", amount: 5, minBlocks: 4_320 },
         vouch: {
           on: true,
-          entityIds: ["siggi-oskarsson", "darren-kellenschwiler", "connor-murray"],
+          entityIds: [
+            "siggi-oskarsson",
+            "darren-kellenschwiler",
+            "connor-murray",
+          ],
         },
         renounce: { on: false, entityIds: [] },
       },
@@ -1089,7 +1120,13 @@ export const chatThreads: ChatThread[] = [
     id: "group-naka-motor",
     group: {
       title: "Naka Motor Club",
-      memberIds: ["tw-krambo", "tw-randy", "tw-utxo", "tw-elonmoist", "tw-mikey"],
+      memberIds: [
+        "tw-krambo",
+        "tw-randy",
+        "tw-utxo",
+        "tw-elonmoist",
+        "tw-mikey",
+      ],
       ecosystem: "twetch",
       icon: "/collectibles/nakamotor/2121.png",
       /* Hold a car, read the room; hold a rarer one, run it. The gate and the
@@ -1770,7 +1807,11 @@ export const chatMessages: ChatMessage[] = [
       status: "sent",
       recipientIds: ["dylan-murray"],
       amountSats: 90000,
-      legs: [{ personId: "dylan-murray", sats: 30000, ok: true }, { personId: "austin-rappaport", sats: 30000, ok: true }, { personId: "oli-oskarsson", sats: 30000, ok: true }],
+      legs: [
+        { personId: "dylan-murray", sats: 30000, ok: true },
+        { personId: "austin-rappaport", sats: 30000, ok: true },
+        { personId: "oli-oskarsson", sats: 30000, ok: true },
+      ],
       note: "Three separate payments. A failed leg can be retried without touching the others.",
     },
   },
@@ -1900,7 +1941,11 @@ export const chatMessages: ChatMessage[] = [
       status: "sent",
       recipientIds: ["mohammad-jaber"],
       amountSats: 120000,
-      legs: [{ personId: "mohammad-jaber", sats: 40000, ok: true }, { personId: "oli-oskarsson", sats: 40000, ok: true }, { personId: "dylan-murray", sats: 40000, ok: true }],
+      legs: [
+        { personId: "mohammad-jaber", sats: 40000, ok: true },
+        { personId: "oli-oskarsson", sats: 40000, ok: true },
+        { personId: "dylan-murray", sats: 40000, ok: true },
+      ],
       note: "Three separate payments. A failed leg can be retried without touching the others.",
     },
   },
@@ -2137,7 +2182,7 @@ export const chatMessages: ChatMessage[] = [
     id: "m-bsv-6",
     conversationId: "group-bsv-builders",
     senderId: "me",
-    text: "Which is the actual pitch. Not \"blockchain\", just that you can charge a tenth of a cent and it clears in a second.",
+    text: 'Which is the actual pitch. Not "blockchain", just that you can charge a tenth of a cent and it clears in a second.',
     createdAt: "2026-07-25T09:38:00.000Z",
     status: "read",
   },
@@ -3380,5 +3425,77 @@ export const chatMessages: ChatMessage[] = [
     senderId: "tomas-lindqvist",
     text: "Worth saying out loud that lifting the general one doesn't lift the specific ones. Half the support tickets we get are someone assuming it did.",
     createdAt: "2026-07-25T10:08:00.000Z",
+  },
+
+  /* Roadmap cards in the rooms where the argument actually happens. A feature
+     is a thing people push each other about, so the card belongs in the
+     conversation and the money belongs in Roadmap. */
+  {
+    id: "m-road-darren-1",
+    conversationId: "dm-darren",
+    senderId: "darren-kellenschwiler",
+    text: "Sync is the one blocking me. Two laptops and a phone and none of them agree about what I have saved. {command}",
+    createdAt: "2026-08-05T10:12:00.000Z",
+    command: {
+      verb: "roadmap",
+      status: "sent",
+      featureId: "device-sync",
+      note: "Fully funded. Nothing built yet.",
+    },
+  },
+  {
+    id: "m-road-darren-2",
+    conversationId: "dm-darren",
+    senderId: "me",
+    text: "Agreed, and the pairing screen already exists which makes it worse. It shows a code that pairs nothing.",
+    createdAt: "2026-08-05T10:19:00.000Z",
+    status: "read",
+  },
+  {
+    id: "m-road-utxo-1",
+    conversationId: "group-treechat-bitcoin",
+    senderId: "tw-utxo",
+    text: "Before anyone funds anything else on that board, this one. {command}",
+    createdAt: "2026-08-05T11:02:00.000Z",
+    command: {
+      verb: "roadmap",
+      status: "sent",
+      featureId: "roadmap-on-chain",
+      note: "Every other number on the board is a claim until this is done.",
+    },
+  },
+  {
+    id: "m-road-utxo-2",
+    conversationId: "group-treechat-bitcoin",
+    senderId: "tc-thoth",
+    text: "That is the correct order, yes. A funding board you have to trust is a spreadsheet with a progress bar.",
+    createdAt: "2026-08-05T11:08:00.000Z",
+  },
+  {
+    id: "m-road-mo-1",
+    conversationId: "dm-mo",
+    senderId: "mohammad-jaber",
+    text: "Found the payment eventually. It was in Mail. {command}",
+    createdAt: "2026-08-04T16:40:00.000Z",
+    command: {
+      verb: "roadmap",
+      status: "sent",
+      featureId: "cross-app-search",
+      note: "Still short of what it needs.",
+    },
+  },
+  {
+    id: "m-road-siggi-1",
+    conversationId: "dm-siggi",
+    senderId: "me",
+    text: "This shipped last week and I still think it is the best thing in the client. {command}",
+    createdAt: "2026-08-05T12:30:00.000Z",
+    status: "read",
+    command: {
+      verb: "roadmap",
+      status: "sent",
+      featureId: "once",
+      note: "Shipped in v2026.0.5.",
+    },
   },
 ];

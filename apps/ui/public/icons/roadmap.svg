@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Roadmap">
+  <defs>
+    <linearGradient id="roadmap-ground" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5b6bff" />
+      <stop offset="1" stop-color="#7c3aed" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#roadmap-ground)" />
+  <!-- Three columns, filling left to right: fundable, funded, shipped. The
+       glyph is the board itself, which is what the app is. -->
+  <g fill="#ffffff">
+    <rect x="86" y="150" width="96" height="96" rx="26" opacity="0.42" />
+    <rect x="86" y="272" width="96" height="96" rx="26" opacity="0.42" />
+    <rect x="208" y="150" width="96" height="96" rx="26" opacity="0.72" />
+    <rect x="330" y="150" width="96" height="96" rx="26" />
+    <rect x="330" y="272" width="96" height="96" rx="26" />
+  </g>
+</svg>
