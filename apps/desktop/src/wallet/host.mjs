@@ -253,9 +253,11 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
   /**
    * The address sweeper.
    *
-   * Constructed once and re-pointed at each wallet, rather than rebuilt per
-   * build: the getters and the callback are arrows, so this can be declared
-   * before `currentNetwork` exists and still read the live value at tick time.
+   * Constructed once and idle until the "Get paid → to an address" screen holds
+   * it open — it is not started when a wallet is built, because an always-on
+   * poll would be asking WhatsOnChain about addresses nobody is watching. The
+   * getters and the callback are arrows, so this can be declared before
+   * `currentNetwork` exists and still read the live value at tick time.
    */
   const sweepLoop = createSweepLoop({
     getWallet: () => wallet,
@@ -279,10 +281,10 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
       console.warn('[wallet] monitor did not stop cleanly:', err?.message)
     }
     /*
-     * The address sweeper is the same kind of thing and has the same lifetime:
-     * a loop holding this wallet's manager and storage. Left running past the
-     * swap it would poll WhatsOnChain for a signed-out wallet, and after a
-     * network switch it would sweep mainnet addresses into a testnet wallet.
+     * The address sweeper, if the address screen happens to be holding it open
+     * across this teardown. Its own pass would notice the swap and drop its
+     * result, but a loop left polling for a wallet the user has signed out of
+     * is a loop asking WhatsOnChain about somebody else's addresses.
      */
     sweepLoop.stop()
     /*
@@ -309,18 +311,6 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
    * a logout or a network switch landing between the build and this callback would
    * otherwise start a background loop against a wallet nobody owns any more.
    */
-  /**
-   * Set the address sweeper running for a freshly built wallet.
-   *
-   * Beside startMonitorSoon rather than inside it because the two answer to
-   * different things — the Monitor to the chain, this to WhatsOnChain — but they
-   * are started and stopped at exactly the same moments, which is why every
-   * caller of one calls the other.
-   */
-  const startSweeperSoon = (built) => {
-    sweepLoop.start(built)
-  }
-
   const startMonitorSoon = (built) => {
     if (!built.monitor) return
     setTimeout(() => {
@@ -347,7 +337,6 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
   const buildFrom = async (phrase, chain) => {
     const built = await restoreDesktopWallet(phrase, buildDeps(chain))
     startMonitorSoon(built)
-    startSweeperSoon(built)
     return built
   }
 
@@ -361,7 +350,6 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
   const buildFromKey = async (key, chain) => {
     const built = await restoreDesktopWalletFromKey(key, buildDeps(chain))
     startMonitorSoon(built)
-    startSweeperSoon(built)
     return built
   }
 
@@ -418,7 +406,10 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
     getWallet: () => wallet,
     getNetwork: currentNetwork,
     adminOriginator: ADMIN_ORIGINATOR,
-    localStorage
+    localStorage,
+    // Every address-screen method renews the sweeper's lease. See sweepLoop.mjs
+    // for why presence rather than an explicit stop decides when it runs.
+    holdSweeper: () => sweepLoop.hold()
   })
 
   return {

@@ -16,6 +16,26 @@ import { getWatchlist, touchWatched, type KVStorage } from '@nexus/wallet-core/s
 /** One poll every 30s — an order of magnitude cheaper than the 3s screen poll it replaces. */
 export const SWEEP_INTERVAL_MS = 30_000
 
+/**
+ * How long the "Get paid → to an address" screen keeps the sweeper alive after
+ * it was last heard from.
+ *
+ * The desktop shell sweeps only while that screen is open, because that is the
+ * only moment anybody is expecting money at an address — see
+ * apps/desktop/src/wallet/sweepLoop.mjs. It learns the screen is open from the
+ * calls the screen already makes, and it learns the screen has gone from their
+ * absence, which is the only signal that survives the window being killed or
+ * the chrome navigating away without warning.
+ *
+ * So this has to exceed the chrome's own poll interval — HISTORY_POLL_MS in
+ * apps/ui/components/apps/wallet/pay-flow.tsx, 5s at the time of writing — by
+ * enough that a slow answer or a stalled frame does not read as a closed
+ * screen. 20s is four missed polls of slack. Raising HISTORY_POLL_MS above this
+ * would make the sweeper stop while the screen is still open, which is why the
+ * relationship is written down here rather than left to be rediscovered.
+ */
+export const ADDRESS_SCREEN_LEASE_MS = 20_000
+
 export interface SweepOutcome {
   address: string
   importedSatoshis: number

@@ -76,7 +76,7 @@ import { findOfflineActions } from '@nexus/wallet-storage/src/methods/offlineAct
  */
 const INBOX_DESCRIPTION = 'PeerPay payment'
 
-export function createPayHost({ getWallet, getNetwork, adminOriginator, localStorage }) {
+export function createPayHost({ getWallet, getNetwork, adminOriginator, localStorage, holdSweeper }) {
   // Read through the getter on every call, never captured: restore, logout and
   // setNetwork all swap the wallet out from under this table.
   const require_ = () => {
@@ -158,12 +158,13 @@ export function createPayHost({ getWallet, getNetwork, adminOriginator, localSto
        * Derive the day's address, put it on the watchlist, and return what has
        * already been imported to it.
        *
-       * The watchlist write happens here even though this shell runs no background
-       * sweeper yet (see buildWallet.ts): the list is what a sweeper is allowed to
-       * poll, so writing it now is what makes one correct the day it lands rather
-       * than blind to every address issued before it. Until then the screen's
-       * "Check this address now" — pay.address.sweep below — is the whole of the
-       * sweep on desktop, which is why that method matters more here than on mobile.
+       * The watchlist write is what the sweeper is allowed to poll, so it has to
+       * happen before any sweep can find this address.
+       *
+       * This is also the screen opening, so it takes the sweeper's lease. Only
+       * this screen reaches this method, which is what makes the call a reliable
+       * signal that somebody is waiting for money at an address — see
+       * sweepLoop.mjs.
        */
       'pay.address.receive': async (params) => {
         const { manager, storage } = require_()
@@ -173,13 +174,22 @@ export function createPayHost({ getWallet, getNetwork, adminOriginator, localSto
         const derivationPrefix = derivationPrefixFor(date)
         const address = await getPaymentAddress(manager, adminOriginator, derivationPrefix, woc.network)
         await watchAddress(storage, { address, date, derivationPrefix })
+        // After the watchlist write, so the first pass can already see this one.
+        holdSweeper?.()
         const processed = await getProcessedTransactions(manager, adminOriginator, address)
         return { address, date, derivationPrefix, daysOffset: offset, maxRecoveryDays: MAX_RECOVERY_DAYS, processed }
       },
 
-      /** Poll-only. Never sweeps, so it cannot race a sweep the user asked for. */
+      /**
+       * Poll-only. Never sweeps, so it cannot race a sweep the user asked for.
+       *
+       * It does renew the sweeper's lease, though: this is the screen's own 5s
+       * poll, so it is the heartbeat that says the screen is still open. The
+       * sweep it keeps alive is the one that actually imports.
+       */
       'pay.address.history': async ({ address }) => {
         const { manager } = require_()
+        holdSweeper?.()
         return getProcessedTransactions(manager, adminOriginator, String(address))
       },
 
@@ -191,6 +201,7 @@ export function createPayHost({ getWallet, getNetwork, adminOriginator, localSto
        */
       'pay.address.sweep': async ({ address, daysOffset }) => {
         const { manager } = require_()
+        holdSweeper?.()
         const offset = Math.min(MAX_RECOVERY_DAYS, Math.max(0, Math.round(daysOffset ?? 0)))
         return sweepAddress({
           wallet: manager,
