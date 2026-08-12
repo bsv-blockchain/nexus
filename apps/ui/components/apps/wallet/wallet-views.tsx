@@ -73,9 +73,14 @@ function Page({
 }
 
 /**
- * Vela's gold verified pill, sourced from BRC-169 rather than a social login:
- * a valid handle certificate plus at least one peer attestation. The tooltip
- * says what it actually proves.
+ * Vela's gold verified pill: a valid handle certificate, plus at least one
+ * other thing standing behind the key — a peer attestation, or an account the
+ * person has proved is theirs.
+ *
+ * The social counts because it is the check most people can actually make: a
+ * peer attestation means something to somebody who knows the peer, and an X
+ * account they already follow means something to everybody else. The
+ * certificate is still required, so a social alone never earns the pill.
  */
 export function VerifiedHandle({
   person,
@@ -83,7 +88,9 @@ export function VerifiedHandle({
   person: MessagePerson;
 }): ReactNode {
   const who = whoisFor(person);
-  const verified = who.certificate === "valid" && who.attestations > 0;
+  const attested = (person.socials ?? []).length;
+  const verified =
+    who.certificate === "valid" && (who.attestations > 0 || attested > 0);
   if (!verified) return null;
   return (
     <Tooltip label={content.wallet.verifiedHint} className="shrink-0">

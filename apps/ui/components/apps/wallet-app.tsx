@@ -1,6 +1,11 @@
 "use client";
 
+import { AppMenu } from "@/components/hub/app-menu";
 import { Portfolio } from "@/components/apps/wallet/portfolio";
+import {
+  WalletSwitcher,
+  WalletTrigger,
+} from "@/components/apps/wallet/wallet-switcher";
 import {
   ExchangeSheet,
   ReceiveSheet,
@@ -73,7 +78,7 @@ export const WALLET_SECTIONS = DEMO_SURFACES
   : ALL_WALLET_SECTIONS.filter((section) => LIVE_SECTIONS.has(section.id));
 
 /**
- * Pay & Receive.
+ * Pay & Get paid.
  *
  * BSV is the base currency throughout: it heads the asset list, it is what a
  * bare amount means, and every other asset is valued through it. Tokens sit
@@ -300,6 +305,7 @@ export function WalletApp(): ReactNode {
    * they go where commands go.
    */
   const profileActions = useProfileQuickActions();
+  const [switching, setSwitching] = useState(false);
 
   return (
     <ProfileActionsProvider actions={profileActions}>
@@ -330,9 +336,24 @@ export function WalletApp(): ReactNode {
         })}
       </nav>
 
+      {/* Which wallet this is, above everything it says about it.
+          A balance with no wallet named against it is the number that gets
+          read as "all of it", which is the one reading that is never true
+          once there is more than one wallet. */}
+      <div className="flex shrink-0 items-center gap-2 px-4 pt-4 sm:px-6">
+        <WalletTrigger onOpen={() => setSwitching(true)} />
+        <span className="flex-1" />
+        <AppMenu slug="wallet" />
+      </div>
+
       <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-20 sm:p-6 md:pb-6">
         {body}
       </div>
+
+      {/* Live: the real rails. `switching` is set by WalletTrigger above, and
+          the switcher itself renders one wallet and no picker when the shell is
+          answering — one wallet per device is docs/DECISIONS.md §3, not a gap. */}
+      <WalletSwitcher open={switching} onClose={() => setSwitching(false)} />
 
       <PaySheet
         open={payOpen !== null}

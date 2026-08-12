@@ -22,8 +22,23 @@ import {
   Plus,
   Sparkles,
 } from "lucide-react";
+import { resolveDataMode } from "@/lib/data-mode";
 import { toast } from "sonner";
 import { useState, type ReactNode } from "react";
+
+/**
+ * Whether this session has more than one wallet to choose between.
+ *
+ * Never, on a live build. docs/DECISIONS.md §3 settles it: storage is local,
+ * there is one wallet per device and no key sync in v1, so a picker offering
+ * four of them would be offering three that do not exist — and naming the one
+ * that does after a fixture ("Everyday") above a real balance is worse than
+ * saying nothing. The whole switcher is a demo affordance until a second wallet
+ * is something the shell can actually hold.
+ */
+function switchable(): boolean {
+  return resolveDataMode() === "demo";
+}
 
 const copy = content.wallet.switcher;
 
@@ -94,7 +109,7 @@ export function WalletTrigger({
   const { activeSpaceId } = useHub();
   useWallets();
   const wallet = activeWalletFor(activeSpaceId);
-  if (!wallet) return null;
+  if (!wallet || !switchable()) return null;
   return (
     <button
       type="button"
@@ -316,6 +331,11 @@ export function WalletSwitcher({
     setUnlocking(null);
     onClose();
   };
+
+  /* Belt as well as braces: WalletTrigger is the only thing that opens this,
+     and it does not render on a live build — but a sheet that can list four
+     invented wallets beside a real balance is worth refusing twice. */
+  if (!switchable()) return null;
 
   return (
     <Sheet
