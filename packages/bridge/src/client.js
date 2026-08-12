@@ -131,6 +131,16 @@ const CREATE_HOST_CLIENT_SOURCE = `function createHostClient(options) {
       list: function () { return call('tabs.list', null) }
     },
     info: function () { return call('host.info', null) },
+    /* The updater's whole surface. state() answers immediately from the shell's
+       own copy — the renderer reloads and must not lose the fact that an update
+       already downloaded — while 'update.state' events push the changes.
+       No backticks anywhere in this file: it is injected as a string constant
+       and tools/check-injection-sources.mjs fails the build on them. */
+    update: {
+      state: function () { return call('update.state', null) },
+      check: function () { return call('update.check', null, 120000) },
+      install: function () { return call('update.install', null) }
+    },
     wallet: {
       // Whether a wallet is actually usable right now. The UI needs to tell "no wallet
       // configured" apart from "wallet is loading" apart from "shell has no wallet at

@@ -131,7 +131,39 @@ The tag then drives CI:
   out of `build.json` and ask for the finished build.
 
 Publishing the draft GitHub release stays a human act. So does promotion out of
-internal testing / TestFlight. Store review flows are watched on the EAS, App Store
+internal testing / TestFlight.
+
+## Publishing is what ships the desktop update
+
+Desktop clients update themselves from the newest **published** GitHub release.
+electron-updater cannot see a draft, so cutting a tag builds the artifacts and
+changes nothing for anybody running Nexus; publishing the draft is the moment
+every desktop install starts converging on it. That gate is deliberate — it is
+the last point at which a release can be abandoned without recalling anything.
+
+What makes it work, and what breaks it:
+
+- `latest.yml`, `latest-mac.yml` and `latest-linux.yml` are built by
+  electron-builder and attached alongside the installers. Each names an artifact
+  and its sha512, and electron-updater refuses an update whose download does not
+  hash to the declared value. **A release missing them ships no update at all.**
+- **Nothing may rewrite an artifact after electron-builder has hashed it.**
+  Windows signing runs inside the build through `apps/desktop/build/win-sign.cjs`
+  for exactly this reason; a post-build signtool step leaves latest.yml
+  describing the unsigned installer and every Windows client aborts with
+  "sha512 checksum mismatch". bsv-desktop shipped that twice — see its
+  `scripts/repair-published-update-metadata.mjs`, which exists to unbreak clients
+  after the fact. The Windows leg now verifies the hash in latest.yml against the
+  installer before the release job runs.
+- macOS updates ride the **zip**, not the dmg, and require the app to be signed
+  and notarized. Both are already true of a release build.
+- **Linux AppImage updates; .deb does not.** electron-updater cannot replace a
+  file the package manager owns, so on a deb install the updater never starts and
+  Settings › About links to the releases page instead.
+
+Because the signing path is now part of the update path, `gh workflow run
+release-desktop.yml --ref my-branch` is worth more than it used to be: a
+rehearsal builds and signs exactly as a release does, and the hash gate runs. Store review flows are watched on the EAS, App Store
 and Play dashboards, not in Actions.
 
 ## What a release asks of you

@@ -37,7 +37,7 @@ import {
 import { WalletSettingsPanel } from "@/components/apps/settings-wallet";
 import { DEMO_SURFACES } from "@/lib/surfaces";
 import { AutofillPanel } from "@/components/apps/settings/autofill-panel";
-import { BetaDialog } from "@/components/apps/settings/beta-dialog";
+import { UpdatePanel } from "@/components/apps/settings/update-panel";
 import { PermissionsPanel } from "@/components/apps/settings/permissions-panel";
 import { ShortcutsPanel } from "@/components/apps/settings/shortcuts-panel";
 import {
@@ -1027,8 +1027,6 @@ function HostVersionBlock(): ReactNode {
  */
 export function AboutPanel(): ReactNode {
   const copy = content.settings.about;
-  const settings = useSettings();
-  const [betaAsk, setBetaAsk] = useState(false);
   const { openDetailPane } = useHub();
   return (
     <>
@@ -1077,47 +1075,21 @@ export function AboutPanel(): ReactNode {
         />
       </Group>
 
-      <Group title={copy.channelTitle} hint={copy.channelHint}>
-        {/* Stable is one click; Beta asks first. The asymmetry is the point —
-            going back is free and going forward is the decision. */}
-        <Choice<"stable" | "beta">
-          value={settings.updateChannel}
-          onPick={(next) => {
-            if (next === settings.updateChannel) return;
-            if (next === "beta") {
-              setBetaAsk(true);
-              return;
-            }
-            setSetting("updateChannel", next);
-            /* Coming back gets a line too, so the safe choice is not the
-               silent one. A lock rather than a tick: what you are getting is
-               not confirmation, it is the build we have hammered on longest. */
-            toast.success(copy.stableDone, {
-              icon: <span aria-hidden="true">🔒</span>,
-            });
-          }}
-          options={[
-            { id: "stable", label: copy.channelStable, hint: "" },
-            { id: "beta", label: copy.channelBeta, hint: "" },
-          ]}
-        />
-      </Group>
+      {/*
+        Updates.
 
-      {betaAsk && (
-        <BetaDialog
-          onCancel={() => setBetaAsk(false)}
-          onConfirm={() => {
-            setSetting("updateChannel", "beta");
-            setBetaAsk(false);
-            /* The dialog's rocket carries through to the confirmation, in
-               place of the tick every other toast gets: the tick says a thing
-               worked, and this one is going somewhere. */
-            toast.success(copy.betaDone, {
-              icon: <span aria-hidden="true">🚀</span>,
-            });
-          }}
-        />
-      )}
+        This was a Stable/Beta channel picker with a beta-warning dialog, and
+        there was nothing behind either of them — a switch with no wire, and a
+        dialog warning about a ring nobody could join. UpdatePanel says what the
+        updater is actually doing and offers the one action that is the user's,
+        which is when to restart. It draws nothing without a shell, so the web
+        preview loses a control it could never have honoured anyway.
+
+        Channels come back when there is something on the other end of them;
+        settings/beta-dialog.tsx stays in the tree for that day.
+      */}
+      <UpdatePanel />
+
     </>
   );
 }

@@ -3,7 +3,7 @@
   "version": "0.2.2",
   "license": "Apache-2.0",
   "private": true,
-  "description": "Nexus desktop shell — Electron, WebContentsView per tab.",
+  "description": "Nexus desktop shell \u2014 Electron, WebContentsView per tab.",
   "homepage": "https://github.com/bsv-blockchain/nexus",
   "desktopName": "org.bsvassociation.nexus.desktop",
   "type": "module",
@@ -21,7 +21,9 @@
   },
   "dependencies": {
     "@nexus/bridge": "*",
-    "@nexus/substrate": "*"
+    "@nexus/substrate": "*",
+    "electron-log": "^5.4.4",
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "electron": "43.2.0",
@@ -83,7 +85,14 @@
       ],
       "icon": "build/icon.ico",
       "verifyUpdateCodeSignature": false,
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "signtoolOptions": {
+        "sign": "build/win-sign.cjs",
+        "signingHashAlgorithms": [
+          "sha256"
+        ],
+        "rfc3161TimeStampServer": "http://timestamp.digicert.com"
+      }
     },
     "linux": {
       "target": [
@@ -102,6 +111,21 @@
     "electronVersion": "43.2.0",
     "dmg": {
       "writeUpdateInfo": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "bsv-blockchain",
+      "repo": "nexus"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "differentialPackage": false,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true
     }
   },
   "author": "BSV Association"

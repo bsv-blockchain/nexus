@@ -29,7 +29,11 @@ const client = createHostClient({
   // protocol and answered by nobody, so a chrome that finds the capability present
   // must still expect those two to fail — which is why the Settings surface offers
   // the share row and not a ledger export.
-  capabilities: ['tabs', 'wallet', 'settings', 'tx', 'pay', 'backup'],
+  // 'update' says the shell has an updater surface at all, not that this install
+  // can use it — a .deb answers update.state with supported:false and a reason.
+  // The distinction is the point: the About panel has something true to say
+  // either way, which it would not if absence and unsupported looked the same.
+  capabilities: ['tabs', 'wallet', 'settings', 'tx', 'pay', 'backup', 'update'],
   post: (msg) => ipcRenderer.send('nexus:host:out', msg)
 })
 

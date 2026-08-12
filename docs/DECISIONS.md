@@ -122,3 +122,28 @@ onto the web as a site a user connects.
 **Prefer the web.** It is the cheaper mistake, it ships on its own schedule, and it proves
 the `window.nexus` seam by using it. Reach for the binary when the answer to "why can this
 not be a website?" is a key, an offline requirement, or the OS.
+
+## 12. Desktop auto-update
+
+Decided 2026-08-12.
+
+**One channel: the latest published release.** No beta ring, no staged rollout,
+no per-user opt-in. Settings › About shows what the updater is doing and offers
+the one decision that is the user's — when to restart into it.
+
+- **Downloads happen without asking; installing does not.** Keeping people
+  current is the point, so waiting for a click before fetching would leave the
+  least attentive users the least protected. Restarting closes the app, which is
+  never ours to do to somebody mid-payment.
+- **A draft release ships nothing.** electron-updater reads the newest published
+  release, so publishing the draft is the act that releases an update. See
+  `docs/RELEASING.md`.
+- **Windows signing lives inside electron-builder** (`build/win-sign.cjs`), not
+  in a later workflow step, because signing after the hash is computed is how
+  bsv-desktop broke updates for every Windows client twice.
+- **Linux: AppImage only.** A .deb is the package manager's to replace, and the
+  About panel says so rather than claiming to watch.
+
+The Stable/Beta picker inherited from the design repository was removed rather
+than disabled: it was a switch with nothing behind it. `settings/beta-dialog.tsx`
+stays in the tree for when channels are real.
