@@ -146,16 +146,28 @@ jobs:
             echo "::notice::rehearsal — building the production AAB without submitting it to Play"
           fi
           eas build --platform android --profile production --non-interactive "${SUBMIT[@]}" --json > build.json
-          # tools/eas-artifact-url.mjs, not an inline node -p. With --auto-submit
-          # eas-cli emits `artifacts.applicationArchiveUrl` and drops the legacy
-          # `artifacts.buildUrl`, which is the only key the old line named — so it
-          # evaluated to undefined, `node -p` printed the STRING "undefined" with exit
-          # 0, and curl failed on a host called "undefined". That took this job red on
-          # v0.2.0 AFTER the build and the Play submission had both succeeded.
-          # The script tries both keys, tolerates either envelope, and exits non-zero
-          # with the shape it saw when it finds nothing — so the next eas-cli change
-          # fails here with a diagnosis instead of two steps later as a DNS error.
-          URL=$(node "$GITHUB_WORKSPACE/tools/eas-artifact-url.mjs" build.json)
+          # THE ARTIFACT URL COMES FROM build:view, NOT FROM THE LINE ABOVE.
+          #
+          # `eas build --json` under --auto-submit emits a build record whose
+          # `artifacts` object is EMPTY: the JSON is composed before the artifact is
+          # published, even though the command goes on to wait for the build and the
+          # submission and reports "All done!". Queried afterwards, the very same build
+          # carries both `artifacts.buildUrl` and `artifacts.applicationArchiveUrl`.
+          #
+          # v0.2.0 died here naming one key inline. v0.2.1 died here again with a
+          # script that named four, because no key was ever going to be present in that
+          # payload — the payload is a snapshot from before there was a URL to name.
+          # Neither release was harmed: both times the build and the store submission
+          # had already succeeded and only the attach step went red. Twice is enough.
+          #
+          # The build id IS in build.json and is stable, so ask for the finished build.
+          BUILD_ID=$(node -e 'const b=JSON.parse(require("fs").readFileSync("build.json","utf8"));const a=Array.isArray(b)?b[0]:(b.builds?b.builds[0]:b);if(!a||!a.id){console.error("no build id in build.json");process.exit(1)}console.log(a.id)')
+          echo "::notice::android build $BUILD_ID — resolving artifact URL"
+          eas build:view "$BUILD_ID" --json > build-view.json
+          # Still through the script: it tolerates every envelope eas-cli has emitted,
+          # insists the result looks like an http(s) URL, and exits non-zero with the
+          # shape it saw rather than handing curl the string "undefined".
+          URL=$(node "$GITHUB_WORKSPACE/tools/eas-artifact-url.mjs" build-view.json)
           curl -fL "$URL" -o "Nexus-${SLUG}.aab"
 
       # So a rehearsal still yields an installable binary, the way the desktop
@@ -300,11 +312,18 @@ jobs:
           SLUG="${GITHUB_REF_NAME//\//-}"
           echo "SLUG=$SLUG" >> "$GITHUB_ENV"
           eas build --platform android --profile preview --non-interactive --json > build.json
-          # Same extractor as the AAB leg. This leg never auto-submits, so its payload
-          # still carried the legacy buildUrl and the old line always worked here —
-          # which is precisely why the bug hid: two identical call sites, and only the
-          # one that submits was ever wrong.
-          URL=$(node "$GITHUB_WORKSPACE/tools/eas-artifact-url.mjs" build.json)
+          # Same two-step as the aab leg, and deliberately identical to it.
+          #
+          # This leg has never failed: without --auto-submit the streaming JSON does
+          # carry artifacts.buildUrl, which is what made it the control case that
+          # identified the aab fault. It is written this way anyway so there is ONE
+          # way of getting an artifact URL in this file rather than two that differ for
+          # a reason nobody remembers — and so the day eas-cli changes the payload for
+          # plain builds too, this leg does not learn it during a release.
+          BUILD_ID=$(node -e 'const b=JSON.parse(require("fs").readFileSync("build.json","utf8"));const a=Array.isArray(b)?b[0]:(b.builds?b.builds[0]:b);if(!a||!a.id){console.error("no build id in build.json");process.exit(1)}console.log(a.id)')
+          echo "::notice::android preview build $BUILD_ID — resolving artifact URL"
+          eas build:view "$BUILD_ID" --json > build-view.json
+          URL=$(node "$GITHUB_WORKSPACE/tools/eas-artifact-url.mjs" build-view.json)
           curl -fL "$URL" -o "Nexus-${SLUG}.apk"
 
       - name: upload APK artifact
