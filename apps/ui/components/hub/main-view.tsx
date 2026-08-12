@@ -138,13 +138,13 @@ function LauncherTile({
       onClick={onOpen}
       className="group focus-ring flex flex-col items-center gap-2 rounded-2xl p-2"
     >
-      <span className="flex size-18 items-center justify-center rounded-3xl bg-surface-raised shadow-sm ring-1 ring-border/60 transition-all group-hover:-translate-y-0.5 group-hover:shadow-lg group-hover:ring-accent/50">
+      <span className="bg-surface-raised ring-border/60 group-hover:ring-accent/50 flex size-18 items-center justify-center rounded-3xl shadow-sm ring-1 transition-all group-hover:-translate-y-0.5 group-hover:shadow-lg">
         <AppTile app={app} size={44} />
       </span>
       <span className="text-sm font-semibold">{app.shortName}</span>
       <span
         className={`-mt-1 h-4 text-xs opacity-0 transition-opacity group-hover:opacity-100 ${
-          hintAccent ? "font-semibold text-accent" : "text-muted-foreground"
+          hintAccent ? "text-accent font-semibold" : "text-muted-foreground"
         }`}
       >
         {hint}
@@ -154,10 +154,10 @@ function LauncherTile({
 }
 
 function EmptyState(): ReactNode {
-  const { installedApps, openApp, openAppPrompt } = useHub();
+  const { isInstalled, openApp, openAppPrompt } = useHub();
   const all = getHubApps();
-  const installed = all.filter((app) => installedApps.includes(app.slug));
-  const available = all.filter((app) => !installedApps.includes(app.slug));
+  const installed = all.filter((app) => isInstalled(app.slug));
+  const available = all.filter((app) => !isInstalled(app.slug));
 
   return (
     <div className="flex h-full flex-col items-center justify-center overflow-y-auto p-6 sm:p-10">
@@ -165,7 +165,7 @@ function EmptyState(): ReactNode {
         <h1 className="text-center text-2xl font-bold text-balance">
           Welcome to {content.brand.name}
         </h1>
-        <p className="mx-auto mt-2 max-w-md text-center text-sm text-balance text-muted-foreground">
+        <p className="text-muted-foreground mx-auto mt-2 max-w-md text-center text-sm text-balance">
           {content.brand.description}
         </p>
 
@@ -182,7 +182,7 @@ function EmptyState(): ReactNode {
 
         {available.length > 0 && (
           <>
-            <h2 className="mt-10 mb-3 px-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            <h2 className="text-muted-foreground mt-10 mb-3 px-1 text-xs font-semibold tracking-wide uppercase">
               {content.appStore.moreApps}
             </h2>
             <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 md:grid-cols-5">
@@ -224,7 +224,7 @@ function AppCanvas(): ReactNode {
       } ${resetTheme ? "theme-reset" : ""}`}
     >
       {app && app.slug !== "browser" && !selfChromedApps.has(app.slug) && (
-        <header className="flex shrink-0 items-center gap-2 border-b border-border px-5 py-3">
+        <header className="border-border flex shrink-0 items-center gap-2 border-b px-5 py-3">
           <AppTile app={app} size={24} />
           <h1 className="min-w-0 flex-1 text-sm font-semibold">{app.name}</h1>
           {/* Offered where something has been written for this app *and* its
@@ -283,7 +283,7 @@ function SplitCanvas(): ReactNode {
   const resetTheme = !signatureApps.has(splitApp);
   return (
     <div
-      className={`flex h-full min-h-0 flex-col bg-background ${
+      className={`bg-background flex h-full min-h-0 flex-col ${
         resetTheme ? "theme-reset" : ""
       }`}
     >
@@ -350,7 +350,7 @@ export function MainView(): ReactNode {
       <div className="flex h-full min-w-0 flex-1 gap-2">
         <main
           id="main-content"
-          className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border shadow-xl ${
+          className={`border-border flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-xl ${
             canvasIsBrowser ? "bg-canvas" : "bg-background"
           }`}
         >
@@ -372,7 +372,7 @@ export function MainView(): ReactNode {
   return (
     <main
       id="main-content"
-      className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border shadow-xl ${
+      className={`border-border flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-xl ${
         !showStore && !showSettings && canvasIsBrowser
           ? "bg-canvas"
           : "bg-background"

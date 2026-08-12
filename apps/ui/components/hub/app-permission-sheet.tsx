@@ -12,6 +12,7 @@ import {
   getHubApp,
   getSystemAppSlugs,
 } from "@/lib/data";
+import { sameUrl } from "@/lib/tabs";
 import {
   BadgeCheck,
   Check,
@@ -53,7 +54,7 @@ function InfoTooltip({ text }: { text: string }): ReactNode {
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         onClick={() => setOpen((v) => !v)}
-        className="focus-ring flex rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+        className="focus-ring text-muted-foreground hover:text-foreground flex rounded-full p-0.5"
       >
         <Info className="size-4" aria-hidden="true" />
       </button>
@@ -65,7 +66,7 @@ function InfoTooltip({ text }: { text: string }): ReactNode {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 4 }}
             transition={{ duration: 0.12 }}
-            className="absolute right-0 bottom-full z-10 mb-2 w-56 rounded-lg bg-foreground px-3 py-2 text-xs leading-snug text-balance text-background shadow-lg"
+            className="bg-foreground text-background absolute right-0 bottom-full z-10 mb-2 w-56 rounded-lg px-3 py-2 text-xs leading-snug text-balance shadow-lg"
           >
             {text}
           </motion.span>
@@ -128,12 +129,12 @@ function AutoApproveField({
     <div className="flex items-center justify-between gap-3">
       <div className="min-w-0">
         <p className="text-sm font-medium">{label}</p>
-        <p className="text-xs text-balance text-muted-foreground">{desc}</p>
+        <p className="text-muted-foreground text-xs text-balance">{desc}</p>
       </div>
       <div className="relative shrink-0">
         {prefix && (
           <span
-            className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-sm text-muted-foreground"
+            className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-sm"
             aria-hidden="true"
           >
             {prefix}
@@ -144,7 +145,7 @@ function AutoApproveField({
           inputMode="decimal"
           defaultValue={defaultValue}
           aria-label={label}
-          className={`focus-ring w-24 rounded-lg border border-border bg-surface-raised py-1.5 pr-2.5 text-right text-sm ${
+          className={`focus-ring border-border bg-surface-raised w-24 rounded-lg border py-1.5 pr-2.5 text-right text-sm ${
             prefix ? "pl-6" : "pl-2.5"
           }`}
         />
@@ -170,7 +171,7 @@ function AutoApproveSettings({
   const store = content.appStore;
   const a = store.autoApprove;
   return (
-    <div className="mt-2 space-y-4 rounded-2xl bg-surface p-4">
+    <div className="bg-surface mt-2 space-y-4 rounded-2xl p-4">
       <h4 className="text-sm font-semibold">
         {a.title} for {title}
       </h4>
@@ -193,7 +194,7 @@ function AutoApproveSettings({
         </span>
         <span className="min-w-0">
           <span className="block text-sm font-medium">{a.notify}</span>
-          <span className="block text-xs text-balance text-muted-foreground">
+          <span className="text-muted-foreground block text-xs text-balance">
             {a.notifyDesc}
           </span>
         </span>
@@ -228,6 +229,9 @@ function SheetBody(): ReactNode {
     closeAppPrompt,
     installApp,
     uninstallApp,
+    pinSite,
+    unpinSite,
+    pinnedSites,
     bulkSetInstalled,
     presetGroup,
     ungroupRef,
@@ -287,10 +291,34 @@ function SheetBody(): ReactNode {
     : copy.permsIntroCollapsed;
 
   const confirm = (): void => {
-    // Installing/removing keeps you on the page you did it from.
+    // Connecting/disconnecting keeps you on the page you did it from.
     if (app) {
-      if (install) installApp(app.slug);
-      else uninstallApp(app.slug);
+      /*
+       * The seam between the two models.
+       *
+       * A catalog row is what the store shows — name, description, who serves
+       * it. What the user ends up with is a rail slot, and for a website that
+       * has to be a `{ kind: "site" }` ref rather than an app slot: it lives on
+       * somebody else's origin, it opens through the browser's own tab layer,
+       * and the grant it carries is scoped to that origin rather than to a
+       * screen we compiled. One slot, not two — a listing that took both would
+       * be a listing with two ways to be half-disconnected.
+       *
+       * This is the line every other wallet draws too: Coinbase's dapp
+       * connections, MetaMask's connected sites, a CAIP-25 session scope. It is
+       * also the line BRC-73 draws when it groups permissions per app.
+       */
+      if (install) {
+        if (app.web) pinSite(app.web.url, app.name);
+        else installApp(app.slug);
+      } else if (app.web) {
+        const site = pinnedSites.find((entry) =>
+          sameUrl(entry.url, app.web!.url),
+        );
+        if (site) unpinSite(site.id);
+      } else {
+        uninstallApp(app.slug);
+      }
     } else if (collection) {
       const slugs = getCollectionAppSlugs(collection.id);
       const essentialSlugs = new Set(getEssentialAppSlugs());
@@ -307,14 +335,14 @@ function SheetBody(): ReactNode {
           const grouped = targets.filter((slug) =>
             bundlesWeb
               ? !essentialSlugs.has(slug)
-              : !essentialSlugs.has(slug) && !systemSet.has(slug),
+              : !essentialSlugs.has(slug) && !systemSet.has(slug)
           );
           /* Refs, not slugs: the rail holds both built-in apps and connected
              sites, so a folder is a list of refs even when everything in it
              happens to be an app. */
           presetGroup(
             collection.name,
-            grouped.map((slug) => ({ kind: "app" as const, slug })),
+            grouped.map((slug) => ({ kind: "app" as const, slug }))
           );
         }
       } else {
@@ -348,11 +376,14 @@ function SheetBody(): ReactNode {
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         transition={{ type: "spring", damping: 30, stiffness: 320 }}
-        className="relative max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-surface-raised text-foreground shadow-[0_-12px_90px_-8px_rgba(0,0,0,0.55)] ring-1 ring-black/10 dark:shadow-[0_-12px_90px_-4px_rgba(0,0,0,0.95)] dark:ring-white/10"
+        className="bg-surface-raised text-foreground relative max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl shadow-[0_-12px_90px_-8px_rgba(0,0,0,0.55)] ring-1 ring-black/10 dark:shadow-[0_-12px_90px_-4px_rgba(0,0,0,0.95)] dark:ring-white/10"
       >
         {/* Grab handle (mobile affordance) */}
-        <div className="flex justify-center pt-2.5 sm:hidden" aria-hidden="true">
-          <span className="h-1 w-9 rounded-full bg-muted-foreground/30" />
+        <div
+          className="flex justify-center pt-2.5 sm:hidden"
+          aria-hidden="true"
+        >
+          <span className="bg-muted-foreground/30 h-1 w-9 rounded-full" />
         </div>
 
         <div className="px-6 pt-4 pb-6 sm:px-7 sm:pt-6">
@@ -375,14 +406,18 @@ function SheetBody(): ReactNode {
                     stiffness: 220,
                     delay: 0.05,
                   }}
-                  className="flex size-16 items-center justify-center rounded-full bg-positive/15 text-positive"
+                  className="bg-positive/15 text-positive flex size-16 items-center justify-center rounded-full"
                 >
-                  <Check className="size-8" strokeWidth={2.5} aria-hidden="true" />
+                  <Check
+                    className="size-8"
+                    strokeWidth={2.5}
+                    aria-hidden="true"
+                  />
                 </motion.span>
                 <p className="mt-4 text-lg font-bold">
                   {title} {install ? copy.doneAdded : copy.doneRemoved}
                 </p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                   {install ? copy.successAdded : copy.successRemoved}
                 </p>
               </motion.div>
@@ -399,7 +434,7 @@ function SheetBody(): ReactNode {
                       <AppTile app={app} size={52} />
                     ) : (
                       CollectionIcon && (
-                        <span className="flex size-13 items-center justify-center rounded-2xl bg-accent/15 text-accent">
+                        <span className="bg-accent/15 text-accent flex size-13 items-center justify-center rounded-2xl">
                           <CollectionIcon
                             className="size-7"
                             aria-hidden="true"
@@ -409,17 +444,17 @@ function SheetBody(): ReactNode {
                     )}
                   </div>
                   <p className="text-lg font-bold">{title}</p>
-                  <p className="text-sm text-muted-foreground">{subtitle}</p>
+                  <p className="text-muted-foreground text-sm">{subtitle}</p>
                 </div>
 
                 {install ? (
                   <>
                     {app &&
                       (app.pricing ? (
-                        <div className="mt-5 rounded-2xl bg-surface p-4">
+                        <div className="bg-surface mt-5 rounded-2xl p-4">
                           <div className="flex items-center gap-2">
                             <Wallet
-                              className="size-4 shrink-0 text-muted-foreground"
+                              className="text-muted-foreground size-4 shrink-0"
                               aria-hidden="true"
                             />
                             <h3 className="min-w-0 flex-1 text-sm font-medium">
@@ -430,7 +465,7 @@ function SheetBody(): ReactNode {
                             </span>
                           </div>
                           {app.pricing.note && (
-                            <p className="mt-1.5 text-xs text-balance text-muted-foreground">
+                            <p className="text-muted-foreground mt-1.5 text-xs text-balance">
                               {app.pricing.note}
                             </p>
                           )}
@@ -439,7 +474,7 @@ function SheetBody(): ReactNode {
                               {app.pricing.plans.map((plan) => (
                                 <li
                                   key={plan.name}
-                                  className="flex items-center justify-between rounded-lg bg-surface-raised px-3 py-2 text-sm"
+                                  className="bg-surface-raised flex items-center justify-between rounded-lg px-3 py-2 text-sm"
                                 >
                                   <span className="text-muted-foreground">
                                     {plan.name}
@@ -453,15 +488,15 @@ function SheetBody(): ReactNode {
                           )}
                         </div>
                       ) : (
-                        <div className="mt-5 flex items-center gap-3 rounded-2xl bg-surface p-4">
-                          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-positive/15 text-positive">
+                        <div className="bg-surface mt-5 flex items-center gap-3 rounded-2xl p-4">
+                          <span className="bg-positive/15 text-positive flex size-9 shrink-0 items-center justify-center rounded-full">
                             <BadgeCheck className="size-5" aria-hidden="true" />
                           </span>
                           <div className="min-w-0">
                             <p className="text-sm font-semibold">
                               {copy.iapFree}
                             </p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-muted-foreground text-xs">
                               {copy.iapFreeNote}
                             </p>
                           </div>
@@ -469,7 +504,7 @@ function SheetBody(): ReactNode {
                       ))}
 
                     <div
-                      className={`${app ? "mt-3" : "mt-5"} rounded-2xl bg-surface p-4`}
+                      className={`${app ? "mt-3" : "mt-5"} bg-surface rounded-2xl p-4`}
                     >
                       <button
                         type="button"
@@ -481,7 +516,7 @@ function SheetBody(): ReactNode {
                           {permsOpen ? introExpanded : introCollapsed}
                         </span>
                         <ChevronDown
-                          className={`size-4 shrink-0 text-muted-foreground transition-transform ${permsOpen ? "rotate-180" : ""}`}
+                          className={`text-muted-foreground size-4 shrink-0 transition-transform ${permsOpen ? "rotate-180" : ""}`}
                           aria-hidden="true"
                         />
                       </button>
@@ -503,7 +538,7 @@ function SheetBody(): ReactNode {
                                     className="flex items-start gap-2.5"
                                   >
                                     <Check
-                                      className="mt-0.5 size-4 shrink-0 text-positive"
+                                      className="text-positive mt-0.5 size-4 shrink-0"
                                       strokeWidth={2.5}
                                       aria-hidden="true"
                                     />
@@ -514,15 +549,15 @@ function SheetBody(): ReactNode {
                                       href={LEARN_MORE_URL}
                                       target="_blank"
                                       rel="noreferrer"
-                                      className="focus-ring mt-0.5 shrink-0 text-xs font-semibold text-accent hover:underline"
+                                      className="focus-ring text-accent mt-0.5 shrink-0 text-xs font-semibold hover:underline"
                                     >
                                       {copy.learnMore}
                                     </a>
                                   </li>
-                                ),
+                                )
                               )}
                             </ul>
-                            <p className="mt-3 border-t border-border pt-3 text-xs text-balance text-muted-foreground">
+                            <p className="border-border text-muted-foreground mt-3 border-t pt-3 text-xs text-balance">
                               {copy.installNote}
                             </p>
                           </motion.div>
@@ -538,10 +573,10 @@ function SheetBody(): ReactNode {
                             {copy.permWords.map((word) => (
                               <span
                                 key={word}
-                                className="inline-flex items-center gap-1 rounded-full bg-surface-raised px-2.5 py-1 text-xs font-medium"
+                                className="bg-surface-raised inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
                               >
                                 <Check
-                                  className="size-3 text-positive"
+                                  className="text-positive size-3"
                                   strokeWidth={3}
                                   aria-hidden="true"
                                 />
@@ -568,7 +603,7 @@ function SheetBody(): ReactNode {
                           type="button"
                           onClick={() => setAdvancedOpen((v) => !v)}
                           aria-expanded={advancedOpen}
-                          className="focus-ring flex items-center gap-1.5 rounded-md py-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+                          className="focus-ring text-muted-foreground hover:text-foreground flex items-center gap-1.5 rounded-md py-1 text-sm font-medium"
                         >
                           <ChevronDown
                             className={`size-4 transition-transform ${advancedOpen ? "rotate-180" : ""}`}
@@ -589,11 +624,11 @@ function SheetBody(): ReactNode {
                     </div>
                   </>
                 ) : (
-                  <div className="mt-5 flex items-start gap-3 rounded-2xl bg-surface p-4">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-negative/15 text-negative">
+                  <div className="bg-surface mt-5 flex items-start gap-3 rounded-2xl p-4">
+                    <span className="bg-negative/15 text-negative flex size-9 shrink-0 items-center justify-center rounded-full">
                       <ShieldAlert className="size-5" aria-hidden="true" />
                     </span>
-                    <p className="text-sm text-balance text-muted-foreground">
+                    <p className="text-muted-foreground text-sm text-balance">
                       {copy.uninstallBody}
                     </p>
                   </div>
@@ -603,7 +638,7 @@ function SheetBody(): ReactNode {
                   <button
                     type="button"
                     onClick={closeAppPrompt}
-                    className="focus-ring flex-1 rounded-full bg-surface px-5 py-2.5 text-sm font-semibold hover:bg-surface-hover"
+                    className="focus-ring bg-surface hover:bg-surface-hover flex-1 rounded-full px-5 py-2.5 text-sm font-semibold"
                   >
                     {copy.cancel}
                   </button>
@@ -616,10 +651,10 @@ function SheetBody(): ReactNode {
                         : "bg-negative text-white transition-colors hover:opacity-90"
                     }`}
                   >
-                    {(install ? copy.installConfirm : copy.uninstallConfirm).replace(
-                      "{name}",
-                      title,
-                    )}
+                    {(install
+                      ? copy.installConfirm
+                      : copy.uninstallConfirm
+                    ).replace("{name}", title)}
                   </button>
                 </div>
               </motion.div>

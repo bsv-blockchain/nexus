@@ -60,7 +60,8 @@ const CATEGORY_ORDER: { id: AppCategory; label: string }[] = [
 ];
 
 // Grid columns; the narrow variant reflows the grid when the detail sheet is open.
-const GRID = "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4";
+const GRID =
+  "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4";
 const GRID_NARROW = "grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3";
 const gridFor = (expanded: boolean): string => (expanded ? GRID_NARROW : GRID);
 
@@ -112,7 +113,7 @@ function sortApps(apps: HubApp[], sort: SortKey): HubApp[] {
     // trending: recent activity weighted by popularity
     sorted.sort(
       (a, b) =>
-        b.createdAt.localeCompare(a.createdAt) || b.popularity - a.popularity,
+        b.createdAt.localeCompare(a.createdAt) || b.popularity - a.popularity
     );
   }
   return sorted;
@@ -131,8 +132,12 @@ function AppCard({
   selected: boolean;
   isNew?: boolean;
 }): ReactNode {
-  const { installedApps, openAppPrompt } = useHub();
-  const installed = installedApps.includes(app.slug);
+  /* isInstalled, not installedApps.includes: a listing that is a website has no
+     app slot to be in — it is connected when its URL is on the rail. Asking the
+     array directly left every web listing's button saying Connect after it had
+     been connected. */
+  const { isInstalled, openAppPrompt } = useHub();
+  const installed = isInstalled(app.slug);
   const copy = content.library.apps;
   /* App copy is data, so the chain's name is substituted rather than composed
      from a component. */
@@ -144,7 +149,7 @@ function AppCard({
          a three-line description. Ragged card bottoms in a grid make the
          Connect buttons land on four different lines, and a row of buttons
          you have to hunt for is worse than a little empty space. */
-      className={`flex h-56 flex-col rounded-2xl bg-surface p-4 ring-1 transition-shadow ${
+      className={`bg-surface flex h-56 flex-col rounded-2xl p-4 ring-1 transition-shadow ${
         selected ? "ring-accent" : "ring-transparent"
       }`}
     >
@@ -168,7 +173,7 @@ function AppCard({
                 </span>
               )}
             </span>
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
               <span className="truncate">v{app.version}</span>
               <span className="flex shrink-0 items-center gap-0.5">
                 <Star
@@ -181,16 +186,20 @@ function AppCard({
             <DevBadge developer={app.developer} className="mt-0.5" />
           </div>
         </div>
-        <p className="mt-3 line-clamp-3 flex-1 overflow-hidden text-xs leading-relaxed text-muted-foreground">
+        <p className="text-muted-foreground mt-3 line-clamp-3 flex-1 overflow-hidden text-xs leading-relaxed">
           {withBrand(app.description, brandMode)}
         </p>
       </button>
       {app.essential ? (
         <span
           aria-label={`${app.name} is ${copy.essential}`}
-          className="mt-3 flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-muted-foreground"
+          className="bg-muted text-muted-foreground mt-3 flex shrink-0 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold"
         >
-          <Check className="size-3 text-positive" strokeWidth={3} aria-hidden="true" />
+          <Check
+            className="text-positive size-3"
+            strokeWidth={3}
+            aria-hidden="true"
+          />
           {copy.essential}
         </span>
       ) : (
@@ -202,7 +211,7 @@ function AppCard({
           aria-label={`${installed ? copy.uninstall : copy.install} ${app.name}`}
           className={`focus-ring mt-3 flex shrink-0 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
             installed
-              ? "bg-muted text-muted-foreground transition-colors hover:bg-negative/15 hover:text-negative"
+              ? "bg-muted text-muted-foreground hover:bg-negative/15 hover:text-negative transition-colors"
               : PRIMARY_CTA
           }`}
         >
@@ -250,9 +259,7 @@ function CategoryFolder({
   const reduced = useReducedMotion();
   const previews = apps.slice(0, 4);
   const extra = apps.length - previews.length;
-  const listVariants = reduced
-    ? { hidden: {}, visible: {} }
-    : CARD_LIST;
+  const listVariants = reduced ? { hidden: {}, visible: {} } : CARD_LIST;
   const itemVariants = reduced
     ? { hidden: { opacity: 0 }, visible: { opacity: 1 } }
     : CARD_ITEM;
@@ -274,7 +281,7 @@ function CategoryFolder({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18, ease: EASE }}
-            className="rounded-2xl bg-surface/60 p-4 ring-1 ring-accent/30"
+            className="bg-surface/60 ring-accent/30 rounded-2xl p-4 ring-1"
           >
             <button
               type="button"
@@ -282,7 +289,7 @@ function CategoryFolder({
               aria-expanded={true}
               className="focus-ring flex w-full items-center gap-3"
             >
-              <span className="flex size-13 shrink-0 items-center justify-center rounded-2xl bg-accent/15 text-accent">
+              <span className="bg-accent/15 text-accent flex size-13 shrink-0 items-center justify-center rounded-2xl">
                 <FolderOpen className="size-7" aria-hidden="true" />
               </span>
               <h3 className="min-w-0 flex-1 truncate text-left text-base font-bold">
@@ -323,14 +330,14 @@ function CategoryFolder({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18, ease: EASE }}
-            className="focus-ring group flex h-56 w-full flex-col justify-between rounded-2xl bg-surface p-4 text-left ring-1 ring-border transition-colors hover:ring-accent/50"
+            className="focus-ring group bg-surface ring-border hover:ring-accent/50 flex h-56 w-full flex-col justify-between rounded-2xl p-4 text-left ring-1 transition-colors"
           >
             {/* A folder is a tile in a grid of tiles, so its mark is the
                 size of the app icons around it and its name is read at the
                 same distance. At 32px against their 52px it looked like a
                 control that had wandered into the catalogue. */}
             <div className="flex items-center gap-3">
-              <span className="flex size-13 shrink-0 items-center justify-center rounded-2xl bg-accent/15 text-accent transition-transform duration-200 group-hover:scale-105">
+              <span className="bg-accent/15 text-accent flex size-13 shrink-0 items-center justify-center rounded-2xl transition-transform duration-200 group-hover:scale-105">
                 <Folder className="size-7" aria-hidden="true" />
               </span>
               <h3 className="min-w-0 flex-1 truncate text-base font-bold">
@@ -361,7 +368,7 @@ function CategoryFolder({
                 ))}
               </div>
               {extra > 0 && (
-                <span className="ml-2.5 text-xs font-medium text-muted-foreground">
+                <span className="text-muted-foreground ml-2.5 text-xs font-medium">
                   +{extra}
                 </span>
               )}
@@ -417,7 +424,7 @@ function CategoryGroups({
             expanded={expanded}
             newSlugs={newSlugs}
           />
-        ),
+        )
       )}
     </div>
   );
@@ -440,7 +447,9 @@ export function AppStore(): ReactNode {
   const [selectedSlug, setSelectedSlug] = useState<HubApp["slug"] | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const repos = useEnabledRepositories();
-  const [versionByRepo, setVersionByRepo] = useState<Record<string, string>>({});
+  const [versionByRepo, setVersionByRepo] = useState<Record<string, string>>(
+    {}
+  );
   /*
    * Both fixed for the life of this visit.
    *
@@ -471,7 +480,7 @@ export function AppStore(): ReactNode {
 
   const q = query.trim().toLowerCase();
   const scoped = getHubApps().filter(
-    (app) => appsCollection === "all" || slugSet.has(app.slug),
+    (app) => appsCollection === "all" || slugSet.has(app.slug)
   );
   const matched = scoped.filter((app) => {
     if (
@@ -508,7 +517,7 @@ export function AppStore(): ReactNode {
       enabledIds.has(app.repoId) &&
       (!q ||
         app.name.toLowerCase().includes(q) ||
-        app.description.toLowerCase().includes(q)),
+        app.description.toLowerCase().includes(q))
   );
   const repoCounts: Record<string, number> = {};
   const categoryCounts: Record<string, number> = {};
@@ -519,7 +528,7 @@ export function AppStore(): ReactNode {
     }
   }
   const groupByCategory = (
-    list: HubApp[],
+    list: HubApp[]
   ): { id: AppCategory; label: string; apps: HubApp[] }[] =>
     CATEGORY_ORDER.map((category) => ({
       ...category,
@@ -537,14 +546,19 @@ export function AppStore(): ReactNode {
   const sections = repos
     .map((repo) => {
       const inRepo = appsForRepo(apps, repo, versionByRepo[repo.id] ?? null);
-      const all = appsForRepo(getHubApps(), repo, versionByRepo[repo.id] ?? null);
+      const all = appsForRepo(
+        getHubApps(),
+        repo,
+        versionByRepo[repo.id] ?? null
+      );
       /* Weighted by how many people rated each app, not a mean of means: an
          app with nine reviews should not move a source's score as far as one
          with nine thousand. */
       const reviews = all.reduce((sum, app) => sum + app.reviews, 0);
       const rating =
         reviews > 0
-          ? all.reduce((sum, app) => sum + app.rating * app.reviews, 0) / reviews
+          ? all.reduce((sum, app) => sum + app.rating * app.reviews, 0) /
+            reviews
           : null;
       return {
         repo,
@@ -564,124 +578,130 @@ export function AppStore(): ReactNode {
   return (
     <div className="flex h-full min-h-0">
       <div className="min-w-0 flex-1 overflow-y-auto px-6 py-8 sm:px-10">
-       <div className="mx-auto max-w-400">
-        <h1 className="text-2xl font-bold tracking-tight">{copy.title}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {collection && appsCollection !== "all"
-            ? collection.description
-            : copy.storeSubtitle}
-        </p>
+        <div className="mx-auto max-w-400">
+          <h1 className="text-2xl font-bold tracking-tight">{copy.title}</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {collection && appsCollection !== "all"
+              ? collection.description
+              : copy.storeSubtitle}
+          </p>
 
-        {/* Search + sort + filter */}
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <div className="flex min-w-52 flex-1 items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2">
-            <Search
-              className="size-4 shrink-0 text-muted-foreground"
-              aria-hidden="true"
-            />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={store.searchPlaceholder}
-              aria-label={store.searchPlaceholder}
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            />
-          </div>
+          {/* Search + sort + filter */}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="border-border bg-surface flex min-w-52 flex-1 items-center gap-2 rounded-lg border px-3 py-2">
+              <Search
+                className="text-muted-foreground size-4 shrink-0"
+                aria-hidden="true"
+              />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={store.searchPlaceholder}
+                aria-label={store.searchPlaceholder}
+                className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-sm outline-none"
+              />
+            </div>
 
-          <div className="relative">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setSortOpen((open) => !open)}
+                aria-expanded={sortOpen}
+                className="focus-ring border-border bg-surface hover:bg-surface-hover flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium"
+              >
+                <ArrowUpDown className="size-4" aria-hidden="true" />
+                <span className="hidden sm:inline">{store.sortLabel}:</span>
+                {sortLabel}
+                <ChevronDown
+                  className="size-3.5 opacity-60"
+                  aria-hidden="true"
+                />
+              </button>
+              <PopoverMenu
+                open={sortOpen}
+                onClose={() => setSortOpen(false)}
+                label={store.sortLabel}
+                className="top-full right-0 mt-2 min-w-44"
+              >
+                {SORTS.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => {
+                      setSort(option.id);
+                      setSortOpen(false);
+                    }}
+                    className="focus-ring hover:bg-surface-hover flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm"
+                  >
+                    <span className="flex-1">{option.label}</span>
+                    {sort === option.id && (
+                      <Check
+                        className="text-accent size-4"
+                        aria-hidden="true"
+                      />
+                    )}
+                  </button>
+                ))}
+              </PopoverMenu>
+            </div>
+
             <button
               type="button"
-              onClick={() => setSortOpen((open) => !open)}
-              aria-expanded={sortOpen}
-              className="focus-ring flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium hover:bg-surface-hover"
+              onClick={() => {
+                /* One panel at a time on this edge. Opening the filter over an
+                 open detail sheet would squeeze the grid twice. */
+                setSelectedSlug(null);
+                setFilterOpen((open) => !open);
+              }}
+              aria-expanded={filterOpen}
+              className="focus-ring border-border bg-surface hover:bg-surface-hover flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium"
             >
-              <ArrowUpDown className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">{store.sortLabel}:</span>
-              {sortLabel}
-              <ChevronDown className="size-3.5 opacity-60" aria-hidden="true" />
+              <SlidersHorizontal className="size-4" aria-hidden="true" />
+              {store.filterLabel}
+              {activeFilters > 0 && (
+                <span className="bg-accent text-accent-foreground flex size-4 items-center justify-center rounded-full text-[10px] font-bold">
+                  {activeFilters}
+                </span>
+              )}
             </button>
-            <PopoverMenu
-              open={sortOpen}
-              onClose={() => setSortOpen(false)}
-              label={store.sortLabel}
-              className="top-full right-0 mt-2 min-w-44"
-            >
-              {SORTS.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => {
-                    setSort(option.id);
-                    setSortOpen(false);
-                  }}
-                  className="focus-ring flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-surface-hover"
-                >
-                  <span className="flex-1">{option.label}</span>
-                  {sort === option.id && (
-                    <Check className="size-4 text-accent" aria-hidden="true" />
-                  )}
-                </button>
-              ))}
-            </PopoverMenu>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              /* One panel at a time on this edge. Opening the filter over an
-                 open detail sheet would squeeze the grid twice. */
-              setSelectedSlug(null);
-              setFilterOpen((open) => !open);
-            }}
-            aria-expanded={filterOpen}
-            className="focus-ring flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium hover:bg-surface-hover"
-          >
-            <SlidersHorizontal className="size-4" aria-hidden="true" />
-            {store.filterLabel}
-            {activeFilters > 0 && (
-              <span className="flex size-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-accent-foreground">
-                {activeFilters}
-              </span>
-            )}
-          </button>
+          <LayoutGroup>
+            {sections.map((section) => (
+              <RepoSection
+                key={section.repo.id}
+                repo={section.repo}
+                version={versionByRepo[section.repo.id] ?? null}
+                onVersion={(version) =>
+                  setVersionByRepo((current) => ({
+                    ...current,
+                    [section.repo.id]: version,
+                  }))
+                }
+                rating={section.rating}
+                reviews={section.reviews}
+                count={section.count}
+                hasNew={section.hasNew}
+                now={now}
+              >
+                <CategoryGroups
+                  groups={section.groups}
+                  onSelect={onSelect}
+                  onHover={onHover}
+                  selectedSlug={selectedSlug}
+                  expanded={detailExpanded}
+                  newSlugs={newSlugs}
+                />
+              </RepoSection>
+            ))}
+          </LayoutGroup>
+
+          {total === 0 && (
+            <p className="text-muted-foreground py-16 text-center text-sm">
+              {store.noResults}
+            </p>
+          )}
         </div>
-
-        <LayoutGroup>
-          {sections.map((section) => (
-            <RepoSection
-              key={section.repo.id}
-              repo={section.repo}
-              version={versionByRepo[section.repo.id] ?? null}
-              onVersion={(version) =>
-                setVersionByRepo((current) => ({
-                  ...current,
-                  [section.repo.id]: version,
-                }))
-              }
-              rating={section.rating}
-              reviews={section.reviews}
-              count={section.count}
-              hasNew={section.hasNew}
-              now={now}
-            >
-              <CategoryGroups
-                groups={section.groups}
-                onSelect={onSelect}
-                onHover={onHover}
-                selectedSlug={selectedSlug}
-                expanded={detailExpanded}
-                newSlugs={newSlugs}
-              />
-            </RepoSection>
-          ))}
-        </LayoutGroup>
-
-        {total === 0 && (
-          <p className="py-16 text-center text-sm text-muted-foreground">
-            {store.noResults}
-          </p>
-        )}
-       </div>
       </div>
 
       <StoreFilterPane
@@ -705,17 +725,17 @@ export function AppStore(): ReactNode {
             animate={{ width: collapsed ? 52 : 420 }}
             exit={{ width: 0 }}
             transition={{ duration: 0.24, ease: [0.4, 0, 0.2, 1] }}
-            className="hidden shrink-0 overflow-hidden border-l border-border md:block"
+            className="border-border hidden shrink-0 overflow-hidden border-l md:block"
           >
             {collapsed ? (
               <button
                 type="button"
                 onClick={() => setCollapsed(false)}
                 aria-label={content.appStore.detail.expand}
-                className="focus-ring flex h-full w-13 flex-col items-center gap-3 py-4 transition-colors hover:bg-surface-hover"
+                className="focus-ring hover:bg-surface-hover flex h-full w-13 flex-col items-center gap-3 py-4 transition-colors"
               >
                 <ChevronLeft
-                  className="size-5 text-muted-foreground"
+                  className="text-muted-foreground size-5"
                   aria-hidden="true"
                 />
                 <AppTile app={selectedApp} size={30} />
@@ -741,7 +761,7 @@ export function AppStore(): ReactNode {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 32, stiffness: 340 }}
-            className="fixed inset-0 z-60 bg-background md:hidden"
+            className="bg-background fixed inset-0 z-60 md:hidden"
           >
             <AppDetailPanel
               app={selectedApp}

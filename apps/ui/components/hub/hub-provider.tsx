@@ -1368,9 +1368,22 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     [activeSpaceId],
   );
 
+  /**
+   * Whether this profile has the listing connected.
+   *
+   * Two answers behind one question, because a listing is one of two things. A
+   * screen we compiled is connected when the profile's list names it. A website
+   * is connected when its URL is on the rail — there is no app slot for it to
+   * occupy, and inventing one would mean the same listing had two rail slots
+   * and two ways to be half-removed.
+   */
   const isInstalled = useCallback(
-    (slug: AppSlug) => installedApps.includes(slug),
-    [installedApps],
+    (slug: AppSlug) => {
+      const web = getHubApp(slug)?.web;
+      if (web) return pinnedSites.some((site) => sameUrl(site.url, web.url));
+      return installedApps.includes(slug);
+    },
+    [installedApps, pinnedSites],
   );
 
   const groupRefs = useCallback(

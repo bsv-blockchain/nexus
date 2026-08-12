@@ -3,12 +3,10 @@
 import { Favicon } from "@/components/hub/favicon";
 import { IdentitySigil } from "@/components/hub/identity-sigil";
 import { PopoverMenu } from "@/components/hub/popover-menu";
+import { DEMO_SURFACES } from "@/lib/surfaces";
 import { content, type AppRepository, type HubApp } from "@/lib/data";
 import { Check, ChevronDown, ExternalLink, Star } from "lucide-react";
-import {
-  toggleRepoCollapsed,
-  useCollapsedRepos,
-} from "@/lib/collapsed-repos";
+import { toggleRepoCollapsed, useCollapsedRepos } from "@/lib/collapsed-repos";
 import { useReducedMotion } from "@/lib/motion";
 import { AnimatePresence, motion } from "motion/react";
 import { useState, type ReactNode } from "react";
@@ -24,12 +22,15 @@ const DEFAULT_ACCENT = "#4353ff";
  * six people and 4.5 from nine thousand are not the same claim, and a bare
  * average lets the first impersonate the second.
  */
-function Stars({ value, reviews }: { value: number; reviews: number }): ReactNode {
+function Stars({
+  value,
+  reviews,
+}: {
+  value: number;
+  reviews: number;
+}): ReactNode {
   return (
-    <span
-      className="flex items-center gap-1"
-      title={`${value.toFixed(1)} / 5`}
-    >
+    <span className="flex items-center gap-1" title={`${value.toFixed(1)} / 5`}>
       <Star
         className="size-3.5 fill-[#FFAF00] text-[#FFAF00]"
         aria-hidden="true"
@@ -56,7 +57,8 @@ export function sinceLabel(iso: string, now: number): string {
   if (days < 1) return copy.repoToday;
   if (days === 1) return copy.repoYesterday;
   if (days < 14) return copy.repoDays.replace("{n}", String(days));
-  if (days < 60) return copy.repoWeeks.replace("{n}", String(Math.floor(days / 7)));
+  if (days < 60)
+    return copy.repoWeeks.replace("{n}", String(Math.floor(days / 7)));
   return copy.repoMonths.replace("{n}", String(Math.floor(days / 30)));
 }
 
@@ -222,13 +224,23 @@ export function RepoSection({
           )}
         </span>
 
+        {/*
+          Three claims on this row that only a registry could make: the rating,
+          the catalogue version, and how long ago it moved. Nexus operates no
+          registry, so on a shipping build there is nothing to ask and nobody to
+          be wrong on behalf of — they render in demo builds and nowhere else.
+          The app count survives because it counts what is in front of you.
+          See docs/SPEC-design-catchup.md §1 and lib/surfaces.ts.
+        */}
         <span className="text-muted-foreground flex flex-1 items-center justify-end gap-3 text-[11px]">
-          {rating !== null && <Stars value={rating} reviews={reviews} />}
+          {DEMO_SURFACES && rating !== null && (
+            <Stars value={rating} reviews={reviews} />
+          )}
           <span className="tabular-nums">
             {copy.repoApps.replace("{n}", String(count))}
           </span>
 
-          {versions.length > 0 && (
+          {DEMO_SURFACES && versions.length > 0 && (
             <>
               <button
                 type="button"
@@ -278,7 +290,9 @@ export function RepoSection({
                     >
                       <Check className="size-3.5" aria-hidden="true" />
                     </span>
-                    <span className="flex-1 font-semibold">v{entry.version}</span>
+                    <span className="flex-1 font-semibold">
+                      v{entry.version}
+                    </span>
                     {index === 0 && (
                       <span className="text-muted-foreground">
                         {copy.repoLatest}
@@ -290,7 +304,7 @@ export function RepoSection({
             </>
           )}
 
-          {selected && (
+          {DEMO_SURFACES && selected && (
             <span className="hidden sm:inline">
               {sinceLabel(selected.releasedAt, now)}
             </span>
@@ -348,7 +362,7 @@ export function RepoSection({
 export function appsForRepo(
   apps: HubApp[],
   repo: AppRepository,
-  version: string | null,
+  version: string | null
 ): HubApp[] {
   const mine = apps.filter((app) => app.repoId === repo.id);
   const versions = repo.versions ?? [];

@@ -1,6 +1,7 @@
 "use client";
 
 import { useBrandMode, withBrand } from "@/lib/brand";
+import { DEMO_SURFACES } from "@/lib/surfaces";
 import { AppTile } from "@/components/hub/app-icon";
 import { content, type HubApp } from "@/lib/data";
 import {
@@ -72,10 +73,18 @@ function getAppStats(app: HubApp): AppStats {
   ];
   const total = weights.reduce((a, b) => a + b, 0);
   const distribution = weights.map((w) =>
-    Math.round((w / total) * reviewCount),
+    Math.round((w / total) * reviewCount)
   );
   const updated = relativeUpdated(1 + (hash(`${app.slug}:u`) % 90));
-  return { installs, stars, follows, rating, reviewCount, distribution, updated };
+  return {
+    installs,
+    stars,
+    follows,
+    rating,
+    reviewCount,
+    distribution,
+    updated,
+  };
 }
 
 interface Review {
@@ -142,7 +151,13 @@ function getAppReviews(app: HubApp): Review[] {
 }
 
 /** A row of five filled stars, amber up to `value` and grey beyond. */
-function Stars({ value, size = 14 }: { value: number; size?: number }): ReactNode {
+function Stars({
+  value,
+  size = 14,
+}: {
+  value: number;
+  size?: number;
+}): ReactNode {
   return (
     <span
       className="inline-flex items-center gap-0.5"
@@ -165,7 +180,13 @@ function Stars({ value, size = 14 }: { value: number; size?: number }): ReactNod
   );
 }
 
-function MetaRow({ label, value }: { label: string; value: string }): ReactNode {
+function MetaRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}): ReactNode {
   return (
     <div className="flex items-center justify-between px-3.5 py-2.5 text-sm">
       <dt className="text-muted-foreground">{label}</dt>
@@ -197,11 +218,11 @@ export function AppDetailPanel({
   return (
     <div className="flex h-full flex-col">
       {/* Sticky header */}
-      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/95 px-5 py-4 backdrop-blur">
+      <div className="border-border bg-background/95 sticky top-0 z-10 flex items-center gap-3 border-b px-5 py-4 backdrop-blur">
         <AppTile app={app} size={40} />
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-base font-bold">{app.name}</h2>
-          <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+          <p className="text-muted-foreground flex items-center gap-1 truncate text-xs">
             {app.publisher}
             {verified && (
               <span
@@ -221,7 +242,7 @@ export function AppDetailPanel({
           type="button"
           onClick={onClose}
           aria-label={d.close}
-          className="focus-ring rounded-full p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+          className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground rounded-full p-1.5"
         >
           {variant === "overlay" ? (
             <X className="size-5" aria-hidden="true" />
@@ -247,28 +268,39 @@ export function AppDetailPanel({
           </span>
         </div>
 
-        <p className="mt-4 text-sm leading-relaxed text-balance text-muted-foreground">
+        <p className="text-muted-foreground mt-4 text-sm leading-relaxed text-balance">
           {withBrand(app.description, brandMode)}
         </p>
 
-        {/* Meta */}
-        <dl className="mt-5 divide-y divide-border/60 overflow-hidden rounded-xl bg-surface ring-1 ring-border">
-          <MetaRow label={d.installs} value={compact(stats.installs)} />
-          <MetaRow label={d.version} value={`v${app.version}`} />
-          <MetaRow label={d.updated} value={stats.updated} />
-          <div className="flex items-center justify-between px-3.5 py-2.5 text-sm">
-            <dt className="flex items-center gap-1.5 text-muted-foreground">
-              <Github className="size-3.5" aria-hidden="true" />
-              GitHub
-            </dt>
-            <dd className="font-medium">
-              {compact(stats.stars)} ★ · {compact(stats.follows)} followers
-            </dd>
-          </div>
-        </dl>
+        {/*
+          Meta.
+
+          Every row here is derived from a hash of the slug — installs, stars,
+          followers, the rating and how many it is over. That is exactly right
+          for a prototype and exactly wrong for a build somebody downloads, so
+          the whole block, and the reviews under it, are demo-only. What a live
+          build can honestly say about a listing is its name, what it does and
+          who serves it, which is what remains.
+        */}
+        {DEMO_SURFACES && (
+          <dl className="divide-border/60 bg-surface ring-border mt-5 divide-y overflow-hidden rounded-xl ring-1">
+            <MetaRow label={d.installs} value={compact(stats.installs)} />
+            <MetaRow label={d.version} value={`v${app.version}`} />
+            <MetaRow label={d.updated} value={stats.updated} />
+            <div className="flex items-center justify-between px-3.5 py-2.5 text-sm">
+              <dt className="text-muted-foreground flex items-center gap-1.5">
+                <Github className="size-3.5" aria-hidden="true" />
+                GitHub
+              </dt>
+              <dd className="font-medium">
+                {compact(stats.stars)} ★ · {compact(stats.follows)} followers
+              </dd>
+            </div>
+          </dl>
+        )}
 
         {/* Permissions (collapsed chips → expandable full list) */}
-        <div className="mt-5 rounded-2xl bg-surface p-4 ring-1 ring-border">
+        <div className="bg-surface ring-border mt-5 rounded-2xl p-4 ring-1">
           <button
             type="button"
             onClick={() => setPermsOpen((v) => !v)}
@@ -278,11 +310,11 @@ export function AppDetailPanel({
             <span className="min-w-0 flex-1 text-sm font-semibold">
               {d.permissionsTitle}
             </span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-muted-foreground text-xs">
               {permsOpen ? d.permissionsCollapse : d.permissionsExpand}
             </span>
             <ChevronDown
-              className={`size-4 shrink-0 text-muted-foreground transition-transform ${
+              className={`text-muted-foreground size-4 shrink-0 transition-transform ${
                 permsOpen ? "rotate-180" : ""
               }`}
               aria-hidden="true"
@@ -301,7 +333,7 @@ export function AppDetailPanel({
                 {[copy.perm1, copy.perm2, copy.perm3].map((perm) => (
                   <li key={perm} className="flex items-start gap-2.5">
                     <Check
-                      className="mt-0.5 size-4 shrink-0 text-positive"
+                      className="text-positive mt-0.5 size-4 shrink-0"
                       strokeWidth={2.5}
                       aria-hidden="true"
                     />
@@ -312,7 +344,7 @@ export function AppDetailPanel({
                       href={LEARN_MORE_URL}
                       target="_blank"
                       rel="noreferrer"
-                      className="focus-ring mt-0.5 shrink-0 text-xs font-semibold text-accent hover:underline"
+                      className="focus-ring text-accent mt-0.5 shrink-0 text-xs font-semibold hover:underline"
                     >
                       {copy.learnMore}
                     </a>
@@ -331,10 +363,10 @@ export function AppDetailPanel({
                 {copy.permWords.map((word) => (
                   <span
                     key={word}
-                    className="inline-flex items-center gap-1 rounded-full bg-surface-raised px-2.5 py-1 text-xs font-medium"
+                    className="bg-surface-raised inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
                   >
                     <Check
-                      className="size-3 text-positive"
+                      className="text-positive size-3"
                       strokeWidth={3}
                       aria-hidden="true"
                     />
@@ -346,96 +378,101 @@ export function AppDetailPanel({
           </AnimatePresence>
         </div>
 
-        {/* Reviews */}
-        <div className="mt-6">
-          <h3 className="flex items-baseline gap-2">
-            <span className="text-base font-bold">{d.reviewsTitle}</span>
-            <span className="text-sm text-muted-foreground">
-              ({stats.reviewCount})
-            </span>
-          </h3>
-
-          <div className="mt-3 rounded-2xl bg-surface p-4 ring-1 ring-border">
-            <p className="text-sm font-semibold">{d.overallRating}</p>
-            <div className="mt-1 flex items-center gap-2">
-              <span className="text-3xl font-extrabold">
-                {stats.rating.toFixed(1)}
+        {/* Reviews — hashed from the slug, so demo-only for the same reason. */}
+        {DEMO_SURFACES && (
+          <div className="mt-6">
+            <h3 className="flex items-baseline gap-2">
+              <span className="text-base font-bold">{d.reviewsTitle}</span>
+              <span className="text-muted-foreground text-sm">
+                ({stats.reviewCount})
               </span>
-              <Stars value={stats.rating} size={16} />
-            </div>
-            <ul className="mt-3 space-y-1.5">
-              {stats.distribution.map((count, i) => {
-                const starVal = 5 - i;
-                const pct =
-                  stats.reviewCount > 0
-                    ? Math.round((count / stats.reviewCount) * 100)
-                    : 0;
-                return (
-                  <li key={starVal} className="flex items-center gap-2 text-xs">
-                    <span className="w-2 text-right text-muted-foreground">
-                      {starVal}
-                    </span>
-                    <Star
-                      className="size-3 fill-amber-400 text-amber-400"
-                      aria-hidden="true"
-                    />
-                    <span className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                      <span
-                        className="absolute inset-y-0 left-0 rounded-full bg-amber-400"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </span>
-                    <span className="w-8 text-right tabular-nums text-muted-foreground">
-                      {count}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                className="focus-ring flex-1 rounded-full bg-surface-raised px-3 py-2 text-xs font-semibold ring-1 ring-border hover:bg-surface-hover"
-              >
-                {d.writeReview}
-              </button>
-              <button
-                type="button"
-                className="focus-ring flex-1 rounded-full bg-surface-raised px-3 py-2 text-xs font-semibold ring-1 ring-border hover:bg-surface-hover"
-              >
-                {d.allReviews}
-              </button>
-            </div>
-          </div>
+            </h3>
 
-          <ul className="mt-4 space-y-4">
-            {reviews.map((review) => (
-              <li
-                key={review.id}
-                className="border-b border-border/60 pb-4 last:border-0"
-              >
-                <div className="flex items-center justify-between">
-                  <Stars value={review.rating} />
-                  <span className="text-xs text-muted-foreground">
-                    {review.date}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm text-balance text-muted-foreground">
-                  {review.body}
-                </p>
-                <div className="mt-2 text-xs text-muted-foreground">
-                  <span className="font-semibold text-foreground">
-                    {review.author}
-                  </span>
-                  {" · "}
-                  {review.location}
-                  {" · "}
-                  {review.tenure}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
+            <div className="bg-surface ring-border mt-3 rounded-2xl p-4 ring-1">
+              <p className="text-sm font-semibold">{d.overallRating}</p>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="text-3xl font-extrabold">
+                  {stats.rating.toFixed(1)}
+                </span>
+                <Stars value={stats.rating} size={16} />
+              </div>
+              <ul className="mt-3 space-y-1.5">
+                {stats.distribution.map((count, i) => {
+                  const starVal = 5 - i;
+                  const pct =
+                    stats.reviewCount > 0
+                      ? Math.round((count / stats.reviewCount) * 100)
+                      : 0;
+                  return (
+                    <li
+                      key={starVal}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <span className="text-muted-foreground w-2 text-right">
+                        {starVal}
+                      </span>
+                      <Star
+                        className="size-3 fill-amber-400 text-amber-400"
+                        aria-hidden="true"
+                      />
+                      <span className="bg-muted relative h-1.5 flex-1 overflow-hidden rounded-full">
+                        <span
+                          className="absolute inset-y-0 left-0 rounded-full bg-amber-400"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </span>
+                      <span className="text-muted-foreground w-8 text-right tabular-nums">
+                        {count}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  className="focus-ring bg-surface-raised ring-border hover:bg-surface-hover flex-1 rounded-full px-3 py-2 text-xs font-semibold ring-1"
+                >
+                  {d.writeReview}
+                </button>
+                <button
+                  type="button"
+                  className="focus-ring bg-surface-raised ring-border hover:bg-surface-hover flex-1 rounded-full px-3 py-2 text-xs font-semibold ring-1"
+                >
+                  {d.allReviews}
+                </button>
+              </div>
+            </div>
+
+            <ul className="mt-4 space-y-4">
+              {reviews.map((review) => (
+                <li
+                  key={review.id}
+                  className="border-border/60 border-b pb-4 last:border-0"
+                >
+                  <div className="flex items-center justify-between">
+                    <Stars value={review.rating} />
+                    <span className="text-muted-foreground text-xs">
+                      {review.date}
+                    </span>
+                  </div>
+                  <p className="text-muted-foreground mt-2 text-sm text-balance">
+                    {review.body}
+                  </p>
+                  <div className="text-muted-foreground mt-2 text-xs">
+                    <span className="text-foreground font-semibold">
+                      {review.author}
+                    </span>
+                    {" · "}
+                    {review.location}
+                    {" · "}
+                    {review.tenure}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );

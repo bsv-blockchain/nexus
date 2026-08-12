@@ -59,11 +59,19 @@ function Toggle({
 // — their switch is shown on but disabled. Web apps stay removable.
 const alwaysOnSlugs = new Set(getEssentialAppSlugs());
 
-function CollectionRow({ collection }: { collection: AppCollection }): ReactNode {
-  const { installedApps, appsCollection, setAppsCollection, openCollectionPrompt } =
-    useHub();
+function CollectionRow({
+  collection,
+}: {
+  collection: AppCollection;
+}): ReactNode {
+  const {
+    isInstalled,
+    appsCollection,
+    setAppsCollection,
+    openCollectionPrompt,
+  } = useHub();
   const slugs = getCollectionAppSlugs(collection.id);
-  const allInstalled = slugs.every((slug) => installedApps.includes(slug));
+  const allInstalled = slugs.every((slug) => isInstalled(slug));
   const Icon = collectionIcons[collection.icon] ?? Sparkles;
   const selected = appsCollection === collection.id;
   const count = slugs.length;
@@ -100,7 +108,7 @@ function CollectionRow({ collection }: { collection: AppCollection }): ReactNode
           <span className="block truncate text-sm font-medium">
             {collection.name}
           </span>
-          <span className="block truncate text-[11px] text-muted-foreground">
+          <span className="text-muted-foreground block truncate text-[11px]">
             {count} app{count === 1 ? "" : "s"}
           </span>
         </span>
@@ -130,7 +138,7 @@ export function AppCollections(): ReactNode {
   const collections = getAppCollections();
 
   return (
-    <div className="flex h-full flex-col rounded-2xl bg-surface p-3">
+    <div className="bg-surface flex h-full flex-col rounded-2xl p-3">
       <h2 className="px-1.5 pb-2 text-sm font-semibold">
         {content.appStore.collectionsTitle}
       </h2>
