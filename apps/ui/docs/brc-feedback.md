@@ -896,6 +896,44 @@ Recording these so the next reader knows they were exercised rather than skipped
 
 ---
 
+### 3.34 GAP — a chat can move money to a person but not to a piece of work
+
+**Where.** §5 verbs, all of which address a `@handle`.
+
+**What is missing.** Every value verb in BRC-218 pays somebody. `/pay`, `/tip`,
+`/split`, `/subscribe`, `/escrow` — the recipient is always a person or an agent
+holding for two people. Nothing in the grammar addresses a *thing being built*.
+
+That gap matters because the thing being built is what the conversation is
+usually about. A room full of people arguing over whether a feature is worth it
+has no way to say "here is the feature" without pasting a link out of the
+client, and no way to see, in the room, that four of them have already put money
+behind it.
+
+**What Nexus does.** `/roadmap #slug [note]` shares a card for one feature: what
+it is, what has been pledged, and how far that is from what it needs. It is
+deliberately **read-only in the thread**. Funding happens in the Roadmap app,
+against the wallet, because a payment should be confirmed where payments are
+confirmed. A "Fund" button in a chat bubble would be a second way to spend, in
+the surface least suited to reviewing one.
+
+Two consequences of that choice are worth stating:
+
+1. **The card is not the record of the pledge.** It reads live figures. A card
+   somebody scrolls back to six weeks later shows the total now, not the total
+   when it was posted — the opposite of how a `/pay` card behaves, and correct
+   for the same reason: a `/pay` records something that happened, this points at
+   something ongoing.
+2. **Backers are handles, not names.** A pledge attributable under BRC-169 is
+   what makes a funding board different from a spreadsheet with a progress bar.
+
+**Suggested for BRC-218.** If a verb of this shape belongs in the specification
+at all, the argument type is the interesting part: `#slug` naming a resource in
+a namespace the client resolves, rather than a handle. §2.3 has no shape for a
+non-handle named argument — `/send`'s `#asset` has the same problem and solves
+it the same way, informally. Two verbs inventing the same convention separately
+suggests the convention belongs in §2.3.
+
 ## 4. Smaller notes
 
 - **Fiat that cannot be converted.** A currency the client has no rate for must fail loudly.

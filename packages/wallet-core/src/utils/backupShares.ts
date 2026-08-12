@@ -314,8 +314,7 @@ export async function generatePrintHTML(
         <strong>Recovery Instructions</strong>
         <p>This is 1 of ${shares.length} backup shares. You need any ${threshold} of them to recover this wallet.</p>
         <p>Store each share in a separate, secure location. Do not store shares together — any ${threshold} together are the wallet.</p>
-        <p>To recover: in Nexus, choose Set up your wallet &rarr; Restore from backup shares, and enter any ${threshold} shares. Say it is a ${wordCount}-word phrase.</p>
-        <p>These shares recover the recovery phrase itself, so a successful recovery gives the words back.</p>
+        <p>To recover: in Nexus, choose Set up your wallet &rarr; Restore from backup shares, and enter any ${threshold} shares.</p>
       </div>
     </div>
   `

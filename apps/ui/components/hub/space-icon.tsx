@@ -3,6 +3,7 @@
 import {
   Bike,
   Bird,
+  Briefcase,
   Camera,
   Cat,
   Circle,
@@ -83,6 +84,7 @@ export const SPACE_ICON_GROUPS: {
       { name: "Dumbbell", Icon: Dumbbell },
       { name: "Gamepad2", Icon: Gamepad2 },
       { name: "ShoppingBag", Icon: ShoppingBag },
+      { name: "Briefcase", Icon: Briefcase },
       { name: "Leaf", Icon: Leaf },
     ],
   },

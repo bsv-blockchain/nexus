@@ -5,13 +5,13 @@ import {
   hasContextSidebar,
 } from "@/components/hub/app-context-sidebar";
 import { SiteTile } from "@/components/hub/app-icon";
+import { AppHelpBar } from "@/components/hub/app-help-bar";
 import { BrowserNav } from "@/components/hub/browser-nav";
 import { useHub } from "@/components/hub/hub-provider";
 import { NewItemMenu } from "@/components/hub/new-item-menu";
 import { OriginLabel } from "@/components/hub/origin-label";
 import { SpaceContent } from "@/components/hub/space-content";
 import { SpaceIcon } from "@/components/hub/space-icon";
-import { ThemeButton } from "@/components/hub/theme-picker";
 import { SpaceMenu } from "@/components/hub/space-menu";
 import { panelContainer, panelItem } from "@/components/hub/panel-motion";
 import { content } from "@/lib/data";
@@ -75,7 +75,6 @@ export function SpacesPanel(): ReactNode {
   const {
     spaces,
     activeSpaceId,
-    setActiveSpaceId,
     setLibraryTab,
     activeApp,
     activeRef,
@@ -187,56 +186,18 @@ export function SpacesPanel(): ReactNode {
         <SpaceContent spaceId={activeSpace.id} />
       </motion.div>
 
-      <motion.div
-        variants={panelItem}
-        className="relative flex items-center justify-between pt-2"
-      >
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            aria-label={content.library.downloads.title}
-            onClick={() => setLibraryTab("downloads")}
-            className="focus-ring rounded-md p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
-          >
-            <Download className="size-4" aria-hidden="true" />
-          </button>
-          {/* The profiles manager shows every profile but the active one, so
-              until now the one you were actually using was the only one you
-              could not theme. */}
-          <ThemeButton spaceId={activeSpace.id} />
-        </div>
+      {/*
+        The same bar every app column ends in, so this stops being the one
+        panel with a footer of its own design. What was on the right — the
+        new-item menu — moves to the left with the other controls, and the
+        right is where help lives everywhere else.
 
-        <div
-          className="flex items-center gap-1.5"
-          role="tablist"
-          aria-label="Profiles"
-        >
-          {spaces.map((space) => {
-            const selected = space.id === activeSpace.id;
-            return (
-              <button
-                key={space.id}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                aria-label={space.name}
-                onClick={() => setActiveSpaceId(space.id)}
-                /* The selected dot used to be painted with the profile's own
-                   themeColor, which read as a stray brand colour in every other
-                   theme. `--foreground` is the same treatment as the primary
-                   CTAs: whatever the active palette's strongest ink is. */
-                className={`focus-ring size-2.5 rounded-full transition-colors ${
-                  selected ? "bg-foreground" : ""
-                }`}
-              >
-                {!selected && (
-                  <span className="block size-full rounded-full bg-muted-foreground/40 hover:bg-muted-foreground" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-
+        The theme picker is gone from here. It was added because the profiles
+        manager used to hide the active profile, so this was the only place to
+        theme it; the manager shows every profile now, which makes this a
+        second way to do a thing that already has a home.
+      */}
+      <AppHelpBar slug="browser">
         <div className="relative">
           <button
             type="button"
@@ -250,10 +211,18 @@ export function SpacesPanel(): ReactNode {
           <NewItemMenu
             open={newItemMenuOpen}
             onClose={() => setNewItemMenuOpen(false)}
-            className="right-0 bottom-full mb-2"
+            className="left-0 bottom-full mb-2"
           />
         </div>
-      </motion.div>
+        <button
+          type="button"
+          aria-label={content.library.downloads.title}
+          onClick={() => setLibraryTab("downloads")}
+          className="focus-ring rounded-md p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+        >
+          <Download className="size-4" aria-hidden="true" />
+        </button>
+      </AppHelpBar>
     </motion.div>
   );
 }

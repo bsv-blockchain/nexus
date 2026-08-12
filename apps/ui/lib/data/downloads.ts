@@ -6,6 +6,7 @@ import type { DownloadItem } from "./types";
 export const downloads: DownloadItem[] = [
   {
     id: "dl-whitepaper",
+    spaceId: "space-my-hub",
     fileName: "bitcoin-whitepaper.pdf",
     fileType: "document",
     sizeBytes: 184_292,
@@ -17,6 +18,7 @@ export const downloads: DownloadItem[] = [
   },
   {
     id: "dl-logo-pack",
+    spaceId: "space-work",
     fileName: "bsv-brand-assets.zip",
     fileType: "archive",
     sizeBytes: 24_811_520,
@@ -28,6 +30,7 @@ export const downloads: DownloadItem[] = [
   },
   {
     id: "dl-keynote",
+    spaceId: "space-work",
     fileName: "london-blockchain-keynote.mp4",
     fileType: "video",
     sizeBytes: 734_003_200,
@@ -39,6 +42,7 @@ export const downloads: DownloadItem[] = [
   },
   {
     id: "dl-headshot",
+    spaceId: "space-my-hub",
     fileName: "team-photo.png",
     fileType: "image",
     sizeBytes: 2_411_724,
@@ -47,5 +51,41 @@ export const downloads: DownloadItem[] = [
     progress: 100,
     thumbnail: { from: "#34d399", to: "#0f766e" },
     createdAt: "2026-07-01T08:30:00.000Z",
+  },
+  {
+    id: "dl-brc218",
+    spaceId: "space-my-hub",
+    fileName: "brc-218-draft.pdf",
+    fileType: "document",
+    sizeBytes: 412_880,
+    sourceUrl: "https://hub.bsvblockchain.org/brc/218",
+    status: "completed",
+    progress: 100,
+    thumbnail: null,
+    createdAt: "2026-08-02T11:18:00.000Z",
+  },
+  {
+    id: "dl-audit",
+    spaceId: "space-work",
+    fileName: "overlay-audit-q3.xlsx",
+    fileType: "document",
+    sizeBytes: 96_512,
+    sourceUrl: "https://bsvassociation.org/reports",
+    status: "in-progress",
+    progress: 62,
+    thumbnail: null,
+    createdAt: "2026-08-06T09:41:00.000Z",
+  },
+  {
+    id: "dl-node",
+    spaceId: "space-work",
+    fileName: "teranode-testnet.dmg",
+    fileType: "app",
+    sizeBytes: 318_767_104,
+    sourceUrl: "https://github.com/bsv-blockchain/teranode/releases",
+    status: "failed",
+    progress: 38,
+    thumbnail: null,
+    createdAt: "2026-08-05T14:02:00.000Z",
   },
 ];

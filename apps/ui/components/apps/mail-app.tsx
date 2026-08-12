@@ -1,5 +1,6 @@
 "use client";
 
+import { useIsDesktop } from "@/lib/use-is-desktop";
 import { useHub } from "@/components/hub/hub-provider";
 import { getMailMessages } from "@/lib/data";
 import {
@@ -15,19 +16,7 @@ import {
   Send,
   Trash2,
 } from "lucide-react";
-import { useState, useSyncExternalStore, type ReactNode } from "react";
-
-function useIsDesktop(): boolean {
-  return useSyncExternalStore(
-    (onChange) => {
-      const mq = window.matchMedia("(min-width: 768px)");
-      mq.addEventListener("change", onChange);
-      return () => mq.removeEventListener("change", onChange);
-    },
-    () => window.matchMedia("(min-width: 768px)").matches,
-    () => false,
-  );
-}
+import { useState, type ReactNode } from "react";
 
 function formatBsv(satoshis: number): string {
   return `${(satoshis / 100_000_000).toLocaleString("en-US", {

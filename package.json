@@ -18,6 +18,8 @@
     "ui:build": "node tools/build-ui.mjs",
     "ui:build:demo": "node tools/build-ui.mjs --demo",
     "ui:dev": "npm run dev --prefix apps/ui",
+    "dev:wallet": "NEXT_PUBLIC_DEMO_DATA=0 NEXT_PUBLIC_SURFACES=wallet,browser npm run dev --prefix apps/ui",
+    "dev:shell": "NEXUS_CHROME_URL=http://localhost:3000 npm --workspace @nexus/desktop run dev",
     "web": "node tools/web.mjs dev",
     "web:deploy": "node tools/web.mjs deploy",
     "typecheck": "tsc --noEmit -p apps/mobile",

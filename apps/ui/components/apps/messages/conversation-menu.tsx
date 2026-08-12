@@ -14,6 +14,7 @@ import {
   subscribeEffects,
 } from "@/lib/command-effects";
 import { content, type MessagePerson } from "@/lib/data";
+import { useIsDesktop } from "@/lib/use-is-desktop";
 import { handleOf } from "@/lib/messages";
 import {
   Archive,
@@ -23,7 +24,9 @@ import {
   CircleArrowUp,
   HeartHandshake,
   HeartCrack,
+  Columns2,
   MoreVertical,
+  X,
   Sparkles,
   Star,
   StarOff,
@@ -54,7 +57,14 @@ export function ConversationMenu({
   person: MessagePerson;
 }): ReactNode {
   const copy = content.messages.menu;
-  const { conversationFlags, setConversationFlag, setMessageThread } = useHub();
+  const {
+    conversationFlags,
+    setConversationFlag,
+    setMessageThread,
+    splitApp,
+    setSplitApp,
+  } = useHub();
+  const isDesktop = useIsDesktop();
   const seed = useProfileActions()?.seed;
   const [open, setOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -73,8 +83,12 @@ export function ConversationMenu({
     action();
   };
 
+  /* `flex`, not the default inline. The tooltip inside is `inline-flex`, and an
+     inline-level box sits on the text baseline — which left this button a few
+     pixels below the one beside it, in a row where every other item is a flex
+     child. */
   return (
-    <span className="relative shrink-0">
+    <span className="relative flex shrink-0">
       <Tooltip label={copy.open} side="bottom">
         <button
           type="button"
@@ -172,6 +186,26 @@ export function ConversationMenu({
             })
           }
         />
+        {/* The one app-level action worth reaching from here. A second
+            ellipsis beside this one would be two identical buttons meaning
+            different things; the group thread has room for its own because its
+            header carries only a gear. */}
+        {isDesktop && (
+          <>
+            <MenuSeparator />
+            <MenuItem
+              icon={splitApp === null ? Columns2 : X}
+              label={
+                splitApp === null
+                  ? content.appMenu.openSplit
+                  : content.appMenu.closeSplit
+              }
+              onClick={() =>
+                run(() => setSplitApp(splitApp === null ? "" : null))
+              }
+            />
+          </>
+        )}
       </PopoverMenu>
 
       {confirmDelete && (

@@ -1,5 +1,6 @@
 "use client";
 
+import { useIsDesktop } from "@/lib/use-is-desktop";
 import {
   ConversationList,
   useConversationRows,
@@ -13,20 +14,7 @@ import { useHub } from "@/components/hub/hub-provider";
 import { content, getChatThread } from "@/lib/data";
 import { MessageSquare, SquarePen } from "lucide-react";
 import { toast } from "sonner";
-import { useSyncExternalStore, type ReactNode } from "react";
-
-/** Tracks the md breakpoint, which is where the contextual sidebar appears. */
-function useIsDesktop(): boolean {
-  return useSyncExternalStore(
-    (onChange) => {
-      const query = window.matchMedia("(min-width: 768px)");
-      query.addEventListener("change", onChange);
-      return () => query.removeEventListener("change", onChange);
-    },
-    () => window.matchMedia("(min-width: 768px)").matches,
-    () => false,
-  );
-}
+import type { ReactNode } from "react";
 
 /** Renders whichever thread kind the active conversation is. */
 function Thread({

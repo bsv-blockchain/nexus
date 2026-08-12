@@ -58,8 +58,8 @@ function SiteRow({
       /* items-start, not items-center: through OriginLabel a long host wraps
          instead of being cut, so the row can grow — and when it does, the tile
          and the verb belong against the title rather than floating mid-row. */
-      className={`flex items-start gap-3 rounded-2xl bg-surface p-3 ring-1 transition-shadow duration-300 ${
-        flash ? "ring-accent" : "ring-transparent hover:ring-border"
+      className={`bg-surface flex items-start gap-3 rounded-2xl p-3 ring-1 transition-shadow duration-300 ${
+        flash ? "ring-accent" : "hover:ring-border ring-transparent"
       }`}
     >
       <SiteTile site={site} size={36} />
@@ -98,7 +98,7 @@ function SiteRow({
         type="button"
         onClick={onRemove}
         aria-label={`${copy.remove} ${site.title}`}
-        className="focus-ring flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-negative/15 hover:text-negative"
+        className="focus-ring bg-muted text-muted-foreground hover:bg-negative/15 hover:text-negative flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
       >
         <Minus className="size-3" aria-hidden="true" />
         {copy.remove}
@@ -108,7 +108,13 @@ function SiteRow({
 }
 
 /**
- * Web3 Apps: the sites the user pinned to the rail.
+ * Connected sites: the websites this profile has connected, and the one control
+ * that matters on a list like this — disconnect.
+ *
+ * The same list every wallet keeps. It is not the Apps surface, which is where
+ * you go to find something; this is where you go to see what already has a
+ * grant against your wallet and take it away. Both reach the same store
+ * underneath, and a listing connected from either shows up in the other.
  *
  * There is no catalog here, and no section of things Nexus suggests. Every icon
  * on the rail beyond the apps compiled into this build is there because somebody
@@ -170,8 +176,8 @@ export function Web3Apps(): ReactNode {
   return (
     <div className="h-full overflow-y-auto px-6 py-8 sm:px-10">
       <div className="mx-auto max-w-3xl">
-        <h1 className="text-2xl font-bold tracking-tight">{copy.title}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{copy.subtitle}</p>
+        <h1 className="text-2xl font-bold tracking-tight">{copy.sitesTitle}</h1>
+        <p className="text-muted-foreground mt-1 text-sm">{copy.subtitle}</p>
 
         <div className="mt-6 flex flex-wrap items-center gap-2">
           <input
@@ -186,7 +192,7 @@ export function Web3Apps(): ReactNode {
             placeholder={copy.addPlaceholder}
             aria-label={copy.addLabel}
             aria-invalid={notice === "invalid"}
-            className="focus-ring min-w-52 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted-foreground"
+            className="focus-ring border-border bg-surface placeholder:text-muted-foreground min-w-52 flex-1 rounded-lg border px-3 py-2 text-sm outline-none"
           />
           <button
             type="button"
@@ -198,12 +204,12 @@ export function Web3Apps(): ReactNode {
           </button>
         </div>
         {notice === "invalid" && (
-          <p role="alert" className="mt-2 text-xs text-negative">
+          <p role="alert" className="text-negative mt-2 text-xs">
             {copy.addInvalid}
           </p>
         )}
         {notice === "duplicate" && (
-          <p role="status" className="mt-2 text-xs text-muted-foreground">
+          <p role="status" className="text-muted-foreground mt-2 text-xs">
             {copy.addDuplicate}
           </p>
         )}
@@ -213,9 +219,12 @@ export function Web3Apps(): ReactNode {
              in this build that pins a site. It is not a placeholder for a list
              of sites Nexus would have suggested — there is no such list. */
           <div className="flex flex-col items-center gap-3 py-20 text-center">
-            <Globe className="size-10 text-muted-foreground" aria-hidden="true" />
-            <p className="max-w-xs text-sm text-balance text-muted-foreground">
-              {copy.empty}
+            <Globe
+              className="text-muted-foreground size-10"
+              aria-hidden="true"
+            />
+            <p className="text-muted-foreground max-w-xs text-sm text-balance">
+              {copy.emptySites}
             </p>
           </div>
         ) : (

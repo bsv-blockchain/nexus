@@ -6,6 +6,8 @@ import type { PinnedSite } from "@/lib/rail/sites";
 import { faviconColorFor } from "@/lib/tabs";
 import { Folder, Globe, Palette, Pin, type LucideIcon } from "lucide-react";
 
+const DEFAULT_ACCENT = "#4353ff";
+
 /**
  * Resolves icon names stored in the data layer (future Postgres rows) to
  * lucide components — used for space items. App icons are image tiles, see
@@ -33,16 +35,35 @@ export function DataIcon({
 /**
  * Rounded app-tile icon from /public/icons. Plain <img> so both PNG and SVG
  * tiles work without next/image remote/SVG configuration.
+ *
+ * A listing with no tile of its own is a website, and it wears its own favicon
+ * rather than a mark we drew for it — a logo is the one thing in a listing that
+ * has to come from whoever it belongs to. `Favicon` falls back to a letter on
+ * the app's accent when the site has none, so nothing ever renders as a broken
+ * image.
  */
 export function AppTile({
   app,
   size,
   className = "",
 }: {
-  app: Pick<HubApp, "iconSrc" | "name">;
+  app: Pick<HubApp, "iconSrc" | "name"> & Partial<Pick<HubApp, "web" | "accent">>;
   size: number;
   className?: string;
 }): React.ReactNode {
+  if (!app.iconSrc && app.web) {
+    return (
+      <Favicon
+        url={app.web.url}
+        letter={app.name.slice(0, 1).toUpperCase()}
+        color={app.accent ?? DEFAULT_ACCENT}
+        size={size}
+        rounded="rounded-[22%]"
+        {...(className ? { className } : {})}
+      />
+    );
+  }
+
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img

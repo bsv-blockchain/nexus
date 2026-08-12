@@ -1,5 +1,6 @@
 "use client";
 
+import { AppMenu } from "@/components/hub/app-menu";
 import { AppTile } from "@/components/hub/app-icon";
 import { useHub } from "@/components/hub/hub-provider";
 import {
@@ -192,6 +193,7 @@ export function MarketApp(): ReactNode {
           <Tag className="size-4" aria-hidden="true" />
           {copy.sellAction}
         </button>
+        <AppMenu slug="market" />
       </header>
 
       <div className="p-6">

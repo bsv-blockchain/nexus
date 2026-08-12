@@ -33,7 +33,8 @@ interface CustomThemeContextValue {
    * profile follows the system.
    */
   profileMode: (spaceId: string) => "light" | "dark" | null;
-  setProfileMode: (spaceId: string, mode: "light" | "dark") => void;
+  /** `null` clears it, which hands the profile back to the system setting */
+  setProfileMode: (spaceId: string, mode: "light" | "dark" | null) => void;
   /**
    * Live-apply colours without committing (null clears). Pass a spaceId to
    * target a specific profile — the chrome only previews when the target is the
@@ -162,24 +163,36 @@ export function CustomThemeProvider({
    * Light and dark are as much a part of "this is my Work profile" as its
    * colour is, and a profile that comes back in the wrong one has not really
    * been remembered. Applied on activation rather than only when set, so
-   * switching profiles carries it across; a profile that has never been given
-   * one is left alone, and follows the system like everything else.
+   * switching profiles carries it across.
+   *
+   * A profile with no choice goes back to the system, and that `?? "system"` is
+   * load-bearing. Leaving it alone meant it kept whatever the last profile was
+   * wearing: set Work to light, switch to a profile that has never been given a
+   * mode, and the screen stayed light while the picker — correctly reading an
+   * empty setting — showed Match this device. Clicking Light then changed
+   * nothing, because light was already on, and the control looked broken.
    */
   const activeMode = modeByProfile[activeSpaceId];
   useEffect(() => {
-    if (activeMode) setTheme(activeMode);
+    setTheme(activeMode ?? "system");
   }, [activeMode, setTheme]);
 
   const setProfileMode = useCallback(
-    (spaceId: string, mode: "light" | "dark") => {
+    (spaceId: string, mode: "light" | "dark" | null) => {
       setModeByProfile((current) => {
-        const next = { ...current, [spaceId]: mode };
+        const next = { ...current };
+        /* Removed rather than stored as "system": this map is the record of
+           profiles that have been given an opinion, and the effect above only
+           forces a theme for the ones that have. Writing "system" into it
+           would make every profile look decided. */
+        if (mode) next[spaceId] = mode;
+        else delete next[spaceId];
         writeJSON(MODE_KEY, next);
         return next;
       });
       // Applied at once when it is the profile you are actually looking at.
       // Setting another profile's mode saves it for when you switch to it.
-      if (spaceId === activeSpaceId) setTheme(mode);
+      if (spaceId === activeSpaceId) setTheme(mode ?? "system");
     },
     [activeSpaceId, setTheme],
   );

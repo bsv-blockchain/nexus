@@ -1,5 +1,6 @@
 "use client";
 
+import { useIsDesktop } from "@/lib/use-is-desktop";
 import { ColorPicker } from "@/components/hub/color-picker";
 import { useCustomTheme } from "@/components/hub/theme-provider";
 import { content } from "@/lib/data";
@@ -8,20 +9,9 @@ import { SpaceIcon } from "@/components/hub/space-icon";
 import { useHub } from "@/components/hub/hub-provider";
 import { Check, Moon, Palette, RotateCcw, Sun, Trash2 } from "lucide-react";
 import { useTheme } from "next-themes";
+import { toast } from "sonner";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState, type ReactNode } from "react";
-
-function useIsDesktop(): boolean {
-  const [desktop, setDesktop] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 768px)");
-    const update = (): void => setDesktop(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
-  return desktop;
-}
 
 const MODES: { n: number; key: "solid" | "gradient2" | "gradient3" }[] = [
   { n: 1, key: "solid" },
@@ -50,11 +40,18 @@ export interface ThemeAnchor {
  * of them is "on" and the other is the absence of it, and neither is the
  * default any more than the other. Sitting in the theme panel because that is
  * where someone goes when they are thinking about how the app looks.
+ *
+ * Picking one is picking the whole default theme, not just the mode. Setting a
+ * profile to Dark while it keeps a custom palette gives you a dark version of
+ * somebody's orange, which is neither what they chose nor what this button
+ * says. So the palette goes back to the default with it — and because that
+ * throws away work, the toast can put it back.
  */
 function ModeToggle({ spaceId }: { spaceId: string }): ReactNode {
   const copy = content.theme;
   const { resolvedTheme } = useTheme();
-  const { profileMode, setProfileMode } = useCustomTheme();
+  const { profileMode, setProfileMode, profileTheme, setProfileTheme, preview } =
+    useCustomTheme();
   // What this profile is set to, falling back to what is on screen for a
   // profile that has never been given one.
   const current = profileMode(spaceId) ?? resolvedTheme;
@@ -62,6 +59,26 @@ function ModeToggle({ spaceId }: { spaceId: string }): ReactNode {
     { key: "light", label: copy.light, icon: <Sun className="size-3.5" /> },
     { key: "dark", label: copy.dark, icon: <Moon className="size-3.5" /> },
   ];
+
+  const pick = (mode: "light" | "dark", label: string): void => {
+    const previous = profileTheme(spaceId);
+    setProfileMode(spaceId, mode);
+    /* A half-applied preview would survive the reset and repaint the profile
+       the moment the pointer moved. */
+    preview(null);
+    setProfileTheme(spaceId, null);
+    toast.success(label, {
+      description: copy.modeReset,
+      ...(previous
+        ? {
+            action: {
+              label: content.hub.undo,
+              onClick: () => setProfileTheme(spaceId, previous),
+            },
+          }
+        : {}),
+    });
+  };
   return (
     <div
       role="radiogroup"
@@ -78,7 +95,7 @@ function ModeToggle({ spaceId }: { spaceId: string }): ReactNode {
             aria-checked={on}
             aria-label={mode.label}
             title={mode.label}
-            onClick={() => setProfileMode(spaceId, mode.key)}
+            onClick={() => pick(mode.key, mode.label)}
             className={`focus-ring grid size-6 place-items-center rounded-full transition-colors ${
               on
                 ? "bg-foreground text-background"
@@ -212,8 +229,11 @@ function ThemePicker({
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
           <div className="mb-3 flex items-center gap-2">
+            {/* The profile's own icon, not a palette. The palette is the
+                button that opened this; repeating it in the heading says
+                "colours" to somebody already looking at colours, where naming
+                the profile says whose. */}
             <h2 className="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-semibold">
-              <Palette className="size-4 shrink-0" aria-hidden="true" />
               {space && (
                 <SpaceIcon value={space.emoji} size={16} className="shrink-0" />
               )}

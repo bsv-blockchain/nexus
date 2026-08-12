@@ -9,7 +9,8 @@
  * Foreign keys are modeled as `<table>Id` string fields.
  */
 
-export type HubAppSlug =
+/** Apps Nexus ships as views of its own — each one has a component behind it. */
+export type NativeAppSlug =
   | "browser"
   | "connect"
   | "wallet"
@@ -24,7 +25,33 @@ export type HubAppSlug =
   | "baskets"
   | "mail"
   | "identity"
-  | "attestations";
+  | "attestations"
+  | "roadmap";
+
+/**
+ * Listings that are somebody else's website.
+ *
+ * They connect, sit in the rail and open under the same app header as the rest,
+ * because from where a person stands that is what an app is. What is behind the
+ * header is a page we did not write, which is why the profile's theme stops at
+ * the frame: recolouring another party's site would be us speaking for them.
+ *
+ * Split from the native slugs so `appViews` stays exhaustive — the compiler
+ * still refuses a native app with no view, and never asks for one here.
+ */
+export type WebAppSlug =
+  | "cookie-clucker"
+  | "pelf"
+  | "pixel-war"
+  | "omnibazaar"
+  | "soundbase"
+  | "tonicpow-handcash"
+  | "1sat-market"
+  | "tonicpow"
+  | "jamify"
+  | "scribe";
+
+export type HubAppSlug = NativeAppSlug | WebAppSlug;
 
 /** table: identity_keys — the user's identity public keys */
 export interface IdentityKey {
@@ -47,13 +74,87 @@ export interface IdentityCertificate {
 }
 
 /**
- * table: hub_apps — the app surfaces compiled into this build
+ * Which folder a listing sits in inside its repo's block.
  *
- * There is no `publisher` column, and no `category`, `version` or `createdAt`.
- * A row here is a screen in this binary, not a listing: nobody publishes into
- * this table, nothing sorts or filters it, and the build that carries a row is
- * the only thing that dates it. See the note on `content.library.apps`.
+ * One per app, because a card can only be in one folder. This is shelving, not
+ * description — see `StoreCategory` for what an app is *about*, which is a
+ * different question and one an app can answer more than once.
  */
+export type AppCategory =
+  | "system"
+  | "core"
+  | "finance"
+  | "identity"
+  | "media"
+  | "social"
+  | "learning"
+  | "developer"
+  | "gaming"
+  | "marketplace"
+  | "productivity";
+
+/**
+ * What an app is for, in the words somebody would use looking for one.
+ *
+ * Many per app: a market for ordinals is a marketplace and a collectibles app
+ * at once, and forcing that choice would hide it from half the people who want
+ * it. Used by the store filter; the folder an app lands in is `AppCategory`.
+ */
+export type StoreCategory =
+  | "block-explorers"
+  | "collectibles"
+  | "education"
+  | "exchanges"
+  | "finance"
+  | "gaming"
+  | "marketplaces"
+  | "media"
+  | "other"
+  | "productivity"
+  | "social"
+  | "wallets";
+
+/** table: app_collections — persona bundles that install several apps at once */
+export type CollectionId =
+  | "all"
+  | "core"
+  | "essentials"
+  | "consumer"
+  | "knowledge"
+  | "creator"
+  | "developer";
+
+export interface AppCollection {
+  id: CollectionId;
+  name: string;
+  description: string;
+  /** lucide icon name */
+  icon: string;
+  /** apps toggled by this collection ("all" ignores this and uses every app) */
+  apps: HubAppSlug[];
+  /** persona bundle: also installs the Web apps and folds them into its rail folder */
+  bundlesWeb?: boolean;
+}
+
+/** table: hub_apps — installable apps shown in the icon rail / Apps manager */
+/** Who publishes an app — surfaced as a verified badge and store filter. */
+export type AppDeveloper =
+  | "nexus"
+  | "bsv-association"
+  | "open-protocol-labs"
+  | "handcash"
+  | "third-party";
+
+/** In-app purchase model surfaced in the install sheet. Absent ⇒ free. */
+export interface AppPricing {
+  /** short right-aligned tag, e.g. "Free to use", "Subscription" */
+  summary: string;
+  /** optional one-line note under the summary */
+  note?: string;
+  /** optional subscription tiers */
+  plans?: { name: string; price: string }[];
+}
+
 export interface HubApp {
   id: string;
   slug: HubAppSlug;
@@ -62,10 +163,47 @@ export interface HubApp {
   description: string;
   /** two or three word subtitle for tiles and tooltips */
   tagline: string;
-  /** app tile image, served from /public */
+  /** publishing organisation category */
+  developer: AppDeveloper;
+  /** 0–100 popularity score used for store sorting */
+  popularity: number;
+  /** app tile image, served from /public (later: asset url column) */
   iconSrc: string;
   /** accent used for badges and highlights */
   accent: string;
+  /** installed for new users by default */
+  defaultInstalled: boolean;
+  /** always-on app that can't be removed (shown as "Essential") */
+  essential?: boolean;
+  /** in-app purchases; omitted for the (majority) free apps */
+  pricing?: AppPricing;
+  /** the folder it sits in within its repo's block */
+  category: AppCategory;
+  /** what it is for; one app can be several things, and the filter reads these */
+  categories: StoreCategory[];
+  /**
+   * Set when the listing is a website rather than a view we ship.
+   *
+   * `embeds` is declared rather than detected, because a frame that a host
+   * refuses fails silently and cross-origin — by the time the pane is blank
+   * there is nothing left to ask. Hosts that say no open in Browse instead,
+   * where the address bar and the back button already exist.
+   */
+  web?: { url: string; embeds: boolean };
+  version: string;
+  /** which repository serves this listing; see lib/data/repositories.ts */
+  repoId: string;
+  /** how many people the rating is an average of */
+  reviews: number;
+  /**
+   * Stars out of five, to one decimal.
+   *
+   * Per app rather than per repo, because a repo's rating is the average of
+   * what it carries — a source cannot be better than the things it serves.
+   */
+  rating: number;
+  publisher: string;
+  createdAt: string;
 }
 
 export type SpaceProfile = "personal" | "work" | "shared";
@@ -149,6 +287,14 @@ export interface MockPage {
 /** table: downloads */
 export interface DownloadItem {
   id: string;
+  /**
+   * Which profile downloaded it.
+   *
+   * Downloads belong to a profile for the same reason tabs and favourites do:
+   * a profile is a separate person's-worth of browsing, and a work file showing
+   * up in a personal one is the whole point of profiles failing.
+   */
+  spaceId: string;
   fileName: string;
   fileType: "image" | "video" | "document" | "archive" | "app";
   sizeBytes: number;
@@ -166,6 +312,26 @@ export interface WalletAccount {
   id: string;
   label: string;
   address: string;
+  /**
+   * The key this wallet is, written once and never again.
+   *
+   * A label is what you call a wallet and can be changed on a whim; this is
+   * what it *is*, and it is what appears in Identity beside your other
+   * identifiers. Two wallets can be called "Everyday" — a prototype should not
+   * pretend that is impossible — but they can never be this.
+   */
+  identifier: string;
+  /** the two stops of the wallet's gradient, so it is known by sight */
+  colors: [string, string];
+  /** a picture, where one has been set; without it the gradient carries it */
+  avatar?: string;
+  /**
+   * Sealed until a password is given.
+   *
+   * Data rather than session state because it is a property of the wallet, not
+   * of this visit: a locked wallet is locked on every device it appears on.
+   */
+  locked?: boolean;
   balanceSatoshis: number;
   fiatCurrency: string;
   /** placeholder exchange rate, BSV → fiat */
@@ -445,6 +611,12 @@ export interface SplitBill {
 }
 
 /** table: message_people — everyone the user can hold a conversation with */
+/** An account somebody has proved belongs to their identity key. */
+export interface AttestedSocial {
+  provider: "x" | "github" | "google" | "linkedin";
+  handle: string;
+}
+
 export interface MessagePerson {
   id: string;
   name: string;
@@ -464,6 +636,14 @@ export interface MessagePerson {
   /** organisation / community shown under the name in a thread header */
   organization: string | null;
   city: string;
+  /**
+   * Accounts attested to this person's key.
+   *
+   * Distinct from a vouch: a vouch is somebody's opinion of a person, this is
+   * proof that an account you already know is the same key. Absent means none
+   * have been linked, which is the common case.
+   */
+  socials?: AttestedSocial[];
   /** avatar image path; `null` falls back to the generated colour tile */
   photo: string | null;
   /** colour stops for the generated fallback avatar */
@@ -589,7 +769,13 @@ export type ReservedVerb = "bounty" | "poll" | "gate" | "contract";
  * does not shadow one, so section 8 permits it as an ecosystem-custom command.
  * `renounce` is its opposite, and is likewise ours rather than the spec's.
  */
-export type CustomVerb = "vouch" | "renounce" | "help" | "watch" | "agent";
+export type CustomVerb =
+  | "vouch"
+  | "renounce"
+  | "help"
+  | "watch"
+  | "agent"
+  | "roadmap";
 
 export type CommandStatus =
   | "sent"
@@ -702,6 +888,8 @@ export interface CommandCard {
   txid?: string;
   /** the escrow this card belongs to, so its later states can find it */
   escrowId?: string;
+  /** the roadmap feature a /roadmap card points at */
+  featureId?: string;
   /** when an escrow offer stops being matchable */
   expiresAt?: string;
   /** the handle holding both sides of an escrow */

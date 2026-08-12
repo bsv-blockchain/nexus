@@ -1,5 +1,6 @@
 "use client";
 
+import { Inspector } from "@/components/hub/inspector";
 import { useHub } from "@/components/hub/hub-provider";
 import { OriginChip } from "@/components/hub/origin-chip";
 import { getMockPage, type BrowserTab, type MockPage } from "@/lib/data";
@@ -191,7 +192,13 @@ function useHasShell(): boolean {
 }
 
 /** The live site, embedded. Keyed by URL upstream so state resets per page. */
-function SiteFrame({ url, title }: { url: string; title: string }): ReactNode {
+export function SiteFrame({
+  url,
+  title,
+}: {
+  url: string;
+  title: string;
+}): ReactNode {
   const [loaded, setLoaded] = useState(false);
 
   return (
@@ -290,7 +297,25 @@ function BrowserCanvas({
 }
 
 /** Renders the active tab's site in the canvas viewport. */
+/**
+ * The page, with the developer panel under it when it is switched on.
+ *
+ * Wrapped here rather than inside each of the three page kinds, so the panel
+ * appears under a real site, a local profile page and the search results alike —
+ * one place to dock it, and no page that quietly lacks it.
+ */
 export function BrowserApp(): ReactNode {
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1">
+        <BrowserPage />
+      </div>
+      <Inspector />
+    </div>
+  );
+}
+
+function BrowserPage(): ReactNode {
   const { activeTab, activeRef, setActiveRef, unpinSite } = useHub();
   const hasShell = useHasShell();
 

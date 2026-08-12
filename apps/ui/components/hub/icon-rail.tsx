@@ -56,9 +56,9 @@ const systemTabs: {
   },
   {
     id: "apps",
-    label: "Apps",
+    label: content.library.apps.title,
     icon: LayoutGrid,
-    desc: "The sites you have pinned to your rail.",
+    desc: "Browse, connect and manage the apps in your Nexus.",
   },
 ];
 
@@ -244,12 +244,12 @@ export function IconRail(): ReactNode {
     id === "spaces"
       ? mainView === "profiles"
       : id === "apps"
-        ? mainView === "sites"
+        ? mainView === "store"
         : libraryTab === "downloads";
   // Clicking a tab sets both the panel (libraryTab) and the main view.
   const openTabView = (id: LibraryTab): void => {
     setLibraryTab(id);
-    if (id === "apps") setMainView("sites");
+    if (id === "apps") setMainView("store");
     else if (id === "spaces") setMainView("profiles");
     else setMainView("app");
   };
@@ -302,16 +302,18 @@ export function IconRail(): ReactNode {
     (entry) =>
       entry.type === "group" &&
       entry.members.some(
-        (member) => dragging !== null && sameRef(member, dragging),
-      ),
+        (member) => dragging !== null && sameRef(member, dragging)
+      )
   );
 
-  const startDrag = (ref: RailRef) => (event: React.DragEvent): void => {
-    event.dataTransfer.setData(DRAG_MIME, refKey(ref));
-    event.dataTransfer.effectAllowed = "move";
-    setDragging(ref);
-    setTip(null);
-  };
+  const startDrag =
+    (ref: RailRef) =>
+    (event: React.DragEvent): void => {
+      event.dataTransfer.setData(DRAG_MIME, refKey(ref));
+      event.dataTransfer.effectAllowed = "move";
+      setDragging(ref);
+      setTip(null);
+    };
   /** The slot being dragged, read back from the drop's own payload. */
   const droppedRef = (event: React.DragEvent): RailRef | null =>
     decodeRefKey(event.dataTransfer.getData(DRAG_MIME));
@@ -334,7 +336,7 @@ export function IconRail(): ReactNode {
   const showTip = (
     event: React.MouseEvent,
     label: string,
-    desc: string,
+    desc: string
   ): void => {
     if (dragging) return;
     const rect = event.currentTarget.getBoundingClientRect();
@@ -355,7 +357,7 @@ export function IconRail(): ReactNode {
   const startPress = (entry: RailEntry) => (): void => {
     pressTimer.current = window.setTimeout(
       () => openGroupSettings(entry),
-      LONG_PRESS_MS,
+      LONG_PRESS_MS
     );
   };
   const cancelPress = (): void => {
@@ -386,328 +388,349 @@ export function IconRail(): ReactNode {
               compact={railCollapsed}
               onClick={() => openTabView(tab.id)}
             >
-              <tab.icon className="size-6" aria-hidden="true" />
+              {/* The icon keeps its size; the box around it takes the 36px an
+                  app tile below occupies. Bare, a 24px glyph sat six pixels
+                  inside the column of tiles under it, and the top of the rail
+                  read as indented. Growing the glyph would have fixed the
+                  alignment by making these icons louder than the artwork they
+                  sit above, which is the wrong half to change. */}
+              <span className="grid size-9 place-items-center">
+                <tab.icon className="size-6" aria-hidden="true" />
+              </span>
             </RailShell>
           </div>
         ))}
       </div>
 
       {railEntries.length > 0 && (
-        <div className="my-2 h-px w-12 shrink-0 bg-border" aria-hidden="true" />
+        <div className="bg-border my-2 h-px w-12 shrink-0" aria-hidden="true" />
       )}
 
       {/* Apps and pinned sites — scroll underneath the pinned tabs. */}
       <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-y-auto px-2 py-1">
         {railEntries.map((entry) => {
-            const showUnread = entryUnread(entry);
-            if (entry.type === "single") {
-              const ref = entry.ref;
-              const resolved = resolve(ref);
-              if (!resolved) return null;
-              const isActive = sameRef(activeRef, ref);
-              const prefix = `${refKey(ref)}:`;
-              const zone = overTarget?.startsWith(prefix)
-                ? overTarget.slice(prefix.length)
-                : null;
-              return (
-                <div
-                  key={refKey(ref)}
-                  className="relative"
-                  onMouseEnter={(event) =>
-                    showTip(event, resolved.name, resolved.desc)
-                  }
-                  onMouseLeave={hideTip}
-                >
-                  {showUnread && (
-                    <span
-                      className="absolute top-1/2 left-0 z-10 h-3.5 w-1.5 -translate-y-1/2 rounded-r-full bg-foreground"
-                      aria-hidden="true"
-                    />
-                  )}
-                  {zone === "before" && (
-                    <span
-                      className="absolute -top-0.5 left-1/2 z-10 h-0.5 w-12 -translate-x-1/2 rounded-full bg-accent"
-                      aria-hidden="true"
-                    />
-                  )}
-                  <RailShell
-                    label={resolved.label}
-                    active={isActive}
-                    compact={railCollapsed}
-                    onClick={() => openSlot(ref, resolved)}
-                    draggable
-                    onDragStart={startDrag(ref)}
-                    onDragEnd={endDrag}
-                    onDragOver={(event) => {
-                      if (
-                        canDrop(event) &&
-                        !(dragging && sameRef(dragging, ref))
-                      ) {
-                        event.preventDefault();
-                        setOverTarget(`${prefix}${dropZone(event)}`);
-                      }
-                    }}
-                    onDragLeave={() => setOverTarget(null)}
-                    onDrop={(event) => {
+          const showUnread = entryUnread(entry);
+          if (entry.type === "single") {
+            const ref = entry.ref;
+            const resolved = resolve(ref);
+            if (!resolved) return null;
+            const isActive = sameRef(activeRef, ref);
+            const prefix = `${refKey(ref)}:`;
+            const zone = overTarget?.startsWith(prefix)
+              ? overTarget.slice(prefix.length)
+              : null;
+            return (
+              <div
+                key={refKey(ref)}
+                className="relative"
+                onMouseEnter={(event) =>
+                  showTip(event, resolved.name, resolved.desc)
+                }
+                onMouseLeave={hideTip}
+              >
+                {showUnread && (
+                  <span
+                    className="bg-foreground absolute top-1/2 left-0 z-10 h-3.5 w-1.5 -translate-y-1/2 rounded-r-full"
+                    aria-hidden="true"
+                  />
+                )}
+                {zone === "before" && (
+                  <span
+                    className="bg-accent absolute -top-0.5 left-1/2 z-10 h-0.5 w-12 -translate-x-1/2 rounded-full"
+                    aria-hidden="true"
+                  />
+                )}
+                <RailShell
+                  label={resolved.label}
+                  active={isActive}
+                  compact={railCollapsed}
+                  onClick={() => openSlot(ref, resolved)}
+                  draggable
+                  onDragStart={startDrag(ref)}
+                  onDragEnd={endDrag}
+                  onDragOver={(event) => {
+                    if (
+                      canDrop(event) &&
+                      !(dragging && sameRef(dragging, ref))
+                    ) {
                       event.preventDefault();
-                      const dropped = droppedRef(event);
-                      if (dropped && !sameRef(dropped, ref)) {
-                        const z = dropZone(event);
-                        if (z === "before")
-                          reorderRailRef(dropped, ref, "before");
-                        else if (z === "after")
-                          reorderRailRef(dropped, ref, "after");
-                        else groupRefs(dropped, { kind: "ref", ref });
-                      }
-                      endDrag();
-                    }}
-                    className={zone === "mid" ? "ring-2 ring-accent" : ""}
+                      setOverTarget(`${prefix}${dropZone(event)}`);
+                    }
+                  }}
+                  onDragLeave={() => setOverTarget(null)}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const dropped = droppedRef(event);
+                    if (dropped && !sameRef(dropped, ref)) {
+                      const z = dropZone(event);
+                      if (z === "before")
+                        reorderRailRef(dropped, ref, "before");
+                      else if (z === "after")
+                        reorderRailRef(dropped, ref, "after");
+                      else groupRefs(dropped, { kind: "ref", ref });
+                    }
+                    endDrag();
+                  }}
+                  className={zone === "mid" ? "ring-accent ring-2" : ""}
+                >
+                  <RefTile
+                    resolved={resolved}
+                    size={36}
+                    className={tileTone(isActive)}
+                  />
+                </RailShell>
+                {zone === "after" && (
+                  <span
+                    className="bg-accent absolute -bottom-0.5 left-1/2 z-10 h-0.5 w-12 -translate-x-1/2 rounded-full"
+                    aria-hidden="true"
+                  />
+                )}
+              </div>
+            );
+          }
+
+          // group
+          const isOver = overTarget === `group:${entry.id}`;
+          const isExpanded = expandedGroup === entry.id;
+          const tint = entry.color || undefined;
+          return (
+            <div
+              key={entry.id}
+              className="relative"
+              onContextMenu={(event) => {
+                event.preventDefault();
+                openGroupSettings(entry);
+              }}
+              onPointerDown={startPress(entry)}
+              onPointerUp={cancelPress}
+              onPointerLeave={cancelPress}
+            >
+              {showUnread && (
+                <span
+                  className="bg-foreground absolute top-4 left-0 z-10 h-3.5 w-1.5 rounded-r-full"
+                  aria-hidden="true"
+                />
+              )}
+              {isExpanded ? (
+                <div
+                  className={`bg-surface flex flex-col items-center gap-1 rounded-2xl p-1.5 ${
+                    railCollapsed ? "w-14" : "w-20"
+                  }`}
+                  onDragOver={(event) => {
+                    if (canDrop(event)) {
+                      event.preventDefault();
+                      setOverTarget(`group:${entry.id}`);
+                    }
+                  }}
+                  onDragLeave={() => setOverTarget(null)}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const dropped = droppedRef(event);
+                    if (dropped)
+                      groupRefs(dropped, { kind: "group", id: entry.id });
+                    endDrag();
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setExpandedGroup(null)}
+                    aria-label={`Collapse ${entry.name}`}
+                    className="focus-ring text-muted-foreground hover:text-foreground flex flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-[10px]"
                   >
-                    <RefTile
-                      resolved={resolved}
-                      size={36}
-                      className={tileTone(isActive)}
+                    <Folder
+                      className="size-4"
+                      style={tint ? { color: tint } : undefined}
+                      aria-hidden="true"
                     />
-                  </RailShell>
-                  {zone === "after" && (
+                    {!railCollapsed && (
+                      <span className="max-w-full truncate">{entry.name}</span>
+                    )}
+                  </button>
+                  {entry.members.map((member) => {
+                    const resolved = resolve(member);
+                    if (!resolved) return null;
+                    const isActive = sameRef(activeRef, member);
+                    return (
+                      <button
+                        key={refKey(member)}
+                        type="button"
+                        draggable
+                        onDragStart={startDrag(member)}
+                        onDragEnd={endDrag}
+                        onClick={() => openSlot(member, resolved)}
+                        onMouseEnter={(event) =>
+                          showTip(event, resolved.name, resolved.desc)
+                        }
+                        onMouseLeave={hideTip}
+                        aria-label={resolved.name}
+                        className={`focus-ring group flex flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-medium transition-colors ${
+                          isActive
+                            ? "bg-surface-raised text-foreground shadow-sm"
+                            : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+                        }`}
+                      >
+                        <RefTile
+                          resolved={resolved}
+                          size={34}
+                          className={tileTone(isActive)}
+                        />
+                        {!railCollapsed && (
+                          <span className="max-w-full truncate">
+                            {resolved.label}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                  {isOver && (
                     <span
-                      className="absolute -bottom-0.5 left-1/2 z-10 h-0.5 w-12 -translate-x-1/2 rounded-full bg-accent"
+                      className="bg-accent my-0.5 h-0.5 w-12 rounded-full"
                       aria-hidden="true"
                     />
                   )}
                 </div>
-              );
-            }
-
-            // group
-            const isOver = overTarget === `group:${entry.id}`;
-            const isExpanded = expandedGroup === entry.id;
-            const tint = entry.color || undefined;
-            return (
-              <div
-                key={entry.id}
-                className="relative"
-                onContextMenu={(event) => {
-                  event.preventDefault();
-                  openGroupSettings(entry);
-                }}
-                onPointerDown={startPress(entry)}
-                onPointerUp={cancelPress}
-                onPointerLeave={cancelPress}
-              >
-                {showUnread && (
-                  <span
-                    className="absolute top-4 left-0 z-10 h-3.5 w-1.5 rounded-r-full bg-foreground"
-                    aria-hidden="true"
-                  />
-                )}
-                {isExpanded ? (
-                  <div
-                    className={`flex flex-col items-center gap-1 rounded-2xl bg-surface p-1.5 ${
-                      railCollapsed ? "w-14" : "w-20"
-                    }`}
-                    onDragOver={(event) => {
-                      if (canDrop(event)) {
-                        event.preventDefault();
-                        setOverTarget(`group:${entry.id}`);
-                      }
-                    }}
-                    onDragLeave={() => setOverTarget(null)}
-                    onDrop={(event) => {
+              ) : (
+                <RailShell
+                  label={entry.name}
+                  active={entry.members.some((member) =>
+                    sameRef(activeRef, member)
+                  )}
+                  compact={railCollapsed}
+                  onClick={() => setExpandedGroup(entry.id)}
+                  onDragOver={(event) => {
+                    if (canDrop(event)) {
                       event.preventDefault();
-                      const dropped = droppedRef(event);
-                      if (dropped)
-                        groupRefs(dropped, { kind: "group", id: entry.id });
-                      endDrag();
-                    }}
+                      setOverTarget(`group:${entry.id}`);
+                    }
+                  }}
+                  onDragLeave={() => setOverTarget(null)}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const dropped = droppedRef(event);
+                    if (dropped)
+                      groupRefs(dropped, { kind: "group", id: entry.id });
+                    endDrag();
+                  }}
+                >
+                  <span
+                    className={`grid size-11 grid-cols-2 grid-rows-2 gap-0.5 rounded-[22%] p-1 ${
+                      tint ? "" : "bg-surface"
+                    } ${isOver ? "nexus-shake ring-accent ring-2" : ""}`}
+                    style={tint ? { backgroundColor: tint } : undefined}
                   >
-                    <button
-                      type="button"
-                      onClick={() => setExpandedGroup(null)}
-                      aria-label={`Collapse ${entry.name}`}
-                      className="focus-ring flex flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground"
-                    >
-                      <Folder
-                        className="size-4"
-                        style={tint ? { color: tint } : undefined}
-                        aria-hidden="true"
-                      />
-                      {!railCollapsed && (
-                        <span className="max-w-full truncate">
-                          {entry.name}
-                        </span>
-                      )}
-                    </button>
-                    {entry.members.map((member) => {
+                    {entry.members.slice(0, 4).map((member) => {
                       const resolved = resolve(member);
-                      if (!resolved) return null;
-                      const isActive = sameRef(activeRef, member);
-                      return (
-                        <button
+                      return resolved ? (
+                        <RefTile
                           key={refKey(member)}
-                          type="button"
-                          draggable
-                          onDragStart={startDrag(member)}
-                          onDragEnd={endDrag}
-                          onClick={() => openSlot(member, resolved)}
-                          onMouseEnter={(event) =>
-                            showTip(event, resolved.name, resolved.desc)
-                          }
-                          onMouseLeave={hideTip}
-                          aria-label={resolved.name}
-                          className={`focus-ring group flex flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-medium transition-colors ${
-                            isActive
-                              ? "bg-surface-raised text-foreground shadow-sm"
-                              : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
-                          }`}
-                        >
-                          <RefTile
-                            resolved={resolved}
-                            size={34}
-                            className={tileTone(isActive)}
-                          />
-                          {!railCollapsed && (
-                            <span className="max-w-full truncate">
-                              {resolved.label}
-                            </span>
-                          )}
-                        </button>
+                          resolved={resolved}
+                          size={16}
+                        />
+                      ) : (
+                        <span key={refKey(member)} />
                       );
                     })}
-                    {isOver && (
-                      <span
-                        className="my-0.5 h-0.5 w-12 rounded-full bg-accent"
-                        aria-hidden="true"
-                      />
-                    )}
-                  </div>
-                ) : (
-                  <RailShell
-                    label={entry.name}
-                    active={entry.members.some((member) =>
-                      sameRef(activeRef, member),
-                    )}
-                    compact={railCollapsed}
-                    onClick={() => setExpandedGroup(entry.id)}
-                    onDragOver={(event) => {
-                      if (canDrop(event)) {
-                        event.preventDefault();
-                        setOverTarget(`group:${entry.id}`);
-                      }
-                    }}
-                    onDragLeave={() => setOverTarget(null)}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      const dropped = droppedRef(event);
-                      if (dropped)
-                        groupRefs(dropped, { kind: "group", id: entry.id });
-                      endDrag();
-                    }}
-                  >
-                    <span
-                      className={`grid size-11 grid-cols-2 grid-rows-2 gap-0.5 rounded-[22%] p-1 ${
-                        tint ? "" : "bg-surface"
-                      } ${isOver ? "nexus-shake ring-2 ring-accent" : ""}`}
-                      style={tint ? { backgroundColor: tint } : undefined}
-                    >
-                      {entry.members.slice(0, 4).map((member) => {
-                        const resolved = resolve(member);
-                        return resolved ? (
-                          <RefTile
-                            key={refKey(member)}
-                            resolved={resolved}
-                            size={16}
-                          />
-                        ) : (
-                          <span key={refKey(member)} />
-                        );
-                      })}
-                    </span>
-                  </RailShell>
-                )}
-              </div>
-            );
-          })}
-
-          {draggingFromGroup && (
-            <div
-              onDragOver={(event) => {
-                if (canDrop(event)) {
-                  event.preventDefault();
-                  setOverTarget("ungroup");
-                }
-              }}
-              onDragLeave={() => setOverTarget(null)}
-              onDrop={(event) => {
-                event.preventDefault();
-                const dropped = droppedRef(event);
-                if (dropped) ungroupRef(dropped);
-                endDrag();
-              }}
-              className={`mt-1 flex flex-col items-center gap-1 rounded-xl border border-dashed px-1 py-2.5 text-center text-[10px] leading-tight transition-colors ${
-                railCollapsed ? "w-13" : "w-20"
-              } ${
-                overTarget === "ungroup"
-                  ? "border-accent bg-accent/10 text-accent"
-                  : "border-border text-muted-foreground"
-              }`}
-              title={railCollapsed ? "Remove from folder" : undefined}
-            >
-              <FolderMinus className="size-5" aria-hidden="true" />
-              {!railCollapsed && (
-                <span className="max-w-full">Remove from folder</span>
+                  </span>
+                </RailShell>
               )}
             </div>
-          )}
+          );
+        })}
+
+        {draggingFromGroup && (
+          <div
+            onDragOver={(event) => {
+              if (canDrop(event)) {
+                event.preventDefault();
+                setOverTarget("ungroup");
+              }
+            }}
+            onDragLeave={() => setOverTarget(null)}
+            onDrop={(event) => {
+              event.preventDefault();
+              const dropped = droppedRef(event);
+              if (dropped) ungroupRef(dropped);
+              endDrag();
+            }}
+            className={`mt-1 flex flex-col items-center gap-1 rounded-xl border border-dashed px-1 py-2.5 text-center text-[10px] leading-tight transition-colors ${
+              railCollapsed ? "w-13" : "w-20"
+            } ${
+              overTarget === "ungroup"
+                ? "border-accent bg-accent/10 text-accent"
+                : "border-border text-muted-foreground"
+            }`}
+            title={railCollapsed ? "Remove from folder" : undefined}
+          >
+            <FolderMinus className="size-5" aria-hidden="true" />
+            {!railCollapsed && (
+              <span className="max-w-full">Remove from folder</span>
+            )}
+          </div>
+        )}
       </div>
 
-      <div
-        className={`flex w-full shrink-0 items-center pt-3 ${
-          railCollapsed
-            ? "flex-col-reverse gap-1 px-2"
-            : // px-2, not px-4: the expanded rail is 96px, and two 28px buttons plus
-              // the version label need every one of the 80px this leaves.
-              "justify-between gap-1 px-2"
-        }`}
-      >
-        {/* Settings, not the panel toggle: closing the panel now lives beside
-            the panel's own title, and the rail keeps the two things that are
-            about the whole product rather than about one app. */}
-        <button
-          type="button"
-          aria-label={content.settings.title}
-          onClick={openSettings}
-          aria-current={mainView === "settings" ? "true" : undefined}
-          /* Open is the tint behind the gear, not a recoloured gear. Same rule
-             as the settings categories: the accent marks where you are, and the
-             glyph stays the colour every other icon in the rail footer is. */
-          className={`focus-ring rounded-md p-1.5 transition-colors ${
-            mainView === "settings"
-              ? "bg-accent/15 text-foreground"
-              : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+      {/*
+        The footer is a column: the version on its own line, the two buttons on
+        the line under it, hard against the bottom of the rail.
+
+        They used to share a row, and the row could not hold them — 96px of rail
+        less px-2 leaves 80, two 28px buttons take 56, and "v0.2.1" needs about
+        34 in the 24 that remain. It truncated to "v...", which is a version
+        label that has stopped being one. A line of its own has the whole 80px.
+
+        The buttons stay last because they are the things you press, and a
+        control that moves depending on whether a label above it rendered is a
+        control you have to look for.
+      */}
+      <div className="flex w-full shrink-0 flex-col items-center gap-1 pt-3">
+        {/* Collapsed, the rail is 64px and there is no width to be had; the
+            version lives in Settings › About either way. */}
+        {!railCollapsed && <ShellVersion />}
+        <div
+          className={`flex w-full items-center ${
+            railCollapsed
+              ? "flex-col-reverse gap-1 px-2"
+              : "justify-between gap-1 px-2"
           }`}
         >
-          <Settings className="size-4" aria-hidden="true" />
-        </button>
-        {!railCollapsed && <ShellVersion />}
-        <button
-          type="button"
-          aria-label="Share Nexus"
-          onClick={openShare}
-          className="focus-ring rounded-md p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
-        >
-          <Gift className="size-4" aria-hidden="true" />
-        </button>
+          {/* Settings, not the panel toggle: closing the panel now lives beside
+            the panel's own title, and the rail keeps the two things that are
+            about the whole product rather than about one app. */}
+          <button
+            type="button"
+            aria-label={content.settings.title}
+            onClick={openSettings}
+            aria-current={mainView === "settings" ? "true" : undefined}
+            /* Open is the tint behind the gear, not a recoloured gear. Same rule
+             as the settings categories: the accent marks where you are, and the
+             glyph stays the colour every other icon in the rail footer is. */
+            className={`focus-ring rounded-md p-1.5 transition-colors ${
+              mainView === "settings"
+                ? "bg-accent/15 text-foreground"
+                : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+            }`}
+          >
+            <Settings className="size-4" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            aria-label="Share Nexus"
+            onClick={openShare}
+            className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground rounded-md p-1.5"
+          >
+            <Gift className="size-4" aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       {tip && (
         <div
           role="tooltip"
           style={{ top: tip.top, left: tip.left }}
-          className="pointer-events-none fixed z-70 max-w-52 -translate-y-1/2 rounded-xl border border-border bg-white px-3 py-2 shadow-xl dark:bg-surface"
+          className="border-border dark:bg-surface pointer-events-none fixed z-70 max-w-52 -translate-y-1/2 rounded-xl border bg-white px-3 py-2 shadow-xl"
         >
-          <p className="text-xs font-semibold text-foreground">{tip.label}</p>
-          <p className="line-clamp-3 text-[11px] leading-snug text-balance text-muted-foreground">
+          <p className="text-foreground text-xs font-semibold">{tip.label}</p>
+          <p className="text-muted-foreground line-clamp-3 text-[11px] leading-snug text-balance">
             {tip.desc}
           </p>
         </div>

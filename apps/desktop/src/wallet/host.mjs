@@ -27,6 +27,7 @@ import {
 import { restoreDesktopWallet, restoreDesktopWalletFromKey } from './buildWallet.ts'
 import { createExchangeRate } from './exchangeRate.mjs'
 import { createPayHost } from './payHost.mjs'
+import { createSweepLoop } from './sweepLoop.mjs'
 import { printHtmlDocument } from './printDocument.mjs'
 import { createLocalStorage } from '../platform/index.mjs'
 import { installDesktopOnlineProbe } from '../platform/onlineProbe.mjs'
@@ -250,6 +251,22 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
   }
 
   /**
+   * The address sweeper.
+   *
+   * Constructed once and idle until the "Get paid → to an address" screen holds
+   * it open — it is not started when a wallet is built, because an always-on
+   * poll would be asking WhatsOnChain about addresses nobody is watching. The
+   * getters and the callback are arrows, so this can be declared before
+   * `currentNetwork` exists and still read the live value at tick time.
+   */
+  const sweepLoop = createSweepLoop({
+    getWallet: () => wallet,
+    getNetwork: () => currentNetwork(),
+    adminOriginator: ADMIN_ORIGINATOR,
+    onSwept: () => notifyTxChanged()
+  })
+
+  /**
    * Stop the background work the current wallet owns.
    *
    * Called before every teardown — logout, the setNetwork rebuild, quit — because
@@ -263,6 +280,13 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
     } catch (err) {
       console.warn('[wallet] monitor did not stop cleanly:', err?.message)
     }
+    /*
+     * The address sweeper, if the address screen happens to be holding it open
+     * across this teardown. Its own pass would notice the swap and drop its
+     * result, but a loop left polling for a wallet the user has signed out of
+     * is a loop asking WhatsOnChain about somebody else's addresses.
+     */
+    sweepLoop.stop()
     /*
      * Drop any spend request the outgoing wallet raised.
      *
@@ -382,7 +406,10 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
     getWallet: () => wallet,
     getNetwork: currentNetwork,
     adminOriginator: ADMIN_ORIGINATOR,
-    localStorage
+    localStorage,
+    // Every address-screen method renews the sweeper's lease. See sweepLoop.mjs
+    // for why presence rather than an explicit stop decides when it runs.
+    holdSweeper: (target) => sweepLoop.hold(target)
   })
 
   return {
@@ -842,6 +869,9 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
      * part we control.
      */
     shutdown() {
+      // Before stopMonitor, so a pass that is mid-await drops its result rather
+      // than writing into a wallet the process is tearing down.
+      sweepLoop.shuttingDown()
       stopMonitor()
       stopOnlineFeed()
       if (notifyTimer) clearTimeout(notifyTimer)

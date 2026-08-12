@@ -7,8 +7,9 @@
  * change the reachability policy the whole app reports.
  *
  * Module-level store read through `useSyncExternalStore`, matching how the hub
- * already reads the sites the user pinned. Nothing here is written to disk:
- * these are the effects of the current session's commands.
+ * already reads what each profile has connected — both the apps and the sites.
+ * Nothing here is written to disk: these are the effects of the current
+ * session's commands.
  */
 import { storageKeys } from "@/lib/config";
 import { getChatMessages, mediaItems } from "@/lib/data";
@@ -962,7 +963,13 @@ const INITIAL: EffectsState = {
       createdAt: "2026-07-30T12:22:00.000Z",
     },
   ],
-  tolls: [],
+  /* Two per-sender tolls, seeded. A row that only ever says "none" cannot
+     teach what the feature is, and these are the case it exists for: someone
+     persistent, and someone who once cost you an afternoon. */
+  tolls: [
+    { personId: "tw-elonmoist", sats: 5000 },
+    { personId: "tc-cranker", sats: 1000 },
+  ],
   // Seeded from the handles with the most peer attestations — the people you
   // would actually transact with.
   favourites: ["tc-treechad", "tw-utxo", "tw-randy", "hc-brandon", "mark-frederiks"],

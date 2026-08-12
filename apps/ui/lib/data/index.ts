@@ -28,6 +28,8 @@ import { attributeColors, collectibles } from "./collectibles";
 import { paymentLinks, splitBills } from "./wallet-extras";
 import { connections, outputBaskets } from "./developer";
 import { downloads } from "./downloads";
+import { appCollections } from "./collections";
+import { defaultRepositories, type AppRepository } from "./repositories";
 import { hubApps } from "./hub-apps";
 import { identityCertificates, identityKeys } from "./identity";
 import { mailMessages } from "./mail";
@@ -44,10 +46,12 @@ import { chainTransactions } from "./transactions";
 import { walletAccounts, walletTransactions } from "./wallet";
 import { DEMO_SURFACES, shippedApps } from "../surfaces";
 import type {
+  AppCollection,
   BrowserTab,
   ChainTransaction,
   ChatMessage,
   ChatThread,
+  CollectionId,
   Connection,
   Course,
   DownloadItem,
@@ -81,7 +85,41 @@ import type {
 } from "./types";
 
 export * from "./types";
+export {
+  checkHandle,
+  handleListings,
+  listingFor,
+  MAX_HANDLES,
+  HANDLE_CHANGE_USD,
+  linkedAccounts,
+  socialProviders,
+  type HandleCheck,
+  type HandleListing,
+  type LinkedAccount,
+  type SocialProvider,
+} from "./handles";
+export { licence, type LicenceBlock } from "./licence";
+export {
+  shortcutGroups,
+  shortcuts,
+  type Shortcut,
+  type ShortcutGroup,
+} from "./shortcuts";
+export {
+  getSearchEngine,
+  searchEngines,
+  type SearchEngine,
+} from "./search-engines";
 export { media, mediaItems, type MediaKey } from "./media";
+export {
+  appOnboarding,
+  getAppOnboarding,
+  type AppOnboarding,
+  type OnboardingFeature,
+  type OnboardingMedia,
+  type OnboardingSlug,
+} from "./onboarding";
+export { getLanguage, languages, type Language } from "./languages";
 export {
   currentRelease,
   getRelease,
@@ -89,6 +127,20 @@ export {
   type Release,
   type ReleaseFeature,
 } from "./releases";
+export {
+  getRoadmapFeature,
+  roadmapFeatures,
+  ROADMAP_STATUSES,
+  type Complexity,
+  type RoadmapComment,
+  type RoadmapFeature,
+  type RoadmapPledge,
+  type RoadmapSort,
+  type RoadmapStatus,
+} from "./roadmap";
+export type { AppRepository } from "./repositories";
+export { suggestedRepositories } from "./repositories";
+export { storeCategories, type StoreCategoryInfo } from "./categories";
 export { content } from "./content";
 export {
   RARE_HAT,
@@ -114,6 +166,51 @@ export function getHubApps(): HubApp[] {
 }
 export function getHubApp(slug: HubApp["slug"]): HubApp | undefined {
   return getHubApps().find((app) => app.slug === slug);
+}
+/** Apps a fresh profile starts connected to. */
+export function getDefaultInstalledAppSlugs(): HubApp["slug"][] {
+  return getHubApps()
+    .filter((app) => app.defaultInstalled)
+    .map((app) => app.slug);
+}
+/** Always-on apps that can't be disconnected (identity, pay & get paid). */
+export function getEssentialAppSlugs(): HubApp["slug"][] {
+  return getHubApps()
+    .filter((app) => app.essential)
+    .map((app) => app.slug);
+}
+/** Apps in the "system" folder (browse, web3 connect). */
+export function getSystemAppSlugs(): HubApp["slug"][] {
+  return getHubApps()
+    .filter((app) => app.category === "system")
+    .map((app) => app.slug);
+}
+export function isEssentialApp(slug: HubApp["slug"]): boolean {
+  return getHubApps().some((app) => app.slug === slug && app.essential === true);
+}
+
+/*
+ * app_repositories — the sources the Apps surface groups listings under.
+ *
+ * A source is who serves an app, not a channel we operate: for a built-in app
+ * that is Nexus itself, and for a web app it is whoever runs the origin. See
+ * docs/SPEC-design-catchup.md §1.
+ */
+export function getDefaultRepositories(): AppRepository[] {
+  return defaultRepositories;
+}
+
+/* app_collections */
+export function getAppCollections(): AppCollection[] {
+  return appCollections;
+}
+/** App slugs a collection connects — "all" expands to every app this build has. */
+export function getCollectionAppSlugs(id: CollectionId): HubApp["slug"][] {
+  const shipped = new Set(getHubApps().map((app) => app.slug));
+  if (id === "all") return [...shipped];
+  return (appCollections.find((c) => c.id === id)?.apps ?? []).filter((slug) =>
+    shipped.has(slug),
+  );
 }
 
 /* identity */
@@ -201,11 +298,17 @@ export function getFavorites(): Favorite[] {
 }
 
 /* downloads */
-export function getDownloads(): DownloadItem[] {
-  return [...downloads].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+export function getDownloads(spaceId?: string): DownloadItem[] {
+  return downloads
+    .filter((item) => !spaceId || item.spaceId === spaceId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 /* wallet */
+export function getWalletAccounts(): WalletAccount[] {
+  return walletAccounts;
+}
+/** The everyday wallet, for the surfaces that predate there being several. */
 export function getWalletAccount(): WalletAccount {
   const account = walletAccounts[0];
   if (!account) throw new Error("No accounts seeded in lib/data/wallet.ts");

@@ -3,14 +3,19 @@
 import { storageKeys } from "@/lib/config";
 import {
   getBrowserTabs,
+  getDefaultInstalledAppSlugs,
   getDefaultSpace,
+  getEssentialAppSlugs,
   getFavorites,
+  getHubApp,
   getHubApps,
   getIdentityKeys,
+  isEssentialApp,
   getSpaceItems,
   getSpaces,
   conversationNotes,
   type BrowserTab,
+  type CollectionId,
   type Favorite,
   type GroupGates,
   type RoomRoles,
@@ -19,8 +24,11 @@ import {
   type PageId,
   type Space,
   type SpaceItem,
+  type RoadmapSort,
+  type RoadmapStatus,
   type SpaceProfile,
 } from "@/lib/data";
+import { isVisibleInPhase, usePhase } from "@/lib/phase";
 import {
   reconcileRail,
   sameRef,
@@ -39,6 +47,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   useSyncExternalStore,
@@ -47,14 +56,8 @@ import {
 
 export type AppSlug = HubApp["slug"];
 export type LibraryTab = "spaces" | "downloads" | "apps";
-/**
- * What the main canvas shows, independent of which rail panel is open.
- *
- * `sites` is the Web3 Apps surface — the sites the user pinned. It was `store`,
- * and the name went with the screen: nothing is distributed here, so there is
- * nothing for a store id to describe.
- */
-export type MainViewKind = "app" | "sites" | "profiles" | "settings";
+/** What the main canvas shows, independent of which rail panel is open. */
+export type MainViewKind = "app" | "store" | "profiles" | "settings";
 
 /**
  * The settings categories, in the narrow column.
@@ -66,18 +69,27 @@ export type MainViewKind = "app" | "sites" | "profiles" | "settings";
 export type SettingsCategory =
   | "general"
   | "privacy"
+  | "permissions"
+  | "autofill"
   | "browsing"
+  | "shortcuts"
   | "appearance"
   | "about"
   /** live builds only — keys, network and backup; see settings-wallet.tsx */
   | "wallet";
 
 /**
- * A rail slot holds a `RailRef` — a builtin app or a site the user pinned.
+ * A rail slot holds a `RailRef` — a built-in app or a site the user connected.
  *
  * Both types are re-exported from here because the rail's consumers already
  * import them from the provider; the definitions themselves live in
  * `lib/rail/layout` so the pure module can be tested without React.
+ *
+ * The two kinds stay distinct in the type on purpose. `app` is a screen
+ * compiled into this binary; `site` is somebody else's website, connected with
+ * an origin-scoped grant against this profile's wallet. Collapsing them into
+ * one stringly-typed id would erase exactly the boundary the permission model
+ * rests on — see docs/SPEC-design-catchup.md §1.
  */
 export type { RailEntry, RailRef } from "@/lib/rail/layout";
 
@@ -127,7 +139,21 @@ export interface DetailPane {
     /** every release, newest first */
     | "releases"
     /** one release, `id` being its version */
-    | "release";
+    | "release"
+    /** an app's onboarding, `id` being its slug */
+    | "onboarding"
+    /** the licence this software is granted under */
+    | "licence"
+    /** one roadmap feature, `id` being its slug */
+    | "feature"
+    /** what each profile has downloaded */
+    | "downloads"
+    /** every site that has a permission or a connection */
+    | "sites"
+    /** which language pages are asked for */
+    | "languages"
+    /** what to wipe, and the button that wipes it */
+    | "clear-data";
   /** MessagePerson id, or conversation id, per `kind` */
   id: string;
 }
@@ -140,8 +166,16 @@ export type WalletSection =
   | "links"
   | "contacts"
   | "splits";
-export type IdentitySection = "keys" | "retired" | "certificates";
+export type IdentitySection =
+  | "handles"
+  | "keys"
+  | "retired"
+  | "certificates";
 export type AttestationFilter = "all" | "issued" | "received";
+export type AppPromptMode = "install" | "uninstall";
+export type AppPrompt =
+  | { kind: "app"; slug: AppSlug; mode: AppPromptMode }
+  | { kind: "collection"; id: CollectionId; mode: AppPromptMode };
 export interface MarketFilters {
   query: string;
   nameSort: "none" | "az" | "za";
@@ -173,21 +207,75 @@ function subscribeToUrl(onChange: () => void): () => void {
   return () => window.removeEventListener("popstate", onChange);
 }
 
+/**
+ * Which canvas the address bar is asking for, when it is not an app.
+ *
+ * Apps and Profiles are places, and a place you cannot link to is a place you
+ * cannot send anybody. `app` is kept alongside rather than cleared, so a reload
+ * on Profiles still knows which app the rail should return you to.
+ */
+const VIEW_PARAM = "view";
+/** The second app, when two are open side by side. */
+const SPLIT_PARAM = "split";
+const VIEWS: Record<string, MainViewKind> = {
+  apps: "store",
+  profiles: "profiles",
+  settings: "settings",
+};
+const VIEW_SLUGS: Partial<Record<MainViewKind, string>> = {
+  store: "apps",
+  profiles: "profiles",
+  settings: "settings",
+};
+
 function urlAppSlug(): string | null {
   return new URLSearchParams(window.location.search).get(APP_PARAM);
 }
 
+function urlView(): string | null {
+  return new URLSearchParams(window.location.search).get(VIEW_PARAM);
+}
+
+function urlSplit(): string | null {
+  return new URLSearchParams(window.location.search).get(SPLIT_PARAM);
+}
+
+/**
+ * Reflect the second pane in the address bar.
+ *
+ * A split is a place, the same way Apps and Profiles are: two apps side by side
+ * is a working arrangement worth sending somebody, and one that should survive
+ * a reload rather than quietly collapsing to one app.
+ */
+function writeSplitToUrl(slug: AppSlug | "" | null): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (slug === null) url.searchParams.delete(SPLIT_PARAM);
+  else url.searchParams.set(SPLIT_PARAM, slug);
+  window.history.replaceState(window.history.state, "", url);
+}
+
 /** Reflect the open app in the address bar so the page can be shared. */
-function writeAppToUrl(slug: string | null): void {
+function writeAppToUrl(slug: AppSlug | null): void {
   if (typeof window === "undefined") return;
   const url = new URL(window.location.href);
   // Nothing to say: every rail click and every in-browser navigation reaches
   // here, and rewriting history with the value it already holds is noise.
-  if (url.searchParams.get(APP_PARAM) === slug) return;
+  if ((url.searchParams.get(APP_PARAM) ?? null) === slug) return;
   if (slug) url.searchParams.set(APP_PARAM, slug);
   else url.searchParams.delete(APP_PARAM);
   // Replace rather than push: the rail is not navigation, and every app switch
   // adding a history entry would make the back button useless.
+  window.history.replaceState(window.history.state, "", url);
+}
+
+/** Same for the canvas; "app" is the absence of a view rather than a value. */
+function writeViewToUrl(view: MainViewKind): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  const slug = VIEW_SLUGS[view];
+  if (slug) url.searchParams.set(VIEW_PARAM, slug);
+  else url.searchParams.delete(VIEW_PARAM);
   window.history.replaceState(window.history.state, "", url);
 }
 
@@ -219,13 +307,39 @@ function normalizeGroups(entries: RailEntry[]): RailEntry[] {
   });
 }
 
+/** A built-in app as a ref, which is how the rail talks about everything. */
+function appRef(slug: AppSlug): RailRef {
+  return { kind: "app", slug };
+}
+
+/**
+ * A ref's slug, if this build actually carries an app by that name.
+ *
+ * The rail model stores a plain string so `lib/rail/layout` can stay free of
+ * the data layer and be tested under bare Node. Everywhere the string has to
+ * become an app — the address bar, the canvas — it is checked against the
+ * catalog first, which is also what makes a stale layout harmless.
+ */
+function asAppSlug(slug: string): AppSlug | null {
+  return KNOWN_SLUGS.has(slug) ? (slug as AppSlug) : null;
+}
+
 interface HubState {
+  /** the active profile's apps */
+  installedApps: AppSlug[];
+  /** any profile's apps, for surfaces that show more than one */
+  installedFor: (spaceId: string) => AppSlug[];
+  installApp: (slug: AppSlug, spaceId?: string) => void;
+  uninstallApp: (slug: AppSlug, spaceId?: string) => void;
+  isInstalled: (slug: AppSlug) => boolean;
+  /** install or remove several apps at once (collection toggles) */
+  bulkSetInstalled: (slugs: AppSlug[], installed: boolean) => void;
+
   /**
-   * The apps compiled into this build. Not user state: nothing removes them, so
-   * non-removability is a property of the list rather than a flag on a row.
+   * The sites the user connected. A listing whose `web` field is set connects
+   * as one of these rather than as an app slot: it stays on somebody else's
+   * server, and the grant it carries is scoped to an origin.
    */
-  builtinApps: AppSlug[];
-  /** the sites the user pinned to the rail — Nexus ships none */
   pinnedSites: PinnedSite[];
   /** returns the pinned site (existing or new), or null if the URL is unusable */
   pinSite: (url: string, title?: string) => PinnedSite | null;
@@ -241,14 +355,19 @@ interface HubState {
     targetRef: RailRef,
     position: "before" | "after",
   ) => void;
+  presetGroup: (name: string, refs: RailRef[]) => void;
   renameGroup: (id: string, name: string) => void;
   setGroupColor: (id: string, color: string) => void;
 
+  /** Apps surface collection filter */
+  appsCollection: CollectionId;
+  setAppsCollection: (id: CollectionId) => void;
+
   /**
-   * What the rail shows as open: a builtin app or a pinned site.
+   * What the rail shows as open: a built-in app or a connected site.
    *
    * Reading it always yields a ref — the fallback chain ends at Browser, and a
-   * ref naming something that has gone (an unpinned site, an app this build
+   * ref naming something that has gone (a disconnected site, an app this build
    * does not carry) is replaced rather than held. Passing `null` to the setter
    * is how you say "back to that fallback"; it is not a state you can read.
    */
@@ -268,6 +387,21 @@ interface HubState {
   /** what the main canvas shows (decoupled from the open rail panel) */
   mainView: MainViewKind;
   setMainView: (view: MainViewKind) => void;
+  /**
+   * The app in the second pane, or null when one app has the canvas.
+   *
+   * Only ever set on a desktop layout and only while an app is showing — the
+   * store and the profiles manager are already multi-column screens, and a
+   * split inside one of those is a third set of columns nobody asked for.
+   */
+  /**
+   * `null` is closed, `""` is open with nothing chosen yet, a slug is open on
+   * that app. Three states because opening the pane and filling it are two
+   * separate acts — the pane has to be able to exist while it asks.
+   */
+  splitApp: AppSlug | "" | null;
+  setSplitApp: (slug: AppSlug | "" | null) => void;
+
   settingsCategory: SettingsCategory;
   setSettingsCategory: (category: SettingsCategory) => void;
   /** open the settings surface, taking over both the panel and the canvas */
@@ -294,6 +428,13 @@ interface HubState {
   clearMessageFocus: () => void;
   /** show only conversations with unread messages */
   messagesUnreadOnly: boolean;
+  /** Roadmap: which column the board is filtered to, "all" for every column */
+  roadmapStatus: RoadmapStatus | "all";
+  setRoadmapStatus: (status: RoadmapStatus | "all") => void;
+  roadmapSort: RoadmapSort;
+  setRoadmapSort: (sort: RoadmapSort) => void;
+  roadmapQuery: string;
+  setRoadmapQuery: (query: string) => void;
   setMessagesUnreadOnly: (only: boolean) => void;
   /** bumped when a conversation is created, so lists re-read the data layer */
   conversationsVersion: number;
@@ -404,20 +545,18 @@ interface HubState {
   setIdentitySection: (section: IdentitySection) => void;
   attestationFilter: AttestationFilter;
   setAttestationFilter: (filter: AttestationFilter) => void;
-  /*
-   * There was an install/uninstall permission sheet here, opened with a slug and
-   * a mode. Pinning a site grants it nothing, so there is no longer a moment at
-   * which it could fire; the consent it collected belongs at first request,
-   * keyed on origin, which is the spend-authorization path that already exists.
-   */
-  /** show the Web3 Apps surface — the sites the user pinned */
-  openWeb3Apps: () => void;
+  /** pending install/uninstall permission sheet */
+  appPrompt: AppPrompt | null;
+  openAppPrompt: (slug: AppSlug, mode: AppPromptMode) => void;
+  openCollectionPrompt: (id: CollectionId, mode: AppPromptMode) => void;
+  closeAppPrompt: () => void;
+  openAppStore: () => void;
   openProfilesManager: () => void;
 
   activeSpaceId: string;
   setActiveSpaceId: (id: string) => void;
 
-  /** identity badges (keys) — session state seeded from lib/data */
+  /** identifiers (keys) — session state seeded from lib/data */
   identityKeys: IdentityKey[];
   createIdentityKey: () => void;
   setPrimaryIdentityKey: (id: string) => void;
@@ -428,6 +567,22 @@ interface HubState {
   /** spaces + their folder/easel items — session state seeded from lib/data */
   spaces: Space[];
   spaceItemsBySpace: Record<string, SpaceItem[]>;
+  /**
+   * Move a bookmark or a folder to another profile.
+   *
+   * A folder takes its children with it — dragging "Reading" and leaving its
+   * eleven links behind in the profile you dragged it out of is not what
+   * anybody means by moving a folder.
+   *
+   * `index` is the position among the target's top-level items, so a drop
+   * between two rows lands between them rather than at the end.
+   */
+  moveItemToSpace: (
+    itemId: string,
+    fromSpaceId: string,
+    toSpaceId: string,
+    index: number,
+  ) => void;
   renameSpace: (id: string, name: string) => void;
   setSpaceEmoji: (id: string, emoji: string) => void;
   setSpaceThemeColor: (id: string, color: string) => void;
@@ -459,6 +614,13 @@ interface HubState {
 
   /** open tabs per space — session state seeded from lib/data rows */
   tabsBySpace: Record<string, BrowserTab[]>;
+  /** Move an open tab to another profile, at a position in its list. */
+  moveTabToSpace: (
+    tabId: string,
+    fromSpaceId: string,
+    toSpaceId: string,
+    index: number,
+  ) => void;
   activeTabId: string | null;
   activeTab: BrowserTab | null;
   openTab: (tabId: string) => void;
@@ -490,17 +652,166 @@ interface HubState {
 const HubContext = createContext<HubState | null>(null);
 
 /**
- * Pinned sites live in localStorage (per-user client state until a real user
+ * Installed apps live in localStorage (per-user client state until a real
+ * user table exists) and are exposed through useSyncExternalStore so SSR
+ * renders the seed defaults and the client re-syncs after hydration.
+ */
+const INSTALLED_APPS_EVENT = "nexus:installed-apps";
+const essentialInstalled = getEssentialAppSlugs();
+const defaultInstalled = withEssentials(getDefaultInstalledAppSlugs());
+
+/** Essential apps are always installed — force them in (handles stale state). */
+function withEssentials(apps: AppSlug[]): AppSlug[] {
+  const missing = essentialInstalled.filter((slug) => !apps.includes(slug));
+  return missing.length ? [...apps, ...missing] : apps;
+}
+
+let snapshotRaw: string | null = null;
+let snapshotMap: Record<string, AppSlug[]> = { "*": defaultInstalled };
+
+/** Slugs that were renamed after shipping, mapped to their current value. */
+const RENAMED_SLUGS: Record<string, AppSlug> = { chat: "messages" };
+
+const KNOWN_SLUGS = new Set<string>(getHubApps().map((app) => app.slug));
+
+/**
+ * Reads the persisted install list, migrating renamed slugs and dropping any
+ * that no longer exist — otherwise a stale entry renders a dead rail icon.
+ */
+function parseInstalledApps(raw: string): AppSlug[] | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const migrated = parsed
+      .filter((slug): slug is string => typeof slug === "string")
+      .map((slug) => RENAMED_SLUGS[slug] ?? slug)
+      .filter((slug): slug is AppSlug => KNOWN_SLUGS.has(slug));
+    return [...new Set(migrated)];
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Which apps each profile has connected.
+ *
+ * Per profile rather than per Nexus, because that is what a profile is for: the
+ * point of keeping Work apart from Personal is that they are not carrying the
+ * same things, and an app list shared by both made the profile a paint job over
+ * one installation.
+ *
+ * The stored shape used to be a flat array. One that is still an array is read
+ * as what every profile had, so nobody loses their apps to the change.
+ */
+function parseByProfile(raw: string | null): Record<string, AppSlug[]> | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) return null;
+    if (!parsed || typeof parsed !== "object") return null;
+    const out: Record<string, AppSlug[]> = {};
+    for (const [spaceId, slugs] of Object.entries(
+      parsed as Record<string, unknown>,
+    )) {
+      if (!Array.isArray(slugs)) continue;
+      out[spaceId] = withEssentials(slugs as AppSlug[]);
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+function getInstalledMapSnapshot(): Record<string, AppSlug[]> {
+  let raw: string | null = null;
+  try {
+    raw = window.localStorage.getItem(storageKeys.connectedApps);
+  } catch {
+    // storage unavailable (private mode) — fall back to defaults
+  }
+  if (raw !== snapshotRaw) {
+    snapshotRaw = raw;
+    const byProfile = parseByProfile(raw);
+    if (byProfile) {
+      snapshotMap = byProfile;
+    } else {
+      /* Either nothing stored or the old flat array: every profile starts from
+         the same list, and they diverge from there. */
+      const flat = raw
+        ? withEssentials(parseInstalledApps(raw) ?? defaultInstalled)
+        : defaultInstalled;
+      snapshotMap = { "*": flat };
+    }
+  }
+  return snapshotMap;
+}
+
+/** A profile's list, falling back to the shared starting set. */
+function installedFor(
+  map: Record<string, AppSlug[]>,
+  spaceId: string,
+): AppSlug[] {
+  return map[spaceId] ?? map["*"] ?? defaultInstalled;
+}
+
+function getInstalledMapServerSnapshot(): Record<string, AppSlug[]> {
+  return SERVER_MAP;
+}
+
+const SERVER_MAP: Record<string, AppSlug[]> = { "*": defaultInstalled };
+
+function subscribeToInstalledApps(onChange: () => void): () => void {
+  window.addEventListener("storage", onChange);
+  window.addEventListener(INSTALLED_APPS_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(INSTALLED_APPS_EVENT, onChange);
+  };
+}
+
+function writeInstalledMap(map: Record<string, AppSlug[]>): void {
+  const raw = JSON.stringify(map);
+  try {
+    window.localStorage.setItem(storageKeys.connectedApps, raw);
+  } catch {
+    // storage unavailable — keep the in-memory snapshot instead
+    snapshotRaw = raw;
+    snapshotMap = map;
+  }
+  window.dispatchEvent(new Event(INSTALLED_APPS_EVENT));
+}
+
+/**
+ * Rewrite one profile's list.
+ *
+ * Takes the whole map first so a profile that has never been touched inherits
+ * the shared set before diverging from it, rather than starting empty.
+ */
+function writeInstalledFor(spaceId: string, apps: AppSlug[]): void {
+  const map = getInstalledMapSnapshot();
+  /* Essentials survive every write. They are what other apps rely on, and a
+     profile that has lost them is a profile that cannot be paid or identified
+     — not a state any control here offers, so not one a write should produce. */
+  writeInstalledMap({ ...map, [spaceId]: withEssentials(apps) });
+}
+
+/**
+ * Connected sites live in localStorage (per-user client state until a real user
  * table exists) and are exposed through useSyncExternalStore so SSR renders an
  * empty rail and the client re-syncs after hydration.
+ *
+ * Separate from the app map above, and deliberately so. Connecting an app turns
+ * a screen already in this binary on; connecting a site records that somebody
+ * else's origin may talk to this profile's wallet. Same verb in the UI, two
+ * different things being written, and the storage shape says which.
  */
 const PINNED_SITES_EVENT = "nexus:pinned-sites";
 
 /**
- * Sites the user pinned. Nexus ships none — every icon on the rail beyond the
- * builtin apps got there because somebody chose it. BSV Browser reached the
- * same position: shared/constants.ts's defaultBookmarks is an empty array with
- * its ten entries commented out rather than deleted.
+ * Sites the user connected. Nexus ships none — every icon on the rail beyond
+ * the built-in apps got there because somebody chose it. BSV Browser reached
+ * the same position: shared/constants.ts's defaultBookmarks is an empty array
+ * with its ten entries commented out rather than deleted.
  */
 const NO_SITES: PinnedSite[] = [];
 
@@ -570,17 +881,14 @@ function writePinnedSites(sites: PinnedSite[]): void {
 }
 
 /**
- * The apps compiled into this build.
+ * Everything that currently has a rail slot, in catalog-then-connection order.
  *
- * Read once at module load, like the catalog it comes from: nothing installs or
- * removes an app any more, so this cannot change while the page is open.
+ * Apps first because they are the fixed part — a build carries the same set on
+ * every device — and sites after, in the order they were connected.
  */
-const BUILTIN_APPS: AppSlug[] = getHubApps().map((app) => app.slug);
-
-/** Everything that currently has a rail slot, in catalog-then-pin order. */
-function presentRefs(sites: PinnedSite[]): RailRef[] {
+function presentRefs(apps: AppSlug[], sites: PinnedSite[]): RailRef[] {
   return [
-    ...BUILTIN_APPS.map((slug): RailRef => ({ kind: "app", slug })),
+    ...apps.map((slug): RailRef => ({ kind: "app", slug })),
     ...sites.map((site): RailRef => ({ kind: "site", id: site.id })),
   ];
 }
@@ -634,6 +942,30 @@ function generatePublicKey(): string {
 export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   const defaultSpace = getDefaultSpace();
 
+  const installedMap = useSyncExternalStore(
+    subscribeToInstalledApps,
+    getInstalledMapSnapshot,
+    getInstalledMapServerSnapshot,
+  );
+  /* Declared here rather than beside the other space state because what is
+     installed now depends on which profile is active, and the phase filter
+     below reads the result. */
+  const [activeSpaceId, setActiveSpaceId] = useState(defaultSpace.id);
+  /* The active profile's list. Every consumer of `installedApps` keeps reading
+     one array; which array it is now depends on where you are. */
+  const installedApps = installedFor(installedMap, activeSpaceId);
+  /* The rail helpers rebuild a layout against what is installed, and they run
+     inside setState callbacks where the render's value is already stale. */
+  const installedHere = useCallback(
+    (): AppSlug[] => installedFor(getInstalledMapSnapshot(), activeSpaceId),
+    [activeSpaceId],
+  );
+  /* Any profile's list, for the manager, which shows several columns at once. */
+  const installedForSpace = useCallback(
+    (spaceId: string): AppSlug[] => installedFor(installedMap, spaceId),
+    [installedMap],
+  );
+
   const pinnedSites = useSyncExternalStore(
     subscribeToPinnedSites,
     getPinnedSitesSnapshot,
@@ -643,16 +975,6 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   // `null` means nothing has been picked in this session yet, so the address
   // bar decides. Any explicit `setActiveRef` takes over from there.
   const [selectedRef, setSelectedRef] = useState<RailRef | null>(null);
-  const [libraryTab, setLibraryTab] = useState<LibraryTab>("spaces");
-  const [railLayout, setRailLayout] = useState<RailEntry[]>([]);
-
-  // Always reconciled, never rendered raw: a stored layout can name a site that
-  // has since been unpinned, and a group can be left holding one member.
-  const railEntries = useMemo(
-    () => reconcileRail(railLayout, presentRefs(pinnedSites)),
-    [railLayout, pinnedSites],
-  );
-
   /**
    * The one way to change what the canvas shows, so the address bar cannot
    * drift from it: the rail sets a ref and `?app=` follows. A site clears the
@@ -660,7 +982,10 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
    * on the browser rather than on an app.
    */
   const setActiveRef = useCallback((ref: RailRef | null) => {
-    writeAppToUrl(ref?.kind === "app" ? ref.slug : null);
+    /* `RailRef.slug` is a plain string — lib/rail/layout is dependency-free so
+       the Node tests can reach it — so the catalog decides whether it names an
+       app this build carries before it reaches the address bar. */
+    writeAppToUrl(ref?.kind === "app" ? asAppSlug(ref.slug) : null);
     // Keep the identity when the ref is unchanged, so navigating inside the
     // browser does not re-render every consumer of the context.
     setSelectedRef((current) =>
@@ -671,7 +996,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   /**
    * Bring the browser forward because a tab moved.
    *
-   * A pinned site is already showing in the browser, so it stays the active
+   * A connected site is already showing in the browser, so it stays the active
    * ref: replacing it would take the origin chip away the moment the page
    * navigated, and the chip is the only thing saying where the user is.
    */
@@ -679,10 +1004,69 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     if (selectedRef?.kind === "site") return;
     setActiveRef(BROWSER_REF);
   }, [selectedRef, setActiveRef]);
+  const [libraryTab, setLibraryTab] = useState<LibraryTab>("spaces");
+  const [appsCollection, setAppsCollection] = useState<CollectionId>("all");
+  const [railLayout, setRailLayout] = useState<RailEntry[]>([]);
+
+  /* Apps outside the product state being shown are dropped before the rail is
+     reconciled, so a hidden app cannot leave an empty folder or a gap behind
+     it. The install list itself is untouched: switching back to Later has to
+     restore exactly what was there. */
+  const phase = usePhase();
+  /*
+   * Apps the user connected by hand, which the phase filter does not overrule.
+   *
+   * The phase switcher exists to show what a Now-shaped Nexus looks like, so it
+   * hides apps classified Next or Later. That is right for what ships switched
+   * on and wrong the moment somebody goes to the store and connects one: they
+   * approved a permission sheet, watched a confirmation, and got nothing in the
+   * rail — the app deciding it knew better than the thing they had just asked
+   * for. Connecting is a statement about now.
+   *
+   * Mostly derived rather than stored: anything installed that did not ship
+   * installed was chosen. That survives a reload, which a remembered set would
+   * not — `installedApps` is persisted and this is not, so a stored-only answer
+   * would put the apps in the rail and then lose them on refresh, which is the
+   * same bug with a delay on it. The remembered set is still kept for the one
+   * case the derivation misses: reconnecting an app that ships by default.
+   */
+  const shippedInstalled = useMemo(
+    () => new Set(getDefaultInstalledAppSlugs()),
+    [],
+  );
+  const [askedFor, setAskedFor] = useState<Set<AppSlug>>(() => new Set());
+  const visibleApps = useMemo(
+    () =>
+      installedApps.filter(
+        (slug) =>
+          !shippedInstalled.has(slug) ||
+          askedFor.has(slug) ||
+          isVisibleInPhase(slug, phase),
+      ),
+    [installedApps, phase, askedFor, shippedInstalled],
+  );
+  /* Always reconciled, never rendered raw: a stored layout can name a site that
+     has since been disconnected, an app this profile no longer carries, or a
+     group left holding one member. */
+  const railEntries = useMemo(
+    () => reconcileRail(railLayout, presentRefs(visibleApps, pinnedSites)),
+    [railLayout, visibleApps, pinnedSites],
+  );
+  /* The rail callbacks reconcile against the live present-list, read out here
+     rather than inside the updater: an updater has to be pure, and React is
+     free to run it more than once. */
+  const presentHere = useCallback(
+    (): RailRef[] => presentRefs(installedHere(), getPinnedSitesSnapshot()),
+    [installedHere],
+  );
   // The rail is always shown; collapsing hides the wider panel column.
   const [railCollapsed, setRailCollapsed] = useState(false);
   // What the main canvas shows (app by default; store/profiles open via tabs).
-  const [mainView, setMainView] = useState<MainViewKind>("app");
+  /* A plain setter, not a wrapped one. Wrapping it to write the URL made it a
+     new identity the linter wanted in nine dependency arrays; the URL is a
+     consequence of the view rather than of the call, so it is written where the
+     view is read. */
+  const [requestedView, setMainView] = useState<MainViewKind | null>(null);
   const [settingsCategory, setSettingsCategory] =
     useState<SettingsCategory>("general");
   const openSettings = useCallback(() => {
@@ -690,7 +1074,6 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     // The panel has to be open for the categories to be reachable at all.
     setRailCollapsed(false);
   }, []);
-  const [activeSpaceId, setActiveSpaceId] = useState(defaultSpace.id);
   const [identityKeys, setIdentityKeys] =
     useState<IdentityKey[]>(getIdentityKeys);
   const [spaces, setSpaces] = useState<Space[]>(getSpaces);
@@ -734,6 +1117,11 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   );
   const clearMessageFocus = useCallback(() => setMessageFocus(null), []);
   const [messagesUnreadOnly, setMessagesUnreadOnly] = useState(false);
+  const [roadmapStatus, setRoadmapStatus] = useState<RoadmapStatus | "all">(
+    "all",
+  );
+  const [roadmapSort, setRoadmapSort] = useState<RoadmapSort>("top-funded");
+  const [roadmapQuery, setRoadmapQuery] = useState("");
   const [conversationsVersion, setConversationsVersion] = useState(0);
   const bumpConversations = useCallback(
     () => setConversationsVersion((n) => n + 1),
@@ -857,34 +1245,88 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   const [basketSelected, setBasketSelected] = useState<string | null>(null);
   const [signSection, setSignSection] = useState("Envelopes");
   const [identitySection, setIdentitySection] =
-    useState<IdentitySection>("keys");
+    useState<IdentitySection>("handles");
   const [attestationFilter, setAttestationFilter] =
     useState<AttestationFilter>("all");
-  const urlApp = useSyncExternalStore(subscribeToUrl, urlAppSlug, () => null);
-  const fromUrl = getHubApps().find((app) => app.slug === urlApp)?.slug ?? null;
+  const [appPrompt, setAppPrompt] = useState<AppPrompt | null>(null);
+  const openAppPrompt = useCallback(
+    (slug: AppSlug, mode: AppPromptMode) =>
+      setAppPrompt({ kind: "app", slug, mode }),
+    [],
+  );
+  const openCollectionPrompt = useCallback(
+    (id: CollectionId, mode: AppPromptMode) =>
+      setAppPrompt({ kind: "collection", id, mode }),
+    [],
+  );
+  const closeAppPrompt = useCallback(() => setAppPrompt(null), []);
 
-  // Nothing picked in this session means the address bar decides, and failing
-  // that the browser — the fallback the hub has always had, as a ref.
+  const urlApp = useSyncExternalStore(subscribeToUrl, urlAppSlug, () => null);
+  const urlViewSlug = useSyncExternalStore(subscribeToUrl, urlView, () => null);
+  const mainView: MainViewKind =
+    requestedView ?? (urlViewSlug ? (VIEWS[urlViewSlug] ?? "app") : "app");
+
+  /* Same shape as the view: the address bar wins until something asks. */
+  const urlSplitSlug = useSyncExternalStore(subscribeToUrl, urlSplit, () => null);
+  const [requestedSplit, setRequestedSplit] = useState<AppSlug | "" | null>(
+    null,
+  );
+  const [splitTouched, setSplitTouched] = useState(false);
+  /* An empty `split=` in the address bar is a pane that was open and waiting,
+     which is worth restoring — somebody sharing that link is sharing "look at
+     these two side by side", half-finished. */
+  const splitApp: AppSlug | "" | null = splitTouched
+    ? requestedSplit
+    : urlSplitSlug === null
+      ? null
+      : ((getHubApps().find((app) => app.slug === urlSplitSlug)?.slug ??
+          "") as AppSlug | "");
+  const setSplitApp = useCallback((slug: AppSlug | "" | null) => {
+    setSplitTouched(true);
+    setRequestedSplit(slug);
+    writeSplitToUrl(slug);
+  }, []);
+  /* Only once something in the app has asked for a view. Writing on every
+     render meant the first one — before the store had read the address bar —
+     deleted the very parameter the page was opened with. */
+  useEffect(() => {
+    if (requestedView === null) return;
+    writeViewToUrl(requestedView);
+  }, [requestedView]);
+  /* A host that refuses to be framed has no pane to restore, so it is not a
+     value this parameter can hold — `openApp` hands those to Browse and never
+     writes one. Hand-typed, it falls through to Browse rather than to a frame
+     that will come back empty. */
+  const fromUrl =
+    getHubApps().find(
+      (app) => app.slug === urlApp && app.web?.embeds !== false,
+    )?.slug ?? null;
+
+  /**
+   * What the rail shows as open.
+   *
+   * A ref naming something that has gone — a site disconnected in another tab,
+   * an app this profile no longer carries — is replaced rather than held, so
+   * there is no state in which the rail highlights a slot that is not there.
+   */
   const activeRef = useMemo<RailRef>(() => {
-    // A pinned site can vanish from under the selection: another tab unpinned
-    // it, and the `storage` listener brought the shorter list here. Validate
-    // the site half of the ref the way activeApp validates the app half, or the
-    // origin chip is left looking up an id nothing answers to.
-    const selected =
+    if (
       selectedRef?.kind === "site" &&
       !pinnedSites.some((site) => site.id === selectedRef.id)
-        ? null
-        : selectedRef;
-    return selected ?? (fromUrl ? { kind: "app", slug: fromUrl } : BROWSER_REF);
+    ) {
+      return BROWSER_REF;
+    }
+    if (selectedRef) return selectedRef;
+    return fromUrl ? appRef(fromUrl) : BROWSER_REF;
   }, [selectedRef, fromUrl, pinnedSites]);
 
-  // An app is only active while this build carries it, so a ref naming an app
-  // that is not in the catalog reads as no app open — what the install check
-  // used to do for an app that had been removed.
+  // An app is only active while this profile has it connected; disconnecting
+  // the active app falls back to the empty state without effect-driven cleanup.
   const activeApp = useMemo<AppSlug | null>(() => {
     if (activeRef.kind !== "app") return null;
-    return BUILTIN_APPS.find((slug) => slug === activeRef.slug) ?? null;
-  }, [activeRef]);
+    const slug = asAppSlug(activeRef.slug);
+    return slug && installedApps.includes(slug) ? slug : null;
+  }, [activeRef, installedApps]);
 
   const activeTab = useMemo(() => {
     if (!activeTabId) return null;
@@ -895,90 +1337,102 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     return null;
   }, [tabsBySpace, activeTabId]);
 
-  /*
-   * The pin API reads the live snapshot rather than the render closure, so two
-   * pins in quick succession cannot clobber each other. `now` and `id` are
-   * supplied here: lib/rail/sites is pure and never reaches for the clock.
-   */
-  const pinSite = useCallback(
-    (url: string, title?: string): PinnedSite | null => {
-      const result = addPinnedSite(getPinnedSitesSnapshot(), {
-        url,
-        // exactOptionalPropertyTypes: an optional property is present or
-        // absent, never explicitly undefined.
-        ...(title === undefined ? {} : { title }),
-        now: new Date().toISOString(),
-        // newId, not crypto.randomUUID: the latter is undefined outside a
-        // secure context, and http://<lan-ip>:3000 from a phone is exactly how
-        // pinning gets tested.
-        id: newId("s"),
-      });
-      if (!result) return null;
-      writePinnedSites(result.sites);
-      return result.site;
+  // Read the live snapshot (not the render closure) so rapid successive
+  // installs/uninstalls never clobber each other.
+  /* Everything below writes one profile's list. `activeSpaceId` is in the
+     dependency arrays rather than read from a ref: these functions genuinely
+     mean something different in a different profile, and pretending otherwise
+     is how an app ends up connected to whichever profile you were in last. */
+  const installApp = useCallback(
+    (slug: AppSlug, spaceId?: string) => {
+      const target = spaceId ?? activeSpaceId;
+      setAskedFor((current) => new Set(current).add(slug));
+      const current = installedFor(getInstalledMapSnapshot(), target);
+      if (current.includes(slug)) return;
+      writeInstalledFor(target, [...current, slug]);
     },
-    [],
+    [activeSpaceId],
   );
 
-  const unpinSite = useCallback((id: string) => {
-    writePinnedSites(removePinnedSite(getPinnedSitesSnapshot(), id));
-    // Unpinning what is open falls back to the default, the same way removing
-    // an app used to — no effect-driven cleanup.
-    setSelectedRef((current) =>
-      current && current.kind === "site" && current.id === id ? null : current,
-    );
-  }, []);
+  const uninstallApp = useCallback(
+    (slug: AppSlug, spaceId?: string) => {
+      if (isEssentialApp(slug)) return; // essential apps can't be removed
+      const target = spaceId ?? activeSpaceId;
+      writeInstalledFor(
+        target,
+        installedFor(getInstalledMapSnapshot(), target).filter(
+          (app) => app !== slug,
+        ),
+      );
+    },
+    [activeSpaceId],
+  );
 
-  const renameSite = useCallback((id: string, title: string) => {
-    writePinnedSites(renamePinnedSite(getPinnedSitesSnapshot(), id, title));
-  }, []);
-
-  /*
-   * The rail callbacks reconcile against the live present-list, read out here
-   * rather than inside the updater: an updater has to be pure, and React is
-   * free to run it more than once.
+  /**
+   * Whether this profile has the listing connected.
+   *
+   * Two answers behind one question, because a listing is one of two things. A
+   * screen we compiled is connected when the profile's list names it. A website
+   * is connected when its URL is on the rail — there is no app slot for it to
+   * occupy, and inventing one would mean the same listing had two rail slots
+   * and two ways to be half-removed.
    */
-  const groupRefs = useCallback((dragRef: RailRef, target: RailTarget) => {
-    if (target.kind === "ref" && sameRef(target.ref, dragRef)) return;
-    const present = presentRefs(getPinnedSitesSnapshot());
-    setRailLayout((prev) => {
-      const entries = reconcileRail(prev, present);
-      const base = normalizeGroups(withoutRef(entries, dragRef));
-      if (target.kind === "group") {
+  const isInstalled = useCallback(
+    (slug: AppSlug) => {
+      const web = getHubApp(slug)?.web;
+      if (web) return pinnedSites.some((site) => sameUrl(site.url, web.url));
+      return installedApps.includes(slug);
+    },
+    [installedApps, pinnedSites],
+  );
+
+  const groupRefs = useCallback(
+    (dragRef: RailRef, target: RailTarget) => {
+      if (target.kind === "ref" && sameRef(target.ref, dragRef)) return;
+      const present = presentHere();
+      setRailLayout((prev) => {
+        const entries = reconcileRail(prev, present);
+        const base = normalizeGroups(withoutRef(entries, dragRef));
+        if (target.kind === "group") {
+          return base.map((entry) =>
+            entry.type === "group" && entry.id === target.id
+              ? { ...entry, members: [...entry.members, dragRef] }
+              : entry,
+          );
+        }
+        const count = base.filter((entry) => entry.type === "group").length;
         return base.map((entry) =>
-          entry.type === "group" && entry.id === target.id
-            ? { ...entry, members: [...entry.members, dragRef] }
+          entry.type === "single" && sameRef(entry.ref, target.ref)
+            ? {
+                type: "group",
+                id: newGroupId(),
+                name: `Group ${count + 1}`,
+                members: [entry.ref, dragRef],
+              }
             : entry,
         );
-      }
-      const count = base.filter((entry) => entry.type === "group").length;
-      return base.map((entry) =>
-        entry.type === "single" && sameRef(entry.ref, target.ref)
-          ? {
-              type: "group",
-              id: newGroupId(),
-              name: `Group ${count + 1}`,
-              members: [entry.ref, dragRef],
-            }
-          : entry,
-      );
-    });
-  }, []);
+      });
+    },
+    [presentHere],
+  );
 
-  const ungroupRef = useCallback((ref: RailRef) => {
-    const present = presentRefs(getPinnedSitesSnapshot());
-    setRailLayout((prev) => {
-      const entries = reconcileRail(prev, present);
-      const base = normalizeGroups(withoutRef(entries, ref));
-      return [...base, { type: "single", ref }];
-    });
-  }, []);
+  const ungroupRef = useCallback(
+    (ref: RailRef) => {
+      const present = presentHere();
+      setRailLayout((prev) => {
+        const entries = reconcileRail(prev, present);
+        const base = normalizeGroups(withoutRef(entries, ref));
+        return [...base, { type: "single", ref }];
+      });
+    },
+    [presentHere],
+  );
 
   // Move a rail slot to just before/after another top-level entry.
   const reorderRailRef = useCallback(
     (dragRef: RailRef, targetRef: RailRef, position: "before" | "after") => {
       if (sameRef(dragRef, targetRef)) return;
-      const present = presentRefs(getPinnedSitesSnapshot());
+      const present = presentHere();
       setRailLayout((prev) => {
         const entries = reconcileRail(prev, present);
         // Pull the dragged slot out of wherever it currently sits.
@@ -996,50 +1450,193 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         return next;
       });
     },
+    [presentHere],
+  );
+
+  const presetGroup = useCallback(
+    (name: string, refs: RailRef[]) => {
+      if (refs.length < 2) return;
+      const present = presentHere();
+      setRailLayout((prev) => {
+        const entries = reconcileRail(prev, present);
+        let base = entries;
+        for (const ref of refs) base = withoutRef(base, ref);
+        base = normalizeGroups(base).filter(
+          (entry) => !(entry.type === "group" && entry.name === name),
+        );
+        return [
+          ...base,
+          { type: "group", id: newGroupId(), name, members: refs },
+        ];
+      });
+    },
+    [presentHere],
+  );
+
+  const renameGroup = useCallback(
+    (id: string, name: string) => {
+      const present = presentHere();
+      setRailLayout((prev) =>
+        reconcileRail(prev, present).map((entry) =>
+          entry.type === "group" && entry.id === id ? { ...entry, name } : entry,
+        ),
+      );
+    },
+    [presentHere],
+  );
+
+  const setGroupColor = useCallback(
+    (id: string, color: string) => {
+      const present = presentHere();
+      setRailLayout((prev) =>
+        reconcileRail(prev, present).map((entry) =>
+          entry.type === "group" && entry.id === id
+            ? { ...entry, color }
+            : entry,
+        ),
+      );
+    },
+    [presentHere],
+  );
+
+  /*
+   * Connecting a site.
+   *
+   * `addPinnedSite` returns the existing row rather than duplicating it, so a
+   * second attempt is not a failure — the caller reveals the row it got back.
+   * Null means the input was not a usable URL at all.
+   */
+  const pinSite = useCallback((url: string, title?: string): PinnedSite | null => {
+    const current = getPinnedSitesSnapshot();
+    const result = addPinnedSite(current, {
+      url,
+      ...(title === undefined ? {} : { title }),
+      now: new Date().toISOString(),
+      id: newId("site"),
+    });
+    if (!result) return null;
+    if (result.sites !== current) writePinnedSites(result.sites);
+    return result.site;
+  }, []);
+
+  const unpinSite = useCallback((id: string) => {
+    writePinnedSites(removePinnedSite(getPinnedSitesSnapshot(), id));
+  }, []);
+
+  const renameSite = useCallback((id: string, title: string) => {
+    writePinnedSites(renamePinnedSite(getPinnedSitesSnapshot(), id, title));
+  }, []);
+
+  const bulkSetInstalled = useCallback(
+    (slugs: AppSlug[], installed: boolean) => {
+      const current = installedFor(getInstalledMapSnapshot(), activeSpaceId);
+      const set = new Set(current);
+      if (installed) {
+        for (const slug of slugs) set.add(slug);
+        setAskedFor((asked) => {
+          const next = new Set(asked);
+          for (const slug of slugs) next.add(slug);
+          return next;
+        });
+      } else for (const slug of slugs) set.delete(slug);
+      // preserve the catalog order for a stable rail
+      writeInstalledFor(
+        activeSpaceId,
+        current
+          .filter((entry) => set.has(entry))
+          .concat([...set].filter((entry) => !current.includes(entry))),
+      );
+    },
+    [activeSpaceId],
+  );
+
+
+  /*
+   * Moving between profiles.
+   *
+   * Both of these also connect Browse where it is missing: a profile that has
+   * been given a bookmark but cannot open one is a profile holding something it
+   * has no way to use, and refusing the drop would be refusing the clearer
+   * request of the two.
+   */
+  const ensureBrowser = useCallback(
+    (spaceId: string) => {
+      const current = installedFor(getInstalledMapSnapshot(), spaceId);
+      if (current.includes("browser")) return;
+      writeInstalledFor(spaceId, [...current, "browser"]);
+      setAskedFor((asked) => new Set(asked).add("browser"));
+    },
     [],
   );
 
-  const renameGroup = useCallback((id: string, name: string) => {
-    const present = presentRefs(getPinnedSitesSnapshot());
-    setRailLayout((prev) =>
-      reconcileRail(prev, present).map((entry) =>
-        entry.type === "group" && entry.id === id ? { ...entry, name } : entry,
-      ),
-    );
-  }, []);
-
-  const setGroupColor = useCallback((id: string, color: string) => {
-    const present = presentRefs(getPinnedSitesSnapshot());
-    setRailLayout((prev) =>
-      reconcileRail(prev, present).map((entry) =>
-        entry.type === "group" && entry.id === id ? { ...entry, color } : entry,
-      ),
-    );
-  }, []);
-
-  const openApp = useCallback(
-    (slug: AppSlug) => {
-      setActiveRef({ kind: "app", slug });
-      setActivePage(null);
-      // Show the app in the canvas and the profile/context panel alongside it.
-      setMainView("app");
-      setLibraryTab("spaces");
-      setMobileSheetOpen(false);
+  const moveItemToSpace = useCallback(
+    (itemId: string, fromSpaceId: string, toSpaceId: string, index: number) => {
+      if (fromSpaceId === toSpaceId) return;
+      ensureBrowser(toSpaceId);
+      setSpaceItemsBySpace((current) => {
+        const from = current[fromSpaceId] ?? [];
+        const moving = from.find((item) => item.id === itemId);
+        if (!moving) return current;
+        /* The folder and everything under it, so the move is the whole thing. */
+        const kin = from.filter((item) => item.parentId === itemId);
+        const movingIds = new Set([itemId, ...kin.map((item) => item.id)]);
+        const to = current[toSpaceId] ?? [];
+        const top = to.filter((item) => !item.parentId);
+        const at = Math.max(0, Math.min(index, top.length));
+        /* Renumbered against the target's own order rather than carried over,
+           since sortOrder means nothing outside the list it came from. */
+        const reordered = [
+          ...top.slice(0, at),
+          { ...moving, spaceId: toSpaceId },
+          ...top.slice(at),
+        ].map((item, order) => ({ ...item, sortOrder: order }));
+        return {
+          ...current,
+          [fromSpaceId]: from.filter((item) => !movingIds.has(item.id)),
+          [toSpaceId]: [
+            ...reordered,
+            ...to.filter((item) => item.parentId),
+            ...kin.map((item) => ({ ...item, spaceId: toSpaceId })),
+          ],
+        };
+      });
     },
-    [setActiveRef],
+    [ensureBrowser],
   );
 
-  const openTab = useCallback(
-    (tabId: string) => {
-      setActiveTabId(tabId);
-      setActiveRef(BROWSER_REF);
-      setActivePage(null);
-      setMainView("app");
-      setMobileSheetOpen(false);
-      setCommandPaletteOpen(false);
+  const moveTabToSpace = useCallback(
+    (tabId: string, fromSpaceId: string, toSpaceId: string, index: number) => {
+      if (fromSpaceId === toSpaceId) return;
+      ensureBrowser(toSpaceId);
+      setTabsBySpace((current) => {
+        const from = current[fromSpaceId] ?? [];
+        const moving = from.find((tab) => tab.id === tabId);
+        if (!moving) return current;
+        const to = current[toSpaceId] ?? [];
+        const at = Math.max(0, Math.min(index, to.length));
+        const next = [
+          ...to.slice(0, at),
+          { ...moving, spaceId: toSpaceId },
+          ...to.slice(at),
+        ].map((tab, order) => ({ ...tab, sortOrder: order }));
+        return {
+          ...current,
+          [fromSpaceId]: from.filter((tab) => tab.id !== tabId),
+          [toSpaceId]: next,
+        };
+      });
     },
-    [setActiveRef],
+    [ensureBrowser],
   );
+
+  const openTab = useCallback((tabId: string) => {
+    setActiveTabId(tabId);
+    setActiveRef(BROWSER_REF);
+    setActivePage(null);
+    setMainView("app");
+    setMobileSheetOpen(false);
+    setCommandPaletteOpen(false);
+  }, [setActiveRef]);
 
   const toggleFolder = useCallback((id: string) => {
     setExpandedFolders((current) =>
@@ -1049,41 +1646,25 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     );
   }, []);
 
-  const openPage = useCallback(
-    (id: PageId) => {
-      setActivePage(id);
-      setActiveRef(BROWSER_REF);
-      setMainView("app");
-      setMobileSheetOpen(false);
-    },
-    [setActiveRef],
-  );
+  const openPage = useCallback((id: PageId) => {
+    setActivePage(id);
+    setActiveRef(BROWSER_REF);
+    setMainView("app");
+    setMobileSheetOpen(false);
+  }, [setActiveRef]);
 
   const createTab = useCallback(
     (input: string) => {
-      /*
-       * The tab is built BEFORE the state update, not inside it.
-       *
-       * setActiveTabId and setHistoryByTab used to be called from inside the
-       * setTabsBySpace updater. An updater must be pure — React is free to run it
-       * more than once — so the activation could be discarded, and the new tab
-       * would be added but never focused. That is exactly what a link opened from
-       * outside the browser hit: the tab appeared in the switcher while the pane
-       * kept showing the previous one.
-       *
-       * `sortOrder` is assigned inside the updater instead, where the current tab
-       * list is actually known.
-       */
-      const tab = buildTab(input, activeSpaceId, 0);
       setTabsBySpace((current) => {
         const tabs = current[activeSpaceId] ?? [];
-        return { ...current, [activeSpaceId]: [...tabs, { ...tab, sortOrder: tabs.length }] };
+        const tab = buildTab(input, activeSpaceId, tabs.length);
+        setActiveTabId(tab.id);
+        setHistoryByTab((h) => ({
+          ...h,
+          [tab.id]: { stack: [tab.url], index: 0 },
+        }));
+        return { ...current, [activeSpaceId]: [...tabs, tab] };
       });
-      setActiveTabId(tab.id);
-      setHistoryByTab((h) => ({ ...h, [tab.id]: { stack: [tab.url], index: 0 } }));
-      // Same as openTab: setActiveRef also names the browser in the address
-      // bar, so reloading the chrome lands in the browser the new tab belongs
-      // to rather than in whichever app was open when it was created.
       setActiveRef(BROWSER_REF);
       setActivePage(null);
       setMainView("app");
@@ -1093,37 +1674,25 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     [activeSpaceId, setActiveRef],
   );
 
-  /**
+  /*
    * Open a link in a specific profile's Browse and focus it.
    *
-   * `ref` is what the rail should show as open once the tab is up, and it is a
-   * parameter rather than something the caller sets afterwards because setting
-   * it afterwards is a rule nobody can see: minting the tab is how a pinned
-   * site comes on screen, so a `setActiveRef(siteRef)` before the call would be
-   * overwritten here and the origin chip would never appear. Defaulting to the
-   * browser keeps every existing caller — the Profiles manager, the command
-   * palette — exactly as it was.
+   * The tab is built here rather than inside the updater, and that is the whole
+   * point: `buildTab` invents a random id, React invokes updaters twice in
+   * development, and the id the second run focused was not the id the first run
+   * kept. The tab appeared in the list and nothing was selected — one click to
+   * create it, a second to open it. Built once in the handler, the id every
+   * setter sees is the same one.
    */
   const openLinkInBrowser = useCallback(
-    (spaceId: string, url: string, ref: RailRef = BROWSER_REF) => {
-      /*
-       * Reuse-or-build is decided out here, then written.
-       *
-       * Deciding it inside the setTabsBySpace updater meant the focus and
-       * history writes happened inside it too. Updaters have to be pure — React
-       * may run them twice — so those writes could be discarded and the link
-       * would land in a tab nothing ever focused, or a rerun would mint a
-       * second tab id for the same URL.
-       */
+    (spaceId: string, url: string, ref?: RailRef) => {
       const tabs = tabsBySpace[spaceId] ?? [];
-      // sameUrl, not ===: a pinned site's url is `new URL(...).href` and a tab
-      // typed into the address bar is not, so the two spellings of one site
-      // differ by a trailing slash and the reuse check used to miss.
+      /* Matched on the canonical URL rather than the string, so opening a
+         connected site twice reuses its tab whether the rail passed
+         `https://example.com/` or the address bar produced `example.com`. */
       const existing = tabs.find((tab) => sameUrl(tab.url, url));
-      if (existing) {
-        setActiveTabId(existing.id);
-      } else {
-        const tab = buildTab(url, spaceId, tabs.length);
+      const tab = existing ?? buildTab(url, spaceId, tabs.length);
+      if (!existing) {
         setTabsBySpace((current) => ({
           ...current,
           [spaceId]: [...(current[spaceId] ?? []), tab],
@@ -1132,52 +1701,71 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
           ...h,
           [tab.id]: { stack: [tab.url], index: 0 },
         }));
-        setActiveTabId(tab.id);
       }
       setActiveSpaceId(spaceId);
-      setActiveRef(ref);
+      setActiveTabId(tab.id);
+      setActiveRef(ref ?? BROWSER_REF);
       setActivePage(null);
       setMainView("app");
     },
     [tabsBySpace, setActiveRef],
   );
 
-  const closeTab = useCallback(
-    (tabId: string) => {
-      // The replacement is chosen from the list as it stands, before either
-      // write. Choosing it inside the setTabsBySpace updater made that updater
-      // impure, so a rerun could drop the focus change and leave the chrome
-      // pointing at a tab that had just been removed.
-      if (activeTabId === tabId) {
-        // Closing the active tab activates its space's first remaining tab.
-        const owner = Object.values(tabsBySpace).find((tabs) =>
-          tabs.some((tab) => tab.id === tabId),
-        );
-        setActiveTabId(owner?.find((tab) => tab.id !== tabId)?.id ?? null);
+  /*
+   * Defined after `openLinkInBrowser` because it calls it: a listing whose host
+   * refuses to be framed opens in Browse instead of in its own pane.
+   *
+   * Decided here rather than in the pane, because by the time a blocked frame
+   * has rendered there is nothing to show and no way to ask why — the refusal
+   * is cross-origin and silent. Handing off costs the rail's highlight and buys
+   * the address bar, the back button and a page that loads, none of which an
+   * app pane has.
+   */
+  const openApp = useCallback(
+    (slug: AppSlug) => {
+      const web = getHubApp(slug)?.web;
+      if (web && !web.embeds) {
+        openLinkInBrowser(activeSpaceId, web.url);
+        return;
       }
-      setTabsBySpace((current) => {
-        const next: Record<string, BrowserTab[]> = {};
-        for (const [spaceId, tabs] of Object.entries(current)) {
-          next[spaceId] = tabs.filter((tab) => tab.id !== tabId);
-        }
-        return next;
-      });
+      setActiveRef(appRef(slug));
+      setActivePage(null);
+      // Show the app in the canvas and the profile/context panel alongside it.
+      setMainView("app");
+      setLibraryTab("spaces");
+      setMobileSheetOpen(false);
     },
-    [tabsBySpace, activeTabId],
+    [activeSpaceId, openLinkInBrowser, setActiveRef],
   );
 
-  const clearTabs = useCallback(
-    (spaceId: string) => {
-      // Same shape as closeTab: work out whether the focused tab is among the
-      // ones about to go, so neither write sits inside the other's updater.
-      const clearingActive = (tabsBySpace[spaceId] ?? []).some(
-        (tab) => tab.id === activeTabId,
+  const closeTab = useCallback((tabId: string) => {
+    setTabsBySpace((current) => {
+      const next: Record<string, BrowserTab[]> = {};
+      for (const [spaceId, tabs] of Object.entries(current)) {
+        next[spaceId] = tabs.filter((tab) => tab.id !== tabId);
+      }
+      setActiveTabId((activeId) => {
+        if (activeId !== tabId) return activeId;
+        // Closing the active tab activates its space's first remaining tab.
+        for (const [spaceId, tabs] of Object.entries(current)) {
+          if (tabs.some((tab) => tab.id === tabId)) {
+            return next[spaceId]?.[0]?.id ?? null;
+          }
+        }
+        return null;
+      });
+      return next;
+    });
+  }, []);
+
+  const clearTabs = useCallback((spaceId: string) => {
+    setTabsBySpace((current) => {
+      setActiveTabId((activeId) =>
+        current[spaceId]?.some((tab) => tab.id === activeId) ? null : activeId,
       );
-      if (clearingActive) setActiveTabId(null);
-      setTabsBySpace((current) => ({ ...current, [spaceId]: [] }));
-    },
-    [tabsBySpace, activeTabId],
-  );
+      return { ...current, [spaceId]: [] };
+    });
+  }, []);
 
   // Replaces the active tab's content and pushes onto its history stack.
   const navigateActiveTab = useCallback(
@@ -1214,33 +1802,28 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   const stepHistory = useCallback(
     (delta: number) => {
       if (!activeTabId) return;
-      // Resolve the destination from the history in hand. The tab rewrite below
-      // used to live inside the setHistoryByTab updater, where React was free
-      // to run it twice or throw it away — a Back press that moved the index
-      // but not the page.
-      const entry = historyByTab[activeTabId];
-      if (!entry) return;
-      const target = entry.index + delta;
-      if (target < 0 || target >= entry.stack.length) return;
-      const url = entry.stack[target]!;
-      setTabsBySpace((current) => {
-        const next: Record<string, BrowserTab[]> = {};
-        for (const [spaceId, tabs] of Object.entries(current)) {
-          next[spaceId] = tabs.map((tab) => {
-            if (tab.id !== activeTabId) return tab;
-            const fresh = buildTab(url, spaceId, tab.sortOrder);
-            return { ...fresh, id: tab.id, createdAt: tab.createdAt };
-          });
-        }
-        return next;
-      });
       setHistoryByTab((h) => {
-        const live = h[activeTabId];
-        return live ? { ...h, [activeTabId]: { ...live, index: target } } : h;
+        const entry = h[activeTabId];
+        if (!entry) return h;
+        const target = entry.index + delta;
+        if (target < 0 || target >= entry.stack.length) return h;
+        const url = entry.stack[target]!;
+        setTabsBySpace((current) => {
+          const next: Record<string, BrowserTab[]> = {};
+          for (const [spaceId, tabs] of Object.entries(current)) {
+            next[spaceId] = tabs.map((tab) => {
+              if (tab.id !== activeTabId) return tab;
+              const fresh = buildTab(url, spaceId, tab.sortOrder);
+              return { ...fresh, id: tab.id, createdAt: tab.createdAt };
+            });
+          }
+          return next;
+        });
+        return { ...h, [activeTabId]: { ...entry, index: target } };
       });
       focusBrowser();
     },
-    [activeTabId, historyByTab, focusBrowser],
+    [activeTabId, focusBrowser],
   );
 
   const goBack = useCallback(() => stepHistory(-1), [stepHistory]);
@@ -1383,7 +1966,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       ...current,
       {
         id: `key-${publicKey.slice(2, 10)}`,
-        label: "New Identity Badge",
+        label: "New Identifier",
         publicKey,
         primary: false,
       },
@@ -1424,30 +2007,24 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     );
   }, []);
 
-  const deleteSpace = useCallback(
-    (id: string) => {
-      if (spaces.length <= 1) return; // never delete the last space
-      const remaining = spaces.filter((space) => space.id !== id);
-      if (remaining.length === spaces.length) return; // unknown id: nothing to drop
-      // Both writes happen out here. Picking the fallback profile from inside
-      // the setSpaces updater made it impure, and a discarded rerun left the
-      // hub pointing at a profile that no longer existed — every panel keyed by
-      // activeSpaceId then reads an empty bucket.
-      if (activeSpaceId === id) {
-        setActiveSpaceId(remaining[0]?.id ?? activeSpaceId);
-      }
-      setSpaces(remaining);
-      setSpaceItemsBySpace((current) => {
-        const { [id]: _removed, ...rest } = current;
-        return rest;
-      });
-      setTabsBySpace((current) => {
-        const { [id]: _removed, ...rest } = current;
-        return rest;
-      });
-    },
-    [spaces, activeSpaceId],
-  );
+  const deleteSpace = useCallback((id: string) => {
+    setSpaces((current) => {
+      if (current.length <= 1) return current; // never delete the last space
+      const remaining = current.filter((space) => space.id !== id);
+      setActiveSpaceId((activeId) =>
+        activeId === id ? (remaining[0]?.id ?? activeId) : activeId,
+      );
+      return remaining;
+    });
+    setSpaceItemsBySpace((current) => {
+      const { [id]: _removed, ...rest } = current;
+      return rest;
+    });
+    setTabsBySpace((current) => {
+      const { [id]: _removed, ...rest } = current;
+      return rest;
+    });
+  }, []);
 
   const addSpaceFolder = useCallback((spaceId: string) => {
     setSpaceItemsBySpace((current) => {
@@ -1495,8 +2072,8 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     setShareOpen(true);
   }, []);
 
-  const openWeb3Apps = useCallback(() => {
-    setMainView("sites");
+  const openAppStore = useCallback(() => {
+    setMainView("store");
     setLibraryTab("apps");
     setActivePage(null);
   }, []);
@@ -1508,7 +2085,12 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
 
   const value = useMemo<HubState>(
     () => ({
-      builtinApps: BUILTIN_APPS,
+      installedApps,
+      installedFor: installedForSpace,
+      installApp,
+      uninstallApp,
+      isInstalled,
+      bulkSetInstalled,
       pinnedSites,
       pinSite,
       unpinSite,
@@ -1517,8 +2099,11 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       groupRefs,
       ungroupRef,
       reorderRailRef,
+      presetGroup,
       renameGroup,
       setGroupColor,
+      appsCollection,
+      setAppsCollection,
       activeRef,
       setActiveRef,
       activeApp,
@@ -1530,9 +2115,11 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       setSettingsCategory,
       openSettings,
       setMainView,
+      splitApp,
+      setSplitApp,
       railCollapsed,
       toggleRail,
-      openWeb3Apps,
+      openAppStore,
       openProfilesManager,
       activeSpaceId,
       setActiveSpaceId,
@@ -1544,6 +2131,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       renameIdentityKey,
       spaces,
       spaceItemsBySpace,
+      moveItemToSpace,
       renameSpace,
       setSpaceEmoji,
       setSpaceThemeColor,
@@ -1563,6 +2151,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       shareCode,
       openShare,
       tabsBySpace,
+      moveTabToSpace,
       activeTabId,
       activeTab,
       openTab,
@@ -1594,6 +2183,12 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       openMessageAt,
       clearMessageFocus,
       messagesUnreadOnly,
+      roadmapStatus,
+      setRoadmapStatus,
+      roadmapSort,
+      setRoadmapSort,
+      roadmapQuery,
+      setRoadmapQuery,
       setMessagesUnreadOnly,
       conversationsVersion,
       bumpConversations,
@@ -1647,18 +2242,32 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       setIdentitySection,
       attestationFilter,
       setAttestationFilter,
+      appPrompt,
+      openAppPrompt,
+      openCollectionPrompt,
+      closeAppPrompt,
     }),
     [
+      installedApps,
+      splitApp,
+      setSplitApp,
+      installedForSpace,
+      installApp,
+      uninstallApp,
+      isInstalled,
+      bulkSetInstalled,
+      railEntries,
       pinnedSites,
       pinSite,
       unpinSite,
       renameSite,
-      railEntries,
       groupRefs,
       ungroupRef,
       reorderRailRef,
+      presetGroup,
       renameGroup,
       setGroupColor,
+      appsCollection,
       activeRef,
       setActiveRef,
       activeApp,
@@ -1667,7 +2276,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       mainView,
       railCollapsed,
       toggleRail,
-      openWeb3Apps,
+      openAppStore,
       openProfilesManager,
       activeSpaceId,
       identityKeys,
@@ -1678,6 +2287,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       renameIdentityKey,
       spaces,
       spaceItemsBySpace,
+      moveItemToSpace,
       renameSpace,
       setSpaceEmoji,
       setSpaceThemeColor,
@@ -1696,6 +2306,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       shareCode,
       openShare,
       tabsBySpace,
+      moveTabToSpace,
       activeTabId,
       activeTab,
       openTab,
@@ -1717,6 +2328,12 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       mailFolder,
       mailTab,
       messagesUnreadOnly,
+      roadmapStatus,
+      setRoadmapStatus,
+      roadmapSort,
+      setRoadmapSort,
+      roadmapQuery,
+      setRoadmapQuery,
       setMessagesUnreadOnly,
       conversationsVersion,
       bumpConversations,
@@ -1762,6 +2379,10 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       signSection,
       identitySection,
       attestationFilter,
+      appPrompt,
+      openAppPrompt,
+      openCollectionPrompt,
+      closeAppPrompt,
     ],
   );
 

@@ -56,7 +56,11 @@ export function ShellVersion({ className = "" }: { className?: string }) {
 
   return (
     <span
-      className={`min-w-0 truncate select-text text-[10px] tabular-nums text-muted-foreground/70 ${className}`}
+      /* Never truncated. The whole job of this label is to be a version number
+         somebody can read into a bug report, and "v..." does not do that job —
+         better to render nothing than a string that has lost the part that
+         matters. Callers give it a line wide enough or do not render it. */
+      className={`shrink-0 whitespace-nowrap select-text text-[10px] tabular-nums text-muted-foreground/70 ${className}`}
       title={`Nexus v${info.version} — ${info.shell ?? "?"}/${info.platform ?? "?"}`}
     >
       v{info.version}

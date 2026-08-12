@@ -18,6 +18,7 @@ import {
   getCollectibles,
   getEcosystems,
   getMessagePeople,
+  getRoadmapFeature,
   getTokenBySymbol,
   type Collectible,
   type CommandVerb,
@@ -25,6 +26,7 @@ import {
   type EcosystemId,
   type MessagePerson,
   type ReservedVerb,
+  type RoadmapFeature,
 } from "@/lib/data";
 import { confusabilitySkeleton, fiatToSats } from "@/lib/messages";
 
@@ -56,7 +58,15 @@ export type ArgKind =
    * that is meant to stay readable. Section 2.3 has no shape for that, which is
    * why quoting exists here and nowhere else.
    */
-  | "secret";
+  | "secret"
+  /**
+   * `#slug`, naming a feature on the roadmap.
+   *
+   * Named rather than positional, like `asset` and for the same reason: a
+   * reader who knows the feature's name should not also have to know where in
+   * the line it goes.
+   */
+  | "feature";
 
 export interface CommandSpec {
   verb: CommandVerb | ReservedVerb | CustomVerb;
@@ -350,6 +360,22 @@ export const COMMANDS: CommandSpec[] = [
       "Lists every command this client knows, grouped by whether you can run it here. The reply is written by Nexus into this chat for you alone. It is not sent, nobody else in the conversation receives it, and no agent in the room can read it. Name a command to get just that one.",
     example: "/help trolltoll",
     args: ["command"],
+  },
+
+  /* Nexus's own verb. The roadmap is a public board, and a feature is the kind
+     of thing people argue about in a room rather than on it — so the card comes
+     to the conversation, carrying the one number that matters. */
+  {
+    verb: "roadmap",
+    usage: "/roadmap #feature [note]",
+    summary: "Put a roadmap feature in the conversation, with what is behind it.",
+    section: "Nexus",
+    confirms: false,
+    custom: true,
+    detail:
+      "Shares a card for one feature: what it is, how much has been pledged, and how far that is from what it needs. Read-only in the thread — funding happens in Roadmap, from the card, because a payment should be confirmed where payments are confirmed rather than in a chat bubble. Nothing is sent to anybody's wallet by typing this. Name the feature with a #slug; anything after it is your own note, which is what most people actually want to say.",
+    example: "/roadmap #cross-app-search this is the one I keep hitting",
+    args: ["feature", "text"],
   },
 
   /* Nexus's own verb, advertised per section 8. Reputation is a different
@@ -710,6 +736,8 @@ export interface ParsedCommand {
   secret?: string;
   scope?: string;
   serial?: string;
+  /** the roadmap feature named by a `#slug` argument */
+  feature?: RoadmapFeature;
   /** `p`/`public` on /renounce: sign it openly rather than anonymously */
   public?: boolean;
   text?: string;
@@ -943,6 +971,19 @@ export function parseCommand(
     }
   }
 
+  if (spec.args.includes("feature")) {
+    const at = tokens.findIndex(
+      (token, i) => i >= index && token.startsWith("#"),
+    );
+    if (at !== -1) {
+      const slug = tokens[at]!.slice(1).toLowerCase();
+      const found = getRoadmapFeature(slug);
+      if (found) command.feature = found;
+      else command.errors.push(`No feature called ${tokens[at]} on the roadmap.`);
+      tokens.splice(at, 1);
+    }
+  }
+
   if (spec.args.includes("serial") && index < tokens.length) {
     command.serial = tokens[index]!;
     index += 1;
@@ -1091,6 +1132,8 @@ export function remainingSyntax(
         return Boolean(c.scope);
       case "serial":
         return Boolean(c.serial);
+      case "feature":
+        return Boolean(c.feature);
       case "visibility":
         return Boolean(c.public);
       case "secret":
@@ -1159,6 +1202,9 @@ export function remainingSyntax(
         break;
       case "asset":
         if (!c.asset) out.push("#asset");
+        break;
+      case "feature":
+        if (!c.feature) out.push("#feature");
         break;
       case "secret":
         /* With files staged the payload is the files, so the secret becomes

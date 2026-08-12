@@ -15,7 +15,11 @@
  * in the app — the confirmation stays where the decision is.
  */
 
-import { Choice, Group, Row } from "@/components/apps/settings-app";
+/* The shared settings primitives, which upstream moved out of settings-app
+   into their own module. Importing them from there rather than through
+   settings-app keeps this panel off the barrel that pulls in eight demo
+   panels. */
+import { Choice, Group, Row } from "@/components/apps/settings/blocks";
 import {
   canCreateBackupShares,
   createBackupShares,
