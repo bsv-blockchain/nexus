@@ -5,7 +5,6 @@ import { RoadmapSidebar } from "@/components/apps/roadmap/roadmap-sidebar";
 import { SuggestFeature } from "@/components/apps/roadmap/suggest-feature";
 import { WALLET_SECTIONS } from "@/components/apps/wallet-app";
 import { Tooltip } from "@/components/hub/tooltip";
-import { PRIMARY_CTA } from "@/components/hub/cta";
 import { Favicon } from "@/components/hub/favicon";
 import { AppHelpBar } from "@/components/hub/app-help-bar";
 import { useHub, type AppSlug } from "@/components/hub/hub-provider";
@@ -30,8 +29,6 @@ import {
   Archive,
   ArchiveX,
   AtSign,
-  ArrowDownLeft,
-  ArrowUpRight,
   BadgeCheck,
   Boxes,
   File,
@@ -725,8 +722,6 @@ function SpendSidebar(): ReactNode {
 
 /** Docked primary/secondary CTAs at the bottom of a contextual column. */
 function AppContextFooter({ slug }: { slug: AppSlug }): ReactNode {
-  const copy = content.wallet;
-  const { setWalletIntent } = useHub();
   if (slug === "roadmap") {
     /* Suggesting a feature is the one thing on this board you do rather than
        read, so it gets the docked slot the wallet's CTAs use. */
@@ -736,28 +731,16 @@ function AppContextFooter({ slug }: { slug: AppSlug }): ReactNode {
       </div>
     );
   }
-  if (slug === "wallet") {
-    return (
-      <div className="mt-2 flex shrink-0 gap-2 border-t border-border pt-3">
-        <button
-          type="button"
-          onClick={() => setWalletIntent({ kind: "send" })}
-          className={`focus-ring flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold ${PRIMARY_CTA}`}
-        >
-          <ArrowUpRight className="size-4" aria-hidden="true" />
-          {copy.send}
-        </button>
-        <button
-          type="button"
-          onClick={() => setWalletIntent({ kind: "receive" })}
-          className="focus-ring flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-muted px-3 py-2 text-sm font-semibold hover:bg-surface-hover"
-        >
-          <ArrowDownLeft className="size-4" aria-hidden="true" />
-          {copy.receive}
-        </button>
-      </div>
-    );
-  }
+  /*
+   * The wallet had a docked Pay / Get paid pair here. It is gone: the Portfolio
+   * carries the same two actions a few hundred pixels to the right, on the card
+   * with the balance they act on, and two routes to one sheet a screen apart
+   * teaches that they are different sheets.
+   *
+   * `setWalletIntent` is untouched and still the way in — TokenDetail's buttons
+   * and the command runner both raise an intent, and wallet-app.tsx still
+   * translates it to the live PaySheet or an honest refusal.
+   */
   return null;
 }
 

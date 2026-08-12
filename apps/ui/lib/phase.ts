@@ -74,7 +74,7 @@ export const PHASE_FEATURES: PhaseFeature[] = [
   },
   {
     key: "wallet",
-    label: "Pay & Get paid",
+    label: "Payments",
     phase: "now",
     impact: "high",
     effort: "medium",

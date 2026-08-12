@@ -53,7 +53,7 @@ export const hubApps: HubApp[] = [
   {
     id: "app-wallet",
     slug: "wallet",
-    name: "Pay & Get paid",
+    name: "Payments",
     shortName: "Wallet",
     description:
       "Make payments, check your balance and browse your full transaction history.",

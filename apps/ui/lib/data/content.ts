@@ -265,8 +265,16 @@ export const content = {
     rate: "Rate",
     midMarket: "Mid-market rate",
     noSpread: "No spread added",
-    send: "Send",
-    receive: "Receive",
+    /*
+     * The two verbs, and they are the app's own rather than a bank's.
+     *
+     * Keys stay `send`/`receive` — fourteen call sites read them and renaming
+     * those buys nothing — but what a person sees is Pay and Get paid, which is
+     * what the app is called and what the act actually is. "Receive" describes
+     * something happening to you; getting paid is something you arranged.
+     */
+    send: "Pay",
+    receive: "Get paid",
     historyTitle: "Transaction history",
     pendingBadge: "Pending",
     subscriptionsTitle: "Subscriptions",
@@ -1590,7 +1598,7 @@ export const content = {
       {
         icon: "Wallet",
         title: "Make your first payment",
-        body: "Open Pay & Get paid from the rail to send BSV, check your balance and browse your full transaction history.",
+        body: "Open Payments from the rail to send BSV, check your balance and browse your full transaction history.",
       },
     ],
     shortcutsTitle: "Essential shortcuts",

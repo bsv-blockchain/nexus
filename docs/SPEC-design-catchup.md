@@ -175,7 +175,7 @@ upstream's wins where it is only ever shown to a person.
 | `entry.apps: AppSlug[]` | `entry.members: RailRef[]` | ours |
 | `installedApps: AppSlug[]` | `builtinApps` + `pinnedSites` | merged: per-profile `connectedApps` over `RailRef` |
 | `installApp` / `uninstallApp` | `pinSite` / `unpinSite` | `connect(ref)` / `disconnect(ref)` |
-| "Pay & Receive" | — | "Pay & Get paid" (upstream) |
+| "Pay & Receive" | — | "Payments" — upstream renamed it "Pay & Get paid"; ours is shorter |
 | "badges" | — | "identifiers" (upstream) |
 | "Canary" | — | "Dragon" (upstream) |
 

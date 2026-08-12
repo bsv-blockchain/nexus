@@ -177,7 +177,7 @@ slug: "profiles",
         body: "Nothing on this board is a promise. Putting satoshis behind a feature says how much you want it, and a feature people have paid for is one we weigh more heavily when deciding what to do next — but it can still be reconsidered, reshaped, or turned down, and some of it will be. Anybody telling you a public roadmap guarantees delivery is selling you something.",
         steps: [
           "Open a card and pick an amount, or type your own.",
-          "It goes through Pay & Get paid like anything else you spend — a second way to send money is a second way to get it wrong.",
+          "It goes through Payments like anything else you spend — a second way to send money is a second way to get it wrong.",
           "Every pledge is attributable to a handle, so the backer list is people rather than a total.",
         ],
         reference: "BRC-169",

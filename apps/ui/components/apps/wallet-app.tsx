@@ -78,7 +78,7 @@ export const WALLET_SECTIONS = DEMO_SURFACES
   : ALL_WALLET_SECTIONS.filter((section) => LIVE_SECTIONS.has(section.id));
 
 /**
- * Pay & Get paid.
+ * Payments.
  *
  * BSV is the base currency throughout: it heads the asset list, it is what a
  * bare amount means, and every other asset is valued through it. Tokens sit

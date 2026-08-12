@@ -62,7 +62,7 @@ function Funding({ feature }: { feature: RoadmapFeature }): ReactNode {
     if (chosen <= 0) return;
     pledge(feature.id, chosen);
     /* The money leaves the wallet, so the wallet is where it is confirmed.
-       Funding that never touches Pay & Get paid would be a second, quieter
+       Funding that never touches Payments would be a second, quieter
        way to spend, and the point of one wallet is that there is one. */
     setWalletIntent({ kind: "send" });
     toast.success(
