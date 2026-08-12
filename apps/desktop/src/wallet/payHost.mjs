@@ -174,8 +174,13 @@ export function createPayHost({ getWallet, getNetwork, adminOriginator, localSto
         const derivationPrefix = derivationPrefixFor(date)
         const address = await getPaymentAddress(manager, adminOriginator, derivationPrefix, woc.network)
         await watchAddress(storage, { address, date, derivationPrefix })
-        // After the watchlist write, so the first pass can already see this one.
-        holdSweeper?.()
+        /*
+         * This is the one call that knows which address is on screen, so it is
+         * the one that points the sweeper at it. Stepping the day back lands
+         * here again with a different address, which is how the sweeper follows
+         * the stepper instead of polling yesterday forever.
+         */
+        holdSweeper?.({ address, derivationPrefix })
         const processed = await getProcessedTransactions(manager, adminOriginator, address)
         return { address, date, derivationPrefix, daysOffset: offset, maxRecoveryDays: MAX_RECOVERY_DAYS, processed }
       },

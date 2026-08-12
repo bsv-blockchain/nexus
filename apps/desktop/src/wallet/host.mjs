@@ -409,7 +409,7 @@ export function createWalletHost({ userDataDir, onStateChange, onPermissionReque
     localStorage,
     // Every address-screen method renews the sweeper's lease. See sweepLoop.mjs
     // for why presence rather than an explicit stop decides when it runs.
-    holdSweeper: () => sweepLoop.hold()
+    holdSweeper: (target) => sweepLoop.hold(target)
   })
 
   return {

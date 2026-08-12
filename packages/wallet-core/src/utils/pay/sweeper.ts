@@ -17,6 +17,22 @@ import { getWatchlist, touchWatched, type KVStorage } from '@nexus/wallet-core/s
 export const SWEEP_INTERVAL_MS = 30_000
 
 /**
+ * The cadence while an address is actually on screen.
+ *
+ * Matches the chrome's own history poll, and for the same reason: this is not
+ * background housekeeping but a short synchronous exchange. The address is
+ * showing, the payer is paying, and the screen is closed by the money arriving —
+ * so the wait between somebody sending and the wallet noticing is the whole of
+ * the experience, and 30s of it is a screen that looks broken.
+ *
+ * Affordable because a held sweep polls the ONE address being displayed rather
+ * than the whole watchlist: one WhatsOnChain request per tick, not one per
+ * watched day. At 8 watched addresses the naive version would have been 1.6
+ * requests a second against a public API that starts refusing around 3.
+ */
+export const ADDRESS_SCREEN_POLL_MS = 5_000
+
+/**
  * How long the "Get paid → to an address" screen keeps the sweeper alive after
  * it was last heard from.
  *
