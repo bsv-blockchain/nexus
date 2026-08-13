@@ -1,6 +1,8 @@
 # Design catch-up — vincemedia/bsvnexus → bsv-blockchain/nexus
 
-Status: **spec**, agreed 2026-08-11. Branch `feat/design-catchup`.
+Status: **shipped**, merged to `main` 2026-08-12 as `4cf1635`. Kept because the
+reasoning outlived the branch — §1 is why the Apps surface looks the way it does,
+and §2 why a profile owns a wallet.
 
 ## Why this exists
 

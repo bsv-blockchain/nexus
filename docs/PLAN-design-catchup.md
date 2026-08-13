@@ -1,6 +1,7 @@
 # Design catch-up — implementation plan
 
-Companion to `docs/SPEC-design-catchup.md`. Branch `feat/design-catchup`.
+Status: **done**. Companion to `docs/SPEC-design-catchup.md`, kept as the record of
+what was ported and how the 121 upstream files were classified.
 
 Reference trees, produced by `git worktree` off `/Users/personal/git/_ref/bsvnexus-upstream`:
 

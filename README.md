@@ -4,6 +4,10 @@ A BSV wallet and browser across iOS, Android, macOS, Windows, and Linux. It host
 
 A sixth target, **web**, is not a product: it is the demo build the design work runs on. See [Web — the preview target](#web--the-preview-target).
 
+**Doing UX work here?** Start with [`docs/DESIGN-HANDOVER.md`](docs/DESIGN-HANDOVER.md)
+— the three ways to run it, a prompt to hand Claude, and the one rule about not
+showing a number the build cannot stand behind.
+
 ## Architecture — Decision A′
 
 See `docs/ARCHITECTURE.md` for the full rationale.

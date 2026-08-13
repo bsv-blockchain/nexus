@@ -189,6 +189,14 @@ jobs:
             apps/desktop/out/*.dmg
             apps/desktop/out/*.zip
             apps/desktop/out/latest-mac.yml
+          # error, not the default warn. A missing latest*.yml is the one failure
+          # in this workflow that looks exactly like success: every installer is
+          # built, signed and attached, the job is green, and the release simply
+          # cannot update anybody on that platform. Nobody finds out until the
+          # NEXT release fails to reach them, by which time the evidence is two
+          # releases old. The Windows leg proves its metadata by hash; this is
+          # the same insistence for the two legs that cannot.
+          if-no-files-found: error
 
       # ── Linux ──────────────────────────────────────────────────────────────
       - name: build (Linux)
@@ -235,6 +243,14 @@ jobs:
             apps/desktop/out/SHA256SUMS
             apps/desktop/out/SHA256SUMS.asc
             apps/desktop/out/latest-linux.yml
+          # error, not the default warn. A missing latest*.yml is the one failure
+          # in this workflow that looks exactly like success: every installer is
+          # built, signed and attached, the job is green, and the release simply
+          # cannot update anybody on that platform. Nobody finds out until the
+          # NEXT release fails to reach them, by which time the evidence is two
+          # releases old. The Windows leg proves its metadata by hash; this is
+          # the same insistence for the two legs that cannot.
+          if-no-files-found: error
 
       # ── Windows ────────────────────────────────────────────────────────────
       - name: decode DigiCert client certificate
@@ -327,6 +343,14 @@ jobs:
           path: |
             apps/desktop/out/*.exe
             apps/desktop/out/latest.yml
+          # error, not the default warn. A missing latest*.yml is the one failure
+          # in this workflow that looks exactly like success: every installer is
+          # built, signed and attached, the job is green, and the release simply
+          # cannot update anybody on that platform. Nobody finds out until the
+          # NEXT release fails to reach them, by which time the evidence is two
+          # releases old. The Windows leg proves its metadata by hash; this is
+          # the same insistence for the two legs that cannot.
+          if-no-files-found: error
 
   release:
     needs: build
