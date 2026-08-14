@@ -11,7 +11,9 @@ import {
   useSpaceDrag,
 } from "@/components/hub/space-drag";
 import { content, type SpaceItem } from "@/lib/data";
-import { ArrowDown, ChevronRight, X } from "lucide-react";
+import { sameUrl } from "@/lib/tabs";
+import { useTabsThatReachedForWallet } from "@/lib/wallet-reach";
+import { ArrowDown, ChevronRight, Plus, X } from "lucide-react";
 import type { ReactNode } from "react";
 
 /** A folder child — an internal page or an external link. */
@@ -118,8 +120,13 @@ export function SpaceContent({
     setMainView,
     moveItemToSpace,
     moveTabToSpace,
+    pinnedSites,
+    pinSite,
   } = useHub();
   const { drag, setDrag, over, setOver } = useSpaceDrag();
+  /* One hook for every row: these are read inside a `.map`, and a hook per tab
+     would change the hook count whenever a tab opened or closed. */
+  const reachedForWallet = useTabsThatReachedForWallet();
   const items = spaceItemsBySpace[spaceId] ?? [];
   const topLevel = items.filter((item) => !item.parentId);
   const childrenOf = (id: string): SpaceItem[] =>
@@ -346,6 +353,20 @@ export function SpaceContent({
       {tabs.map((tab, tabIndex) => {
         const active = activeApp === "browser" && activeTabId === tab.id;
         const carrying = drag?.kind === "tab" && drag.id === tab.id;
+        /*
+         * Offered on the active row only, and only once the site has actually
+         * asked the wallet for something. A site that has not reached for it has
+         * told us nothing a favicon does not already say, and the rail is not a
+         * bookmarks bar — see docs/DECISIONS.md §10.
+         *
+         * Already-pinned is checked by URL rather than by id: the pinned entry
+         * carries its own id, and `sameUrl` is what the rest of the chrome uses
+         * to decide two addresses are the same place.
+         */
+        const canAddToRail =
+          active &&
+          reachedForWallet.has(tab.id) &&
+          !pinnedSites.some((site) => sameUrl(site.url, tab.url));
         return (
           <div key={tab.id} {...tabRowDrag(tabIndex)}>
           <DropLine active={overTabIndex === tabIndex} />
@@ -399,16 +420,41 @@ export function SpaceContent({
                 color={tab.faviconColor}
                 size={16}
               />
-              <HoverMarquee text={tab.title} className="min-w-0 flex-1 pr-5 text-left" />
+              {/* Wider right gutter while the offer is up, so the title gives way
+                  to it instead of running underneath. */}
+              <HoverMarquee
+                text={tab.title}
+                className={`min-w-0 flex-1 text-left ${canAddToRail ? "pr-20" : "pr-5"}`}
+              />
             </button>
-            <button
-              type="button"
-              onClick={() => closeTab(tab.id)}
-              aria-label={`Close ${tab.title}`}
-              className="focus-ring absolute right-1.5 rounded p-1 text-muted-foreground opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-surface-hover hover:text-foreground"
-            >
-              <X className="size-3.5" aria-hidden="true" />
-            </button>
+            {/* One right-aligned group rather than two absolutely-placed buttons:
+                Add is persistent and close appears on hover, so stacking them in
+                a row is what keeps the second from landing on the first. */}
+            <div className="absolute right-1.5 flex items-center gap-0.5">
+              {canAddToRail && (
+                <button
+                  type="button"
+                  onClick={() => pinSite(tab.url, tab.title)}
+                  /* The name of the thing it joins is in the rail, not on the
+                     button — at this width "Add to rail" costs the title the
+                     three words that say which site this is. */
+                  aria-label={`${content.hub.addSiteToRail} — ${tab.title}`}
+                  title={content.hub.addSiteToRail}
+                  className="focus-ring text-accent hover:bg-surface-hover flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-[11px] font-semibold"
+                >
+                  <Plus className="size-3" aria-hidden="true" />
+                  {content.hub.addSiteShort}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => closeTab(tab.id)}
+                aria-label={`Close ${tab.title}`}
+                className="focus-ring rounded p-1 text-muted-foreground opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-surface-hover hover:text-foreground"
+              >
+                <X className="size-3.5" aria-hidden="true" />
+              </button>
+            </div>
           </div>
           </div>
         );

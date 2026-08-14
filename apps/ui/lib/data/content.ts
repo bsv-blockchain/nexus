@@ -2181,6 +2181,15 @@ export const content = {
     collapsePanel: "Close this panel",
     expandPanel: "Open the panel",
     undo: "Undo",
+    /*
+     * Two lengths for one action, because the row it sits in is narrow.
+     * `addSiteShort` is what a tab row has space for once a title has had its
+     * turn; the full sentence is the accessible name and the tooltip, where
+     * there is no width to lose. A button reading "Add" with no context is fine
+     * to look at and useless to a screen reader.
+     */
+    addSiteShort: "Add",
+    addSiteToRail: "Add this site to the rail",
   },
 
   repositories: {
