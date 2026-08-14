@@ -116,6 +116,17 @@ export interface SettingsState {
    */
   revokedConnections: string[];
 
+  /**
+   * Payment links the holder has put away, by id.
+   *
+   * Archiving is not closing. A link's `status` is what the link itself is doing
+   * — open, closed, expired — and belongs to the link; this is a note about
+   * whether its owner wants to look at it, and belongs here. A closed link with
+   * takings worth remembering stays out of the archive; an open one nobody used
+   * can go in.
+   */
+  archivedPaymentLinks: string[];
+
   /* ---- Shortcuts ------------------------------------------------------ */
   /**
    * Rebound shortcuts, by id. Absent means the one that shipped.
@@ -217,6 +228,7 @@ const INITIAL: SettingsState = {
   offerToSavePasswords: false,
 
   revokedConnections: [],
+  archivedPaymentLinks: [],
   keymap: {},
   handles: ["crumbs", "breadcrumbs"],
   activeHandle: {},
@@ -306,6 +318,18 @@ export function toggleConnection(id: string): void {
     revokedConnections: revoked
       ? state.revokedConnections.filter((entry) => entry !== id)
       : [...state.revokedConnections, id],
+  };
+  emit();
+}
+
+/** Puts a payment link away, or takes it back out. Reversible, like revoking. */
+export function toggleArchivedPaymentLink(id: string): void {
+  const archived = state.archivedPaymentLinks.includes(id);
+  state = {
+    ...state,
+    archivedPaymentLinks: archived
+      ? state.archivedPaymentLinks.filter((entry) => entry !== id)
+      : [...state.archivedPaymentLinks, id],
   };
   emit();
 }

@@ -250,7 +250,6 @@ export const content = {
     collected: "collected",
     copyLink: "Copy link",
     linkCopied: "Link copied",
-    linkComingSoon: "Creating links is coming soon",
     contacts: "Contacts",
     searchContacts: "Search name or handle",
     searchActivity: "Search activity",

@@ -2,6 +2,11 @@
 
 import { ChainPolicyButton } from "@/components/apps/messages/chain-policy";
 import {
+  NewPaymentLinkFooter,
+  NewPaymentLinkPane,
+} from "@/components/apps/wallet/new-payment-link-pane";
+import { removePaymentLink } from "@/lib/payment-links-store";
+import {
   ReleaseDetail,
   ReleaseList,
 } from "@/components/hub/release-notes";
@@ -151,6 +156,30 @@ export function DetailPane(): ReactNode {
         onClose={closeDetailPane}
       >
         <ClearDataPane />
+      </SidePane>
+    );
+  }
+
+  if (detailPane?.kind === "new-payment-link") {
+    return (
+      <SidePane
+        open
+        title={content.wallet.newLinkPane.title}
+        onClose={closeDetailPane}
+        footer={<NewPaymentLinkFooter />}
+      >
+        <NewPaymentLinkPane
+          onCreated={(linkId, description) => {
+            closeDetailPane();
+            toast.success(content.wallet.newLinkPane.created, {
+              description,
+              action: {
+                label: content.hub.undo,
+                onClick: () => removePaymentLink(linkId),
+              },
+            });
+          }}
+        />
       </SidePane>
     );
   }

@@ -66,7 +66,10 @@ const ALL_WALLET_SECTIONS: {
   { id: "cash", label: "Cash", icon: Coins },
   { id: "collectibles", label: "Collectibles", icon: ImageIcon },
   { id: "activity", label: "Activity", icon: Receipt },
-  { id: "links", label: "Links", icon: Link2 },
+  /* From content, unlike its five siblings: "Payment links" already exists
+     there and the section had drifted to a shortened copy of it. The other five
+     are still hardcoded here. */
+  { id: "links", label: content.wallet.links, icon: Link2 },
   { id: "contacts", label: "Contacts", icon: Users },
   { id: "splits", label: "Splits", icon: Scissors },
 ];
@@ -96,6 +99,7 @@ export function WalletApp(): ReactNode {
     walletIntent,
     setWalletIntent,
     openApp,
+    openDetailPane,
   } = useHub();
   // A section this build does not ship is not an error: hub state persists across
   // upgrades and deep links carry it, so a dropped tab falls back to Cash rather
@@ -251,7 +255,11 @@ export function WalletApp(): ReactNode {
         );
       case "links":
         return (
-          <PaymentLinks onCreate={() => toast.info(copy.linkComingSoon)} />
+          <PaymentLinks
+            onCreate={() =>
+              openDetailPane({ kind: "new-payment-link", id: "" })
+            }
+          />
         );
       case "contacts":
         return (

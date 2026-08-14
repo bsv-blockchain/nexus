@@ -153,7 +153,9 @@ export interface DetailPane {
     /** which language pages are asked for */
     | "languages"
     /** what to wipe, and the button that wipes it */
-    | "clear-data";
+    | "clear-data"
+    /** the form for a new payment link; `id` is unused */
+    | "new-payment-link";
   /** MessagePerson id, or conversation id, per `kind` */
   id: string;
 }
