@@ -125,6 +125,6 @@ export function useTabsThatReachedForWallet(): ReadonlySet<string> {
   return useSyncExternalStore(
     subscribe,
     () => snapshot,
-    () => EMPTY,
+    () => EMPTY
   );
 }

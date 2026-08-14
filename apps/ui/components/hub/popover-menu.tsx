@@ -25,6 +25,7 @@ export function PopoverMenu({
   label,
   anchor,
   align = "end",
+  width,
 }: {
   open: boolean;
   onClose: () => void;
@@ -41,6 +42,16 @@ export function PopoverMenu({
   anchor?: { top: number; left: number; right: number; bottom: number };
   /** which edge of the trigger the menu lines up with */
   align?: "start" | "end";
+  /**
+   * Pin the menu to this width, in px — normally the trigger's own.
+   *
+   * A menu that picks one value for a field reads as part of the field, and a
+   * fixed 256px hanging under a 308px control looks like a different element
+   * that happened to open nearby. Also replaces MENU_WIDTH in the edge clamp
+   * below, which would otherwise keep a wider menu on screen by the wrong
+   * margin.
+   */
+  width?: number;
 }): ReactNode {
   useEffect(() => {
     if (!open) return;
@@ -53,13 +64,17 @@ export function PopoverMenu({
 
   /* Placed from the trigger's own rect, flush with the chosen edge and nudged
      back inside the viewport if that would overflow it. */
+  const menuWidth = width ?? MENU_WIDTH;
   const rect = anchor
     ? {
         top: anchor.bottom + 8,
         left: Math.max(
           8,
           align === "end"
-            ? Math.min(anchor.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8)
+            ? Math.min(
+                anchor.right - menuWidth,
+                window.innerWidth - menuWidth - 8
+              )
             : anchor.left,
         ),
       }
@@ -77,10 +92,15 @@ export function PopoverMenu({
       <div
         role="menu"
         aria-label={label}
-        style={rect ? { top: rect.top, left: rect.left } : undefined}
-        className={`${
-          rect ? "fixed" : "absolute"
-        } z-50 min-w-56 rounded-2xl border border-border bg-surface-raised p-1.5 shadow-2xl ${className}`}
+        style={{
+          ...(rect ? { top: rect.top, left: rect.left } : {}),
+          ...(width ? { width } : {}),
+        }}
+        /* `min-w-56` only where no width was given: with one, it is the floor
+           that would stop a narrow trigger's menu from matching it. */
+        className={`${rect ? "fixed" : "absolute"} ${
+          width ? "" : "min-w-56"
+        } z-50 rounded-2xl border border-border bg-surface-raised p-1.5 shadow-2xl ${className}`}
       >
         {children}
       </div>
