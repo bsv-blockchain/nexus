@@ -13,10 +13,10 @@ import { toggleFavourite } from "@/lib/command-effects";
 import { useCommandEffects } from "@/lib/use-command-effects";
 import { handleOf, whoisFor } from "@/lib/messages";
 import {
+  ArrowDownLeft,
   ArrowUpRight,
   BadgeCheck,
-  HandCoins,
-  Mail,
+  MessageSquare,
   Search,
   Star,
   UserRoundSearch,
@@ -144,7 +144,9 @@ export function Contacts({
               {
                 key: "message",
                 label: copy.actions.message,
-                icon: <Mail className="size-4" />,
+                /* The Messages app's own mark, not an envelope: this opens a
+                   conversation in Nexus, and nothing here sends email. */
+                icon: <MessageSquare className="size-4" />,
                 onClick: () => onMessage(person.id),
               },
               {
@@ -156,7 +158,9 @@ export function Contacts({
               {
                 key: "request",
                 label: copy.actions.request,
-                icon: <HandCoins className="size-4" />,
+                /* Same arrow as Get paid in Payments, so one act has one mark
+                   wherever it appears. */
+                icon: <ArrowDownLeft className="size-4" />,
                 onClick: () => onRequest(person.id),
               },
               {
@@ -224,7 +228,12 @@ export function Contacts({
                   </span>
                 </ProfileHovercard>
 
-                <span className="flex shrink-0 items-center gap-0.5">
+                {/* `ml-auto` because the growing sibling does not grow:
+                    ProfileHovercard puts the `flex-1` it is handed on its inner
+                    button, while the flex child of this row is its `inline-flex`
+                    wrapper, which sizes to content. Pushing from this side is
+                    independent of that. */}
+                <span className="ml-auto flex shrink-0 items-center gap-0.5">
                   {actions.map((action) => (
                     <Tooltip key={action.key} label={action.label}>
                       <button

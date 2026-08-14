@@ -137,7 +137,25 @@ export function Portfolio({
                 onClick={onClick}
                 className="focus-ring flex flex-col items-center gap-1.5 rounded-xl bg-surface-raised px-3 py-3 text-xs font-semibold ring-1 ring-border/60 transition-colors hover:bg-surface-hover"
               >
-                <Icon className="size-4 text-accent" aria-hidden="true" />
+                {/*
+                  Bigger, and mixed toward the foreground rather than sitting at
+                  the flat accent.
+
+                  `var(--foreground)` is near-black in a light theme and
+                  near-white in a dark one, so mixing the accent toward it
+                  darkens the mark on light and lightens it on dark by
+                  construction — no `dark:` variant, and it follows the custom
+                  per-workspace palettes the theme picker sets, which a pair of
+                  hardcoded colours would not.
+                */}
+                <Icon
+                  className="size-5"
+                  style={{
+                    color:
+                      "color-mix(in oklab, var(--accent) 62%, var(--foreground))",
+                  }}
+                  aria-hidden="true"
+                />
                 {label}
               </button>
             ))}

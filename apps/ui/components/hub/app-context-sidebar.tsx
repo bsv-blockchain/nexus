@@ -51,8 +51,11 @@ import {
   Upload,
   User,
   Vault as VaultIcon,
+  X,
   type LucideIcon,
 } from "lucide-react";
+import { toast } from "sonner";
+import { toggleConnection, useSettings } from "@/lib/settings-store";
 import type { ReactNode } from "react";
 
 /** Apps whose sidebar column is contextual (everything except Browse). */
@@ -748,37 +751,81 @@ function AppContextFooter({ slug }: { slug: AppSlug }): ReactNode {
 
 function ConnectSidebar(): ReactNode {
   const { connectSelected, setConnectSelected } = useHub();
-  const connections = getConnections();
+  const settings = useSettings();
+  /*
+   * Revoked sites leave this list rather than sitting in it greyed out.
+   *
+   * Safe to drop them because revoking still is not deleting: Settings › Sites
+   * lists them with their revoked state and the toggle back, and the toast below
+   * carries an Undo for the moment right after. This list answers "who can reach
+   * my wallet", and a row that cannot is a different question.
+   */
+  const connections = getConnections().filter(
+    (conn) => !settings.revokedConnections.includes(conn.id),
+  );
   const activeId = connectSelected ?? connections[0]?.id ?? null;
+  const copy = content.connect;
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
       {connections.map((conn) => {
         const active = conn.id === activeId;
+        const disconnect = (): void => {
+          toggleConnection(conn.id);
+          /* Selection would otherwise point at a row that is no longer here,
+             leaving the pane beside it showing a site this list denies. */
+          if (active) {
+            const next = connections.find((entry) => entry.id !== conn.id);
+            setConnectSelected(next?.id ?? null);
+          }
+          toast.success(conn.name, {
+            description: copy.disconnected,
+            action: {
+              label: content.hub.undo,
+              onClick: () => toggleConnection(conn.id),
+            },
+          });
+        };
         return (
-          <button
+          /* A row, not a button: the X is its own control, and a button inside a
+             button is neither valid nor clickable. */
+          <div
             key={conn.id}
-            type="button"
-            onClick={() => setConnectSelected(conn.id)}
-            className={`flex w-full items-center gap-2.5 rounded-lg p-2 text-left ${
+            className={`group relative flex items-center rounded-lg ${
               active ? "bg-accent/10" : "hover:bg-surface-hover"
             }`}
           >
-            <Favicon
-              url={conn.origin}
-              letter={conn.favicon}
-              color={conn.faviconColor}
-              size={22}
-              rounded="rounded-lg"
-            />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">
-                {conn.name}
+            <button
+              type="button"
+              onClick={() => setConnectSelected(conn.id)}
+              aria-current={active ? "true" : undefined}
+              className="focus-ring flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-2 text-left"
+            >
+              <Favicon
+                url={conn.origin}
+                letter={conn.favicon}
+                color={conn.faviconColor}
+                size={22}
+                rounded="rounded-lg"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate pr-6 text-sm font-medium">
+                  {conn.name}
+                </span>
+                <span className="block truncate pr-6 text-xs text-muted-foreground">
+                  {conn.origin.replace(/^https?:\/\//, "")}
+                </span>
               </span>
-              <span className="block truncate text-xs text-muted-foreground">
-                {conn.origin.replace(/^https?:\/\//, "")}
-              </span>
-            </span>
-          </button>
+            </button>
+            <button
+              type="button"
+              onClick={disconnect}
+              aria-label={`${copy.disconnect} ${conn.name}`}
+              title={copy.disconnect}
+              className="focus-ring absolute right-1.5 rounded p-1 text-muted-foreground opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-surface-hover hover:text-negative"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+            </button>
+          </div>
         );
       })}
     </div>

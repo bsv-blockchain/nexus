@@ -2,6 +2,7 @@
 
 import { FloatingPanel, useDismissOnOutside } from "@/components/apps/messages/floating-panel";
 import { Handle } from "@/components/apps/messages/ecosystem-tag";
+import { EcosystemHovercard } from "@/components/apps/messages/ecosystem-hovercard";
 import { Tooltip } from "@/components/hub/tooltip";
 import { MemberAvatar } from "@/components/apps/messages/member-avatar";
 import { PresenceDot } from "@/components/apps/messages/presence-dot";
@@ -208,6 +209,11 @@ function Card({
   onClose: () => void;
 }): ReactNode {
   const named = namedHandleOf(person);
+  /* Only a foreign ecosystem renders a suffix in `Handle`, so only a foreign one
+     has anything for a card to explain. */
+  const foreignEcosystem = Boolean(
+    getEcosystem(person.ecosystem) && !getEcosystem(person.ecosystem)?.local
+  );
   const presence = presenceFor(person.id);
 
   return (
@@ -224,12 +230,34 @@ function Card({
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-bold">{person.name}</p>
             {/* `Handle` puts the mark between the colon and the ecosystem
-                name, which is the format used everywhere else. */}
-            <Handle
-              person={person}
-              size={11}
-              className="mt-0.5 max-w-full truncate text-[11px] text-muted-foreground"
-            />
+                name, which is the format used everywhere else.
+
+                Wrapped where the ecosystem is a foreign one, so the suffix
+                explains itself: "@twetch" is the part of a handle a reader is
+                least likely to know, and this is the card that answers it. Only
+                where there IS a suffix — a local handle renders without one, and
+                a hover target over nothing is a promise of an answer that never
+                comes.
+
+                Wrapped here rather than inside `Handle` for two reasons: thirty
+                other call sites do not all want a hover target, and
+                ecosystem-hovercard imports ecosystem-tag, so putting it the
+                other way round is a cycle. */}
+            {foreignEcosystem ? (
+              <EcosystemHovercard ecosystem={person.ecosystem}>
+                <Handle
+                  person={person}
+                  size={11}
+                  className="mt-0.5 max-w-full truncate text-[11px] text-muted-foreground"
+                />
+              </EcosystemHovercard>
+            ) : (
+              <Handle
+                person={person}
+                size={11}
+                className="mt-0.5 max-w-full truncate text-[11px] text-muted-foreground"
+              />
+            )}
             {named && (
               <p className="truncate font-mono text-[11px] text-muted-foreground">
                 {named}

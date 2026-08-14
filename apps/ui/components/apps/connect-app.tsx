@@ -19,10 +19,20 @@ function formatDate(iso: string): string {
 export function ConnectApp(): ReactNode {
   const { connectSelected } = useHub();
   const connections = getConnections();
-  const conn =
-    connections.find((c) => c.id === connectSelected) ?? connections[0] ?? null;
   const copy = content.connect;
   const settings = useSettings();
+  /*
+   * An explicit selection wins, revoked or not — that is the one path left to
+   * this pane's Reconnect button. Only the FALLBACK skips revoked sites, because
+   * the sidebar stopped listing them: defaulting to one would put a site on
+   * screen that the list beside it says is not there, and the comment on the
+   * button below is right that these two views must not disagree.
+   */
+  const conn =
+    connections.find((c) => c.id === connectSelected) ??
+    connections.find((c) => !settings.revokedConnections.includes(c.id)) ??
+    connections[0] ??
+    null;
   const revoked = conn ? settings.revokedConnections.includes(conn.id) : false;
 
   if (!conn) {
