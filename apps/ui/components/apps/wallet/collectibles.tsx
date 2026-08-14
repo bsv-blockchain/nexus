@@ -16,13 +16,28 @@ import {
   Copy,
   ExternalLink,
   Flame,
+  Search,
   Share2,
   Ticket,
 } from "lucide-react";
+import { motion } from "motion/react";
+import { useReducedMotion } from "@/lib/motion";
 import { toast } from "sonner";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 const BUCKETS: CollectibleBucket[] = ["finite", "permanent", "expired"];
+
+/**
+ * How many of a collection are drawn before scrolling asks for the next lot.
+ *
+ * Twelve fills the widest grid this pane reaches (three columns) four rows deep,
+ * so the first screen is full and the second lot is fetched while the first is
+ * still being looked at.
+ */
+const PAGE = 12;
+
+/** Seconds between one tile appearing and the next. */
+const STAGGER = 0.035;
 
 function statusOf(item: Collectible): {
   label: string;
@@ -103,34 +118,104 @@ function Bundle({
         className="absolute rounded-2xl border-3 border-border bg-surface"
         style={{ width: "100%", height: "90%", bottom: "7.5%", left: 0, zIndex: 1 }}
       />
+      {/*
+        The frame lights up under the pointer.
+        `color-mix` against `var(--accent)` rather than a fixed colour, so it
+        follows the theme — including the per-workspace accents the theme picker
+        sets, which a hardcoded blue would ignore. Same construction as the
+        handles panel and the share backdrop.
+        Its own layer purely so it can fade: a background-image cannot be
+        transitioned, and switching one on at hover pops.
+      */}
+      <span
+        aria-hidden="true"
+        className="absolute rounded-2xl opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100"
+        style={{
+          width: "100%",
+          height: "90%",
+          bottom: "7.5%",
+          left: 0,
+          zIndex: 1,
+          backgroundImage:
+            "radial-gradient(120% 80% at 50% 100%, color-mix(in oklab, var(--accent) 30%, transparent), transparent 70%)",
+        }}
+      />
+      {/*
+        The cards behind sit HIGHER, not just narrower.
+
+        All three used to share `bottom: 0` and `height: 75%`, and the front one
+        is full width — so it covered the other two exactly, and a collection of
+        forty showed one picture. Being narrower buys nothing when the thing on
+        top is wider than you are.
+
+        Each step back now clears the front card's top edge by a few percent,
+        which is the only part of a stacked deck that ever reads as a stack. The
+        hover lift is ordered to match: the ones behind rise furthest, so the deck
+        fans open instead of closing up.
+      */}
+      {/*
+        Deeper at rest, further apart on hover, and dimmer the further back.
+
+        The stagger is the whole effect: at rest the deck sits low and the cards
+        behind are shaded, so the front one is plainly the one being offered. On
+        hover they rise past it by different amounts and the shading lifts, which
+        is the deck fanning out to say there is more in here than one.
+
+        The overlays are what make depth read at a glance — a card behind that is
+        merely smaller looks like a smaller card, while a card behind that is
+        darker looks further away. They fade rather than switch, on the same
+        durations as the lift, so shading and movement are one gesture.
+
+        The rest offsets have to earn their visibility. The front card is full
+        width, so the only part of the ones behind that shows is the sliver above
+        its top edge — a 2% offset is five pixels at this size, which is a stagger
+        in the markup and nothing on screen. 4% and 8% are the smallest that read
+        as a deck.
+
+        `object-top` on all three: these cards are a 4:3 window onto art that is
+        usually square, and centring the crop ate the top and the bottom of it.
+        Anchored to the top, a piece loses only its foot — where the least tends
+        to be happening, and where the caption is sitting anyway.
+      */}
       {third && (
         <span
-          className="absolute overflow-hidden rounded-2xl transition-all duration-200 ease-out group-hover:-translate-y-0.5"
-          style={{ width: "80%", height: "75%", left: "10%", bottom: 0, zIndex: 1 }}
+          className="absolute overflow-hidden rounded-2xl transition-all duration-300 ease-out group-hover:-translate-y-4"
+          style={{ width: "80%", height: "75%", left: "10%", bottom: "8%", zIndex: 1 }}
         >
-          <CollectibleArt src={third.imageUrl} className="size-full object-cover" />
-          <span className="absolute inset-0 bg-black/30" />
+          <CollectibleArt
+            src={third.imageUrl}
+            className="size-full object-cover object-top"
+          />
+          <span className="absolute inset-0 bg-black/55 transition-opacity duration-300 ease-out group-hover:opacity-0" />
         </span>
       )}
       {second && (
         <span
-          className="absolute overflow-hidden rounded-2xl transition-all duration-300 ease-out group-hover:-translate-y-1"
-          style={{ width: "90%", height: "75%", left: "5%", bottom: 0, zIndex: 2 }}
+          className="absolute overflow-hidden rounded-2xl transition-all duration-300 ease-out group-hover:-translate-y-2"
+          style={{ width: "90%", height: "75%", left: "5%", bottom: "4%", zIndex: 2 }}
         >
-          <CollectibleArt src={second.imageUrl} className="size-full object-cover" />
-          <span className="absolute inset-0 bg-black/15" />
+          <CollectibleArt
+            src={second.imageUrl}
+            className="size-full object-cover object-top"
+          />
+          <span className="absolute inset-0 bg-black/30 transition-opacity duration-300 ease-out group-hover:opacity-0" />
         </span>
       )}
       {front && (
         <span
-          className="absolute overflow-hidden rounded-2xl shadow-md transition-all duration-300 ease-out group-hover:-translate-y-1.5"
+          className="absolute overflow-hidden rounded-2xl shadow-md transition-all duration-300 ease-out"
           style={{ width: "100%", height: "75%", left: 0, bottom: 0, zIndex: 3 }}
         >
           <CollectibleArt
             src={front.imageUrl}
-            className="size-full object-cover"
+            className="size-full object-cover object-top"
           />
-          <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent p-3 text-left">
+          {/* Its own layer with a stated height, for the reason Tile explains. */}
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/95 via-black/60 to-transparent"
+          />
+          <span className="absolute inset-x-0 bottom-0 p-3 text-left">
             <span className="line-clamp-2 text-sm font-medium text-balance text-white">
               ({items.length}) {org}
             </span>
@@ -138,6 +223,157 @@ function Bundle({
         </span>
       )}
     </button>
+  );
+}
+
+/**
+ * Inside one collection: a search field where the heading used to be, and the
+ * grid it filters.
+ *
+ * The collection's name is the placeholder rather than a label beside the box.
+ * The name is already the reason you are on this screen — a heading repeating it
+ * spends the widest line on the page saying what the breadcrumb behind the back
+ * arrow says — and a watermark keeps it readable until the moment you type over
+ * it, which is the moment it stops being the answer.
+ *
+ * Matching is over the name, the serial and the traits, because a collection is
+ * the one place people search by attribute: "blue", "1872" and "Legendary" are
+ * all things somebody looking for one car out of six would type.
+ */
+function CollectionView({
+  org,
+  items,
+  onBack,
+  onOpen,
+}: {
+  org: string;
+  items: Collectible[];
+  onBack: () => void;
+  onOpen: (id: string) => void;
+}): ReactNode {
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const shown = q
+    ? items.filter((item) =>
+        [
+          item.name,
+          item.serialNumber,
+          item.rarity ?? "",
+          ...(item.traits ?? []).flatMap((trait) => [trait.name, trait.value]),
+          ...Object.entries(item.attributes ?? {}).flat(),
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(q)
+      )
+    : items;
+
+  return (
+    <div className="mx-auto w-full max-w-2xl">
+      <div className="mb-4 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label={content.wallet.back}
+          className="focus-ring -ml-1 rounded-md p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+        >
+          <ArrowLeft className="size-5" aria-hidden="true" />
+        </button>
+        <div className="relative min-w-0 flex-1">
+          <Search
+            className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
+            aria-hidden="true"
+          />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            /* "Search 5 Counterfeit Rares" — the count rides in the watermark
+               rather than sitting in a corner of its own. It is the size of the
+               collection, not the size of the result: a number that changed as
+               you typed would be answering a question the grid below is already
+               answering, and it disappears the moment you type anyway. */
+            placeholder={`${content.wallet.collectibles.searchCollection} ${items.length} ${org}`}
+            aria-label={`${content.wallet.collectibles.searchCollection} ${org}`}
+            /* Bold and large like the heading it replaced, so the screen keeps
+               its shape whether or not anything has been typed. */
+            className="focus-ring bg-surface ring-border/60 placeholder:text-muted-foreground w-full rounded-lg py-1.5 pr-2.5 pl-8 text-lg font-bold ring-1 placeholder:font-bold"
+          />
+        </div>
+      </div>
+      {shown.length === 0 ? (
+        <p className="rounded-2xl bg-surface px-4 py-10 text-center text-sm text-muted-foreground">
+          {content.wallet.collectibles.noMatches}
+        </p>
+      ) : (
+        <CollectionGrid items={shown} onOpen={onOpen} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * A collection's contents, a dozen at a time, each tile arriving after the one
+ * before it.
+ *
+ * The stagger is per BATCH, not per collection: the delay is the tile's position
+ * within its own twelve, so the first lot ripples in on open and every lot after
+ * it ripples in as it arrives. Framer only runs `initial → animate` when an
+ * element mounts, and these are keyed by id, so tiles already on screen sit
+ * still while the new ones come in — which is the difference between a list that
+ * extends and a list that re-animates itself every time it grows.
+ *
+ * The sentinel is what asks for more, 200px before it is reached, so the next
+ * twelve are usually decoded by the time they matter. It is only rendered while
+ * there is more to load, which is also what stops the observer re-firing at the
+ * end of the list.
+ */
+function CollectionGrid({
+  items,
+  onOpen,
+}: {
+  items: Collectible[];
+  onOpen: (id: string) => void;
+}): ReactNode {
+  const reduced = useReducedMotion();
+  const [shown, setShown] = useState(PAGE);
+  const sentinel = useRef<HTMLDivElement | null>(null);
+  const more = shown < items.length;
+
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!more || !el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        setShown((count) => Math.min(count + PAGE, items.length));
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [more, items.length]);
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {items.slice(0, shown).map((item, index) => (
+          <motion.div
+            key={item.id}
+            className="min-w-0"
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: reduced ? 0.01 : 0.28,
+              ease: [0.4, 0, 0.2, 1],
+              delay: reduced ? 0 : (index % PAGE) * STAGGER,
+            }}
+          >
+            <Tile item={item} onOpen={() => onOpen(item.id)} />
+          </motion.div>
+        ))}
+      </div>
+      {more && <div ref={sentinel} aria-hidden="true" className="h-8" />}
+    </>
   );
 }
 
@@ -161,7 +397,10 @@ function Tile({
     <button
       type="button"
       onClick={onOpen}
-      className="group focus-ring bg-surface ring-border/60 hover:ring-accent/50 relative aspect-square overflow-hidden rounded-2xl text-left ring-1 transition-all hover:-translate-y-0.5"
+      /* `w-full` because this is no longer always a direct grid child — inside a
+         collection each tile is wrapped for its entry animation, and a button is
+         inline-block, so without it the square sizes to its content. */
+      className="group focus-ring bg-surface ring-border/60 hover:ring-accent/50 relative aspect-square w-full overflow-hidden rounded-2xl text-left ring-1 transition-all hover:-translate-y-0.5"
     >
       <CollectibleArt
         src={item.imageUrl}
@@ -176,7 +415,24 @@ function Tile({
           {status.label}
         </span>
       )}
-      <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent p-3">
+      {/*
+        The ramp is its own layer, with its own height.
+
+        It used to be the text's own background, so how far the dark reached was
+        decided by how many lines the name happened to run to — two lines of
+        padding, and the top line sat where the wash was still half transparent.
+        White on whatever the artwork happened to be, which on a pale piece is
+        nothing at all. Padding was the wrong lever: it could only buy height by
+        moving the words.
+
+        Split, the height is stated. Half the tile, dark at the bottom and gone by
+        the middle, and the text sits on the dark end of it wherever it wraps to.
+      */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/95 via-black/60 to-transparent"
+      />
+      <span className="absolute inset-x-0 bottom-0 p-3">
         <span className="line-clamp-2 text-sm font-medium text-balance text-white">
           {item.name}
         </span>
@@ -491,29 +747,16 @@ export function Collectibles({
   }
 
   if (openOrg) {
-    const inside = all.filter((item) => item.org === openOrg);
     return (
-      <div className="mx-auto w-full max-w-2xl">
-        <div className="mb-4 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setOpenOrg(null)}
-            aria-label={content.wallet.back}
-            className="focus-ring -ml-1 rounded-md p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
-          >
-            <ArrowLeft className="size-5" aria-hidden="true" />
-          </button>
-          <h2 className="min-w-0 flex-1 truncate text-lg font-bold">{openOrg}</h2>
-          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-            {inside.length}
-          </span>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {inside.map((item) => (
-            <Tile key={item.id} item={item} onOpen={() => setOpenId(item.id)} />
-          ))}
-        </div>
-      </div>
+      <CollectionView
+        /* Keyed by collection so opening a second one starts empty and at twelve
+           again rather than inheriting the last one's query and scroll depth. */
+        key={openOrg}
+        org={openOrg}
+        items={all.filter((item) => item.org === openOrg)}
+        onBack={() => setOpenOrg(null)}
+        onOpen={(id) => setOpenId(id)}
+      />
     );
   }
 
