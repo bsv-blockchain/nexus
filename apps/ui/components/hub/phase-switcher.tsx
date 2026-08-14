@@ -1,6 +1,12 @@
 "use client";
 
 import {
+  DEMO_DATA_COMPILED_IN,
+  resolveDataMode,
+  setDataMode,
+  type DataMode,
+} from "@/lib/data-mode";
+import {
   PHASE_FEATURES,
   PHASE_LABELS,
   PHASES,
@@ -19,6 +25,31 @@ import {
 } from "react";
 
 const ORDER: Record<Phase, number> = { now: 0, next: 1, later: 2 };
+
+const DATA_MODES: readonly DataMode[] = ["demo", "live"];
+const DATA_MODE_LABELS: Record<DataMode, string> = {
+  demo: "Demo",
+  live: "Live",
+};
+
+/**
+ * Switch what this session reads, and reload so that everything agrees.
+ *
+ * `resolveDataMode()` is read during render by wallet-data, pay-data and the
+ * surfaces that branch on it — none of them subscribe, because the mode was
+ * never meant to change while a session was open. Flipping it in place would
+ * leave a portfolio drawn from fixtures beside a transaction list drawn from a
+ * wallet, which is worse than either. A reload is the honest way to make
+ * ninety-nine importers change their minds at once.
+ *
+ * Both directions pin an explicit override rather than clearing it. Auto-detect
+ * asks whether a shell with a wallet is present, so inside the Electron shell
+ * "Demo" has to overrule that answer to mean anything.
+ */
+function chooseDataMode(next: DataMode): void {
+  setDataMode(next);
+  window.location.reload();
+}
 
 function Level({
   label,
@@ -88,6 +119,10 @@ export function PhaseSwitcher(): ReactNode {
 
   if (!mounted) return null;
 
+  /* Read after the mount guard, not through a hook: this is localStorage plus a
+     query parameter, and the server has neither. */
+  const dataMode = resolveDataMode();
+
   const rank = ORDER[phase];
   /* The selected state first with its own new features, then what it carries
      over from the states before it. Later states are not listed: the point of
@@ -115,7 +150,7 @@ export function PhaseSwitcher(): ReactNode {
           >
             <div className="border-border/60 flex items-center gap-2 border-b p-3">
               <p className="text-muted-foreground flex-1 text-[10px] font-semibold tracking-[1px] uppercase">
-                Product state
+                Demo controls
               </p>
               <button
                 type="button"
@@ -127,7 +162,54 @@ export function PhaseSwitcher(): ReactNode {
               </button>
             </div>
 
+            {/* Only where there is something to switch to. With fixtures
+                compiled out `resolveDataMode` refuses a demo override and keeps
+                the session live, so this pair of buttons would offer a choice
+                the build cannot honour — the same "control that spends a tap to
+                say no" the Exchange action was dropped for. */}
+            {DEMO_DATA_COMPILED_IN && (
             <div className="border-border/60 border-b p-3">
+              <p className="text-muted-foreground pb-1.5 text-[10px] font-semibold tracking-[1px] uppercase">
+                Data
+              </p>
+              <div
+                role="group"
+                aria-label="Data source"
+                className="bg-surface ring-border/60 grid grid-cols-2 gap-0.5 rounded-lg p-0.5 ring-1"
+              >
+                {DATA_MODES.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-pressed={dataMode === option}
+                    onClick={() => chooseDataMode(option)}
+                    className={`focus-ring rounded-md px-2 py-1.5 text-xs font-semibold transition-colors ${
+                      dataMode === option
+                        ? "bg-accent/20 text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {DATA_MODE_LABELS[option]}
+                  </button>
+                ))}
+              </div>
+              {/* Live in a demo build is the honest empty screen, not a broken
+                  one. Said here because the difference between "no service
+                  answers this" and "this failed" is invisible once the rows are
+                  gone, and somebody who flipped the switch a minute ago has
+                  already forgotten they did. */}
+              <p className="text-muted-foreground mt-1.5 text-[10px] leading-relaxed text-pretty">
+                {dataMode === "demo"
+                  ? "Fixtures. Every surface has rows to show."
+                  : "Only what a service can answer. Empty states are correct here."}
+              </p>
+            </div>
+            )}
+
+            <div className="border-border/60 border-b p-3">
+              <p className="text-muted-foreground pb-1.5 text-[10px] font-semibold tracking-[1px] uppercase">
+                Product state
+              </p>
               <div
                 role="group"
                 aria-label="Product state"

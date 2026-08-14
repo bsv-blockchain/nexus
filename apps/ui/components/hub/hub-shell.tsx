@@ -135,9 +135,19 @@ function Shell(): ReactNode {
           what we would ship first" is a conversation, not a feature. A shipped
           binary has one product state, so the chip has nothing to switch and the
           panel behind it lists features nobody in that build can reach. Gated
-          here rather than inside the component so that with the flag folded to
-          a literal false the whole thing leaves the bundle. */}
-      {DEMO_SURFACES && <PhaseSwitcher />}
+          here rather than inside the component so that with both flags folded to
+          literal false the whole thing leaves the bundle.
+
+          The `dev` half is why it appears in the Electron shell. `dev:wallet`
+          sets NEXT_PUBLIC_DEMO_DATA=0, which used to take the chip with it — so
+          the one build where you can see a real wallet was the one build with no
+          way to switch product state. A packaged binary is a production build
+          with the flag off, so it is still absent there, which is the part that
+          matters. The panel drops its own Data section when fixtures are
+          compiled out; see phase-switcher. */}
+      {(DEMO_SURFACES || process.env.NODE_ENV === "development") && (
+        <PhaseSwitcher />
+      )}
     </div>
   );
 }
