@@ -146,6 +146,11 @@ export const content = {
     },
     collectibles: {
       title: "Collectibles",
+      /* The accessible name for the field that replaced the collection's
+         heading. The visible watermark is the collection's own name, which says
+         where you are but not what the box does. */
+      searchCollection: "Search",
+      noMatches: "Nothing in here matches that.",
       /* Tab labels, so short enough to sit in a row of three. */
       buckets: {
         permanent: "Permanent",
@@ -192,7 +197,54 @@ export const content = {
     newLink: "New link",
     linksHint:
       "A link anyone can pay, without needing your address. Share it, and payments land against your handle.",
-    linkStatus: { open: "Open", closed: "Closed", expired: "Expired" },
+    /* "Active" rather than "Open": a payment link is not a door, and next to
+       Closed and Expired the question it answers is whether it still takes
+       money. */
+    linkStatus: { open: "Active", closed: "Closed", expired: "Expired" },
+    linkTabs: { active: "Active", archived: "Archived" },
+    archiveLink: "Archive",
+    restoreLink: "Restore",
+    previewLink: "Preview",
+    /* The preview is somebody else's screen, which is the whole reason to look
+       at it — you cannot see your own link the way the person paying does. */
+    previewTitle: "What the payer sees",
+    previewAccepting: "Accepting until",
+    previewPay: "Pay",
+    previewNote: "A preview. Nothing here is live, and no payment can be made.",
+    linkArchived: "Archived",
+    linkRestored: "Back in Active",
+    noArchivedLinks: "Nothing archived.",
+    /*
+     * The new-link form.
+     *
+     * Two kinds of link, because that is what the seeded ones are: one names a
+     * price and one lets the payer decide. Everything else — which asset, how
+     * long it lasts, what it is for — every link has.
+     */
+    newLinkPane: {
+      title: "New payment link",
+      descriptionLabel: "What is it for",
+      /* The kinds of thing rather than one of them. The old watermark was a
+         seeded link's own description, which read as an instruction to sell
+         agricultural sample kits. */
+      descriptionPlaceholder: "Deposit, invoice, ticket…",
+      descriptionHint: "The payer sees this, so name the thing being paid for.",
+      kindLabel: "Amount",
+      kindFixed: "Fixed price",
+      kindOpen: "Payer chooses",
+      kindFixedHint: "Everyone pays the same amount.",
+      kindOpenHint: "Each payer decides what to send.",
+      amountLabel: "Price per payer",
+      assetLabel: "Paid in",
+      assetEmpty: "Choose an asset",
+      expiryLabel: "Stops accepting",
+      expiryDays: "days from now",
+      submit: "Create link",
+      created: "Payment link created",
+      /* Said once, on the form, rather than discovered after sharing it. */
+      noBackendNote:
+        "Nothing is published. A link made here lasts as long as this session.",
+    },
     perPayer: "per payer",
     payerChooses: "Payer chooses the amount",
     collected: "collected",
@@ -1296,6 +1348,9 @@ export const content = {
     lastUsed: "Last used",
     disconnect: "Disconnect",
     reconnect: "Reconnect",
+    /* Past tense, for the toast that confirms it. Deliberately not "Removed":
+       the access is gone, the record is not — Settings › Sites still has it. */
+    disconnected: "Disconnected. It can no longer reach your wallet.",
   },
   baskets: {
     title: "Output baskets",
