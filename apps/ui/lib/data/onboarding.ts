@@ -81,23 +81,23 @@ function band(slug: string, alt: string): OnboardingMedia {
 export const appOnboarding: AppOnboarding[] = [
   {
 slug: "profiles",
-    title: "Profiles",
+    title: "Workspaces",
     headline: "One device, several lives, kept apart.",
     features: [
       {
         id: "what",
         title: "A context, not an account",
         summary: "Nothing to sign into. You are the same person in all of them.",
-        body: "A profile answers which version of you is doing this, and the answer decides which name people see and which money moves. Work and Personal are the obvious pair; a shop, a side project or a shared household are the same idea.",
+        body: "A workspace answers which version of you is doing this, and the answer decides which name people see and which money moves. Work and Personal are the obvious pair; a shop, a side project or a shared household are the same idea.",
       },
       {
         id: "connections",
         title: "One handle, one wallet, its own apps",
-        summary: "Connected from what you own, not owned by the profile.",
-        body: "One of each rather than several: a context holding three wallets puts which one did that come from back on every payment, which is what a profile is meant to settle. The same wallet can serve two profiles, and the left column says when it does.",
+        summary: "Connected from what you own, not owned by the workspace.",
+        body: "One of each rather than several: a context holding three wallets puts which one did that come from back on every payment, which is what a workspace is meant to settle. The same wallet can serve two workspaces, and the left column says when it does.",
         steps: [
-          "Pick a handle and a wallet under a profile's Connections tab.",
-          "Connect an app another profile already has from the row above its list.",
+          "Pick a handle and a wallet under a workspace's Connections tab.",
+          "Connect an app another workspace already has from the row above its list.",
           "Anything new comes from Apps, which asks for permissions first.",
         ],
       },
@@ -110,8 +110,8 @@ slug: "profiles",
       {
         id: "browsing",
         title: "Browsing stays where it happened",
-        summary: "Tabs and bookmarks belong to the profile that opened them.",
-        body: "A tab opened in Work stays in Work. Drag one onto another column to move it — a profile without Browse gets it connected on the drop, since a bookmark it cannot open is no use to it.",
+        summary: "Tabs and bookmarks belong to the workspace that opened them.",
+        body: "A tab opened in Work stays in Work. Drag one onto another column to move it — a workspace without Browse gets it connected on the drop, since a bookmark it cannot open is no use to it.",
       },
     ],
   },
@@ -273,13 +273,13 @@ slug: "profiles",
   {
     slug: "browser",
     headline: "The web, with a wallet and an identity already in it.",
-    media: band("browser", "Browsing with Nexus profiles and spaces"),
+    media: band("browser", "Browsing with Nexus workspaces"),
     features: [
       {
         id: "spaces",
         title: "Spaces keep contexts apart",
-        summary: "Each profile has its own tabs, theme and identity.",
-        body: "Work and personal browsing do not share a key, a history or a look. Switching profile switches all three at once, so there is no state left behind to leak between them.",
+        summary: "Each workspace has its own tabs, theme and identity.",
+        body: "Work and personal browsing do not share a key, a history or a look. Switching workspace switches all three at once, so there is no state left behind to leak between them.",
       },
       {
         id: "connect",

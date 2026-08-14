@@ -50,9 +50,9 @@ const systemTabs: {
 }[] = [
   {
     id: "spaces",
-    label: "Profiles",
+    label: "Workspaces",
     icon: Layers,
-    desc: "Switch between your profiles. Each keeps its own browser tabs, balances and identities.",
+    desc: "Switch between your workspaces. Each keeps its own browser tabs, balances and identities.",
   },
   {
     id: "apps",

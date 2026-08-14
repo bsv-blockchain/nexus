@@ -21,8 +21,8 @@ export const content = {
     },
     downloads: {
       title: "Downloads",
-      empty: "Nothing downloaded in this profile.",
-      profile: "Profile",
+      empty: "Nothing downloaded in this workspace.",
+      profile: "Workspace",
       failed: "Stopped before it finished",
       retry: "Try again",
     },
@@ -31,7 +31,7 @@ export const content = {
      *
      * "Connect" is the web3 word — the same act Coinbase calls a dapp connection
      * and MetaMask calls a connected site — and it means a grant against this
-     * profile's wallet. It is never a synonym for downloading: a built-in app was
+     * workspace's wallet. It is never a synonym for downloading: a built-in app was
      * already in the binary, and a web app stays on somebody else's server.
      *
      * So nothing here says install, purchase or update. "Add to rail" is the whole
@@ -57,7 +57,7 @@ export const content = {
        */
       sitesTitle: "Connected sites",
       subtitle:
-        "Websites you've connected to this profile. Opening one opens the website.",
+        "Websites you've connected to this workspace. Opening one opens the website.",
       onRail: "On your rail",
       add: "Add to rail",
       remove: "Remove from rail",
@@ -78,7 +78,7 @@ export const content = {
     },
   },
   wallet: {
-    /* The multi-wallet switcher, shared by the wallet app and Profiles. */
+    /* The multi-wallet switcher, shared by the wallet app and Workspaces. */
     switcher: {
       title: "Wallets",
       active: "Spending from this",
@@ -108,9 +108,9 @@ export const content = {
       importWarning:
         "Anything typed here can spend everything it holds. Nothing in this prototype is sent anywhere, but that is a habit worth keeping outside it.",
       importAction: "Import",
-      added: "Added, and active in this profile",
+      added: "Added, and active in this workspace",
       scopeNote:
-        "Picking one connects it to this profile. A profile uses one wallet at a time.",
+        "Picking one connects it to this workspace. A workspace uses one wallet at a time.",
     },
     balanceLabel: "Total balance",
     totalValue: "Portfolio value",
@@ -1181,7 +1181,7 @@ export const content = {
       title: "Handles",
       yoursTitle: "Your handles",
       yoursHint:
-        "The names people reach you by. Up to five, and each profile answers to one of them.",
+        "The names people reach you by. Up to five, and each workspace answers to one of them.",
       active: "Active here",
       useHere: "Use here",
       addTitle: "Claim another",
@@ -1201,7 +1201,7 @@ export const content = {
       buyFor: "Buy for {price}",
       forSaleBy: "For sale by {seller}",
       bought:
-        "Bought. It is yours, and the profile you were on now answers to it.",
+        "Bought. It is yours, and the workspace you were on now answers to it.",
       onNexus: "On Nexus, and anywhere your handle resolves",
       change: "Change",
       cancel: "Cancel",
@@ -1455,27 +1455,27 @@ export const content = {
     emptyColumn: "Nothing here yet.",
   },
   newItemMenu: {
-    newSpace: "New Profile",
+    newSpace: "New Workspace",
     newFolder: "New Folder",
     newTab: "New Tab",
   },
   spaceMenu: {
-    changeIcon: "Change Profile Icon",
-    rename: "Rename Profile",
+    changeIcon: "Change Workspace Icon",
+    rename: "Rename Workspace",
     editTheme: "Edit Theme Color…",
-    setProfile: "Set Profile",
+    setProfile: "Set Workspace",
     newFolder: "New Folder",
     liveFolders: "Live Folders",
-    shareSpace: "Share Profile",
-    manageSpaces: "Manage Profiles",
-    deleteSpace: "Delete Profile",
+    shareSpace: "Share Workspace",
+    manageSpaces: "Manage Workspaces",
+    deleteSpace: "Delete Workspace",
     // sub-panels
     iconPanelTitle: "Change icon",
     themePanelTitle: "Theme color",
-    profilePanelTitle: "Set profile",
+    profilePanelTitle: "Set workspace",
     liveFoldersPanelTitle: "Add live folder",
     back: "Back",
-    // profile options
+    // workspace options
     profilePersonal: "Personal",
     profileWork: "Work",
     profileShared: "Shared",
@@ -1484,14 +1484,14 @@ export const content = {
     liveTodaysTabs: "Today's Tabs",
     liveFavorites: "Favorites",
     // dialogs
-    renameTitle: "Rename profile",
+    renameTitle: "Rename workspace",
     renameSave: "Save",
     renameCancel: "Cancel",
-    deleteTitle: "Delete this profile?",
+    deleteTitle: "Delete this workspace?",
     deleteBody: "Its tabs and folders will be removed. This can't be undone.",
-    deleteConfirm: "Delete profile",
-    deleteCancel: "Keep profile",
-    manageTitle: "Manage profiles",
+    deleteConfirm: "Delete workspace",
+    deleteCancel: "Keep workspace",
+    manageTitle: "Manage workspaces",
     manageMoveUp: "Move up",
     manageMoveDown: "Move down",
   },
@@ -1639,7 +1639,7 @@ export const content = {
     hub: "Sync with Nexus Desktop",
     sync: {
       title: "Sync with Nexus Desktop",
-      subtitle: "Search, browse, and pin to your profiles on the go.",
+      subtitle: "Search, browse, and pin to your workspaces on the go.",
       signIn: "Sign in with Nexus",
       noAccount: "I don't have an account",
     },
@@ -1666,8 +1666,8 @@ export const content = {
       startupNewTab: "A new tab",
       startupContinue: "Where you left off",
       startupHome: "Your home page",
-      restoreProfile: "Reopen the profile you were last in",
-      restoreProfileHint: "Off always starts in your first profile.",
+      restoreProfile: "Reopen the workspace you were last in",
+      restoreProfileHint: "Off always starts in your first workspace.",
 
       /* Rows that used to toast "coming soon". Each is a real setting now, so
          each needs the words for what it does. */
@@ -1889,7 +1889,7 @@ export const content = {
       sitesTitle: "Sites",
       tabsTitle: "Tabs",
       filesTitle: "Files",
-      downloadsHint: "What each profile has downloaded.",
+      downloadsHint: "What each workspace has downloaded.",
       devTitle: "Developer",
       devHint: "Off by default. These change what pages can see and do.",
       devToolsLabel: "Developer tools",
@@ -1983,9 +1983,9 @@ export const content = {
       modeLight: "Light",
       modeDark: "Dark",
       modeAuto: "Match this device",
-      themeDefault: "Every profile uses the default styling.",
-      themeReset: "Reset profile colours",
-      themeResetDone: "Every profile is back to the default styling",
+      themeDefault: "Every workspace uses the default styling.",
+      themeReset: "Reset workspace colours",
+      themeResetDone: "Every workspace is back to the default styling",
       brandTitle: "Name for the chain",
       brandHint: "Two names for one network. Pick the one you use.",
       brandScope:
@@ -2119,22 +2119,22 @@ export const content = {
     pickerTitle: "Pick an app for this pane",
     pickerSearch: "Search your apps",
     pickerNoMatch: "Nothing matches that.",
-    noneToSplit: "No other app is connected to this profile.",
-    disconnect: "Disconnect from this profile",
+    noneToSplit: "No other app is connected to this workspace.",
+    disconnect: "Disconnect from this workspace",
     disconnected: "Disconnected from",
   },
 
-  /** the profiles manager: what each profile is connected to */
+  /** the workspaces manager: what each workspace is connected to */
   profiles: {
     sidebar: {
-      title: "Profiles",
-      statProfiles: "profiles",
+      title: "Workspaces",
+      statProfiles: "workspaces",
       statHandles: "handles",
       statWallets: "wallets",
-      allProfiles: "All profiles",
+      allProfiles: "All workspaces",
       current: "You are here",
       rowSummary: "{handle} · {wallet}",
-      sharedTitle: "Shared across profiles",
+      sharedTitle: "Shared across workspaces",
       sharedHint:
         "Not a mistake, but worth knowing about if you are keeping these apart.",
     },
@@ -2150,8 +2150,8 @@ export const content = {
       wallet: "Wallet",
       connectHandle: "Connect a handle",
       connectWallet: "Connect a wallet",
-      pickHandle: "Handle for this profile",
-      pickWallet: "Wallet for this profile",
+      pickHandle: "Handle for this workspace",
+      pickWallet: "Wallet for this workspace",
       newHandle: "Claim another handle",
       newWallet: "Add a wallet",
       nowWallet: "Now the wallet for",
@@ -2160,7 +2160,7 @@ export const content = {
       /* The trigger is a watermark in a 288px column; the popover's label is
          where the whole sentence belongs. */
       addApp: "Connect an app",
-      addAppLabel: "Connect an app from another profile",
+      addAppLabel: "Connect an app from another workspace",
       connectedTo: "Connected to",
       morePile: "+{n} more",
       locked: "Locked",
@@ -2169,10 +2169,10 @@ export const content = {
       nowOn: "Now the handle for",
       disconnected: "Disconnected from",
       noApps: "No apps connected.",
-      /* Apps are still connected for the whole Nexus rather than per profile,
+      /* Apps are still connected for the whole Nexus rather than per workspace,
          and the note says so rather than letting the surrounding switches imply
          otherwise. */
-      footnote: "Permissions are scoped to this profile's wallet.",
+      footnote: "Permissions are scoped to this workspace's wallet.",
     },
   },
 
@@ -2242,7 +2242,7 @@ export const content = {
     dark: "Dark",
     /* Said on the way past, because picking a mode also drops a custom
        palette and somebody who spent a minute on theirs deserves the word. */
-    modeReset: "Default palette, for this profile",
+    modeReset: "Default palette, for this workspace",
     ofTheme: "theme",
     savedTitle: "Saved themes",
     delete: "Delete",
