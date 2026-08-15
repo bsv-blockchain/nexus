@@ -54,7 +54,10 @@ export const hubApps: HubApp[] = [
     id: "app-wallet",
     slug: "wallet",
     name: "Payments",
-    shortName: "Wallet",
+    /* The rail reads `shortName`, which had been left behind when the app was
+       renamed — so the store said Payments and the rail beside it said Wallet.
+       Not shorter than the name it abbreviates, but the rail has room for it. */
+    shortName: "Payments",
     description:
       "Make payments, check your balance and browse your full transaction history.",
     tagline: "Payments & balance",
