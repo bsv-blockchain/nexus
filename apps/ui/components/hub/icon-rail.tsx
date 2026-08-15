@@ -1,7 +1,6 @@
 "use client";
 
 import { AppTile, SiteTile } from "@/components/hub/app-icon";
-import { ShellVersion } from "@/components/hub/shell-version";
 import { GroupSettingsDialog } from "@/components/hub/group-settings-dialog";
 import {
   useHub,
@@ -683,9 +682,6 @@ export function IconRail(): ReactNode {
         control you have to look for.
       */}
       <div className="flex w-full shrink-0 flex-col items-center gap-1 pt-3">
-        {/* Collapsed, the rail is 64px and there is no width to be had; the
-            version lives in Settings › About either way. */}
-        {!railCollapsed && <ShellVersion />}
         <div
           className={`flex w-full items-center ${
             railCollapsed

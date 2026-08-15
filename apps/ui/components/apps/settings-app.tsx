@@ -3,6 +3,7 @@
 import { Favicon } from "@/components/hub/favicon";
 import { IdentitySigil } from "@/components/hub/identity-sigil";
 import { QrBlock } from "@/components/hub/qr-block";
+import { ShellVersion } from "@/components/hub/shell-version";
 import { useCustomTheme } from "@/components/hub/theme-provider";
 import { useHub, type SettingsCategory } from "@/components/hub/hub-provider";
 import {
@@ -1271,9 +1272,29 @@ export function SettingsApp(): ReactNode {
       <div className="mx-auto max-w-2xl px-5 py-6 sm:px-8">
         <header className="mb-5">
           <h1 className="text-lg font-bold">{category?.label}</h1>
-          <p className="text-muted-foreground mt-0.5 text-sm text-pretty">
-            {category?.hint}
-          </p>
+          {/*
+            About says which build this is, where every other category says what
+            it is for.
+
+            It used to sit in the rail, under the apps, which put a version
+            number on screen at all times for the one moment a year somebody
+            needs it. This is where they come looking, and the header line was
+            spending itself on "Version and what changed" directly above a group
+            titled Version.
+
+            The SHELL's version, which is the part the panel below cannot state:
+            that group reports the chrome's own release, and these two differ —
+            a desktop build carries a chrome it may have shipped a week earlier.
+            Renders nothing where no shell answers, which is the honest result in
+            a browser: there is no shell to have a version.
+          */}
+          {settingsCategory === "about" ? (
+            <ShellVersion className="mt-0.5" />
+          ) : (
+            <p className="text-muted-foreground mt-0.5 text-sm text-pretty">
+              {category?.hint}
+            </p>
+          )}
         </header>
         {/* Ours, and the one panel here that is live rather than drawn: keys,
             network and BRC-157 backup all reach @nexus/wallet-core. It sits
