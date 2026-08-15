@@ -1,5 +1,6 @@
 "use client";
 
+import { FirstRun } from "@/components/hub/first-run";
 import { PhaseSwitcher } from "@/components/hub/phase-switcher";
 import { DEMO_SURFACES } from "@/lib/surfaces";
 import { AppCollections } from "@/components/hub/app-collections";
@@ -148,6 +149,17 @@ function Shell(): ReactNode {
       {(DEMO_SURFACES || process.env.NODE_ENV === "development") && (
         <PhaseSwitcher />
       )}
+      {/* Demo only. Its last card tells somebody a handle is free, and nothing
+          in a live build can know that — lib/handle-suggest says why, and
+          PROMOTING-DEMO-SURFACES.md says what would have to exist first.
+
+          The flag folds to a literal false, so this never RENDERS in a shipped
+          build, which is the part that matters. It does not leave the bundle:
+          the import above is static, so the module is still emitted — measured,
+          not assumed, and true of PhaseSwitcher above as well despite what its
+          comment says. Dropping it for real means a dynamic import, which is a
+          size question rather than an honesty one. */}
+      {DEMO_SURFACES && <FirstRun />}
     </div>
   );
 }

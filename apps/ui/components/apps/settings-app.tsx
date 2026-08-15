@@ -36,6 +36,7 @@ import {
 } from "@/components/apps/settings/blocks";
 import { WalletSettingsPanel } from "@/components/apps/settings-wallet";
 import { DEMO_SURFACES } from "@/lib/surfaces";
+import { resetFirstRun } from "@/lib/first-run";
 import { AutofillPanel } from "@/components/apps/settings/autofill-panel";
 import { UpdatePanel } from "@/components/apps/settings/update-panel";
 import { PermissionsPanel } from "@/components/apps/settings/permissions-panel";
@@ -898,6 +899,36 @@ export function AppearancePanel(): ReactNode {
 
   return (
     <>
+      {/* Above the theme, because it is the thing somebody came here to find
+          again — a welcome you cannot get back to is a demo you can only give
+          once. Demo-gated to match the screen it replays: with fixtures
+          compiled out there is no first run to trigger, and a row that does
+          nothing is worse than no row. */}
+      {DEMO_SURFACES && (
+        <Group
+          title={content.settings.onboarding.title}
+          hint={content.settings.onboarding.hint}
+        >
+          <Row
+            label={content.settings.onboarding.firstRunLabel}
+            hint={content.settings.onboarding.firstRunHint}
+            value={content.settings.onboarding.replay}
+            onClick={() => {
+              resetFirstRun();
+              toast.success(content.settings.onboarding.replayDone);
+            }}
+          />
+          {/* Named now and empty on purpose: the flow after the first run is
+              next, and a section that appears later looks like a setting that
+              moved. */}
+          <Row
+            label={content.settings.onboarding.flowLabel}
+            hint={content.settings.onboarding.flowHint}
+            value={content.settings.onboarding.soon}
+          />
+        </Group>
+      )}
+
       <Group title={copy.themeTitle} hint={copy.themeHint}>
         <ModePicker />
         {/* One look across every profile. Per-profile palettes were a way to

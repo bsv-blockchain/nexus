@@ -1766,6 +1766,20 @@ export const content = {
 
   /** the settings surface the rail's gear opens */
   settings: {
+    /* The first-run controls. Kept in Settings rather than a hidden gesture
+       because the people who most need to replay it are the ones showing it to
+       somebody else. */
+    onboarding: {
+      title: "Onboarding",
+      hint: "What a new arrival is shown, and how to see it again.",
+      firstRunLabel: "First run",
+      firstRunHint: "The welcome cards and the handle you picked.",
+      replay: "Show again",
+      replayDone: "The first run will play again",
+      flowLabel: "Guided setup",
+      flowHint: "The longer walk-through that follows the welcome.",
+      soon: "Not built yet",
+    },
     title: "Settings",
     soon: "Coming soon",
     /* Pairing a phone to this Nexus, at the head of General. */
@@ -2052,6 +2066,63 @@ export const content = {
     title: "Getting started with",
     button: "What this app does",
     open: "Open",
+  },
+
+  /**
+   * The first run — five cards, then a name.
+   *
+   * Written to Raycast's discipline, which is the reference: two or three words
+   * of title, one sentence under it, and never a second. A first run is read
+   * standing up, and the reader has not agreed to anything yet.
+   *
+   * The middle three are Browse, Payments and Workspaces — the two surfaces
+   * that actually ship, and the one piece of chrome the rest hangs off. Nothing
+   * here promises a feature this build does not have.
+   */
+  firstRun: {
+    next: "Next",
+    finish: "Finish",
+    skip: "Skip",
+    back: "Back",
+    stepLabel: "Step",
+    steps: {
+      welcome: {
+        title: "Welcome to Nexus",
+        body: "The web, your money and your name, finally in one place.",
+      },
+      browse: {
+        title: "The web, with a wallet in it",
+        body: "Pages load as they always did. The ones that speak Bitcoin can now ask.",
+      },
+      pay: {
+        title: "Pay a name, not an address",
+        body: "Send to a handle. Nothing to copy, no chain to choose.",
+      },
+      workspaces: {
+        title: "One device, several lives",
+        body: "Work and personal keep their own tabs, wallet and name.",
+      },
+    },
+    handle: {
+      title: "Pick your handle",
+      body: "This is the name people pay. You can change it later.",
+      label: "Your handle",
+      shuffle: "Suggest another",
+      claim: "Claim it",
+      /* Where it lives afterwards, not a warning. The line above already says
+         it can be changed; this says where, because "you can change it later"
+         is only reassuring if somebody can find the later. Identity › Your
+         handles is the screen that holds them. */
+      changeNote:
+        "Change it whenever you like in Identity, and keep more than one if you need to.",
+      status: {
+        ok: "Available",
+        taken: "Already taken",
+        malformed: "Letters and numbers only, three to twenty.",
+        empty: "Pick something.",
+      },
+      claimed: "Your handle is",
+    },
   },
 
   /** the What's new pane, read from lib/data/releases.ts */
