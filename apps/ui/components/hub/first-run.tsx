@@ -14,10 +14,12 @@ import TiltedTiles from "@/components/hub/vendor/tilted-tiles";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, Check, Shuffle } from "lucide-react";
 import {
+  Component,
   useCallback,
   useEffect,
   useRef,
   useState,
+  type ErrorInfo,
   type ReactNode,
 } from "react";
 
@@ -35,6 +37,79 @@ const GlowingWave = dynamic(
   () => import("@/components/hub/vendor/glowing-wave"),
   { ssr: false }
 );
+
+/**
+ * Whether this surface can draw the wave at all.
+ *
+ * three throws outright when a WebGL context cannot be created, and
+ * @react-three/fiber turns that into a render-time error — which is how a
+ * missing GPU takes down the whole welcome rather than just its background.
+ * Reproduced in a headless Chrome with WebGL disabled: "THREE.WebGLRenderer:
+ * Error creating WebGL context", and inside r3f's own Provider it surfaces as a
+ * null `addEventListener`.
+ *
+ * Asked once, on the client, with the throwaway canvas released immediately.
+ * Contexts are a limited resource and leaking one to answer a yes/no question
+ * would be a poor trade on a machine already short of them.
+ */
+function useHasWebgl(): boolean {
+  /* A lazy initialiser rather than an effect, for the reason the handle
+     suggestion is one: this component never renders on the server, so touching
+     `document` during the first render is safe, and asking in an effect would
+     mean a render with the wave missing before a second with it there. */
+  const [ok] = useState(() => {
+    try {
+      const probe = document.createElement("canvas");
+      const gl =
+        probe.getContext("webgl2") ??
+        probe.getContext("webgl") ??
+        probe.getContext("experimental-webgl");
+      /* Hand the context back rather than waiting for the collector. */
+      (gl as WebGLRenderingContext | null)
+        ?.getExtension("WEBGL_lose_context")
+        ?.loseContext();
+      return Boolean(gl);
+    } catch {
+      return false;
+    }
+  });
+  return ok;
+}
+
+/**
+ * Keeps a failing backdrop from taking the welcome with it.
+ *
+ * The capability check above catches the common case; this catches the rest —
+ * a driver that reports WebGL and then fails, a context lost mid-render, a
+ * future component that throws for its own reasons. A first run is the one
+ * screen where a crash costs the whole first impression, and the thing being
+ * guarded is decoration: rendering nothing is a complete answer.
+ */
+class BackdropBoundary extends Component<
+  { children: ReactNode },
+  { failed: boolean }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { failed: false };
+  }
+
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true };
+  }
+
+  override componentDidCatch(error: Error, info: ErrorInfo): void {
+    console.warn(
+      "first-run backdrop failed, continuing without it",
+      error,
+      info
+    );
+  }
+
+  override render(): ReactNode {
+    return this.state.failed ? null : this.props.children;
+  }
+}
 
 /**
  * The wave's colours, taken from the theme rather than chosen.
@@ -88,39 +163,25 @@ function useThemeInk(): { hot: string; ink: string; backdrop: string } {
 }
 
 /**
- * Card art — the Scroll Stack defaults, until the real renders land.
+ * Card art.
  *
- * Remote, and knowingly so. `tools/check-injection-sources.mjs` bans third-party
- * FAVICON services, because routing those hands somebody else the hostname of
- * every site a person pins; it says nothing about images, and this is a fixed
- * set of four that leaks nothing about the reader.
- *
- * They still have to be replaced before this could ship: a welcome screen that
- * waits on someone else's CDN is a bad first impression, and an offline one is
- * four grey boxes. Swap these four lines for local files when the art arrives.
+ * Local, and named for the step rather than the photograph, so replacing one is
+ * dropping a file over another rather than editing this list. Placeholders from
+ * the component's own demo set until the real renders land.
  */
 const STEPS = [
-  {
-    key: "welcome",
-    image:
-      "https://images.unsplash.com/photo-1487958449943-2429e8be8625?q=80&w=1200&auto=format&fit=crop",
-  },
-  {
-    key: "browse",
-    image:
-      "https://images.unsplash.com/photo-1518005020951-eccb494ad742?q=80&w=1200&auto=format&fit=crop",
-  },
-  {
-    key: "pay",
-    image:
-      "https://images.unsplash.com/photo-1449157291145-7efd050a4d0e?q=80&w=1200&auto=format&fit=crop",
-  },
-  {
-    key: "workspaces",
-    image:
-      "https://images.unsplash.com/photo-1470075801209-17f9ec0cada6?q=80&w=1200&auto=format&fit=crop",
-  },
+  { key: "welcome", image: "/first-run/welcome.jpg" },
+  { key: "browse", image: "/first-run/browse.jpg" },
+  { key: "pay", image: "/first-run/pay.jpg" },
+  { key: "workspaces", image: "/first-run/workspaces.jpg" },
 ] as const;
+
+/** The wall on the browsing card. Same story: local, numbered, replaceable. */
+const TILES = Array.from(
+  { length: 10 },
+  (_, index) =>
+    `/first-run/tiles/tile-${String(index + 1).padStart(2, "0")}.jpg`
+);
 
 /** The handle card sits after the four told ones. */
 const LAST = STEPS.length;
@@ -162,6 +223,7 @@ function Run(): ReactNode {
   const settings = useSettings();
   const { activeSpaceId } = useHub();
   const wave = useThemeInk();
+  const canWave = useHasWebgl();
   const theme = useCustomTheme();
   const scroller = useRef<HTMLDivElement | null>(null);
   const [index, setIndex] = useState(0);
@@ -344,36 +406,46 @@ function Run(): ReactNode {
             canvas, drawing nothing. The wrapper owns the placement; the wave
             just fills it.
           */}
-          <div ref={waveBox} className="pointer-events-none absolute inset-0">
-            <GlowingWave
-              className="h-full w-full"
-              color={wave.ink}
-              hotColor={wave.hot}
-              backgroundColor={wave.backdrop}
-              /* Quieter than the component's own demo: this sits behind five
+          {/* No WebGL, no wave, and the welcome carries on. The overlay's own
+              --background is behind it either way, so what is lost is the
+              movement rather than the screen. */}
+          {canWave && (
+            <BackdropBoundary>
+              <div
+                ref={waveBox}
+                className="pointer-events-none absolute inset-0"
+              >
+                <GlowingWave
+                  className="h-full w-full"
+                  color={wave.ink}
+                  hotColor={wave.hot}
+                  backgroundColor={wave.backdrop}
+                  /* Quieter than the component's own demo: this sits behind five
                  cards of text and is the backdrop, not the subject. Lower swell
                  and glow, less iridescence, fewer bands, and a slow drift. */
-              swell={0.09}
-              swellFrequency={2.2}
-              ripple={0.04}
-              chop={0.02}
-              glow={0.4}
-              glowWidth={0.035}
-              halo={0.28}
-              richness={0.3}
-              colorFrequency={2.5}
-              saturation={0.75}
-              speed={0.55}
-              grain={0.03}
-              opacity={0.85}
-              waterline={-0.08}
-              /* Follows the pointer and a dragging finger, via steerWave above. */
-              cursorInteraction
-              cursorLift={0.07}
-              cursorReach={0.34}
-              paused={reduced}
-            />
-          </div>
+                  swell={0.09}
+                  swellFrequency={2.2}
+                  ripple={0.04}
+                  chop={0.02}
+                  glow={0.4}
+                  glowWidth={0.035}
+                  halo={0.28}
+                  richness={0.3}
+                  colorFrequency={2.5}
+                  saturation={0.75}
+                  speed={0.55}
+                  grain={0.03}
+                  opacity={0.85}
+                  waterline={-0.08}
+                  /* Follows the pointer and a dragging finger, via steerWave above. */
+                  cursorInteraction
+                  cursorLift={0.07}
+                  cursorReach={0.34}
+                  paused={reduced}
+                />
+              </div>
+            </BackdropBoundary>
+          )}
           <div
             ref={scroller}
             /* `overscroll-contain` so flicking past the last card does not
@@ -413,6 +485,7 @@ function Run(): ReactNode {
                         backdrop: (
                           <div className="absolute inset-0">
                             <TiltedTiles
+                              images={TILES}
                               columns={12}
                               tilesPerColumn={5}
                               duration={38}
