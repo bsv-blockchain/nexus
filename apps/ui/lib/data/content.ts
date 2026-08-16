@@ -2096,7 +2096,10 @@ export const content = {
       },
       pay: {
         title: "Pay a name, not an address",
-        body: "Send to a handle. Nothing to copy, no chain to choose.",
+        /* What you can move and how, rather than what you are spared. "No chain
+           to choose" answers an objection somebody arriving has not raised yet,
+           and spends the only sentence this card gets on the machinery. */
+        body: "Send and receive BSV, tokens and collectibles, or share a link anyone can pay.",
       },
       workspaces: {
         title: "One device, several lives",
