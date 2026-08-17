@@ -53,7 +53,7 @@ export const nexusBot: MessagePerson = {
   bio: "Answers command questions locally. Nothing it says is sent to anyone.",
   organization: null,
   city: "",
-  photo: "/icons/nexus.png",
+  photo: "/icons/Nexus-logo-solid-BG2.png",
   avatarColors: ["#4353ff", "#7c3aed", "#0ea5e9"],
 };
 

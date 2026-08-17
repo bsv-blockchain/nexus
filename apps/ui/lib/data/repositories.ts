@@ -51,7 +51,7 @@ export const defaultRepositories: AppRepository[] = [
     official: true,
     note: "Signature apps",
     website: "https://nexus.build",
-    iconSrc: "/icons/nexus.png",
+    iconSrc: "/icons/Nexus-logo-solid-BG2.png",
     versions: [
       { version: "2026.08", releasedAt: "2026-08-06T09:00:00.000Z" },
       { version: "2026.06", releasedAt: "2026-06-18T09:00:00.000Z" },

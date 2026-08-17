@@ -21,7 +21,7 @@ export const ecosystems: Ecosystem[] = [
       "The hub you are signed into. Its handles need no suffix, since they are local to you.",
     alias: "nexus",
     domain: "nexus.app",
-    icon: "/icons/nexus.png",
+    icon: "/icons/Nexus-logo-solid-BG2.png",
     local: true,
     commands: [
       {

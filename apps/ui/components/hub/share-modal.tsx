@@ -111,7 +111,7 @@ function ShareModalContent({ onClose }: { onClose: () => void }): ReactNode {
         >
           <motion.div variants={item}>
             <Image
-              src="/icons/nexus.png"
+              src="/icons/Nexus-logo-solid-BG2.png"
               alt=""
               aria-hidden="true"
               width={64}

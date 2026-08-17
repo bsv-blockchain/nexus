@@ -486,7 +486,7 @@ function SyncPanel(): ReactNode {
             <span className="grid size-11 place-items-center rounded-xl bg-white ring-4 ring-white">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/icons/nexus.png"
+                src="/icons/Nexus-logo-solid-BG2.png"
                 alt=""
                 aria-hidden="true"
                 className="size-9 rounded-lg object-contain"
