@@ -44,6 +44,8 @@ export type ClearOnQuit = "nothing" | "history" | "everything";
 export type OpenLinksIn = "nexus" | "native";
 /** How long a tab sits untouched before it is filed away. */
 export type ArchiveAfter = 0 | 1 | 7 | 30;
+/** Where the open tabs are drawn. */
+export type TabLayout = "horizontal" | "vertical";
 
 export interface SettingsState {
   /* ---- Permissions ---------------------------------------------------- */
@@ -92,6 +94,16 @@ export interface SettingsState {
   translateOffer: boolean;
   /** days a tab may sit untouched before archiving; 0 never archives */
   archiveAfter: ArchiveAfter;
+  /**
+   * Whether tabs run across the top of the page or down the library column.
+   *
+   * A layout rather than a preference about ornament: horizontal moves the open
+   * tabs OUT of the sidebar and into a strip above the viewport, so the two
+   * modes must never both draw the list — a tab in two places is two tabs as
+   * far as anybody clicking is concerned. Spaces, folders and bookmarks stay in
+   * the column either way; only the tab list moves.
+   */
+  tabLayout: TabLayout;
 
   /* ---- Autofill ------------------------------------------------------- */
   autofillAddresses: boolean;
@@ -221,6 +233,10 @@ const INITIAL: SettingsState = {
   openPdfsInNexus: true,
   translateOffer: true,
   archiveAfter: 7,
+  // Horizontal is the shipping default: a strip above the page is what a person
+  // arriving from another browser expects to find, and the column is then free
+  // to be a library rather than a tab list with bookmarks underneath it.
+  tabLayout: "horizontal",
 
   autofillAddresses: true,
   autofillCards: false,

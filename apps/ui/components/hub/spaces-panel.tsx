@@ -15,6 +15,7 @@ import { SpaceIcon } from "@/components/hub/space-icon";
 import { SpaceMenu } from "@/components/hub/space-menu";
 import { panelContainer, panelItem } from "@/components/hub/panel-motion";
 import { content } from "@/lib/data";
+import { useSettings } from "@/lib/settings-store";
 import { displayOrigin } from "@/lib/rail/origin";
 import type { PinnedSite } from "@/lib/rail/sites";
 import {
@@ -84,6 +85,7 @@ export function SpacesPanel(): ReactNode {
     canGoBack,
     canGoForward,
   } = useHub();
+  const horizontal = useSettings().tabLayout === "horizontal";
   /* A site is the one ref with no app behind it, so `activeApp` cannot answer
      this. Resolving the row rather than trusting the ref keeps the panel honest
      if the site is unpinned from another tab mid-render. */
@@ -140,6 +142,10 @@ export function SpacesPanel(): ReactNode {
           </span>
           <Pencil className="size-3.5 shrink-0" aria-hidden="true" />
         </button>
+        {/* Back, forward and reload belong wherever the address bar is. With
+            horizontal tabs that is the bar under the strip, so this column
+            stops drawing a second set that acts on the same page. */}
+        {!horizontal && (
         <div className="flex shrink-0 items-center gap-0.5 text-muted-foreground">
           <button
             type="button"
@@ -167,6 +173,7 @@ export function SpacesPanel(): ReactNode {
             <RotateCw className="size-4" aria-hidden="true" />
           </button>
         </div>
+        )}
         <SpaceMenu
           open={spaceMenuOpen}
           onClose={() => setSpaceMenuOpen(false)}

@@ -3,6 +3,8 @@
 import { AttestationsApp } from "@/components/apps/attestations-app";
 import { BasketsApp } from "@/components/apps/baskets-app";
 import { BrowserApp } from "@/components/apps/browser-app";
+import { TabStrip } from "@/components/hub/tab-strip";
+import { useSettings } from "@/lib/settings-store";
 import { ConnectApp } from "@/components/apps/connect-app";
 import { IdentityApp } from "@/components/apps/identity-app";
 import { LearnApp } from "@/components/apps/learn-app";
@@ -217,6 +219,17 @@ function AppCanvas(): ReactNode {
   // (theme-reset restores the base light/dark palette). The launcher/empty
   // state is always themed.
   const resetTheme = Boolean(activeApp) && !signatureApps.has(activeApp!);
+  /*
+   * Tabs above the viewport, and only over a page.
+   *
+   * Gated on the browser rather than shown for every app because these are
+   * browser tabs: a strip of open pages above Messages labels nothing that is
+   * on screen. In vertical mode the library column draws them instead and this
+   * renders nothing at all — the two are exclusive, never stacked.
+   */
+  const showTabStrip =
+    useSettings().tabLayout === "horizontal" &&
+    (activeApp === "browser" || onSite);
   return (
     <div
       className={`flex min-h-0 flex-1 flex-col ${
@@ -250,6 +263,7 @@ function AppCanvas(): ReactNode {
           <AppMenu slug={app.slug} />
         </header>
       )}
+      {showTabStrip && <TabStrip />}
       {/* The app and its reference pane share the row, so opening the pane
           narrows the app rather than covering it. */}
       <div className="flex min-h-0 flex-1">
@@ -302,6 +316,16 @@ export function MainView(): ReactNode {
      it, and renders dark-theme text on a white sheet. */
   const showSettings = mainView === "settings";
   const showProfiles = mainView === "profiles";
+  /*
+   * The feed: every app you hold, as a wall of icons.
+   *
+   * The same launcher the canvas falls back to when no app is open, but reached
+   * on purpose rather than by having nothing else to show — which is what makes
+   * it a place you can return to and link to (?view=feed) instead of a state
+   * you fall into. Distinct from the App Store, which is about apps you do NOT
+   * have yet.
+   */
+  const showFeed = mainView === "feed";
   const canvasIsBrowser = activeApp === "browser" && !activePage;
 
   /*
@@ -350,7 +374,7 @@ export function MainView(): ReactNode {
       <div className="flex h-full min-w-0 flex-1 gap-2">
         <main
           id="main-content"
-          className={`border-border flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-xl ${
+          className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl shadow-xl ${
             canvasIsBrowser ? "bg-canvas" : "bg-background"
           }`}
         >
@@ -358,7 +382,7 @@ export function MainView(): ReactNode {
         </main>
         <section
           aria-label={content.appMenu.pickApp}
-          className="border-border bg-background flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-xl"
+          className="bg-background flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl shadow-xl"
         >
           <SplitPaneHeader />
           <div className="min-h-0 flex-1">
@@ -372,8 +396,8 @@ export function MainView(): ReactNode {
   return (
     <main
       id="main-content"
-      className={`border-border flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-xl ${
-        !showStore && !showSettings && canvasIsBrowser
+      className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl shadow-xl ${
+        !showStore && !showSettings && !showFeed && canvasIsBrowser
           ? "bg-canvas"
           : "bg-background"
       }`}
@@ -394,6 +418,12 @@ export function MainView(): ReactNode {
       ) : activePage === "getting-started" ? (
         <div className="min-h-0 flex-1">
           <GettingStartedPage />
+        </div>
+      ) : showFeed ? (
+        /* No pane slot: the feed is a grid of doors, and nothing in it opens a
+           reference panel the way an app or the store does. */
+        <div className="min-h-0 flex-1">
+          <EmptyState />
         </div>
       ) : showStore ? (
         /* Same row Settings uses: the store, then whatever pane is open beside

@@ -50,6 +50,7 @@ import {
   type CookiePolicy,
   type OpenLinksIn,
   type StartupBehaviour,
+  type TabLayout,
 } from "@/lib/settings-store";
 import { InfoPopover } from "@/components/apps/roadmap/info-popover";
 import { PerSenderTolls } from "@/components/apps/settings/per-sender-tolls";
@@ -63,6 +64,7 @@ import {
 import {
   Check,
   ChevronRight,
+  Columns3,
   Globe,
   Moon,
   Heart,
@@ -73,6 +75,7 @@ import {
   Monitor,
   PanelLeftClose,
   ReceiptText,
+  Rows3,
   ShieldAlert,
   ShieldCheck,
   Sliders,
@@ -723,6 +726,27 @@ export function BrowsingPanel(): ReactNode {
         />
       </Group>
       <Group title={copy.tabsTitle}>
+        {/* Above archiving, because it decides WHERE the tabs being archived
+            are drawn — answering "which list are we talking about" before the
+            question about that list. */}
+        <Choice<TabLayout>
+          value={settings.tabLayout}
+          options={[
+            {
+              id: "horizontal",
+              label: copy.tabLayoutHorizontal,
+              hint: copy.tabLayoutHorizontalHint,
+              icon: <Rows3 className="size-4" aria-hidden="true" />,
+            },
+            {
+              id: "vertical",
+              label: copy.tabLayoutVertical,
+              hint: copy.tabLayoutVerticalHint,
+              icon: <Columns3 className="size-4" aria-hidden="true" />,
+            },
+          ]}
+          onPick={(next) => setSetting("tabLayout", next)}
+        />
         <Steps
           label={mobile.archiveInactive}
           value={settings.archiveAfter}

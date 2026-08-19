@@ -16,6 +16,11 @@ export const content = {
       title: "Spaces",
       newTab: "New Tab",
       clear: "Clear",
+      /* Screen-reader names for the horizontal strip. The visible row is
+         favicons and titles; these are what it is called when it cannot be
+         seen. */
+      tabs: "Tabs",
+      close: "Close",
       dragHint: "Drag to add Favorites",
       dragSubHint: "Favorites keep your most used sites and apps close",
     },
@@ -1956,6 +1961,10 @@ export const content = {
       hint: "Sites, tabs and downloads.",
       sitesTitle: "Sites",
       tabsTitle: "Tabs",
+      tabLayoutHorizontal: "Horizontal tabs",
+      tabLayoutHorizontalHint: "A strip across the top of the page.",
+      tabLayoutVertical: "Vertical tabs",
+      tabLayoutVerticalHint: "A list down the sidebar, under this space.",
       filesTitle: "Files",
       downloadsHint: "What each workspace has downloaded.",
       devTitle: "Developer",
@@ -2256,6 +2265,7 @@ export const content = {
   profiles: {
     sidebar: {
       title: "Workspaces",
+      viewFeed: "View feed",
       statProfiles: "workspaces",
       statHandles: "handles",
       statWallets: "wallets",
@@ -2263,8 +2273,6 @@ export const content = {
       current: "You are here",
       rowSummary: "{handle} · {wallet}",
       sharedTitle: "Shared across workspaces",
-      sharedHint:
-        "Not a mistake, but worth knowing about if you are keeping these apart.",
     },
     tabConnections: "Connections",
     tabBrowsing: "Browsing",

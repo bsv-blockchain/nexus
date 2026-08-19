@@ -41,8 +41,15 @@ function Stat({ value, label }: { value: string; label: string }): ReactNode {
  * a time.
  */
 export function ProfilesSidebar(): ReactNode {
-  const { spaces, activeSpaceId, setActiveSpaceId, createSpace, toggleRail } =
-    useHub();
+  const {
+    spaces,
+    activeSpaceId,
+    setActiveSpaceId,
+    createSpace,
+    toggleRail,
+    mainView,
+    setMainView,
+  } = useHub();
   const settings = useSettings();
   useWallets();
 
@@ -71,16 +78,34 @@ export function ProfilesSidebar(): ReactNode {
         </h2>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="grid grid-cols-3 gap-1.5 px-0.5">
-          <Stat value={String(spaces.length)} label={copy.statProfiles} />
-          <Stat
-            value={`${settings.handles.length}/${MAX_HANDLES}`}
-            label={copy.statHandles}
-          />
-          <Stat value={String(wallets.length)} label={copy.statWallets} />
-        </div>
+      {/* Wearing the stat tile's shape at full width: this is the one thing in
+          the column that leaves it, and a tile reads as a destination where a
+          text link would read as one more row in the list below. */}
+      <button
+        type="button"
+        onClick={() => setMainView("feed")}
+        aria-current={mainView === "feed" ? "page" : undefined}
+        className={`focus-ring ring-border/60 mx-0.5 rounded-lg px-2 py-1.5 text-center text-sm font-bold ring-1 transition-colors ${
+          mainView === "feed"
+            ? "bg-accent/15"
+            : "bg-surface-raised hover:bg-surface-hover"
+        }`}
+      >
+        {copy.viewFeed}
+      </button>
 
+      {/* Outside the scroller on purpose: the counts describe the whole column,
+          so they stay put while the thing they are counting scrolls past. */}
+      <div className="mt-2 grid shrink-0 grid-cols-3 gap-1.5 px-0.5">
+        <Stat value={String(spaces.length)} label={copy.statProfiles} />
+        <Stat
+          value={`${settings.handles.length}/${MAX_HANDLES}`}
+          label={copy.statHandles}
+        />
+        <Stat value={String(wallets.length)} label={copy.statWallets} />
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
         <h3 className="text-muted-foreground mt-4 px-1.5 text-[10px] font-bold tracking-wide uppercase">
           {copy.allProfiles}
         </h3>
@@ -130,9 +155,6 @@ export function ProfilesSidebar(): ReactNode {
             <h3 className="text-muted-foreground mt-4 px-1.5 text-[10px] font-bold tracking-wide uppercase">
               {copy.sharedTitle}
             </h3>
-            <p className="text-muted-foreground mt-1 px-1.5 text-[10px] text-pretty">
-              {copy.sharedHint}
-            </p>
             <ul className="mt-1.5">
               {shared.map((wallet) => {
                 const names = spaces

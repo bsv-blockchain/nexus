@@ -4,6 +4,7 @@ import { BrowserSettingsMenu } from "@/components/hub/browser-settings-menu";
 import { Favicon } from "@/components/hub/favicon";
 import { useHub } from "@/components/hub/hub-provider";
 import { content } from "@/lib/data";
+import { useSettings } from "@/lib/settings-store";
 import { Link2, SlidersHorizontal, Star, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState, type ReactNode } from "react";
@@ -44,21 +45,16 @@ function copyLinkWithToast(url: string, title: string): void {
  * Reusable browser chrome: address bar + favorites (bookmarks) + the
  * drag-to-add drop zone. Shared by the focus sidebar and the My Hub column.
  */
-export function BrowserNav(): ReactNode {
-  const {
-    activeTab,
-    activeTabId,
-    navigateActiveTab,
-    favorites,
-    addFavoriteFromTab,
-    removeFavorite,
-    tabDragging,
-    tabsBySpace,
-    activeSpaceId,
-    spaces,
-    openTab,
-    createTab,
-  } = useHub();
+/**
+ * The URL field, on its own so it can live in either chrome.
+ *
+ * Vertical tabs keep it in the library column, where BrowserNav has always put
+ * it; horizontal tabs move it into the bar beneath the tab strip. One
+ * definition rather than two, because two address bars that drift apart are two
+ * different browsers.
+ */
+export function AddressBar(): ReactNode {
+  const { activeTab, navigateActiveTab } = useHub();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsAnchor, setSettingsAnchor] = useState<{
     top: number;
@@ -66,37 +62,9 @@ export function BrowserNav(): ReactNode {
     right: number;
     bottom: number;
   } | null>(null);
-  const [favoritesDragOver, setFavoritesDragOver] = useState(false);
-  const [favoritesHintDismissed, setFavoritesHintDismissed] = useState(false);
-
-  const activeSpace =
-    spaces.find((space) => space.id === activeSpaceId) ?? spaces[0];
-  const tabs = activeSpace ? (tabsBySpace[activeSpace.id] ?? []) : [];
   const activeUrl = activeTab ? activeTab.url.replace(/^https?:\/\//, "") : "";
-  const spacesCopy = content.library.spaces;
-  const showHint =
-    tabDragging || (favorites.length === 0 && !favoritesHintDismissed);
-
-  const dropHandlers = {
-    onDragOver: (event: React.DragEvent): void => {
-      if (event.dataTransfer.types.includes("application/x-nexus-tab")) {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "copy";
-        setFavoritesDragOver(true);
-      }
-    },
-    onDragLeave: (): void => setFavoritesDragOver(false),
-    onDrop: (event: React.DragEvent): void => {
-      event.preventDefault();
-      setFavoritesDragOver(false);
-      const tabId = event.dataTransfer.getData("application/x-nexus-tab");
-      if (tabId) addFavoriteFromTab(tabId);
-    },
-  };
-
   return (
-    <>
-      <div className="relative">
+      <div className="relative flex-1">
         <div className="flex items-center gap-1 rounded-lg bg-background px-3 py-2 transition-colors hover:bg-muted">
           <input
             key={`${activeTab?.id ?? "none"}:${activeUrl}`}
@@ -151,6 +119,56 @@ export function BrowserNav(): ReactNode {
           {...(settingsAnchor ? { anchor: settingsAnchor } : {})}
         />
       </div>
+  );
+}
+
+export function BrowserNav(): ReactNode {
+  const {
+    activeTabId,
+    favorites,
+    addFavoriteFromTab,
+    removeFavorite,
+    tabDragging,
+    tabsBySpace,
+    activeSpaceId,
+    spaces,
+    openTab,
+    createTab,
+  } = useHub();
+  const horizontal = useSettings().tabLayout === "horizontal";
+  const [favoritesDragOver, setFavoritesDragOver] = useState(false);
+  const [favoritesHintDismissed, setFavoritesHintDismissed] = useState(false);
+
+  const activeSpace =
+    spaces.find((space) => space.id === activeSpaceId) ?? spaces[0];
+  const tabs = activeSpace ? (tabsBySpace[activeSpace.id] ?? []) : [];
+  const spacesCopy = content.library.spaces;
+  const showHint =
+    tabDragging || (favorites.length === 0 && !favoritesHintDismissed);
+
+  const dropHandlers = {
+    onDragOver: (event: React.DragEvent): void => {
+      if (event.dataTransfer.types.includes("application/x-nexus-tab")) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+        setFavoritesDragOver(true);
+      }
+    },
+    onDragLeave: (): void => setFavoritesDragOver(false),
+    onDrop: (event: React.DragEvent): void => {
+      event.preventDefault();
+      setFavoritesDragOver(false);
+      const tabId = event.dataTransfer.getData("application/x-nexus-tab");
+      if (tabId) addFavoriteFromTab(tabId);
+    },
+  };
+
+  return (
+    <>
+      {/* Only where this column owns it. With horizontal tabs the bar beneath
+          the strip carries it instead, and two address bars is two places to
+          type the same thing. */}
+      {!horizontal && <AddressBar />}
 
       {favorites.length > 0 && (
         <div

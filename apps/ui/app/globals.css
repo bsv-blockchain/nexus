@@ -676,3 +676,43 @@ html [data-sonner-toaster] [data-sonner-toast] [data-description] {
   height: 0;
   pointer-events: none;
 }
+
+/*
+ * The active tab's manila-folder skirt.
+ *
+ * A border radius can only remove a corner; this has to ADD one. Each
+ * pseudo-element is a square sitting just outside the tab at its foot, filled
+ * with the tab's own surface, with a circle punched out of the corner nearest
+ * the tab. What is left is a quarter of a ring: the fill runs past the tab and
+ * curves down into the bar underneath, which is why the two must share a
+ * colour (--surface-raised, the same token `bg-surface-raised` uses).
+ *
+ * `bottom: 0` rather than a negative offset — the tab already sits flush on the
+ * bar, so the skirt belongs on the last row of the tab, not below it.
+ */
+.tab-flare::before,
+.tab-flare::after {
+  background-color: var(--surface-raised);
+  bottom: 0;
+  content: "";
+  height: 8px;
+  pointer-events: none;
+  position: absolute;
+  width: 8px;
+}
+
+.tab-flare::before {
+  left: -8px;
+  /* Circle at the top-left: what survives is the bottom-right of the square,
+     hugging the tab's left edge and flaring away from it. */
+  mask-image: radial-gradient(circle 8px at top left, transparent 8px, black 8px);
+}
+
+.tab-flare::after {
+  right: -8px;
+  mask-image: radial-gradient(
+    circle 8px at top right,
+    transparent 8px,
+    black 8px
+  );
+}

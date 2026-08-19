@@ -57,7 +57,23 @@ import {
 export type AppSlug = HubApp["slug"];
 export type LibraryTab = "spaces" | "downloads" | "apps";
 /** What the main canvas shows, independent of which rail panel is open. */
-export type MainViewKind = "app" | "store" | "profiles" | "settings";
+export type MainViewKind = "app" | "store" | "profiles" | "settings" | "feed";
+
+/**
+ * A page this space has been on, as the command bar needs it.
+ *
+ * A snapshot rather than a reference to a tab: the tab it came from may be
+ * closed by the time anybody reads this, which is exactly the case the list
+ * exists to serve. Carries its own favicon for the same reason.
+ */
+export interface RecentSite {
+  url: string;
+  title: string;
+  favicon: string;
+  faviconColor: string;
+  /** true when it got here by being closed rather than merely visited */
+  closed: boolean;
+}
 
 /**
  * The settings categories, in the narrow column.
@@ -216,6 +232,9 @@ function subscribeToUrl(onChange: () => void): () => void {
  * cannot send anybody. `app` is kept alongside rather than cleared, so a reload
  * on Profiles still knows which app the rail should return you to.
  */
+/** How many pages a space remembers for the command bar. */
+const RECENT_LIMIT = 12;
+
 const VIEW_PARAM = "view";
 /** The second app, when two are open side by side. */
 const SPLIT_PARAM = "split";
@@ -223,11 +242,13 @@ const VIEWS: Record<string, MainViewKind> = {
   apps: "store",
   profiles: "profiles",
   settings: "settings",
+  feed: "feed",
 };
 const VIEW_SLUGS: Partial<Record<MainViewKind, string>> = {
   store: "apps",
   profiles: "profiles",
   settings: "settings",
+  feed: "feed",
 };
 
 function urlAppSlug(): string | null {
@@ -617,6 +638,25 @@ interface HubState {
   /** open tabs per space — session state seeded from lib/data rows */
   tabsBySpace: Record<string, BrowserTab[]>;
   /** Move an open tab to another profile, at a position in its list. */
+  /**
+   * Reorder a tab WITHIN its own space.
+   *
+   * Separate from moveTabToSpace, which returns early when the two spaces match:
+   * moving between columns and reordering inside one are the same gesture to a
+   * person and different operations to the data — the cross-space path removes
+   * from one list and inserts into another, and doing that to a single list
+   * drops the tab before it works out where to put it back.
+   */
+  reorderTab: (spaceId: string, tabId: string, index: number) => void;
+  /**
+   * Pages this space has been on lately, most recent first.
+   *
+   * Fed by navigation and by closing a tab, so it answers both "where was I"
+   * and "bring that back" from one list. Per space because a workspace is the
+   * unit of separation here: Work's history has no business surfacing in a
+   * Personal command bar.
+   */
+  recentBySpace: Record<string, RecentSite[]>;
   moveTabToSpace: (
     tabId: string,
     fromSpaceId: string,
@@ -1093,6 +1133,9 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   const [historyByTab, setHistoryByTab] = useState<Record<string, TabHistory>>(
     () => seedHistory(seedTabsBySpace()),
   );
+  const [recentBySpace, setRecentBySpace] = useState<
+    Record<string, RecentSite[]>
+  >({});
   const [activeTabId, setActiveTabId] = useState<string | null>(
     () => getBrowserTabs(defaultSpace.id)[0]?.id ?? null,
   );
@@ -1631,6 +1674,33 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     [ensureBrowser],
   );
 
+  /**
+   * Reorder within one space.
+   *
+   * `index` is the slot the tab should END UP in, counted against the list with
+   * the tab already removed — which is what a drop indicator between two rows
+   * means. Computing it the other way round makes a drag one place to the right
+   * a no-op, because the tab is still occupying the slot being aimed at.
+   */
+  const reorderTab = useCallback(
+    (spaceId: string, tabId: string, index: number) => {
+      setTabsBySpace((current) => {
+        const tabs = current[spaceId] ?? [];
+        const from = tabs.findIndex((tab) => tab.id === tabId);
+        if (from === -1) return current;
+        const without = tabs.filter((tab) => tab.id !== tabId);
+        const at = Math.max(0, Math.min(index, without.length));
+        const next = [
+          ...without.slice(0, at),
+          tabs[from]!,
+          ...without.slice(at),
+        ].map((tab, order) => ({ ...tab, sortOrder: order }));
+        return { ...current, [spaceId]: next };
+      });
+    },
+    [],
+  );
+
   const openTab = useCallback((tabId: string) => {
     setActiveTabId(tabId);
     setActiveRef(BROWSER_REF);
@@ -1669,6 +1739,27 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
    * updater was the other half of it. An updater has to be pure; these are
    * effects, and they belong out here where they run once.
    */
+  /**
+   * File a page under a space's recents.
+   *
+   * Deduped by URL and newest-first, so revisiting a page moves it up rather
+   * than filling the list with the same row — a command bar that shows one site
+   * five times is a command bar nobody can find anything in. Capped, because
+   * this is a shortcut list and not a history archive.
+   */
+  const rememberRecent = useCallback(
+    (spaceId: string, site: RecentSite): void => {
+      if (!site.url) return;
+      setRecentBySpace((current) => {
+        const kept = (current[spaceId] ?? []).filter(
+          (entry) => entry.url !== site.url,
+        );
+        return { ...current, [spaceId]: [site, ...kept].slice(0, RECENT_LIMIT) };
+      });
+    },
+    [],
+  );
+
   const createTab = useCallback(
     (input: string) => {
       const tabs = tabsBySpace[activeSpaceId] ?? [];
@@ -1681,6 +1772,13 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         ...h,
         [tab.id]: { stack: [tab.url], index: 0 },
       }));
+      rememberRecent(activeSpaceId, {
+        url: tab.url,
+        title: tab.title,
+        favicon: tab.favicon,
+        faviconColor: tab.faviconColor,
+        closed: false,
+      });
       setActiveTabId(tab.id);
       setActiveRef(BROWSER_REF);
       setActivePage(null);
@@ -1688,7 +1786,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       setMobileSheetOpen(false);
       setCommandPaletteOpen(false);
     },
-    [activeSpaceId, tabsBySpace, setActiveRef],
+    [activeSpaceId, tabsBySpace, setActiveRef, rememberRecent],
   );
 
   /*
@@ -1755,7 +1853,28 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     [activeSpaceId, openLinkInBrowser, setActiveRef],
   );
 
-  const closeTab = useCallback((tabId: string) => {
+  const closeTab = useCallback(
+    (tabId: string) => {
+      /*
+       * Filed BEFORE the updater runs, not inside it.
+       *
+       * `rememberRecent` is a state setter, and a setter called from within
+       * another setter's updater makes that updater impure — React is free to
+       * re-run or discard it, which it does, and the close then either loses
+       * unrelated tabs or silently does nothing. Reading the current list here
+       * costs a dependency and keeps the updater a pure function of its input.
+       */
+      for (const [spaceId, tabs] of Object.entries(tabsBySpace)) {
+        const going = tabs.find((tab) => tab.id === tabId);
+        if (!going) continue;
+        rememberRecent(spaceId, {
+          url: going.url,
+          title: going.title,
+          favicon: going.favicon,
+          faviconColor: going.faviconColor,
+          closed: true,
+        });
+      }
     setTabsBySpace((current) => {
       const next: Record<string, BrowserTab[]> = {};
       for (const [spaceId, tabs] of Object.entries(current)) {
@@ -1773,7 +1892,9 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       });
       return next;
     });
-  }, []);
+    },
+    [rememberRecent, tabsBySpace],
+  );
 
   const clearTabs = useCallback((spaceId: string) => {
     setTabsBySpace((current) => {
@@ -1791,7 +1912,14 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         createTab(input);
         return;
       }
+      // Plain strings rather than one nullable object, matching landedUrl above:
+      // a variable only ever assigned inside the updater is narrowed to null by
+      // the compiler, which cannot see that the callback runs.
       let landedUrl = "";
+      let landedSpace = "";
+      let landedTitle = "";
+      let landedFavicon = "";
+      let landedFaviconColor = "";
       setTabsBySpace((current) => {
         const next: Record<string, BrowserTab[]> = {};
         for (const [spaceId, tabs] of Object.entries(current)) {
@@ -1799,6 +1927,13 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
             if (tab.id !== activeTabId) return tab;
             const fresh = buildTab(input, spaceId, tab.sortOrder);
             landedUrl = fresh.url;
+            // Captured here, recorded after the updater returns — same reason
+            // landedUrl is threaded out rather than acted on in place: this
+            // function has to stay a pure function of `current`.
+            landedSpace = spaceId;
+            landedTitle = fresh.title;
+            landedFavicon = fresh.favicon;
+            landedFaviconColor = fresh.faviconColor;
             return { ...fresh, id: tab.id, createdAt: tab.createdAt };
           });
         }
@@ -1810,9 +1945,18 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         trimmed.push(landedUrl);
         return { ...h, [activeTabId]: { stack: trimmed, index: trimmed.length - 1 } };
       });
+      if (landedSpace && landedUrl) {
+        rememberRecent(landedSpace, {
+          url: landedUrl,
+          title: landedTitle,
+          favicon: landedFavicon,
+          faviconColor: landedFaviconColor,
+          closed: false,
+        });
+      }
       focusBrowser();
     },
-    [activeTabId, createTab, focusBrowser],
+    [activeTabId, createTab, focusBrowser, rememberRecent],
   );
 
   // Moves the active tab along its history without pushing a new entry.
@@ -2169,6 +2313,8 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       openShare,
       tabsBySpace,
       moveTabToSpace,
+      reorderTab,
+      recentBySpace,
       activeTabId,
       activeTab,
       openTab,
@@ -2324,6 +2470,8 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       openShare,
       tabsBySpace,
       moveTabToSpace,
+      reorderTab,
+      recentBySpace,
       activeTabId,
       activeTab,
       openTab,

@@ -11,6 +11,7 @@ import {
   useSpaceDrag,
 } from "@/components/hub/space-drag";
 import { content, type SpaceItem } from "@/lib/data";
+import { useSettings } from "@/lib/settings-store";
 import { sameUrl } from "@/lib/tabs";
 import { useTabsThatReachedForWallet } from "@/lib/wallet-reach";
 import { ArrowDown, ChevronRight, Plus, X } from "lucide-react";
@@ -124,6 +125,16 @@ export function SpaceContent({
     pinSite,
   } = useHub();
   const { drag, setDrag, over, setOver } = useSpaceDrag();
+  /*
+   * Horizontal tabs empty this column of tabs rather than duplicating them.
+   *
+   * The strip above the viewport becomes the only tab list in that mode — see
+   * TabStrip — and two lists of the same tabs is two places to close the same
+   * thing from, with only one of them under the pointer. Everything else the
+   * column carries (spaces, folders, bookmarks) is untouched: this hides the
+   * tab list, not the column.
+   */
+  const showTabList = useSettings().tabLayout === "vertical";
   /* One hook for every row: these are read inside a `.map`, and a hook per tab
      would change the hook count whenever a tab opened or closed. */
   const reachedForWallet = useTabsThatReachedForWallet();
@@ -337,6 +348,8 @@ export function SpaceContent({
         <DropLine active={overIndex === topLevel.length} />
       </div>
 
+      {showTabList && (
+        <>
       <div className="my-2 flex items-center gap-2 text-[11px] text-muted-foreground">
         <div className="h-px flex-1 bg-border" aria-hidden="true" />
         <button
@@ -476,6 +489,8 @@ export function SpaceContent({
       >
         <DropLine active={overIndex === TAB_SLOT + tabs.length} />
       </div>
+        </>
+      )}
     </div>
   );
 }

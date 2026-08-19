@@ -21,12 +21,12 @@ import { refKey, sameRef } from "@/lib/rail/layout";
 import { displayOrigin } from "@/lib/rail/origin";
 import type { PinnedSite } from "@/lib/rail/sites";
 import {
+  Cog,
   Folder,
   FolderMinus,
   Gift,
   Layers,
   LayoutGrid,
-  Settings,
   type LucideIcon,
 } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
@@ -706,7 +706,7 @@ export function IconRail(): ReactNode {
                 : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
             }`}
           >
-            <Settings className="size-4" aria-hidden="true" />
+            <Cog className="size-4" aria-hidden="true" />
           </button>
           <button
             type="button"
