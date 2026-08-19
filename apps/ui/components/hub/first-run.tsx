@@ -176,11 +176,16 @@ const STEPS = [
   { key: "workspaces", image: "/first-run/workspaces.jpg" },
 ] as const;
 
-/** The wall on the browsing card. Same story: local, numbered, replaceable. */
+/**
+ * The wall on the browsing card. Same story: local, numbered, replaceable.
+ *
+ * Real Metanet apps rather than stock tiles: the card's claim is that there is
+ * something to browse, and eighteen actual products make it where a wall of
+ * pretty rectangles only decorates it.
+ */
 const TILES = Array.from(
-  { length: 10 },
-  (_, index) =>
-    `/first-run/tiles/tile-${String(index + 1).padStart(2, "0")}.jpg`
+  { length: 18 },
+  (_, index) => `/metanetnet_appdemos/metanet-app-${index + 1}.png`
 );
 
 /** The handle card sits after the four told ones. */
@@ -192,6 +197,40 @@ const NARROW = 768;
 
 /** A swipe has to travel this far, in px, before it counts as one. */
 const SWIPE = 48;
+
+/**
+ * The opening, as a running clock in milliseconds.
+ *
+ * One timeline rather than a chain of nested timeouts: every beat is stated
+ * against the same zero, so reading the sequence is reading this block, and
+ * moving one beat cannot silently shift the ones after it.
+ */
+const INTRO = {
+  /** the mark fades up and settles */
+  logoIn: 0,
+  /** ...and is left alone for two seconds, which is the whole point of it */
+  wordIn: 2600,
+  /** "us" comes up to full while the rest stays quiet */
+  usIn: 3200,
+  /** mark and word recede; the wave comes up to full behind them */
+  recede: 3800,
+  /** the deck arrives just after the wave starts opening up */
+  deck: 4300,
+  /** and the controls last, from below */
+  footer: 4700,
+  /** everything is in place */
+  done: 5100,
+} as const;
+
+/**
+ * How much of the wave is showing before the reveal.
+ *
+ * A wrapper opacity rather than the shader's own `opacity` uniform: that one is
+ * a number the component compiles into its draw, so animating it re-renders the
+ * canvas on every frame. Fading the element the canvas sits in costs the
+ * compositor nothing and looks identical.
+ */
+const WAVE_START = 0.25;
 
 /**
  * The first run.
@@ -228,6 +267,16 @@ function Run(): ReactNode {
   const scroller = useRef<HTMLDivElement | null>(null);
   const [index, setIndex] = useState(0);
   const [leaving, setLeaving] = useState(false);
+  /*
+   * How far into the opening we are, in milliseconds on INTRO's clock.
+   *
+   * Reduced motion starts at the end: the sequence is the one part of this
+   * screen that is purely motion, so there is nothing left of it to show
+   * somebody who has asked not to be shown motion.
+   */
+  const [beat, setBeat] = useState(() => (reduced ? INTRO.done : 0));
+  const introDone = beat >= INTRO.done;
+  const skipIntro = useCallback(() => setBeat(INTRO.done), []);
 
   /*
    * Every handle the seed knows about, plus the ones this browser already has.
@@ -310,8 +359,35 @@ function Run(): ReactNode {
     window.setTimeout(() => markFirstRunSeen(), reduced ? 0 : 420);
   }, [handle, verdict, reduced, activeSpaceId]);
 
+  /*
+   * Walk the opening. One timer per beat, all cleared together.
+   *
+   * Timers rather than a CSS/motion sequence because the beats gate what is
+   * MOUNTED — the deck and the footer are not merely transparent before their
+   * turn, they are not there — and a keyframe cannot mount anything.
+   */
+  useEffect(() => {
+    if (introDone) return;
+    const timers = Object.values(INTRO)
+      .filter((at) => at > 0)
+      .map((at) =>
+        window.setTimeout(() => setBeat((now) => Math.max(now, at)), at)
+      );
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [introDone]);
+
+  /* Any key, anywhere, ends the opening rather than paging the deck. Handled
+     before the arrow keys below so the first press cannot do both. */
+  useEffect(() => {
+    if (introDone) return;
+    const onAnyKey = (): void => skipIntro();
+    window.addEventListener("keydown", onAnyKey);
+    return () => window.removeEventListener("keydown", onAnyKey);
+  }, [introDone, skipIntro]);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
+      if (!introDone) return;
       if (event.key === "ArrowRight" || event.key === "PageDown") {
         event.preventDefault();
         goTo(index + 1);
@@ -323,7 +399,7 @@ function Run(): ReactNode {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [goTo, index]);
+  }, [goTo, index, introDone]);
 
   /* Sideways swipe on narrow screens. Pointer events rather than touch, so a
      trackpad drag works the same way, and captured on the frame rather than the
@@ -350,6 +426,12 @@ function Run(): ReactNode {
 
   const from = useRef<{ x: number; y: number } | null>(null);
   const onDown = (event: React.PointerEvent): void => {
+    /* A press during the opening ends it, and is not also the start of a
+       swipe: the deck it would page is not on screen yet. */
+    if (!introDone) {
+      skipIntro();
+      return;
+    }
     if (window.innerWidth >= NARROW) return;
     from.current = { x: event.clientX, y: event.clientY };
   };
@@ -411,9 +493,21 @@ function Run(): ReactNode {
               movement rather than the screen. */}
           {canWave && (
             <BackdropBoundary>
-              <div
+              <motion.div
                 ref={waveBox}
                 className="pointer-events-none absolute inset-0"
+                /* A quarter of itself until the mark recedes, then all of it.
+                   Slower than the recede it accompanies, so the wave is still
+                   opening as the first card lands rather than arriving with
+                   it. */
+                initial={false}
+                animate={{
+                  opacity: beat >= INTRO.recede ? 1 : WAVE_START,
+                }}
+                transition={{
+                  duration: reduced ? 0 : 1.4,
+                  ease: [0.33, 0, 0.2, 1],
+                }}
               >
                 <GlowingWave
                   className="h-full w-full"
@@ -443,37 +537,161 @@ function Run(): ReactNode {
                   cursorReach={0.34}
                   paused={reduced}
                 />
-              </div>
+              </motion.div>
             </BackdropBoundary>
           )}
-          <div
-            ref={scroller}
-            /* `overscroll-contain` so flicking past the last card does not
+
+          {/* The opening. Sits over the wave and under nothing — the deck is
+              not mounted yet while this is on screen. */}
+          <AnimatePresence>
+            {beat < INTRO.done && (
+              <motion.div
+                key="intro"
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-6"
+                initial={false}
+                animate={
+                  beat >= INTRO.recede
+                    ? { opacity: 0, scale: 0.85, filter: "blur(14px)" }
+                    : { opacity: 1, scale: 1, filter: "blur(0px)" }
+                }
+                exit={{ opacity: 0 }}
+                transition={{
+                  duration: reduced ? 0 : 0.9,
+                  ease: [0.4, 0, 0.6, 1],
+                }}
+              >
+                {/*
+                  The mark, painted rather than drawn.
+
+                  The file is a fixed #F4F2F0, which disappears on a light
+                  theme; used as a mask instead, the colour is whatever
+                  `--foreground` is, so the same asset works in both. Swapping
+                  in the animated logo later means changing this one URL.
+                */}
+                <motion.span
+                  className="bg-foreground size-28 sm:size-36"
+                  style={{
+                    maskImage: "url(/icons/Nexus-logo-white.svg)",
+                    maskRepeat: "no-repeat",
+                    maskPosition: "center",
+                    maskSize: "contain",
+                    WebkitMaskImage: "url(/icons/Nexus-logo-white.svg)",
+                    WebkitMaskRepeat: "no-repeat",
+                    WebkitMaskPosition: "center",
+                    WebkitMaskSize: "contain",
+                  }}
+                  /*
+                   * `layout` is what keeps the mark from jumping.
+                   *
+                   * The name mounting into this column re-centres it, which
+                   * moves the mark up by half the name's height — a layout
+                   * change, and layout changes are instant. Motion measures
+                   * before and after and animates the difference, so the mark
+                   * rises into its new place on the same beat the name fades
+                   * up into the space it just left.
+                   */
+                  layout
+                  initial={reduced ? false : { opacity: 0, scale: 0.92 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{
+                    duration: reduced ? 0 : 0.75,
+                    ease: [0.16, 1, 0.3, 1],
+                    /* Its own timing: the entrance is a slow settle, the rise
+                       should keep pace with the name arriving under it. */
+                    layout: {
+                      duration: reduced ? 0 : 0.55,
+                      ease: [0.16, 1, 0.3, 1],
+                    },
+                  }}
+                />
+
+                {/* The name, held back until the mark has had its two seconds. */}
+                <AnimatePresence>
+                  {beat >= INTRO.wordIn && (
+                    <motion.p
+                      key="word"
+                      className="text-foreground text-4xl font-semibold tracking-tight sm:text-5xl"
+                      /* Comes up from below its resting place rather than
+                         appearing in it, so the pair reads as one movement. */
+                      initial={reduced ? false : { opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{
+                        duration: reduced ? 0 : 0.55,
+                        ease: [0.16, 1, 0.3, 1],
+                      }}
+                    >
+                      {/*
+                        Two spans, one word. Both arrive at the same low
+                        opacity and only "us" comes up to full — the emphasis
+                        is the point, and it cannot be made with one element.
+                      */}
+                      <span className="opacity-40">Nex</span>
+                      <motion.span
+                        initial={false}
+                        animate={{ opacity: beat >= INTRO.usIn ? 1 : 0.4 }}
+                        transition={{
+                          duration: reduced ? 0 : 0.5,
+                          ease: [0.4, 0, 0.2, 1],
+                        }}
+                      >
+                        us
+                      </motion.span>
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {/*
+            Mounted on its beat rather than merely faded in.
+
+            ScrollStack measures the viewport when it mounts and pins its own
+            runway to it; mounting it behind a transparent layer means it
+            measures while nothing can be seen, which is fine, but it also means
+            it starts its scroll-driven work during the opening. Holding the
+            mount until the opening is nearly over keeps the two out of each
+            other's way, and is why the entrance below is on a wrapper rather
+            than on the component.
+          */}
+          {beat >= INTRO.deck && (
+            <motion.div
+              initial={reduced ? false : { opacity: 0, y: 26 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                duration: reduced ? 0 : 0.7,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+              className="absolute inset-0"
+            >
+              <div
+                ref={scroller}
+                /* `overscroll-contain` so flicking past the last card does not
                scroll the app underneath, which is still mounted. */
-            /* Exactly the viewport, and the footer floats over it rather than
+                /* Exactly the viewport, and the footer floats over it rather than
                taking height from it: ScrollStack measures against
                window.innerHeight and pins an h-screen child, so a scroll box
                shorter than the viewport puts every card in the wrong place. */
-            className="absolute inset-0 overflow-y-auto overscroll-contain"
-          >
-            <ScrollStack
-              variant="deck"
-              scrollLength={1}
-              cardHeight={0.66}
-              cardWidth={720}
-              showCounter={false}
-              showProgress={false}
-              blur={reduced ? 0 : 4}
-              smooth={reduced ? 0 : 0.16}
-              onIndexChange={setIndex}
-            >
-              {STEPS.map((step) => (
-                <TellCard
-                  key={step.key}
-                  image={step.image}
-                  {...(step.key === "browse"
-                    ? {
-                        /*
+                className="absolute inset-0 overflow-y-auto overscroll-contain"
+              >
+                <ScrollStack
+                  variant="deck"
+                  scrollLength={1}
+                  cardHeight={0.66}
+                  cardWidth={720}
+                  showCounter={false}
+                  showProgress={false}
+                  blur={reduced ? 0 : 4}
+                  smooth={reduced ? 0 : 0.16}
+                  onIndexChange={setIndex}
+                >
+                  {STEPS.map((step) => (
+                    <TellCard
+                      key={step.key}
+                      image={step.image}
+                      {...(step.key === "browse"
+                        ? {
+                            /*
                           The browsing card shows browsing: a drifting wall of
                           pages that leans toward the pointer, rather than one
                           photograph of nothing in particular. Its own tilt
@@ -482,46 +700,64 @@ function Run(): ReactNode {
                           Slower and flatter than the component's demo, because
                           it sits under a heading rather than being the page.
                         */
-                        backdrop: (
-                          <div className="absolute inset-0">
-                            <TiltedTiles
-                              images={TILES}
-                              columns={12}
-                              tilesPerColumn={5}
-                              duration={38}
-                              rotateX={34}
-                              rotateY={14}
-                              rotateZ={-18}
-                              fadeTop={26}
-                              fadeBottom={10}
-                              saturation={0.85}
-                              parallaxStrength={7}
-                            />
-                          </div>
-                        ),
-                      }
-                    : {})}
-                  title={copy.steps[step.key].title}
-                  body={copy.steps[step.key].body}
-                />
-              ))}
-              <HandleCard
-                value={handle}
-                verdict={verdict}
-                onChange={setHandle}
-                onShuffle={() => setHandle(suggestHandle(taken, Math.random()))}
-              />
-            </ScrollStack>
-          </div>
+                            backdrop: (
+                              <div className="absolute inset-0">
+                                <TiltedTiles
+                                  images={TILES}
+                                  columns={12}
+                                  tilesPerColumn={5}
+                                  duration={38}
+                                  rotateX={34}
+                                  rotateY={14}
+                                  rotateZ={-18}
+                                  fadeTop={26}
+                                  fadeBottom={10}
+                                  saturation={0.85}
+                                  parallaxStrength={7}
+                                />
+                              </div>
+                            ),
+                          }
+                        : {})}
+                      title={copy.steps[step.key].title}
+                      body={copy.steps[step.key].body}
+                    />
+                  ))}
+                  <HandleCard
+                    value={handle}
+                    verdict={verdict}
+                    onChange={setHandle}
+                    onShuffle={() =>
+                      setHandle(suggestHandle(taken, Math.random()))
+                    }
+                  />
+                </ScrollStack>
+              </div>
+            </motion.div>
+          )}
 
-          <Footer
-            index={index}
-            last={last}
-            canFinish={verdict === "ok"}
-            onBack={() => goTo(index - 1)}
-            onNext={() => (last ? finish() : goTo(index + 1))}
-            onDot={goTo}
-          />
+          {/* Last in, and from below: the controls are the invitation to move
+              on, so they should arrive after there is something to move on
+              from. */}
+          {beat >= INTRO.footer && (
+            <motion.div
+              initial={reduced ? false : { opacity: 0, y: "100%" }}
+              animate={{ opacity: 1, y: "0%" }}
+              transition={{
+                duration: reduced ? 0 : 0.6,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+            >
+              <Footer
+                index={index}
+                last={last}
+                canFinish={verdict === "ok"}
+                onBack={() => goTo(index - 1)}
+                onNext={() => (last ? finish() : goTo(index + 1))}
+                onDot={goTo}
+              />
+            </motion.div>
+          )}
         </motion.div>
       )}
     </AnimatePresence>

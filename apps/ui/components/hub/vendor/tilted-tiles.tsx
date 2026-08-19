@@ -7,8 +7,16 @@
  *
  * Uses `motion`, which apps/ui already depends on.
  *
- * One change from the published component: `cn` came from "@/lib/utils", which
- * this app does not have, and is the local join below.
+ * Two changes from the published component:
+ *
+ * 1. `cn` came from "@/lib/utils", which this app does not have, and is the
+ *    local join below.
+ *
+ * 2. `strips` deals every tile from ONE sequence rather than giving each column
+ *    its own random start and stride. See the comment on it: the published
+ *    version lets neighbouring columns land on the same images, which is
+ *    conspicuous once the tiles are recognisable pictures rather than stock
+ *    photography.
  */
 
 import React, {
@@ -274,18 +282,45 @@ const TiltedTiles: React.FC<TiltedTilesProps> = ({
     leanY.set(0);
   }, [leanX, leanY]);
 
+  /*
+   * Which picture goes in which tile.
+   *
+   * Every tile on the plane is dealt from ONE walk of the pool, numbered
+   * `column * depth + tile`, stepping by a stride coprime with the pool size.
+   * Upstream instead gave each column its own random start and its own stride,
+   * which spreads a single column nicely but says nothing about the column
+   * beside it — with 18 pictures over 12 columns that put 19 shared images
+   * between neighbouring columns, and since the columns scroll at different
+   * speeds you meet the same screenshot twice, side by side, constantly.
+   *
+   * Dealing continuously instead means consecutive columns take consecutive
+   * blocks of the walk, and a coprime stride does not revisit a picture until
+   * it has used them all — so a column and its two nearest neighbours either
+   * side are guaranteed disjoint whenever the pool holds at least three
+   * columns' worth. Repeats still exist (60 tiles, 18 pictures) but they are
+   * pushed at least three columns apart, which is further than the eye pairs
+   * things up. Measured on this wall: shared-with-next-column 19 -> 0.
+   *
+   * Where the pool is too small for that — the component's own defaults are 10
+   * pictures over 16 columns — it degrades to the best available packing rather
+   * than failing: neighbours stay disjoint, and the repeat lands as far away as
+   * the arithmetic allows.
+   */
   const strips = useMemo(() => {
     const pool = images.length ? images : DEFAULT_IMAGES;
     const depth = Math.max(tilesPerColumn, 2);
     const steps = coprimeSteps(pool.length);
-    return Array.from({ length: Math.max(columns, 1) }, (_, column) => {
-      const start = scramble(column) % pool.length;
-      const step = steps[scramble(column * 2 + 1) % steps.length] ?? 1;
-      return Array.from(
+    // One stride for the whole plane. Still chosen by `scramble`, so different
+    // pools get different-looking walls, but chosen ONCE — a per-column stride
+    // is what let neighbours collide.
+    const stride = steps[scramble(pool.length * depth) % steps.length] ?? 1;
+    return Array.from({ length: Math.max(columns, 1) }, (_, column) =>
+      Array.from(
         { length: depth },
-        (_, tile) => pool[(start + tile * step) % pool.length] as string
-      );
-    });
+        (_, tile) =>
+          pool[((column * depth + tile) * stride) % pool.length] as string
+      )
+    );
   }, [columns, images, tilesPerColumn]);
 
   const planeRef = useRef<HTMLDivElement | null>(null);
