@@ -2,6 +2,7 @@
 
 import { Favicon } from "@/components/hub/favicon";
 import { useHub } from "@/components/hub/hub-provider";
+import { useHostOverlay } from "@/lib/wallet-data";
 import { content, type BrowserTab } from "@/lib/data";
 import type { RecentSite } from "@/components/hub/hub-provider";
 import { ArrowRight, Globe, Info, Search } from "lucide-react";
@@ -14,6 +15,20 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
  */
 export function CommandPalette(): ReactNode {
   const { commandPaletteOpen, setCommandPaletteOpen } = useHub();
+
+  /*
+   * Hide the tab layer while this is up.
+   *
+   * A browsed page is a native view in both shells and always paints ABOVE this
+   * document, so the palette opened correctly and was then covered by whatever
+   * page was behind it. Nothing in the DOM can out-rank a native sibling; the
+   * only fix is to ask the shell to take it away, which is what this does.
+   *
+   * Called here rather than inside the content below because a hook cannot sit
+   * behind the early return, and refcounted by `useHostOverlay` so closing this
+   * cannot uncover a page some other sheet is still hiding.
+   */
+  useHostOverlay(commandPaletteOpen);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -57,7 +72,8 @@ function CommandPaletteContent({
   const entries = useMemo<PaletteEntry[]>(() => {
     const needle = query.toLowerCase();
     const matches = (title: string, url: string): boolean =>
-      title.toLowerCase().includes(needle) || url.toLowerCase().includes(needle);
+      title.toLowerCase().includes(needle) ||
+      url.toLowerCase().includes(needle);
 
     /*
      * This workspace only, and open tabs before pages that are merely
@@ -73,11 +89,13 @@ function CommandPaletteContent({
       .map((tab) => ({ kind: "tab", tab }));
 
     const openUrls = new Set(
-      (tabsBySpace[activeSpaceId] ?? []).map((tab) => tab.url),
+      (tabsBySpace[activeSpaceId] ?? []).map((tab) => tab.url)
     );
     // A page that is already open is offered as the tab, never twice.
     const recentEntries: PaletteEntry[] = (recentBySpace[activeSpaceId] ?? [])
-      .filter((site) => !openUrls.has(site.url) && matches(site.title, site.url))
+      .filter(
+        (site) => !openUrls.has(site.url) && matches(site.title, site.url)
+      )
       .map((site) => ({ kind: "recent", site }));
 
     const found = [...tabEntries, ...recentEntries];
@@ -116,10 +134,7 @@ function CommandPaletteContent({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center gap-3 px-4 py-3.5">
-          <Search
-            className="size-5 shrink-0 opacity-50"
-            aria-hidden="true"
-          />
+          <Search className="size-5 shrink-0 opacity-50" aria-hidden="true" />
           <input
             autoFocus
             value={query}
@@ -131,7 +146,7 @@ function CommandPaletteContent({
               if (event.key === "ArrowDown") {
                 event.preventDefault();
                 setSelectedIndex((index) =>
-                  Math.min(index + 1, entries.length - 1),
+                  Math.min(index + 1, entries.length - 1)
                 );
               } else if (event.key === "ArrowUp") {
                 event.preventDefault();
