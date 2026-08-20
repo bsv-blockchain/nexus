@@ -28,6 +28,7 @@ import {
   type RoadmapStatus,
   type SpaceProfile,
 } from "@/lib/data";
+import { useSettings } from "@/lib/settings-store";
 import { isVisibleInPhase, usePhase } from "@/lib/phase";
 import {
   reconcileRail,
@@ -1077,15 +1078,26 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     [],
   );
   const [askedFor, setAskedFor] = useState<Set<AppSlug>>(() => new Set());
+  /*
+   * Which apps the rail draws.
+   *
+   * Browse drops out of this list when it is pinned under Workspaces instead
+   * (Settings > Browsing). It has not been uninstalled — every other reader of
+   * `installedApps` still sees it, so the App Store and the workspace's
+   * connections still know it is connected and can still disconnect it. It has
+   * only stopped being one of the tiles, because it is now one of the buttons.
+   */
+  const browsePinned = useSettings().browseAsButton;
   const visibleApps = useMemo(
     () =>
       installedApps.filter(
         (slug) =>
-          !shippedInstalled.has(slug) ||
-          askedFor.has(slug) ||
-          isVisibleInPhase(slug, phase),
+          (!browsePinned || slug !== "browser") &&
+          (!shippedInstalled.has(slug) ||
+            askedFor.has(slug) ||
+            isVisibleInPhase(slug, phase)),
       ),
-    [installedApps, phase, askedFor, shippedInstalled],
+    [installedApps, phase, askedFor, shippedInstalled, browsePinned],
   );
   /* Always reconciled, never rendered raw: a stored layout can name a site that
      has since been disconnected, an app this profile no longer carries, or a

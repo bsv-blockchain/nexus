@@ -6,7 +6,7 @@ export const content = {
   brand: {
     name: "Nexus",
     /** the short one, for a lockup where a full sentence will not fit */
-    slogan: "All the net you need",
+    slogan: "Let the light in",
     tagline: "Your apps, your keys, your Nexus.",
     description:
       "Nexus is a workspace that bundles a browser, wallet, signing, publishing and transaction tools into one place.",
@@ -21,6 +21,9 @@ export const content = {
          seen. */
       tabs: "Tabs",
       close: "Close",
+      browse: "Browse",
+      browseDesc:
+        "The web, with your wallet in it. Pinned here rather than sitting among your apps.",
       dragHint: "Drag to add Favorites",
       dragSubHint: "Favorites keep your most used sites and apps close",
     },
@@ -1780,7 +1783,6 @@ export const content = {
       firstRunLabel: "First run",
       firstRunHint: "The welcome cards and the handle you picked.",
       replay: "Show again",
-      replayDone: "The first run will play again",
       flowLabel: "Guided setup",
       flowHint: "The longer walk-through that follows the welcome.",
       soon: "Not built yet",
@@ -1959,6 +1961,10 @@ export const content = {
     browsing: {
       title: "Browsing",
       hint: "Sites, tabs and downloads.",
+      browseTitle: "Browse",
+      browseAsButtonLabel: "Pin Browse to the rail",
+      browseAsButtonHint:
+        "Sits under Workspaces instead of among your apps. Turn off to keep it as an app.",
       sitesTitle: "Sites",
       tabsTitle: "Tabs",
       tabLayoutHorizontal: "Horizontal tabs",

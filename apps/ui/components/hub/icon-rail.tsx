@@ -18,6 +18,7 @@ import {
   type HubApp,
 } from "@/lib/data";
 import { refKey, sameRef } from "@/lib/rail/layout";
+import { useSettings } from "@/lib/settings-store";
 import { displayOrigin } from "@/lib/rail/origin";
 import type { PinnedSite } from "@/lib/rail/sites";
 import {
@@ -25,6 +26,7 @@ import {
   Folder,
   FolderMinus,
   Gift,
+  Globe,
   Layers,
   LayoutGrid,
   type LucideIcon,
@@ -228,6 +230,7 @@ export function IconRail(): ReactNode {
     openSettings,
     activeRef,
     openApp,
+    isInstalled,
     activeSpaceId,
     openLinkInBrowser,
     pinnedSites,
@@ -260,6 +263,45 @@ export function IconRail(): ReactNode {
       : railCollapsed
         ? "grayscale transition duration-200 group-hover:grayscale-0"
         : ICON_GLOW;
+  /*
+   * The pinned block: Workspaces, then Browse when it is pinned, then Apps.
+   *
+   * Built here rather than at module scope because two of the three now depend
+   * on state — whether Browse is pinned at all, and whether this workspace
+   * still has it connected. Disconnecting Browse takes the button with it,
+   * which is the point: the button is a place to reach the app, not a
+   * replacement for having it.
+   *
+   * `systemTabs` still carries the two that map onto a LibraryTab; Browse is
+   * not one of those — it opens an app rather than a panel — so it is added
+   * here with its own opener instead of being forced into that union.
+   */
+  const browsePinned = useSettings().browseAsButton && isInstalled("browser");
+  const pinned = [
+    {
+      ...systemTabs[0]!,
+      active: tabActive("spaces"),
+      open: () => openTabView("spaces"),
+    },
+    ...(browsePinned
+      ? [
+          {
+            id: "browse",
+            label: content.library.spaces.browse,
+            icon: Globe,
+            desc: content.library.spaces.browseDesc,
+            active: activeRef.kind === "app" && activeRef.slug === "browser",
+            open: () => openApp("browser"),
+          },
+        ]
+      : []),
+    {
+      ...systemTabs[1]!,
+      active: tabActive("apps"),
+      open: () => openTabView("apps"),
+    },
+  ];
+
   const unread = getUnreadRefs();
   const [dragging, setDragging] = useState<RailRef | null>(null);
   const [overTarget, setOverTarget] = useState<string | null>(null);
@@ -375,7 +417,7 @@ export function IconRail(): ReactNode {
     >
       {/* Pinned tabs — Profiles / Apps / Downloads stay at the top. */}
       <div className="flex w-full shrink-0 flex-col items-center gap-1 px-2 py-1">
-        {systemTabs.map((tab) => (
+        {pinned.map((tab) => (
           <div
             key={tab.id}
             onMouseEnter={(event) => showTip(event, tab.label, tab.desc)}
@@ -383,9 +425,9 @@ export function IconRail(): ReactNode {
           >
             <RailShell
               label={tab.label}
-              active={tabActive(tab.id)}
+              active={tab.active}
               compact={railCollapsed}
-              onClick={() => openTabView(tab.id)}
+              onClick={tab.open}
             >
               {/* The icon keeps its size; the box around it takes the 36px an
                   app tile below occupies. Bare, a 24px glyph sat six pixels

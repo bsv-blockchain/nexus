@@ -104,6 +104,19 @@ export interface SettingsState {
    * the column either way; only the tab list moves.
    */
   tabLayout: TabLayout;
+  /**
+   * Whether Browse is a pinned button rather than one of your apps.
+   *
+   * On, it leaves the app section of the rail and sits under Workspaces with
+   * the other things that are part of the client rather than installed into
+   * it — which is what browsing actually is here. Off, it is an app like any
+   * other and appears wherever it is connected.
+   *
+   * The two are exclusive on purpose: Browse in the pinned block AND in the
+   * app list is one thing with two doors, and the second door teaches that
+   * they are different places.
+   */
+  browseAsButton: boolean;
 
   /* ---- Autofill ------------------------------------------------------- */
   autofillAddresses: boolean;
@@ -237,6 +250,8 @@ const INITIAL: SettingsState = {
   // arriving from another browser expects to find, and the column is then free
   // to be a library rather than a tab list with bookmarks underneath it.
   tabLayout: "horizontal",
+  // On by default: browsing is what this client is, not an app you added.
+  browseAsButton: true,
 
   autofillAddresses: true,
   autofillCards: false,

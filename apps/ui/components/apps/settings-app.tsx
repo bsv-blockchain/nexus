@@ -718,6 +718,16 @@ export function BrowsingPanel(): ReactNode {
   const { openDetailPane } = useHub();
   return (
     <>
+      {/* Above Sites and Tabs because it decides whether Browse is a thing you
+          have at all before either of them describes how it behaves. */}
+      <Group title={copy.browseTitle}>
+        <Toggle
+          label={copy.browseAsButtonLabel}
+          hint={copy.browseAsButtonHint}
+          value={settings.browseAsButton}
+          onChange={(next) => setSetting("browseAsButton", next)}
+        />
+      </Group>
       <Group title={copy.sitesTitle}>
         <Row
           label={mobile.globalSiteSettings}
@@ -938,10 +948,10 @@ export function AppearancePanel(): ReactNode {
             label={content.settings.onboarding.firstRunLabel}
             hint={content.settings.onboarding.firstRunHint}
             value={content.settings.onboarding.replay}
-            onClick={() => {
-              resetFirstRun();
-              toast.success(content.settings.onboarding.replayDone);
-            }}
+            /* No toast: the first run takes the whole screen the moment this
+               is pressed, so a message telling you it is about to would be
+               covered by the thing it describes. */
+            onClick={resetFirstRun}
           />
           {/* Named now and empty on purpose: the flow after the first run is
               next, and a section that appears later looks like a setting that
@@ -1145,7 +1155,6 @@ export function AboutPanel(): ReactNode {
         settings/beta-dialog.tsx stays in the tree for that day.
       */}
       <UpdatePanel />
-
     </>
   );
 }
