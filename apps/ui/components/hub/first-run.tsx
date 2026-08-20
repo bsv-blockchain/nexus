@@ -4,6 +4,7 @@ import { ScrollStack } from "@/components/hub/vendor/scroll-stack";
 import dynamic from "next/dynamic";
 import { content, getMessagePeople } from "@/lib/data";
 import { markFirstRunSeen, useFirstRunSeen } from "@/lib/first-run";
+import { useHostOverlay } from "@/lib/wallet-data";
 import { checkHandle, suggestHandle } from "@/lib/handle-suggest";
 import { useReducedMotion } from "@/lib/motion";
 import { addHandle, useSettings } from "@/lib/settings-store";
@@ -11,6 +12,8 @@ import { useHub } from "@/components/hub/hub-provider";
 import { useCustomTheme } from "@/components/hub/theme-provider";
 import { ShareBackdrop } from "@/components/hub/share-backdrop";
 import TiltedTiles from "@/components/hub/vendor/tilted-tiles";
+import { ScannerCardStream } from "@/components/hub/vendor/scanner-card-stream";
+import { HANDLE_CARDS } from "@/components/hub/handle-cards";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, Check, Shuffle } from "lucide-react";
 import {
@@ -177,6 +180,58 @@ const STEPS = [
 ] as const;
 
 /**
+ * The paintings, one per card and all of them in the opening.
+ *
+ * Order matters: `ART[n]` is the plate behind card `n`, and ART[0] is also the
+ * frame the opening's shuffle lands on, so the picture you arrive on is the
+ * picture already there. Everything is a blue duotone at source, which is why
+ * they sit under the chrome without fighting it.
+ *
+ * Chosen against each card's own sentence rather than for looks:
+ *   welcome    a vault, lit through its windows — the slogan, roughly
+ *   browse     a ferry crossing and recrossing, with a village on the far bank
+ *   pay        figures carrying baskets out and back, which is what paying is
+ *   workspaces a camp of separate households, side by side, each its own
+ *   handle     one named landmark alone against the sky
+ */
+const ART = [
+  "/first-run/art/vault.webp",
+  "/first-run/art/ferry.webp",
+  "/first-run/art/fishing.webp",
+  "/first-run/art/halt.webp",
+  "/first-run/art/mill.webp",
+] as const;
+
+/** The three that only ever appear in the opening's shuffle. */
+const ART_EXTRA = [
+  "/first-run/art/rock.webp",
+  "/first-run/art/swiss.webp",
+  "/first-run/art/buffalo.webp",
+] as const;
+
+/** How long one frame of the opening's shuffle is held, in milliseconds. */
+const FLIP = 250;
+
+/**
+ * How long one plate takes to dissolve into the next, in seconds.
+ *
+ * Exactly the hold, which is what makes this a crossfade rather than a pile.
+ * Each plate is fully up as the next starts, and fully gone as the one after
+ * that starts, so there are never more than two on screen and the blend is
+ * always between a known pair. Stretching it beyond FLIP sounds smoother and is
+ * not: at 1.4x the hold, four plates were compositing at once and four
+ * different paintings averaged together is a grey wash, not a dissolve.
+ *
+ * Derived from FLIP rather than typed out so changing the pace cannot leave the
+ * two disagreeing.
+ */
+const DISSOLVE = FLIP / 1000;
+
+/** Behind the mark, and behind the deck: two strengths of the same layer. */
+const ART_INTRO_OPACITY = 0.35;
+const ART_DECK_OPACITY = 0.12;
+
+/**
  * The wall on the browsing card. Same story: local, numbered, replaceable.
  *
  * Real Metanet apps rather than stock tiles: the card's claim is that there is
@@ -233,6 +288,19 @@ const INTRO = {
 const WAVE_START = 0.25;
 
 /**
+ * How much of it is showing once the deck is up.
+ *
+ * Short of full on purpose. The wave has the screen to itself during the
+ * opening, but behind five cards of text and a plate of its own it is the
+ * backdrop rather than the subject, and holding a little of it back is what
+ * keeps the cards sitting on top of something instead of in it.
+ *
+ * Multiplies the shader's own `opacity` uniform (0.85 below) rather than
+ * replacing it, so the wave is drawn at roughly two thirds strength here.
+ */
+const WAVE_DECK = 0.8;
+
+/**
  * The first run.
  *
  * Five cards: four that say what this is, and one that asks for a name. Paged
@@ -257,10 +325,26 @@ export function FirstRun(): ReactNode {
 }
 
 function Run(): ReactNode {
+  /*
+   * Tell the shell it is covered.
+   *
+   * A browsed page is a native view in both shells — a WebContentsView on the
+   * desktop, a native web view on mobile — and a native view is a sibling of
+   * this document that always paints ABOVE it. No z-index here can reach over
+   * one, so without this the welcome renders perfectly and is then completely
+   * hidden behind whatever tab happens to be open.
+   *
+   * Held for the whole mount rather than dropped when `leaving` starts: the
+   * deck falling away is the reveal, and letting the page back in first would
+   * pop it over the top of that.
+   *
+   * A no-op in a plain browser, which has no tab layer to hide.
+   */
+  useHostOverlay(true);
   const copy = content.firstRun;
   const reduced = useReducedMotion();
   const settings = useSettings();
-  const { activeSpaceId } = useHub();
+  const { activeSpaceId, setMainView } = useHub();
   const wave = useThemeInk();
   const canWave = useHasWebgl();
   const theme = useCustomTheme();
@@ -276,6 +360,38 @@ function Run(): ReactNode {
    */
   const [beat, setBeat] = useState(() => (reduced ? INTRO.done : 0));
   const introDone = beat >= INTRO.done;
+
+  /*
+   * The opening's shuffle, worked out once.
+   *
+   * Every plate exactly once: the seven that are not ART[0] in a random order,
+   * then ART[0] last. A fixed list rather than a timer picking as it goes,
+   * because the final frame has to be the plate card one is about to show and a
+   * sequence that decides frame by frame cannot promise where it stops.
+   *
+   * Eight frames at FLIP is two seconds, and the opening runs to INTRO.recede
+   * at 3.8 — so the run finishes early and ART[0] simply holds. That is the
+   * good version of the gap: the flicker settles before the name appears, and
+   * the plate that carries into the first card is already still by then. Making
+   * it fill the whole opening instead means a slower FLIP, not more frames.
+   *
+   * Deterministic per mount (`useState` initialiser, not `useMemo`) so a
+   * re-render cannot deal a different hand mid-animation.
+   */
+  const [shuffle] = useState<string[]>(() => {
+    const pool = [...ART.slice(1), ...ART_EXTRA];
+    for (let i = pool.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j]!, pool[i]!];
+    }
+    return [...pool, ART[0]];
+  });
+  /* Which frame of the shuffle is up. Frozen at the last one once the opening
+     is over, which is what hands the plate to the deck unchanged. */
+  const [flip, setFlip] = useState(0);
+  const plate = introDone
+    ? (ART[Math.min(index, ART.length - 1)] ?? ART[0])
+    : (shuffle[Math.min(flip, shuffle.length - 1)] ?? ART[0]);
   const skipIntro = useCallback(() => setBeat(INTRO.done), []);
 
   /*
@@ -352,12 +468,22 @@ function Run(): ReactNode {
   const finish = useCallback(() => {
     if (handle.trim() && verdict === "ok")
       addHandle(handle.trim(), activeSpaceId);
+    /*
+     * Land on the feed, not on whatever the canvas happened to be showing.
+     *
+     * The welcome has just spent five cards saying what is in here; the wall of
+     * apps is the answer to that, and it is the same place the Workspaces
+     * column's View feed button goes. Set BEFORE the deck falls away rather
+     * than after, so the page is already there to be revealed — switching once
+     * the overlay is gone would show one screen and then replace it.
+     */
+    setMainView("feed");
     /* Let the deck fall away before it unmounts. The reveal of the app behind
        it is the point of the screen, and cutting to it wastes the one moment
        this thing exists for. */
     setLeaving(true);
     window.setTimeout(() => markFirstRunSeen(), reduced ? 0 : 420);
-  }, [handle, verdict, reduced, activeSpaceId]);
+  }, [handle, verdict, reduced, activeSpaceId, setMainView]);
 
   /*
    * Walk the opening. One timer per beat, all cleared together.
@@ -375,6 +501,17 @@ function Run(): ReactNode {
       );
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [introDone]);
+
+  /* Step the shuffle. Stops of its own accord on the last frame, which is the
+     one the deck inherits. */
+  useEffect(() => {
+    if (introDone) return;
+    const timer = window.setInterval(
+      () => setFlip((at) => Math.min(at + 1, shuffle.length - 1)),
+      FLIP
+    );
+    return () => window.clearInterval(timer);
+  }, [introDone, shuffle.length]);
 
   /* Any key, anywhere, ends the opening rather than paging the deck. Handled
      before the arrow keys below so the first press cannot do both. */
@@ -496,13 +633,13 @@ function Run(): ReactNode {
               <motion.div
                 ref={waveBox}
                 className="pointer-events-none absolute inset-0"
-                /* A quarter of itself until the mark recedes, then all of it.
-                   Slower than the recede it accompanies, so the wave is still
-                   opening as the first card lands rather than arriving with
-                   it. */
+                /* A quarter of itself until the mark recedes, then up to its
+                   resting strength. Slower than the recede it accompanies, so
+                   the wave is still opening as the first card lands rather than
+                   arriving with it. */
                 initial={false}
                 animate={{
-                  opacity: beat >= INTRO.recede ? 1 : WAVE_START,
+                  opacity: beat >= INTRO.recede ? WAVE_DECK : WAVE_START,
                 }}
                 transition={{
                   duration: reduced ? 0 : 1.4,
@@ -540,6 +677,51 @@ function Run(): ReactNode {
               </motion.div>
             </BackdropBoundary>
           )}
+
+          {/*
+            The plates: over the shader, under everything else.
+
+            One element that never unmounts between the opening and the deck.
+            The shuffle's last frame is card one's plate, so when the deck
+            arrives nothing is swapped — only the opacity falls, from something
+            you are meant to see to something you are meant to feel. That is the
+            whole reason this is not two layers.
+
+            A background-image rather than an <img>: `cover` on a full-bleed
+            plate is one line here and a wrapper plus object-fit there, and this
+            is decoration with no alt text to give.
+          */}
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <AnimatePresence initial={false}>
+              <motion.div
+                key={plate}
+                className="absolute inset-0 bg-cover bg-center"
+                style={{ backgroundImage: `url(${plate})` }}
+                initial={{ opacity: 0 }}
+                animate={{
+                  opacity:
+                    beat >= INTRO.deck ? ART_DECK_OPACITY : ART_INTRO_OPACITY,
+                }}
+                exit={{ opacity: 0 }}
+                /*
+                  Two different jobs, so two timings.
+                
+                  During the shuffle it is a dissolve: linear, and longer than
+                  the hold, so the outgoing plate is still going as the incoming
+                  one arrives. Linear rather than eased because both halves are
+                  composited independently — an ease-in-out on each would thin
+                  the middle of every crossing and make the run pulse.
+                
+                  After it, the same layer is settling to its resting strength
+                  or changing cards, which wants an ease and no hurry.
+                */
+                transition={{
+                  duration: reduced ? 0 : beat >= INTRO.recede ? 0.8 : DISSOLVE,
+                  ease: beat >= INTRO.recede ? [0.4, 0, 0.2, 1] : "linear",
+                }}
+              />
+            </AnimatePresence>
+          </div>
 
           {/* The opening. Sits over the wave and under nothing — the deck is
               not mounted yet while this is on screen. */}
@@ -689,6 +871,31 @@ function Run(): ReactNode {
                     <TellCard
                       key={step.key}
                       image={step.image}
+                      {...(step.key === "pay"
+                        ? {
+                            /*
+                              Paying is names, so the card shows names: a line
+                              of workspace handles drifting past a scanner, each
+                              resolving out of the key it stands in for. The
+                              direction is the argument — code becomes a
+                              readable name, never the other way round.
+                            */
+                            backdrop: (
+                              <div className="absolute inset-0">
+                                <ScannerCardStream
+                                  cards={HANDLE_CARDS}
+                                  /* Rewinds when this card is reached, so it
+                                     is always entered at its opening rather
+                                     than wherever it drifted to while somebody
+                                     read the two cards before it. */
+                                  active={index === 2}
+                                  reduced={Boolean(reduced)}
+                                  className="h-full w-full"
+                                />
+                              </div>
+                            ),
+                          }
+                        : {})}
                       {...(step.key === "browse"
                         ? {
                             /*
@@ -741,11 +948,28 @@ function Run(): ReactNode {
               from. */}
           {beat >= INTRO.footer && (
             <motion.div
-              initial={reduced ? false : { opacity: 0, y: "100%" }}
-              animate={{ opacity: 1, y: "0%" }}
+              /*
+                A rise, not a slide.
+                
+                It used to come up a full `100%` — its own height — on the same
+                expo curve the mark and the cards use. That curve is nearly
+                vertical at the start, so the opacity it was also driving hit
+                full almost at once and the bar arrived rather than appeared.
+                
+                Now the two are separated: a short travel on a gentle ease-out,
+                and a longer, linear fade over the top of it. Linear because an
+                eased opacity spends most of its time near one end or the other,
+                which is the opposite of gracefully.
+              */
+              initial={reduced ? false : { opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{
-                duration: reduced ? 0 : 0.6,
-                ease: [0.16, 1, 0.3, 1],
+                duration: reduced ? 0 : 0.85,
+                ease: [0.22, 0.61, 0.36, 1],
+                opacity: {
+                  duration: reduced ? 0 : 1.1,
+                  ease: "linear",
+                },
               }}
             >
               <Footer
