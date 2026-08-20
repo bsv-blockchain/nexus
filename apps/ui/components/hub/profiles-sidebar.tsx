@@ -105,7 +105,18 @@ export function ProfilesSidebar(): ReactNode {
         <Stat value={String(wallets.length)} label={copy.statWallets} />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      {/*
+        The workspaces sit at the FOOT of what is left, not the top of it.
+
+        `mt-auto` on the content rather than `justify-end` on the scroller: the
+        two agree while everything fits and disagree the moment it does not. A
+        flex column that justifies to the end pushes its first child above the
+        top of its own scroll box, so a long list would start out of reach. An
+        auto margin collapses to nothing once the content is taller than the
+        box, which leaves the list scrolling normally from its first row.
+      */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div className="mt-auto">
         <h3 className="text-muted-foreground mt-4 px-1.5 text-[10px] font-bold tracking-wide uppercase">
           {copy.allProfiles}
         </h3>
@@ -180,6 +191,7 @@ export function ProfilesSidebar(): ReactNode {
             </ul>
           </>
         )}
+        </div>
       </div>
 
       <div className="border-border/60 mt-2 border-t pt-2">
