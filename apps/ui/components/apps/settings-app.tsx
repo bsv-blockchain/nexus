@@ -37,10 +37,17 @@ import {
 } from "@/components/apps/settings/blocks";
 import { WalletSettingsPanel } from "@/components/apps/settings-wallet";
 import { DEMO_SURFACES } from "@/lib/surfaces";
+import {
+  DeveloperOnly,
+  setDeveloperMode,
+  useDeveloperMode,
+} from "@/lib/developer-mode";
 import { resetFirstRun } from "@/lib/first-run";
 import { AutofillPanel } from "@/components/apps/settings/autofill-panel";
 import { UpdatePanel } from "@/components/apps/settings/update-panel";
 import { PermissionsPanel } from "@/components/apps/settings/permissions-panel";
+import { ProfilesPanel } from "@/components/apps/settings/profiles-panel";
+import { SecurityPanel } from "@/components/apps/settings/security-panel";
 import { ShortcutsPanel } from "@/components/apps/settings/shortcuts-panel";
 import {
   setSetting,
@@ -71,6 +78,8 @@ import {
   Info,
   KeyRound,
   Keyboard,
+  Lock,
+  UserRound,
   Link2Off,
   Monitor,
   PanelLeftClose,
@@ -129,6 +138,22 @@ const ALL_SETTINGS_CATEGORIES: {
     icon: Sliders,
   },
   {
+    /* Below General and above Security: this is who you are, and the two
+       under it are who can get in and what they may see. */
+    id: "profiles",
+    label: content.profilesPanel.title,
+    hint: content.profilesPanel.hint,
+    icon: UserRound,
+  },
+  {
+    /* Above Privacy on purpose: this decides who can get in at all, and
+       Privacy decides what they see once they have. */
+    id: "security",
+    label: content.security.title,
+    hint: content.security.hint,
+    icon: Lock,
+  },
+  {
     id: "privacy",
     label: content.settings.privacy.title,
     hint: content.settings.privacy.hint,
@@ -183,6 +208,11 @@ const ALL_SETTINGS_CATEGORIES: {
  */
 const DEMO_CATEGORY_IDS: ReadonlySet<SettingsCategory> = new Set([
   "general",
+  "profiles",
+  /* Demo only, like the rest of this list: the flows behind it register keys
+     and phones that do not exist, which is exactly the kind of control a live
+     build must not offer. */
+  "security",
   "privacy",
   "permissions",
   "autofill",
@@ -815,36 +845,6 @@ export function BrowsingPanel(): ReactNode {
           onChange={(next) => setSetting("translateOffer", next)}
         />
       </Group>
-
-      {/* Off by default, and grouped as its own thing rather than mixed in with
-          tabs and files: every switch in here widens what a page is allowed to
-          see, which is a different kind of decision from where downloads go. */}
-      <Group title={copy.devTitle} hint={copy.devHint}>
-        <Toggle
-          label={copy.devToolsLabel}
-          hint={copy.devToolsHint}
-          value={settings.devTools}
-          badge={copy.devToolsShortcut}
-          onChange={(next) => {
-            setSetting("devTools", next);
-            toast.success(next ? copy.devToolsOn : copy.devToolsOff, {
-              ...(next ? { description: copy.devWarn } : {}),
-            });
-          }}
-        />
-        <Toggle
-          label={copy.devOverlayLabel}
-          hint={copy.devOverlayHint}
-          value={settings.overlayInspector}
-          onChange={(next) => setSetting("overlayInspector", next)}
-        />
-        <Toggle
-          label={copy.devUnsafeLabel}
-          hint={copy.devUnsafeHint}
-          value={settings.unsignedRepos}
-          onChange={(next) => setSetting("unsignedRepos", next)}
-        />
-      </Group>
     </>
   );
 }
@@ -924,9 +924,24 @@ function ModePicker(): ReactNode {
   );
 }
 
+/**
+ * The switches the master carries with it.
+ *
+ * Listed once so adding a fourth tool is one edit rather than three: the group
+ * renders them, this turns them on and off with the mode.
+ */
+const DEV_TOOLS = ["devTools", "overlayInspector", "unsignedRepos"] as const;
+
 export function AppearancePanel(): ReactNode {
   const copy = content.settings.appearance;
-  const { spaces, setSpaceThemeColor } = useHub();
+  /* The three moved switches kept their own copy where it was — they are the
+     same switches, and rewriting their descriptions to sit under a new heading
+     would have made them look like new features. */
+  const browsing = content.settings.browsing;
+  const settings = useSettings();
+  const developer = useDeveloperMode();
+  const [confirmReplay, setConfirmReplay] = useState(false);
+  const { spaces, setSpaceThemeColor, isInstalled, installApp } = useHub();
   const brandMode = useBrandMode();
   const custom = spaces.filter(
     (space) => space.themeColor && space.themeColor !== DEFAULT_ACCENT
@@ -944,15 +959,48 @@ export function AppearancePanel(): ReactNode {
           title={content.settings.onboarding.title}
           hint={content.settings.onboarding.hint}
         >
+          {/* Asks first. Replaying the welcome rebuilds this workspace's rail
+              from whatever presets get picked the second time, which is not
+              something to discover after the screen has already taken over. */}
           <Row
             label={content.settings.onboarding.firstRunLabel}
             hint={content.settings.onboarding.firstRunHint}
             value={content.settings.onboarding.replay}
-            /* No toast: the first run takes the whole screen the moment this
-               is pressed, so a message telling you it is about to would be
-               covered by the thing it describes. */
-            onClick={resetFirstRun}
+            onClick={() => setConfirmReplay(true)}
           />
+          <Sheet
+            open={confirmReplay}
+            onClose={() => setConfirmReplay(false)}
+            label={content.settings.onboarding.confirmTitle}
+            footer={
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmReplay(false)}
+                  className="focus-ring ring-border hover:bg-surface-hover flex-1 rounded-full px-4 py-2.5 text-sm font-semibold ring-1"
+                >
+                  {content.settings.onboarding.confirmCancel}
+                </button>
+                <button
+                  type="button"
+                  /* No toast: the welcome takes the whole screen the moment
+                     this is pressed, so a message about it would be covered by
+                     the thing it describes. */
+                  onClick={() => {
+                    setConfirmReplay(false);
+                    resetFirstRun();
+                  }}
+                  className="focus-ring bg-accent text-accent-foreground flex-1 rounded-full px-4 py-2.5 text-sm font-semibold"
+                >
+                  {content.settings.onboarding.confirmGo}
+                </button>
+              </div>
+            }
+          >
+            <p className="text-muted-foreground px-6 py-5 text-center text-sm leading-relaxed text-balance">
+              {content.settings.onboarding.confirmBody}
+            </p>
+          </Sheet>
           {/* Named now and empty on purpose: the flow after the first run is
               next, and a section that appears later looks like a setting that
               moved. */}
@@ -963,6 +1011,92 @@ export function AppearancePanel(): ReactNode {
           />
         </Group>
       )}
+
+      {/*
+        Above the theme, because it changes what the rest of Settings — and
+        every other app — has in it. A switch that reveals other switches has to
+        come before the things it reveals, or the page appears to grow upwards.
+
+        The three it holds came from Browsing. They were grouped there because
+        the first one docks a panel under a web page, but the other two were
+        never about browsing at all, and a developer hunting for them had to
+        guess which app owned them. One place, one switch to find it by.
+      */}
+      <Group title={copy.devTitle} hint={copy.devHint}>
+        <Toggle
+          label={copy.devModeLabel}
+          hint={copy.devModeHint}
+          value={developer}
+          onChange={(next) => {
+            setDeveloperMode(next);
+            /*
+             * The master carries the three with it, both ways.
+             *
+             * Revealing three switches that are all off would make turning the
+             * mode on do nothing visible, and leaving them on after the mode
+             * goes off would strand a page inspector with no setting on screen
+             * that explains it. So the master is the state, and these follow.
+             */
+            for (const key of DEV_TOOLS) setSetting(key, next);
+            toast.success(next ? copy.devModeOn : copy.devModeOff, {
+              ...(next ? { description: copy.devModeOnHint } : {}),
+            });
+            /* Two of the three live inside Browse. Offered, not done: an app
+               that connects itself because you opened a settings switch is a
+               worse surprise than a prompt you can ignore. */
+            if (next && !isInstalled("browser")) {
+              toast(copy.devNeedsBrowse, {
+                description: copy.devNeedsBrowseHint,
+                action: {
+                  label: copy.devConnectBrowse,
+                  /* Straight to `installApp`, which is the same call the
+                     permission sheet makes once you approve it. The sheet asks
+                     what an app may do; you have just said what you want, and
+                     asking again in a modal would be asking twice. */
+                  onClick: () => {
+                    installApp("browser");
+                    toast.success(copy.devBrowseConnected);
+                  },
+                },
+              });
+            }
+          }}
+        />
+        {/*
+          The individual tools, revealed by the switch above.
+
+          Rendered inside the same group rather than in one of their own: they
+          are what the switch is for, and a second card appearing below would
+          read as an unrelated section that happened to arrive at the same
+          moment. `DeveloperOnly` is the same gate every other app will use.
+        */}
+        <DeveloperOnly>
+          <Toggle
+            label={browsing.devToolsLabel}
+            hint={browsing.devToolsHint}
+            value={settings.devTools}
+            badge={browsing.devToolsShortcut}
+            onChange={(next) => {
+              setSetting("devTools", next);
+              toast.success(next ? browsing.devToolsOn : browsing.devToolsOff, {
+                ...(next ? { description: browsing.devWarn } : {}),
+              });
+            }}
+          />
+          <Toggle
+            label={browsing.devOverlayLabel}
+            hint={browsing.devOverlayHint}
+            value={settings.overlayInspector}
+            onChange={(next) => setSetting("overlayInspector", next)}
+          />
+          <Toggle
+            label={browsing.devUnsafeLabel}
+            hint={browsing.devUnsafeHint}
+            value={settings.unsignedRepos}
+            onChange={(next) => setSetting("unsignedRepos", next)}
+          />
+        </DeveloperOnly>
+      </Group>
 
       <Group title={copy.themeTitle} hint={copy.themeHint}>
         <ModePicker />
@@ -1335,6 +1469,8 @@ export function SettingsApp(): ReactNode {
             Settings at all. */}
         {settingsCategory === "wallet" && <WalletSettingsPanel />}
         {settingsCategory === "general" && <GeneralPanel />}
+        {settingsCategory === "profiles" && <ProfilesPanel />}
+        {settingsCategory === "security" && <SecurityPanel />}
         {settingsCategory === "privacy" && <PrivacyPanel />}
         {settingsCategory === "permissions" && <PermissionsPanel />}
         {settingsCategory === "autofill" && <AutofillPanel />}

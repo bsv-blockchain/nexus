@@ -145,7 +145,7 @@ export type HandleCheck =
 export function checkHandle(
   raw: string,
   current: string,
-  owned: string[] = [],
+  owned: string[] = []
 ): HandleCheck {
   const value = raw.trim().toLowerCase().replace(/^@/, "");
   if (!value) return { state: "empty" };

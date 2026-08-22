@@ -551,6 +551,39 @@ export const messagePeople: MessagePerson[] = [
   },
 
   /* --------------------------------------------------------------- twetch */
+  /* LaMint issues collectibles, so its people are minters and curators rather
+     than posters. Generated avatar tiles: the ecosystem is new here and a
+     borrowed photograph would be a claim about a person who does not exist. */
+  {
+    id: "lm-pia",
+    name: "Pia Vandenberg",
+    handle: "pia",
+    ecosystem: "lamint",
+    role: "Mint operator",
+    bio: "Runs the press. If an issue is short by one, it is because somebody asked me to burn it.",
+    organization: "LaMint",
+    city: "Antwerp",
+    photo: null,
+    avatarColors: ["#22d3ee", "#f9a8f0", "#a855f7"],
+    registeredAt: "2024-09-04T09:00:00.000Z",
+    expertise: ["Issuance", "Provenance"],
+    profileUrl: "https://lamint.io/u/pia",
+  },
+  {
+    id: "lm-arto",
+    name: "Arto Salmi",
+    handle: "arto",
+    ecosystem: "lamint",
+    role: "Curator",
+    bio: "Looks at a series before it goes out and asks whether anyone will want the twentieth one.",
+    organization: "LaMint",
+    city: "Helsinki",
+    photo: null,
+    avatarColors: ["#f9a8f0", "#38bdf8", "#6366f1"],
+    registeredAt: "2025-01-22T09:00:00.000Z",
+    expertise: ["Curation", "Editions"],
+    profileUrl: "https://lamint.io/u/arto",
+  },
   /* Twetch user numbers are the handle — @3 is the third account ever made. */
   {
     id: "tw-randy",

@@ -17,8 +17,18 @@ export const paymentLinks: PaymentLink[] = [
     createdAt: "2026-07-27T15:10:00.000Z",
     expiresAt: "2026-08-27T15:10:00.000Z",
     payments: [
-      { id: "plp-1", personId: "isa-van-den-berg", units: 25, paidAt: "2026-07-28T09:12:00.000Z" },
-      { id: "plp-2", personId: "dan-kittredge", units: 25, paidAt: "2026-07-28T11:40:00.000Z" },
+      {
+        id: "plp-1",
+        personId: "isa-van-den-berg",
+        units: 25,
+        paidAt: "2026-07-28T09:12:00.000Z",
+      },
+      {
+        id: "plp-2",
+        personId: "dan-kittredge",
+        units: 25,
+        paidAt: "2026-07-28T11:40:00.000Z",
+      },
     ],
   },
   {
@@ -30,7 +40,12 @@ export const paymentLinks: PaymentLink[] = [
     createdAt: "2026-07-28T17:05:00.000Z",
     expiresAt: "2026-08-11T17:05:00.000Z",
     payments: [
-      { id: "plp-3", personId: "tw-shruggr", units: 0.05, paidAt: "2026-07-29T08:22:00.000Z" },
+      {
+        id: "plp-3",
+        personId: "tw-shruggr",
+        units: 0.05,
+        paidAt: "2026-07-29T08:22:00.000Z",
+      },
     ],
   },
   {
@@ -43,9 +58,24 @@ export const paymentLinks: PaymentLink[] = [
     createdAt: "2026-07-14T08:00:00.000Z",
     expiresAt: "2026-07-15T08:00:00.000Z",
     payments: [
-      { id: "plp-4", personId: "marcel-van-silfhout", units: 12, paidAt: "2026-07-14T09:02:00.000Z" },
-      { id: "plp-5", personId: "sophie-meijer", units: 12, paidAt: "2026-07-14T09:31:00.000Z" },
-      { id: "plp-6", personId: "isa-van-den-berg", units: 12, paidAt: "2026-07-14T10:04:00.000Z" },
+      {
+        id: "plp-4",
+        personId: "marcel-van-silfhout",
+        units: 12,
+        paidAt: "2026-07-14T09:02:00.000Z",
+      },
+      {
+        id: "plp-5",
+        personId: "sophie-meijer",
+        units: 12,
+        paidAt: "2026-07-14T09:31:00.000Z",
+      },
+      {
+        id: "plp-6",
+        personId: "isa-van-den-berg",
+        units: 12,
+        paidAt: "2026-07-14T10:04:00.000Z",
+      },
     ],
   },
 ];

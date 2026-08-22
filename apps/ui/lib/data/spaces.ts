@@ -1,13 +1,7 @@
 /**
  * tables: spaces, space_items, tabs, favorites, pages — placeholder rows.
  */
-import type {
-  BrowserTab,
-  Favorite,
-  MockPage,
-  Space,
-  SpaceItem,
-} from "./types";
+import type { BrowserTab, Favorite, MockPage, Space, SpaceItem } from "./types";
 
 export const favorites: Favorite[] = [
   {
@@ -201,5 +195,4 @@ export const mockPages: MockPage[] = [
     linkText: "Start learning",
     linkHref: "#",
   },
-
 ];

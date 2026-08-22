@@ -9,6 +9,7 @@ import { CommandPalette } from "@/components/hub/command-palette";
 import { DownloadsPanel } from "@/components/hub/downloads-panel";
 import { HubProvider, useHub } from "@/components/hub/hub-provider";
 import { ProfilesSidebar } from "@/components/hub/profiles-sidebar";
+import { TimelineSidebar } from "@/components/apps/timeline/timeline-sidebar";
 import { IconRail } from "@/components/hub/icon-rail";
 import { MainView } from "@/components/hub/main-view";
 import { MobileBrowser } from "@/components/hub/mobile-browser";
@@ -38,6 +39,10 @@ function LibraryPanel(): ReactNode {
       </div>
     );
   }
+  /* The Timeline's contextual column, in the slot every app's contextual column
+     uses. It is a view rather than an app, so `hasContextSidebar` further down
+     never sees it — this is where it gets its width. */
+  if (mainView === "timeline") return <TimelineSidebar />;
   if (libraryTab === "apps") return <AppCollections />;
   /* The profiles manager holds every profile now, so this column stops being a
      second copy of the active one and answers what is true across them. */

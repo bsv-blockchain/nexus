@@ -83,6 +83,15 @@ export const ecosystems: Ecosystem[] = [
     icon: "/ecosystems/commonsource.svg",
   },
   {
+    id: "lamint",
+    name: "LaMint",
+    description:
+      "A minting house for on-chain collectibles, where an issue is settled and provable before it is ever offered.",
+    alias: "lamint",
+    domain: "lamint.io",
+    icon: "/ecosystems/lamint.png",
+  },
+  {
     id: "mycelia",
     name: "Mycelia",
     description:

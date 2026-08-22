@@ -12,6 +12,7 @@ import {
   type MessagePerson,
 } from "@/lib/data";
 import { PRESENCE_LABEL, handleOf, namedHandleOf, presenceFor } from "@/lib/messages";
+import { toggleFollow, useTimeline } from "@/lib/timeline-store";
 import {
   CircleArrowDown,
   CircleArrowUp,
@@ -20,6 +21,8 @@ import {
   SendHorizontal,
   UserRound,
   UserRoundCheck,
+  UserRoundMinus,
+  UserRoundPlus,
 } from "lucide-react";
 import {
   createContext,
@@ -100,6 +103,20 @@ export function ProfileActionsRow({
   const copy = content.messages.hovercard;
   const actions = useProfileActions();
   const eco = getEcosystem(person.ecosystem);
+  /*
+   * Follow is read from the store, not from `actions`.
+   *
+   * Every other entry in this row is a host capability — a wallet has no
+   * composer to prefill, so it supplies no handler and the button does not
+   * appear. Following is not like that: it is one account-level fact that the
+   * Timeline reads, and it is equally true of a person met in a conversation,
+   * in a wallet contact list or in the feed itself. Gating it on a handler
+   * would have meant three surfaces each remembering to pass the same function,
+   * and the first one to forget would silently offer a person you could not
+   * follow.
+   */
+  const { follows } = useTimeline();
+  const following = follows.includes(person.id);
 
   const quick: {
     key: string;
@@ -107,6 +124,8 @@ export function ProfileActionsRow({
     icon: ReactNode;
     onClick: () => void;
     show: boolean;
+    /** leave the card open afterwards; see the follow entry */
+    stay?: boolean;
   }[] = [
     {
       key: "profile",
@@ -130,6 +149,27 @@ export function ProfileActionsRow({
       icon: <SendHorizontal className="size-4" />,
       onClick: () => actions?.message?.(person),
       show: Boolean(actions?.message),
+    },
+    {
+      key: "follow",
+      label: following ? copy.actions.unfollow : copy.actions.follow,
+      icon: following ? (
+        <UserRoundMinus className="size-4" />
+      ) : (
+        <UserRoundPlus className="size-4" />
+      ),
+      onClick: () => toggleFollow(person.id),
+      show: true,
+      /*
+       * The one action that does not dismiss the card.
+       *
+       * Every other button here takes you somewhere — a conversation, a pane, a
+       * composer with a command in it — so closing behind them is right. This
+       * one changes a fact about the person you are still looking at, and the
+       * card is where that fact is shown: closing it hides the confirmation and
+       * puts an accidental follow four clicks from being undone.
+       */
+      stay: true,
     },
     /*
      * Pay, request and vouch write the command into the composer rather than
@@ -179,7 +219,7 @@ export function ProfileActionsRow({
             aria-label={action.label}
             onClick={() => {
               action.onClick();
-              onAfter?.();
+              if (!action.stay) onAfter?.();
             }}
             className="focus-ring grid size-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
           >

@@ -22,6 +22,7 @@ import { WebAppView } from "@/components/apps/web-app";
 import { AppTile } from "@/components/hub/app-icon";
 import { hasContextSidebar } from "@/components/hub/app-context-sidebar";
 import { SettingsApp } from "@/components/apps/settings-app";
+import { TimelineApp } from "@/components/apps/timeline-app";
 import { AppStore } from "@/components/hub/app-store";
 import { DetailPane } from "@/components/hub/detail-pane";
 import { GettingStartedPage } from "@/components/hub/getting-started-page";
@@ -317,15 +318,16 @@ export function MainView(): ReactNode {
   const showSettings = mainView === "settings";
   const showProfiles = mainView === "profiles";
   /*
-   * The feed: every app you hold, as a wall of icons.
+   * Timeline: the feed, and the two columns that frame it.
    *
-   * The same launcher the canvas falls back to when no app is open, but reached
-   * on purpose rather than by having nothing else to show — which is what makes
-   * it a place you can return to and link to (?view=feed) instead of a state
-   * you fall into. Distinct from the App Store, which is about apps you do NOT
-   * have yet.
+   * Reached on purpose rather than by having nothing else to show, which is
+   * what makes it a place you can return to and link to (?view=timeline)
+   * instead of a state you fall into. It replaced the wall of app tiles that
+   * used to sit here — the rail and the App Store both open apps better than a
+   * grid of icons did, and neither of them had anything to say about what has
+   * happened since you last looked.
    */
-  const showFeed = mainView === "feed";
+  const showTimeline = mainView === "timeline";
   const canvasIsBrowser = activeApp === "browser" && !activePage;
 
   /*
@@ -397,7 +399,7 @@ export function MainView(): ReactNode {
     <main
       id="main-content"
       className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl shadow-xl ${
-        !showStore && !showSettings && !showFeed && canvasIsBrowser
+        !showStore && !showSettings && !showTimeline && canvasIsBrowser
           ? "bg-canvas"
           : "bg-background"
       }`}
@@ -419,12 +421,11 @@ export function MainView(): ReactNode {
         <div className="min-h-0 flex-1">
           <GettingStartedPage />
         </div>
-      ) : showFeed ? (
-        /* No pane slot: the feed is a grid of doors, and nothing in it opens a
-           reference panel the way an app or the store does. */
-        <div className="min-h-0 flex-1">
-          <EmptyState />
-        </div>
+      ) : showTimeline ? (
+        /* No DetailPane: the Timeline brings its own right-hand column, and two
+           panes on the same edge would be one too many places for a reference
+           to open. */
+        <TimelineApp />
       ) : showStore ? (
         /* Same row Settings uses: the store, then whatever pane is open beside
            it. Without this the Mods guide had a button and nowhere to render —

@@ -17,11 +17,30 @@ import type { ReactNode } from "react";
 
 const copy = content.profiles.sidebar;
 
+/**
+ * The box a library column's top control wears.
+ *
+ * Shared by the stat tiles and by the buttons that sit above them here and in
+ * the Timeline's column, because those have to be the same height — a 32px
+ * button over a row of 47px tiles read as an afterthought stuck on top rather
+ * than the first item in a set.
+ *
+ * The height is stated rather than left to the content: the tiles get theirs
+ * from two lines of type and the buttons carry one, so nothing but a floor
+ * makes them agree. In rem so it moves with the root size.
+ */
+export const COLUMN_TILE =
+  "ring-border/60 grid min-h-[2.9375rem] place-items-center rounded-lg px-2 py-1.5 ring-1";
+
 function Stat({ value, label }: { value: string; label: string }): ReactNode {
   return (
-    <div className="bg-surface-raised ring-border/60 rounded-lg px-2 py-1.5 ring-1">
-      <p className="text-sm font-bold tabular-nums">{value}</p>
-      <p className="text-muted-foreground text-[10px]">{label}</p>
+    <div className={`${COLUMN_TILE} bg-surface-raised`}>
+      {/* A block inside the grid cell: the tile centres its content, and these
+          two lines are one thing, left-aligned against the tile's padding. */}
+      <div className="w-full">
+        <p className="text-sm font-bold tabular-nums">{value}</p>
+        <p className="text-muted-foreground text-[10px]">{label}</p>
+      </div>
     </div>
   );
 }
@@ -83,10 +102,10 @@ export function ProfilesSidebar(): ReactNode {
           text link would read as one more row in the list below. */}
       <button
         type="button"
-        onClick={() => setMainView("feed")}
-        aria-current={mainView === "feed" ? "page" : undefined}
-        className={`focus-ring ring-border/60 mx-0.5 rounded-lg px-2 py-1.5 text-center text-sm font-bold ring-1 transition-colors ${
-          mainView === "feed"
+        onClick={() => setMainView("timeline")}
+        aria-current={mainView === "timeline" ? "page" : undefined}
+        className={`focus-ring ${COLUMN_TILE} mx-0.5 text-center text-sm font-bold transition-colors ${
+          mainView === "timeline"
             ? "bg-accent/15"
             : "bg-surface-raised hover:bg-surface-hover"
         }`}

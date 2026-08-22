@@ -124,8 +124,14 @@ export const hubApps: HubApp[] = [
   {
     id: "app-connect",
     slug: "connect",
-    name: "Web3 Connect",
-    shortName: "Connections",
+    /* Renamed from "Web3 Connect". The slug stays `connect` — it is the key an
+       install list is written under, and renaming it would disconnect the app
+       for everybody who already had it. */
+    name: "Connected Apps",
+    /* The rail truncates every label to one line, and the full name lands as
+       "Connected …" — which is what `shortName` is for. It already differed
+       from the name before this rename; it just said "Connections". */
+    shortName: "Connected",
     description:
       "Manage which sites and apps are connected to your identity and approve their permissions.",
     tagline: "Manage connections",
@@ -472,7 +478,7 @@ export const hubApps: HubApp[] = [
     categories: ["marketplaces", "media"],
     web: { url: "https://omnibazaar.vercel.app", embeds: true },
     version: "2026.07.1",
-    repoId: "repo-catallaxy",
+    repoId: "repo-tlon",
     reviews: 95,
     rating: 3.9,
     publisher: "OmniBazaar",
@@ -623,5 +629,79 @@ export const hubApps: HubApp[] = [
     rating: 4.2,
     publisher: "Scribe",
     createdAt: "2026-06-01T09:00:00.000Z",
+  },
+  /* Three sites listed as apps. Descriptions and embeddability are the sites'
+     own: each one's `<meta name="description">` read as published, and `embeds`
+     checked against the response headers rather than assumed — none of the
+     three sends X-Frame-Options or a frame-ancestors policy, so all three sit
+     in a tab rather than being pushed out to Browse. */
+  {
+    id: "app-free-radio",
+    slug: "free-radio",
+    name: "Free Radio",
+    shortName: "Free Radio",
+    description:
+      "Live voice rooms on a frequency. Scan a band, find a Co-Channel, and talk.",
+    tagline: "Voice rooms on a band",
+    developer: "third-party",
+    popularity: 41,
+    iconSrc: "",
+    accent: "#f97316",
+    defaultInstalled: false,
+    category: "social",
+    categories: ["social", "media"],
+    web: { url: "https://freeradio.bsvb.net", embeds: true },
+    version: "2026.08.1",
+    repoId: "repo-tlon",
+    reviews: 118,
+    rating: 4.3,
+    publisher: "Free Radio",
+    createdAt: "2026-08-14T09:00:00.000Z",
+  },
+  {
+    id: "app-hexacities",
+    slug: "hexacities",
+    name: "Hexacities",
+    shortName: "Hexacities",
+    description:
+      "Every homepage on Hexacities owns a hexagon. Pan the city, click a hex, meet the neighbours.",
+    tagline: "A city of homepages",
+    developer: "third-party",
+    popularity: 36,
+    iconSrc: "",
+    accent: "#8b5cf6",
+    defaultInstalled: false,
+    category: "gaming",
+    categories: ["gaming", "social"],
+    web: { url: "https://www.hexacities.com/", embeds: true },
+    version: "2026.07.2",
+    repoId: "repo-catallaxy",
+    reviews: 94,
+    rating: 4.1,
+    publisher: "Hexacities",
+    createdAt: "2026-07-30T09:00:00.000Z",
+  },
+  {
+    id: "app-bsv-radar",
+    slug: "bsv-radar",
+    name: "BSV Radar",
+    shortName: "BSV Radar",
+    description:
+      "Discover, compare, and access all applications built on the Bitcoin SV blockchain.",
+    tagline: "Every app on the chain",
+    developer: "third-party",
+    popularity: 57,
+    iconSrc: "",
+    accent: "#22d3ee",
+    defaultInstalled: false,
+    category: "productivity",
+    categories: ["productivity", "education"],
+    web: { url: "https://bsvradar.com", embeds: true },
+    version: "2026.08.1",
+    repoId: "repo-nexus",
+    reviews: 203,
+    rating: 4.6,
+    publisher: "BSV Radar",
+    createdAt: "2026-08-11T09:00:00.000Z",
   },
 ];

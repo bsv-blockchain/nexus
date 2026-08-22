@@ -4,6 +4,9 @@ import { ScrollStack } from "@/components/hub/vendor/scroll-stack";
 import dynamic from "next/dynamic";
 import { content, getMessagePeople } from "@/lib/data";
 import { markFirstRunSeen, useFirstRunSeen } from "@/lib/first-run";
+import { PresetPicker } from "@/components/hub/preset-picker";
+import { useApplyPresets } from "@/components/hub/use-apply-presets";
+import { setChosenPresets } from "@/lib/presets-store";
 import { useHostOverlay } from "@/lib/wallet-data";
 import { checkHandle, suggestHandle } from "@/lib/handle-suggest";
 import { useReducedMotion } from "@/lib/motion";
@@ -320,11 +323,102 @@ const WAVE_DECK = 0.8;
  */
 export function FirstRun(): ReactNode {
   const seen = useFirstRunSeen();
+  /*
+   * Two screens, in order: the cards, then the preset picker.
+   *
+   * The picker is not a sixth card. The cards are read and dismissed; the
+   * picker is answered, and its answer builds the rail somebody is about to
+   * land on. Putting it in the deck would have made "Next" mean two different
+   * things on two adjacent screens.
+   */
+  const [picking, setPicking] = useState(false);
+  const [deckGone, setDeckGone] = useState(false);
   if (seen) return null;
-  return <Run />;
+
+  return (
+    <>
+      {/*
+        Both, while the deck is on its way out.
+
+        The picker mounts the moment the last card is answered, underneath the
+        deck, so the deck falls away onto it. Swapping one for the other left a
+        gap where neither was mounted and the Timeline showed through for the
+        length of the animation — a screen nobody had asked for yet, appearing
+        and then being covered again.
+
+        Order is the layering: both sit at `z-120`, so the deck is second and
+        therefore on top until it unmounts.
+      */}
+      {picking && <Presets />}
+      {!deckGone && (
+        <Run
+          onCardsDone={() => setPicking(true)}
+          onDeckGone={() => setDeckGone(true)}
+        />
+      )}
+    </>
+  );
 }
 
-function Run(): ReactNode {
+/**
+ * The picker, over everything, holding the shell's overlay while it is up.
+ *
+ * Same reason the cards do: a browsed page is a native view above this
+ * document, so without it the whole screen renders behind whatever tab happens
+ * to be open.
+ */
+function Presets(): ReactNode {
+  const applyPresets = useApplyPresets();
+  const { setMainView } = useHub();
+  const reduced = useReducedMotion();
+  const [leaving, setLeaving] = useState(false);
+  useHostOverlay(true);
+
+  return (
+    /* `z-120`, the same layer the welcome deck uses. At 90 it sat under the
+       tooltip layer and under the shell's own chrome, so the rail's mark and
+       the assistant button punched through a screen that is meant to be the
+       only thing on it. */
+    <motion.div
+      role="dialog"
+      aria-modal="true"
+      aria-label={content.firstRun.presets.title}
+      className="fixed inset-0 z-120 bg-black"
+      /*
+       * Fades onto the workspace it has just built.
+       *
+       * The rail is already laid out and the feed is already behind this by the
+       * time the fade starts, so what you watch is the thing you asked for
+       * arriving — a cut would have thrown it at you instead.
+       */
+      animate={{ opacity: leaving ? 0 : 1 }}
+      transition={reduced ? { duration: 0 } : { duration: 0.45, delay: 0.05 }}
+      style={{ pointerEvents: leaving ? "none" : undefined }}
+    >
+      <PresetPicker
+        onDone={(chosen) => {
+          setChosenPresets(chosen);
+          applyPresets(chosen);
+          /* Set before the fade rather than after, so the feed is already
+             there to be revealed. */
+          setMainView("timeline");
+          setLeaving(true);
+          /* Unmounted only once it is invisible; `markFirstRunSeen` is what
+             takes this whole tree away. */
+          window.setTimeout(() => markFirstRunSeen(), reduced ? 0 : 520);
+        }}
+      />
+    </motion.div>
+  );
+}
+
+function Run({
+  onCardsDone,
+  onDeckGone,
+}: {
+  onCardsDone: () => void;
+  onDeckGone: () => void;
+}): ReactNode {
   /*
    * Tell the shell it is covered.
    *
@@ -344,7 +438,7 @@ function Run(): ReactNode {
   const copy = content.firstRun;
   const reduced = useReducedMotion();
   const settings = useSettings();
-  const { activeSpaceId, setMainView } = useHub();
+  const { activeSpaceId } = useHub();
   const wave = useThemeInk();
   const canWave = useHasWebgl();
   const theme = useCustomTheme();
@@ -477,13 +571,17 @@ function Run(): ReactNode {
      * than after, so the page is already there to be revealed — switching once
      * the overlay is gone would show one screen and then replace it.
      */
-    setMainView("feed");
-    /* Let the deck fall away before it unmounts. The reveal of the app behind
-       it is the point of the screen, and cutting to it wastes the one moment
-       this thing exists for. */
+    /*
+     * The picker first, then the deck falls away onto it.
+     *
+     * Not `setMainView` here any more: the canvas behind this is not what comes
+     * next, the picker is, and pointing the app at the feed now only meant the
+     * feed flashed up between the two screens.
+     */
+    onCardsDone();
     setLeaving(true);
-    window.setTimeout(() => markFirstRunSeen(), reduced ? 0 : 420);
-  }, [handle, verdict, reduced, activeSpaceId, setMainView]);
+    window.setTimeout(() => onDeckGone(), reduced ? 0 : 420);
+  }, [handle, verdict, reduced, activeSpaceId, onCardsDone, onDeckGone]);
 
   /*
    * Walk the opening. One timer per beat, all cleared together.

@@ -26,6 +26,25 @@ import {
 
 const ORDER: Record<Phase, number> = { now: 0, next: 1, later: 2 };
 
+/**
+ * The one red thing in the shell.
+ *
+ * Live means this session is reading real services, and the difference between
+ * that and a demo is not visible anywhere else — the rows look the same until
+ * one of them is your money. A recording light is the convention nobody has to
+ * be taught, so it is a plain dot with a halo rather than a badge with a word
+ * in it: it has to read at the size of a chip, in the corner of an eye.
+ */
+function LiveDot(): ReactNode {
+  return (
+    <span
+      aria-hidden="true"
+      className="size-1.5 shrink-0 rounded-full bg-red-500"
+      style={{ boxShadow: "0 0 0 2px rgba(239,68,68,.25)" }}
+    />
+  );
+}
+
 const DATA_MODES: readonly DataMode[] = ["demo", "live"];
 const DATA_MODE_LABELS: Record<DataMode, string> = {
   demo: "Demo",
@@ -189,7 +208,10 @@ export function PhaseSwitcher(): ReactNode {
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {DATA_MODE_LABELS[option]}
+                    <span className="flex items-center justify-center gap-1.5">
+                      {option === "live" && <LiveDot />}
+                      {DATA_MODE_LABELS[option]}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -293,14 +315,24 @@ export function PhaseSwitcher(): ReactNode {
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-label="Switch product state"
-        /* Hover deepens in both themes. It was one `hover:bg-amber-200/90` for
-           both, which in dark mode swapped a near-black pill for a pale one
-           under pale text — the hover made it harder to read than at rest.
-           The lift and the brighter edge do the "you can press this" work. */
-        className="focus-ring flex items-center gap-1.5 rounded-full border border-amber-400/50 bg-amber-100/90 px-3 py-1.5 text-[11px] font-semibold tracking-wide text-amber-900 uppercase shadow-lg backdrop-blur transition-[background-color,border-color,box-shadow,translate] hover:-translate-y-px hover:border-amber-500/70 hover:bg-amber-200/95 hover:shadow-xl active:translate-y-0 dark:border-amber-400/30 dark:bg-amber-950/80 dark:text-amber-200 dark:hover:border-amber-300/60 dark:hover:bg-amber-900/90"
+        /*
+           Theme tokens, not amber.
+
+           It was two hand-tuned amber palettes, one per theme, which is two
+           things to keep in step with a product that can be re-themed from
+           Settings — and in a custom accent it was the one control on screen
+           still wearing the old scheme. The surface, border and text now come
+           from the same variables as every other floating control; the lift and
+           the brighter edge still do the "you can press this" work.
+        */
+        className="focus-ring bg-surface-raised/95 border-border text-foreground hover:border-ring flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold tracking-wide uppercase shadow-lg backdrop-blur transition-[background-color,border-color,box-shadow,translate] hover:-translate-y-px hover:shadow-xl active:translate-y-0"
       >
         <Wrench className="size-3.5" strokeWidth={2.2} aria-hidden="true" />
         {PHASE_LABELS[phase]}
+        {/* Live is the state worth noticing from across the room: the session is
+            reading real services rather than fixtures, and everything on screen
+            means something different because of it. */}
+        {dataMode === "live" && <LiveDot />}
       </button>
     </div>
   );

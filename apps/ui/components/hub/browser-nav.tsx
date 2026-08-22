@@ -4,10 +4,11 @@ import { BrowserSettingsMenu } from "@/components/hub/browser-settings-menu";
 import { Favicon } from "@/components/hub/favicon";
 import { useHub } from "@/components/hub/hub-provider";
 import { content } from "@/lib/data";
+import { useHostOverlay } from "@/lib/wallet-data";
 import { useSettings } from "@/lib/settings-store";
-import { Link2, SlidersHorizontal, Star, X } from "lucide-react";
+import { Check, Link2, SlidersHorizontal, Star, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 async function shareUrl(url: string, title: string): Promise<void> {
@@ -56,6 +57,7 @@ function copyLinkWithToast(url: string, title: string): void {
 export function AddressBar(): ReactNode {
   const { activeTab, navigateActiveTab } = useHub();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [settingsAnchor, setSettingsAnchor] = useState<{
     top: number;
     left: number;
@@ -63,62 +65,106 @@ export function AddressBar(): ReactNode {
     bottom: number;
   } | null>(null);
   const activeUrl = activeTab ? activeTab.url.replace(/^https?:\/\//, "") : "";
+
+  /*
+   * Tell the shell the chrome is covering itself.
+   *
+   * The browsed page is a native view stacked ABOVE this document, so it paints
+   * straight through anything the chrome opens over it. In the sidebar layout
+   * that never showed: the column sits outside the page's rectangle, so the
+   * menu had nothing on top of it. With horizontal tabs the address bar is
+   * directly above the page, and the menu opened underneath it — present in the
+   * DOM, findable by a test, and invisible to anybody actually using the app.
+   *
+   * `origin-chip` next door has always done this. This is the same call.
+   */
+  useHostOverlay(settingsOpen);
+
+  /* Back to the link icon on its own. Keyed off the flag rather than a timeout
+     kept in a ref, so copying again while the tick is up restarts the clock
+     instead of being cut short by the first one's pending reset. */
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1600);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
   return (
-      <div className="relative flex-1">
-        <div className="flex items-center gap-1 rounded-lg bg-background px-3 py-2 transition-colors hover:bg-muted">
-          <input
-            key={`${activeTab?.id ?? "none"}:${activeUrl}`}
-            defaultValue={activeUrl}
-            onKeyDown={(event) => {
-              const draft = event.currentTarget.value.trim();
-              if (event.key === "Enter" && draft) {
-                navigateActiveTab(draft);
-                event.currentTarget.blur();
-              } else if (event.key === "Escape") {
-                event.currentTarget.value = activeUrl;
-                event.currentTarget.blur();
-              }
-            }}
-            placeholder="Search or Enter URL…"
-            aria-label="Address bar"
-            className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-          />
-          <button
-            type="button"
-            aria-label="Copy link"
-            disabled={!activeTab}
-            onClick={() =>
-              activeTab && copyLinkWithToast(activeTab.url, activeTab.title)
+    <div className="relative flex-1">
+      <div className="bg-background hover:bg-muted flex items-center gap-1 rounded-lg px-3 py-2 transition-colors">
+        <input
+          key={`${activeTab?.id ?? "none"}:${activeUrl}`}
+          defaultValue={activeUrl}
+          onKeyDown={(event) => {
+            const draft = event.currentTarget.value.trim();
+            if (event.key === "Enter" && draft) {
+              navigateActiveTab(draft);
+              event.currentTarget.blur();
+            } else if (event.key === "Escape") {
+              event.currentTarget.value = activeUrl;
+              event.currentTarget.blur();
             }
-            className="focus-ring shrink-0 rounded p-1 text-muted-foreground hover:text-foreground disabled:opacity-30"
-          >
-            <Link2 className="size-3.5" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            aria-label="Site settings"
-            aria-expanded={settingsOpen}
-            onClick={(event) => {
-              const box = event.currentTarget.getBoundingClientRect();
-              setSettingsAnchor({
-                top: box.top,
-                left: box.left,
-                right: box.right,
-                bottom: box.bottom,
-              });
-              setSettingsOpen(true);
-            }}
-            className="focus-ring shrink-0 rounded p-1 text-muted-foreground hover:text-foreground"
-          >
-            <SlidersHorizontal className="size-3.5" aria-hidden="true" />
-          </button>
-        </div>
-        <BrowserSettingsMenu
-          open={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
-          {...(settingsAnchor ? { anchor: settingsAnchor } : {})}
+          }}
+          placeholder="Search or Enter URL…"
+          aria-label="Address bar"
+          className="text-foreground placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-sm outline-none"
         />
+        {/*
+          The tick is the confirmation that survives.
+
+          The toast still fires, and is the right answer everywhere else in the
+          app — but the browsed page is a native view above this document, so a
+          bottom-right toast raised while you are looking at a page is painted
+          straight over it. Blanking the page for four seconds to show "Link
+          copied" would be a worse trade than the missing message, so the button
+          answers for itself instead, in chrome the page cannot cover.
+        */}
+        <button
+          type="button"
+          aria-label={copied ? "Link copied" : "Copy link"}
+          disabled={!activeTab}
+          onClick={() => {
+            if (!activeTab) return;
+            copyLinkWithToast(activeTab.url, activeTab.title);
+            setCopied(true);
+          }}
+          className={`focus-ring shrink-0 rounded p-1 disabled:opacity-30 ${
+            copied
+              ? "text-positive"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {copied ? (
+            <Check className="size-3.5" aria-hidden="true" />
+          ) : (
+            <Link2 className="size-3.5" aria-hidden="true" />
+          )}
+        </button>
+        <button
+          type="button"
+          aria-label="Site settings"
+          aria-expanded={settingsOpen}
+          onClick={(event) => {
+            const box = event.currentTarget.getBoundingClientRect();
+            setSettingsAnchor({
+              top: box.top,
+              left: box.left,
+              right: box.right,
+              bottom: box.bottom,
+            });
+            setSettingsOpen(true);
+          }}
+          className="focus-ring text-muted-foreground hover:text-foreground shrink-0 rounded p-1"
+        >
+          <SlidersHorizontal className="size-3.5" aria-hidden="true" />
+        </button>
       </div>
+      <BrowserSettingsMenu
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        {...(settingsAnchor ? { anchor: settingsAnchor } : {})}
+      />
+    </div>
   );
 }
 
@@ -173,7 +219,7 @@ export function BrowserNav(): ReactNode {
       {favorites.length > 0 && (
         <div
           className={`mt-3 flex gap-2 rounded-xl ${
-            favoritesDragOver ? "ring-2 ring-accent/60" : ""
+            favoritesDragOver ? "ring-accent/60 ring-2" : ""
           }`}
           role="list"
           aria-label="Favorites"
@@ -196,7 +242,7 @@ export function BrowserNav(): ReactNode {
                   }
                   className={`focus-ring flex h-12 w-full items-center justify-center rounded-xl transition-colors ${
                     active
-                      ? "bg-surface-raised shadow-sm ring-1 ring-accent/40"
+                      ? "bg-surface-raised ring-accent/40 shadow-sm ring-1"
                       : "bg-background hover:bg-muted"
                   }`}
                 >
@@ -212,7 +258,7 @@ export function BrowserNav(): ReactNode {
                   type="button"
                   onClick={() => removeFavorite(favorite.id)}
                   aria-label={`Remove ${favorite.title} from favorites`}
-                  className="focus-ring absolute -top-1.5 -right-1.5 hidden size-4 items-center justify-center rounded-full bg-muted text-muted-foreground group-focus-within:flex group-hover:flex hover:text-foreground"
+                  className="focus-ring bg-muted text-muted-foreground hover:text-foreground absolute -top-1.5 -right-1.5 hidden size-4 items-center justify-center rounded-full group-focus-within:flex group-hover:flex"
                 >
                   <X className="size-2.5" aria-hidden="true" />
                 </button>
@@ -242,18 +288,20 @@ export function BrowserNav(): ReactNode {
                 type="button"
                 onClick={() => setFavoritesHintDismissed(true)}
                 aria-label="Dismiss favorites hint"
-                className="focus-ring absolute top-2 right-2 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                className="focus-ring text-muted-foreground hover:text-foreground absolute top-2 right-2 rounded p-0.5"
               >
                 <X className="size-3.5" aria-hidden="true" />
               </button>
             )}
             <Star
-              className="mx-auto size-5 text-accent"
+              className="text-accent mx-auto size-5"
               aria-hidden="true"
               fill="currentColor"
             />
-            <p className="mt-1.5 text-xs font-semibold">{spacesCopy.dragHint}</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
+            <p className="mt-1.5 text-xs font-semibold">
+              {spacesCopy.dragHint}
+            </p>
+            <p className="text-muted-foreground mt-0.5 text-[11px]">
               {spacesCopy.dragSubHint}
             </p>
           </motion.div>

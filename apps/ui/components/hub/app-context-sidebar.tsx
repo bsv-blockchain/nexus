@@ -37,6 +37,7 @@ import {
   FileText,
   Inbox,
   KeyRound,
+  Lock,
   PanelLeftClose,
   PenTool,
   Plus,
@@ -54,8 +55,11 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import { motion } from "motion/react";
 import { toast } from "sonner";
 import { toggleConnection, useSettings } from "@/lib/settings-store";
+import { useVault } from "@/lib/vault-store";
+import { VaultLockButton } from "@/components/apps/vault/vault-lock-button";
 import type { ReactNode } from "react";
 
 /** Apps whose sidebar column is contextual (everything except Browse). */
@@ -260,20 +264,51 @@ const VAULT_KINDS: { id: string; label: string; icon: LucideIcon }[] = [
 
 function VaultSidebar(): ReactNode {
   const { vaultKind, setVaultKind } = useHub();
+  const { phase } = useVault();
   const items = getVaultItems();
+
+  /*
+   * A shut vault has no contents to filter.
+   *
+   * Listing the kinds and their counts beside a closed door tells anybody
+   * looking over your shoulder what is inside and how much of it — which is
+   * most of what a vault is for keeping to yourself. One row, saying the only
+   * true thing about it right now.
+   */
+  if (phase !== "open") {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+        <div className="text-muted-foreground flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm">
+          <Lock className="size-4 shrink-0" aria-hidden="true" />
+          <span className="flex-1 text-left">{content.vault.lock.locked}</span>
+        </div>
+      </div>
+    );
+  }
+
   const countOf = (id: string): number =>
     id === "all"
       ? items.length
       : items.filter((item: VaultItem) => item.kind === id).length;
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
-      {VAULT_KINDS.map((kind) => {
+      {VAULT_KINDS.map((kind, index) => {
         const active = vaultKind === kind.id;
         return (
-          <button
+          /* Staggered with the canvas beside it, on the same curve and the same
+             step, so opening the vault is one thing arriving in two columns
+             rather than two lists that happen to appear at once. */
+          <motion.button
             key={kind.id}
             type="button"
             onClick={() => setVaultKind(kind.id)}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{
+              duration: 0.34,
+              ease: [0.4, 0, 0.2, 1],
+              delay: 0.08 + index * 0.055,
+            }}
             className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm ${
               active
                 ? "bg-accent/15 font-medium text-foreground"
@@ -285,7 +320,7 @@ function VaultSidebar(): ReactNode {
             <span className="text-xs text-muted-foreground">
               {countOf(kind.id)}
             </span>
-          </button>
+          </motion.button>
         );
       })}
     </div>
@@ -1066,7 +1101,13 @@ export function AppContextSidebar({ slug }: { slug: AppSlug }): ReactNode {
           {/* CTAs first, then the bar: the help button is the least urgent
               thing in the column and belongs furthest from the content. */}
           <AppContextFooter slug={slug} />
-          <AppHelpBar slug={slug} />
+          {/* The vault is the one app whose column carries a setting: when it
+              shuts itself again. It goes in the help bar's left slot, which is
+              where App repositories sits in the Apps column — same bar, same
+              corner, same kind of thing. */}
+          <AppHelpBar slug={slug}>
+            {slug === "vault" ? <VaultLockButton /> : null}
+          </AppHelpBar>
         </div>
       </div>
     </div>

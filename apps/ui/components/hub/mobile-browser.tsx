@@ -6,6 +6,7 @@ import { MobileSettings } from "@/components/hub/mobile-settings";
 import { OriginChip } from "@/components/hub/origin-chip";
 import { useScrollDirection } from "@/lib/scroll-direction";
 import { useIsDesktop } from "@/lib/use-is-desktop";
+import { openSearch } from "@/lib/timeline-store";
 import {
   useHub,
   type RailEntry,
@@ -38,6 +39,7 @@ import {
   Monitor,
   Pin,
   Plus,
+  Search,
   RotateCw,
   Settings,
   Share,
@@ -168,6 +170,7 @@ function BottomBar({
   onSwitcher,
   onAddress,
   onDetails,
+  timeline = false,
 }: {
   tabs: BrowserTab[];
   site: boolean;
@@ -177,6 +180,15 @@ function BottomBar({
   onSwitcher: () => void;
   onAddress: () => void;
   onDetails: () => void;
+  /**
+   * The Timeline has the canvas.
+   *
+   * The centre control is "what does this button open next" rather than a fixed
+   * new-tab: on a timeline the useful next thing is search, and a plus that
+   * opened a browser tab from a feed would be answering a question nobody asked
+   * there.
+   */
+  timeline?: boolean;
 }): ReactNode {
   return (
     <motion.div
@@ -218,11 +230,19 @@ function BottomBar({
       ) : (
         <button
           type="button"
-          onClick={onAddress}
-          aria-label={content.mobileBrowser.newTab}
+          onClick={timeline ? openSearch : onAddress}
+          aria-label={
+            timeline
+              ? content.timeline.rail.search
+              : content.mobileBrowser.newTab
+          }
           className="focus-ring pointer-events-auto flex h-11 w-28 items-center justify-center justify-self-center rounded-full bg-surface-raised/95 shadow-lg ring-1 ring-border backdrop-blur transition-transform active:scale-95"
         >
-          <Plus className="size-5 text-foreground" aria-hidden="true" />
+          {timeline ? (
+            <Search className="size-5 text-foreground" aria-hidden="true" />
+          ) : (
+            <Plus className="size-5 text-foreground" aria-hidden="true" />
+          )}
         </button>
       )}
       <div className="pointer-events-auto flex items-center gap-3 justify-self-end">
@@ -1400,6 +1420,7 @@ export function MobileBrowser({
      be re-rendering mobile chrome nobody can see. */
   const isDesktop = useIsDesktop();
   const { hidden, reveal } = useScrollDirection(!isDesktop && sheet === "none");
+  const onTimeline = mainView === "timeline";
 
   /*
    * What the CANVAS is showing, not what the ref names.
@@ -1460,7 +1481,13 @@ export function MobileBrowser({
       */}
       <AnimatePresence initial={false}>
         {sheet === "none" &&
-          (hidden ? (
+          /*
+           * The pill answers "where am I" for somebody reading a page. On the
+           * Timeline the column itself says that on every row, so the pill was
+           * a second answer to a question already answered — and it took the
+           * search button away with it the moment anybody scrolled.
+           */
+          (hidden && !onTimeline ? (
             <ContextPill key="pill" tabs={tabs} onExpand={reveal} />
           ) : (
             <BottomBar
@@ -1475,6 +1502,7 @@ export function MobileBrowser({
                 setSheet("address");
               }}
               onDetails={() => setSheet("details")}
+              timeline={onTimeline}
             />
           ))}
       </AnimatePresence>

@@ -54,6 +54,8 @@ export const content = {
       availableSection: "Available",
       install: "Connect",
       uninstall: "Disconnect",
+      expandDescription: "Read the full description of",
+      collapseDescription: "Shorten the description of",
       essential: "Essential",
       installedBadge: "Connected",
       empty: "No apps connected. Add one below.",
@@ -409,6 +411,11 @@ export const content = {
         profile: "Open full profile",
         vouches: "Who vouches for them",
         message: "Message",
+        /* Follow is not a Messages action — it is an account-level fact the
+           Timeline reads. Its copy lives here because this is where the row
+           that shows it is defined. */
+        follow: "Follow on Timeline",
+        unfollow: "Unfollow on Timeline",
         pay: "Pay",
         request: "Request payment",
         vouch: "Vouch for them",
@@ -1234,6 +1241,60 @@ export const content = {
     addAction: "Add to vault",
     lastAccessed: "Last accessed",
     encryptedNote: "End-to-end encrypted with your identity key.",
+    /** the door, and everything it takes to get through it */
+    lock: {
+      locked: "Locked",
+      sealed: "Sealed",
+      verifying: "Verifying",
+      open: "Open",
+      openAction: "Open vault",
+      sealAction: "Seal the vault",
+      /* The chooser. Worded as a question about proof rather than about
+         sign-in: nobody is signing in to their own vault. */
+      chooseTitle: "Unlock the vault",
+      chooseBody: "Choose how you want to prove it is you.",
+      cancel: "Cancel",
+      back: "Back",
+      continueAction: "Continue",
+      methods: {
+        password: "Passphrase",
+        qr: "Scan QR code",
+        "security-key": "Use security key",
+        otp: "One-time code",
+      },
+      /* When Security has been stripped back to nothing. A vault with no way
+         in is a bug somewhere else, so this points at where it was made. */
+      noMethods: "No way in is switched on. Turn one on in Security settings.",
+      openSecurity: "Security settings",
+      passwordTitle: "Passphrase",
+      passwordBody: "Enter the passphrase that seals this vault.",
+      passwordPlaceholder: "••••••••",
+      passwordLabel: "Vault passphrase",
+      unlockAction: "Unlock",
+      needPassphrase: "Enter a passphrase",
+      qrTitle: "Scan QR code",
+      qrBody:
+        "Scan this code with a device already holding your identity key. It expires in a minute.",
+      qrWaiting: "Waiting for the other device",
+      keyTitle: "Use security key",
+      keyBody: "Insert your security key and touch it to confirm.",
+      keyWaiting: "Waiting for the key",
+      otpTitle: "One-time code",
+      otpBody: "Enter the six-digit code from your authenticator app.",
+      otpLabel: "One-time code",
+      otpBadCode: "That code is not six digits.",
+      /* The policy popover, opened from the contextual column's help bar. */
+      policyButton: "When to lock",
+      policyTitle: "Lock the vault",
+      policy: {
+        "on-leave": "When I leave the app",
+        "on-leaveDesc": "The doors are shut every time you come back.",
+        timed: "After five minutes",
+        timedDesc: "Stays open while you are working, shuts itself after.",
+        never: "Never, until I seal it",
+        neverDesc: "Stays open until you shut it or reload.",
+      },
+    },
   },
   identity: {
     handles: {
@@ -1780,6 +1841,14 @@ export const content = {
     onboarding: {
       title: "Onboarding",
       hint: "What a new arrival is shown, and how to see it again.",
+      /* The confirmation before the first run is replayed. It says what will be
+   rebuilt and what will not, because "are you sure" on its own asks
+   somebody to guess the blast radius. */
+      confirmTitle: "Run the welcome again?",
+      confirmBody:
+        "You will pick your presets again. This workspace's rail and its connected apps are rebuilt; nothing else is touched.",
+      confirmGo: "Run it again",
+      confirmCancel: "Cancel",
       firstRunLabel: "First run",
       firstRunHint: "The welcome cards and the handle you picked.",
       replay: "Show again",
@@ -1975,11 +2044,16 @@ export const content = {
       downloadsHint: "What each workspace has downloaded.",
       devTitle: "Developer",
       devHint: "Off by default. These change what pages can see and do.",
-      devToolsLabel: "Developer tools",
+      /* "Page inspector" rather than "Developer tools", now that it sits under
+         a section of that name next to the switch that reveals it. Two rows
+         reading "Developer tools" one above the other said nothing about which
+         was which, and this one has always been the narrower thing: a panel
+         docked under a web page, not the mode. */
+      devToolsLabel: "Page inspector",
       devToolsHint:
         "Inspect a page, read its console, and watch what it asks the wallet for.",
-      devToolsOn: "Developer tools are on",
-      devToolsOff: "Developer tools are off",
+      devToolsOn: "Page inspector is on",
+      devToolsOff: "Page inspector is off",
       devToolsShortcut: "⌥⌘I",
       devOverlayLabel: "Overlay network inspector",
       devOverlayHint:
@@ -1988,7 +2062,7 @@ export const content = {
       devUnsafeHint:
         "Lets a repository serve apps with no signature to check. Nothing vets them, including us.",
       devWarn:
-        "A page with developer tools open can be told things by somebody reading over your shoulder. Turn them off when you are done.",
+        "A page with the inspector open can be told things by somebody reading over your shoulder. Turn it off when you are done.",
       readingTitle: "Reading",
       zoom: "Page zoom",
       fontSize: "Base font size",
@@ -2061,6 +2135,28 @@ export const content = {
     appearance: {
       title: "Preferences",
       hint: "Theme, colour and what things are called.",
+      /* The master switch, and the three it reveals. Moved here from Browsing:
+         they were never only about browsing, and a developer looking for them
+         had to guess which app owned them. */
+      devTitle: "Developer Tools",
+      devHint:
+        "Off by default. Reveals diagnostic surfaces across Nexus, and remembers that it is on.",
+      devModeLabel: "Developer tools",
+      devModeHint:
+        "Show the developer surfaces built into each app. Nothing here changes what anyone else sees.",
+      devModeOn: "Developer tools are on",
+      devModeOff: "Developer tools are off",
+      devModeOnHint:
+        "Developer surfaces are now shown wherever an app has them.",
+      /* Two of the three tools live inside Browse, so turning them on without
+         it is switching on a light in a room that is not there. Offered rather
+         than done, and offered once — a prompt that connects an app behind your
+         back is worse than one you can ignore. */
+      devNeedsBrowse: "Browse is not connected in this workspace",
+      devNeedsBrowseHint:
+        "The page inspector and the overlay inspector both live in it.",
+      devConnectBrowse: "Connect Browse",
+      devBrowseConnected: "Browse is connected",
       themeTitle: "Theme",
       themeHint: "Light, dark, or whatever this device is set to.",
       modeLight: "Light",
@@ -2095,6 +2191,15 @@ export const content = {
    * here promises a feature this build does not have.
    */
   firstRun: {
+    /* The preset picker, which is the last thing the first run asks. */
+    presets: {
+      eyebrow: "One more thing",
+      title: "What are you here for?",
+      body: "Pick as many as you like. You can change any of it later.",
+      skip: "Set up without a preset",
+      continueOne: "Set up with 1 preset",
+      continueMany: "Set up with {count} presets",
+    },
     next: "Next",
     finish: "Finish",
     skip: "Skip",
@@ -2267,11 +2372,464 @@ export const content = {
     disconnected: "Disconnected from",
   },
 
+  /** Profiles: yourself, as everybody else gets you */
+  profilesPanel: {
+    title: "Profiles",
+    hint: "How you appear, and which one this workspace wears.",
+    add: "New profile",
+    untitled: "Untitled",
+    identityTitle: "Who you are",
+    identityHint: "The parts of the card people read first.",
+    name: "Display name",
+    handle: "Handle",
+    role: "Role",
+    bio: "Bio",
+    whereTitle: "Where you are",
+    whereHint: "Context under the name, and what you are known for.",
+    organization: "Organisation",
+    city: "City",
+    expertise: "Known for",
+    expertiseHint: "Separate with commas.",
+    contactTitle: "Off-protocol contact",
+    contactHint:
+      "Published beside your handle. Nothing here is attested \u2014 it is a claim, like the display name.",
+    email: "Email",
+    github: "GitHub",
+    useTitle: "This workspace",
+    useHint:
+      "One profile per workspace, the same way a handle or a wallet is connected to one.",
+    connectedHere: "Connected to {workspace}.",
+    notConnected: "Not connected to this workspace.",
+    inUse: "In use",
+    connect: "Connect here",
+    remove: "Delete this profile",
+    previewTitle: "What people see",
+  },
+
+  /** Security: what you can prove yourself with, and where you are asked to */
+  security: {
+    title: "Security",
+    hint: "Passphrase, keys and where you are asked.",
+    passphrase: {
+      title: "Vault passphrase",
+      body: "One of the ways into the vault. Changing it does not re-encrypt anything \u2014 a passphrase unwraps a key, it is not the key.",
+      set: "Set",
+      unset: "Not set",
+      change: "Change passphrase",
+      newLabel: "New passphrase",
+      confirmLabel: "Repeat it",
+      save: "Save passphrase",
+      cancel: "Cancel",
+      mismatch: "Those do not match.",
+      tooShort: "Use at least eight characters.",
+      saved: "Passphrase changed.",
+    },
+    keys: {
+      title: "Security keys",
+      body: "Hardware you touch to prove it is you. Any registered key opens the vault.",
+      add: "Add a security key",
+      waiting: "Insert your security key and touch it",
+      nameTitle: "Name this key",
+      nameBody:
+        "It reported itself as the model below. Rename it if you hold more than one.",
+      nameLabel: "Key name",
+      confirm: "Add key",
+      cancel: "Cancel",
+      remove: "Remove",
+      empty: "No security keys registered.",
+    },
+    otp: {
+      title: "One-time codes",
+      body: "Six-digit codes from an authenticator app on your phone.",
+      on: "On",
+      off: "Off",
+      toggle: "Use one-time codes",
+      setupTitle: "Set up one-time codes",
+      setupBody:
+        "Scan this with your authenticator app, then type the code it shows.",
+      secretLabel: "Or enter this key by hand",
+      codeLabel: "Six-digit code",
+      confirm: "Turn on",
+      cancel: "Cancel",
+      badCode: "That code is not six digits.",
+    },
+    phones: {
+      title: "Paired devices",
+      body: "A phone that answers the vault's QR code. Scanning from a device that already holds your key is what proves it is you.",
+      add: "Pair a phone",
+      scanTitle: "Scan to pair",
+      scanBody: "Open Nexus on the phone and scan this code.",
+      waiting: "Waiting for the phone",
+      nameTitle: "Name this device",
+      nameBody:
+        "It reported the model below. Rename it if you pair more than one.",
+      nameLabel: "Device name",
+      confirm: "Pair device",
+      cancel: "Cancel",
+      remove: "Unpair",
+      empty: "No devices paired.",
+    },
+    exempt: {
+      title: "Apps that skip authentication",
+      body: "Every app is behind the lock unless you say otherwise. Tick the ones that should open without asking.",
+      search: "Search apps",
+      all: "Every app",
+      allDesc: "Nothing but the vault itself will ask.",
+      noMatch: "No apps match that.",
+      none: "Nothing exempt",
+    },
+  },
+
+  /** the Timeline: the feed, its contextual column and its right rail */
+  timeline: {
+    title: "Timeline",
+    strips: {
+      "for-you": "For you",
+      following: "Following",
+      posts: "Posts",
+      activity: "Activity",
+    },
+    /* `Posts` is your own, which the tab alone does not say — the tooltip is
+       where that gets settled rather than in a longer tab label that would
+       push Activity off a narrow column. */
+    stripHints: {
+      "for-you": "Ranked across everyone",
+      following: "Only people you follow",
+      posts: "Everything you have posted",
+      activity: "What your connected apps did",
+    },
+    pin: "Pin a topic as a tab",
+    pinNone: "Every topic is already pinned.",
+    unpin: "Unpin",
+    composer: {
+      placeholder: "What's happening?",
+      post: "Post",
+      /* Mocked, per the brief — the row is here because a composer without it
+         reads as a comment box, and these are the affordances that make it a
+         post. */
+      attach: "Add an image",
+      gif: "Add a GIF",
+      poll: "Add a poll",
+      emoji: "Add an emoji",
+      schedule: "Schedule",
+      location: "Tag a place",
+      pay: "Attach a payment",
+    },
+    refresh: "Show {count} posts",
+    /* One post is the common case here — arrivals are sporadic and you look
+       often — so it is worth a string rather than an "(s)". */
+    refreshOne: "Show 1 post",
+    /* The Activity strip's own pair. Different nouns rather than a shared
+       "Show {count} new", because the two strips hold different things and a
+       bar that would not say which is a bar you have to click to find out. */
+    refreshActivity: "Show {count} activities",
+    refreshActivityOne: "Show 1 activity",
+    pullToRefresh: "Pull to refresh",
+    /* The timestamp's tooltip. It names the block and says what clicking does,
+       because a bare number in a tooltip is a fact with no verb. */
+    inBlock: "In block {height} — open on WhatsOnChain",
+    /* Your own actions, as the Activity strip reports them back. The name is
+       appended by the row so it can carry a hovercard. */
+    events: {
+      app: "Timeline",
+      follow: "You followed",
+      unfollow: "You unfollowed",
+      /* Each ends where the person's name is appended, so the row reads as one
+         sentence: "You liked a post by Rhea Mensah". */
+      like: "You liked a post by",
+      unlike: "You removed a like from a post by",
+      repost: "You reposted",
+      unrepost: "You undid a repost of",
+      reply: "You replied to",
+      quote: "You quoted",
+    },
+    empty: {
+      "for-you": "Nothing ranked yet. Follow a few people and it fills in.",
+      following: "You are not following anyone in this workspace yet.",
+      posts: "You have not posted from this workspace.",
+      activity: "None of this workspace's apps have done anything yet.",
+    },
+    topicEmpty: "Nothing under this topic yet.",
+    post: {
+      reply: "Reply",
+      repost: "Repost",
+      like: "Like",
+      views: "Views",
+      share: "Share",
+      tipped: "{amount} tipped",
+      more: "More",
+    },
+    /* The profile switcher, opened from the posting-as row. */
+    switcher: {
+      title: "This workspace posts as",
+      switchTo: "Switch to",
+      edit: "Edit profile",
+      untitled: "Untitled",
+      close: "Close",
+    },
+    sidebar: {
+      postingAs: "Posting as",
+      topics: "Topics",
+      ecosystems: "Ecosystems",
+      allEcosystems: "Every ecosystem",
+      allTopics: "Everything",
+      saved: "Saved",
+      lists: "Lists",
+      muted: "Muted",
+      backToHub: "Back to workspaces",
+    },
+    rail: {
+      search: "Search Timeline",
+      searching: "Searching",
+      sync: {
+        title: "Nexus Sync",
+        blurb:
+          "Seamlessly sync your Nexus across every device, while staying in full control",
+        cta: "Turn on Sync",
+      },
+      onAir: {
+        title: "On air now",
+        listeners: "{count} listening",
+        showMore: "Show more",
+        allTitle: "On air now",
+      },
+      follow: {
+        title: "Who to follow",
+        action: "Follow",
+        following: "Following",
+        showMore: "Show more",
+        allTitle: "Who to follow",
+      },
+      back: "Back to the timeline",
+    },
+    /* A post's overflow menu. Handles are appended by the row, so an item
+       reads "Mute @rheam@yours" rather than naming a stranger in the abstract. */
+    postMenu: {
+      label: "More",
+      notInterested: "Not interested in this post",
+      dismissed: "Fewer posts like that.",
+      undo: "Undo",
+      follow: "Follow",
+      unfollow: "Unfollow",
+      subscribe: "Subscribe to",
+      unsubscribe: "Unsubscribe from",
+      subscribed: "Subscribed. Their posts will be flagged.",
+      unsubscribed: "Unsubscribed.",
+      lists: "Lists",
+      save: "Save post",
+      unsave: "Remove from Saved",
+      saved: "Saved.",
+      unsaved: "Removed from Saved.",
+      mute: "Mute",
+      unmute: "Unmute",
+      muted: "Muted. Their posts are hidden.",
+      unmuted: "Unmuted.",
+      block: "Block",
+      unblock: "Unblock",
+      blocked: "Blocked. They are hidden and unfollowed.",
+      unblocked: "Unblocked.",
+      activity: "View post activity",
+      /* The numbers already on the row, said once in a sentence — an analytics
+         pane would be a screen this prototype has nothing to put in. */
+      activitySummary: "{views} views · {replies} replies · {reposts} reposts",
+      embed: "Embed post",
+      embedded: "Embed code copied.",
+    },
+    /* The Activity strip's own header: what it is, and what it shows. */
+    activityBar: {
+      /* The distinction worth being unambiguous about. Everything on this
+         strip is yours except the part that never was. */
+      privateNote: "Only you can see this. ",
+      publicNote:
+        "The posts and follows behind it are public; the rest never leaves this device.",
+      range: "Any time",
+      rangeLabel: "Period",
+      from: "From",
+      to: "To",
+      ranges: {
+        all: "Any time",
+        hour: "Last hour",
+        day: "Last 24 hours",
+        week: "Last 7 days",
+        month: "Last 30 days",
+      },
+      apps: "All apps",
+      appsLabel: "Apps",
+      appsSome: "{count} apps",
+      appsOne: "1 app",
+      appsSearch: "Search apps",
+      appsAll: "All connected apps",
+      /* The Timeline is not in `installedApps` — it is the canvas, not a mod —
+         so the filter has to name it itself or your own rows would be the one
+         thing on this strip you could not narrow to. */
+      appsTimeline: "Timeline",
+      appsNoMatch: "No apps match that.",
+      clear: "Reset",
+    },
+    /* One post, read on its own, with its replies under it. */
+    thread: {
+      title: "Post",
+      back: "Back to the timeline",
+      /* "ago" spelled out because the meta line is read as a sentence, unlike
+         the "6m" in a feed row where the column does the explaining. */
+      metaViews: "{views} views",
+      replyPlaceholder: "Post your reply",
+      reply: "Reply",
+      sort: "Relevant",
+      sortNewest: "Newest first",
+      sortRelevant: "Relevant",
+      quotes: "View quotes",
+      quotesSoon: "Quotes are not wired up yet.",
+      noReplies: "No replies yet. Be the first.",
+      yours: "Your reply",
+    },
+    /* Saved, Lists and Muted — the three the contextual column keeps. */
+    panes: {
+      back: "Back to the timeline",
+      savedTitle: "Saved",
+      savedEmpty: "Nothing saved yet. Keep a post from its menu.",
+      listsTitle: "Lists",
+      listsEmpty: "No lists yet.",
+      listMembers: "{count} people",
+      remove: "Remove from list",
+      mutedTitle: "Muted",
+      mutedEmpty: "Nobody is muted.",
+      unmute: "Unmute",
+    },
+    /* The activity sheet, opened from a post's views count or its menu. */
+    analytics: {
+      title: "Post activity",
+      close: "Close",
+      impressions: "Impressions",
+      impressionsWhy:
+        "Times this post was on somebody's screen, counting repeat views by the same person.",
+      engagements: "Engagements",
+      engagementsWhy:
+        "Every interaction with this post: replies, reposts, likes, expands and profile visits.",
+      expands: "Detail expands",
+      expandsWhy: "Times somebody opened the post to read the whole of it.",
+      visits: "Profile visits",
+      visitsWhy:
+        "Times somebody went from this post to the profile that wrote it.",
+      more: "What this counts",
+      /* The three counts already under the post, repeated here as the row X
+         puts above the metrics — the same numbers, gathered rather than spread
+         along an action bar. */
+      likes: "likes",
+      reposts: "reposts",
+      replies: "replies",
+      note: "Counted by the overlay this post was published through. Nothing here leaves your device.",
+    },
+    /* The repost menu, from the repost count. */
+    repostMenu: {
+      label: "Repost",
+      repost: "Repost",
+      undoRepost: "Undo repost",
+      quote: "Quote",
+      reposted: "Reposted.",
+      unreposted: "Repost removed.",
+    },
+    /* The reply composer, opened from a post's reply count. */
+    replyTo: {
+      title: "Reply",
+      quoteTitle: "Quote",
+      quotePlaceholder: "Add a comment",
+      quoteAction: "Post",
+      quoteSent: "Quote posted.",
+      close: "Close",
+      replyingTo: "Replying to",
+      placeholder: "Post your reply",
+      action: "Reply",
+      /* X calls this "Everyone can reply". Mocked here, like the rest of the
+         composer row — it is on the sheet because who may answer is part of
+         writing a reply, not a setting somewhere else. */
+      audience: "Everyone can reply",
+      sent: "Reply posted.",
+    },
+    /* The upgrade sheet, opened by the Sync panel's button. */
+    upgrade: {
+      title: "Turn on Nexus Sync",
+      /* One line, drawn from the three benefits on the card: every device in
+         step, a backup only you can open, and your own activity exportable. */
+      blurb:
+        "Every device in step, a backup only you can open, and your activity yours to export",
+      close: "Close",
+      you: "You",
+      name: "Name",
+      asCompany: "Bill as a company",
+      business: "Business name",
+      businessPlaceholder: "Acme Inc.",
+      vat: "VAT / GST number (optional)",
+      asCompanyHint: "For an invoice in the company's name.",
+      vatPlaceholder: "123456789",
+      payWith: "Payment method",
+      card: "Card",
+      cardNumber: "Card number",
+      cardExpiry: "Expiry",
+      cardCvc: "CVC",
+      cardPostcode: "Postal code",
+      wallet: "Pay from wallet",
+      walletDesc: "Charged in bitcoin at the rate on the day, from {wallet}.",
+      walletAvailable: "{amount} available",
+      walletOff: "6.9% off",
+      walletSaves: "Saves {amount} against the card price",
+      /* Prepaid, so there is nothing to auto-renew and nothing to consent to.
+         The card path keeps its renewal checkbox; this one has no renewal. */
+      walletPrepaid: "Pays for {span} up front. Does not renew.",
+      spanMonth: "one month",
+      spanYear: "one year",
+      walletShort:
+        "Not enough in {wallet} for the {period} charge. Top it up or pay by card.",
+      walletLocked: "{wallet} is sealed. Unlock it to pay from it.",
+      walletNone: "No wallet is connected to this workspace.",
+      billing: "Billing",
+      monthly: "Pay monthly",
+      annually: "Pay annually",
+      perMonth: "/ month",
+      perYear: "/ year",
+      firstMonthOff: "50% off first month",
+      bestValue: "Best value",
+      saves: "Saves {amount} a year",
+      confirm: "Confirm",
+      dueNow: "Due now",
+      renews: "Then {amount} {every}, until you cancel.",
+      autoRenew:
+        "Nexus Sync renews automatically at the price above plus any tax, unless cancelled. Cancel from Settings before the renewal date to avoid further charges.",
+      terms: "terms",
+      cta: "Turn on Nexus Sync",
+      needsConsent: "Agree to the renewal terms first.",
+      done: "Nexus Sync is on.",
+      /* Two grammatical slots, so neither sentence has to bend. "the {period}
+         charge" wants an adjective; "then $99 {every}" wants an adverbial. */
+      periodMonth: "monthly",
+      periodYear: "annual",
+      everyMonth: "a month",
+      everyYear: "a year",
+    },
+    /* The search palette. Grouped, because an unlabelled list of topics, people
+       and posts is three kinds of thing wearing one shape. */
+    search: {
+      placeholder: "Search posts, people and topics",
+      groupTopics: "Topics",
+      groupPeople: "People",
+      groupPosts: "Posts",
+      groupRooms: "On air now",
+      hintTopic: "Filter the feed",
+      hintPerson: "See their posts",
+      hintPost: "Go to post",
+      hintRoom: "See what is on",
+      noResults: "Nothing on the timeline matches that.",
+      /* The strip header, once search has narrowed the feed to somebody. */
+      byline: "Posts from",
+      clear: "Clear",
+    },
+  },
+
   /** the workspaces manager: what each workspace is connected to */
   profiles: {
     sidebar: {
       title: "Workspaces",
-      viewFeed: "View feed",
+      viewFeed: "Show Timeline",
       statProfiles: "workspaces",
       statHandles: "handles",
       statWallets: "wallets",

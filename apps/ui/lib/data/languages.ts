@@ -22,7 +22,11 @@ export const languages: Language[] = [
   { tag: "en-US", name: "English (US)", english: "English (US)" },
   { tag: "de-CH", name: "Deutsch (Schweiz)", english: "German (Switzerland)" },
   { tag: "fr-CH", name: "Français (Suisse)", english: "French (Switzerland)" },
-  { tag: "it-CH", name: "Italiano (Svizzera)", english: "Italian (Switzerland)" },
+  {
+    tag: "it-CH",
+    name: "Italiano (Svizzera)",
+    english: "Italian (Switzerland)",
+  },
   { tag: "es-ES", name: "Español", english: "Spanish" },
   { tag: "pt-BR", name: "Português (Brasil)", english: "Portuguese (Brazil)" },
   { tag: "ja-JP", name: "日本語", english: "Japanese" },

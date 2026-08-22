@@ -58,7 +58,12 @@ import {
 export type AppSlug = HubApp["slug"];
 export type LibraryTab = "spaces" | "downloads" | "apps";
 /** What the main canvas shows, independent of which rail panel is open. */
-export type MainViewKind = "app" | "store" | "profiles" | "settings" | "feed";
+export type MainViewKind =
+  | "app"
+  | "store"
+  | "profiles"
+  | "settings"
+  | "timeline";
 
 /**
  * A page this space has been on, as the command bar needs it.
@@ -85,6 +90,8 @@ export interface RecentSite {
  */
 export type SettingsCategory =
   | "general"
+  | "profiles"
+  | "security"
   | "privacy"
   | "permissions"
   | "autofill"
@@ -243,13 +250,17 @@ const VIEWS: Record<string, MainViewKind> = {
   apps: "store",
   profiles: "profiles",
   settings: "settings",
-  feed: "feed",
+  timeline: "timeline",
+  /* The launcher's old address. Timeline took the slot the wall of app tiles
+     used to hold, so a link somebody already has still lands somewhere true —
+     it just rewrites itself to ?view=timeline on arrival. */
+  feed: "timeline",
 };
 const VIEW_SLUGS: Partial<Record<MainViewKind, string>> = {
   store: "apps",
   profiles: "profiles",
   settings: "settings",
-  feed: "feed",
+  timeline: "timeline",
 };
 
 function urlAppSlug(): string | null {
@@ -380,6 +391,15 @@ interface HubState {
     position: "before" | "after",
   ) => void;
   presetGroup: (name: string, refs: RailRef[]) => void;
+  /**
+   * Lay the rail out from scratch, for the workspace this is called in.
+   *
+   * The first run's presets need to place folders *and* the loose tiles around
+   * them in one decided order. `presetGroup` appends, so building a rail out of
+   * four calls to it would put every folder after the apps that are supposed to
+   * sit above them. This takes the whole arrangement at once.
+   */
+  applyRailPlan: (entries: RailEntry[]) => void;
   renameGroup: (id: string, name: string) => void;
   setGroupColor: (id: string, color: string) => void;
 
@@ -1530,6 +1550,17 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     [presentHere],
   );
 
+  const applyRailPlan = useCallback(
+    (entries: RailEntry[]) => {
+      /* Reconciled rather than trusted: a plan can name an app this profile has
+         not got, and `reconcileRail` drops those and appends anything present
+         that the plan forgot — so the rail is never left missing a tile for
+         something that is actually installed. */
+      setRailLayout(reconcileRail(entries, presentHere()));
+    },
+    [presentHere],
+  );
+
   const renameGroup = useCallback(
     (id: string, name: string) => {
       const present = presentHere();
@@ -2273,6 +2304,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       ungroupRef,
       reorderRailRef,
       presetGroup,
+      applyRailPlan,
       renameGroup,
       setGroupColor,
       appsCollection,
@@ -2440,6 +2472,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       ungroupRef,
       reorderRailRef,
       presetGroup,
+      applyRailPlan,
       renameGroup,
       setGroupColor,
       appsCollection,

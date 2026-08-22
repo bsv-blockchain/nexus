@@ -111,7 +111,8 @@ export const releases: Release[] = [
       {
         id: "permanence",
         title: "A confirmation before the first permanent message",
-        summary: "Asked once per conversation, and again if the setting changes.",
+        summary:
+          "Asked once per conversation, and again if the setting changes.",
         body: "Where a room anchors messages, the composer says so and the first post asks — showing the message itself, because the agreement should be about those words rather than about the idea of permanence. Cancelling leaves the draft exactly as typed.",
       },
       {

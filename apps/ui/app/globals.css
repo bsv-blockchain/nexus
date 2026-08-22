@@ -716,3 +716,91 @@ html [data-sonner-toaster] [data-sonner-toast] [data-description] {
     black 8px
   );
 }
+
+/*
+ * The vault's refusal.
+ *
+ * A door that says no by moving is the one piece of feedback nobody has to be
+ * taught. Lives here rather than in a styled-jsx block because the component
+ * that uses it is a client component in a static export, and a <style> tag
+ * inside it would be re-parsed on every phase change.
+ */
+@keyframes vault-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-9px);
+  }
+  40% {
+    transform: translateX(8px);
+  }
+  60% {
+    transform: translateX(-5px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
+.vault-shake {
+  animation: vault-shake 420ms ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The doors still open, they just stop being an event. */
+  .vault-door,
+  .vault-dial {
+    transition-duration: 1ms !important;
+  }
+  .vault-shake {
+    animation: none;
+  }
+}
+
+/*
+ * A scroller with no visible bar.
+ *
+ * For the tab rows: a horizontal scrollbar sitting directly under a row of
+ * underlined tabs reads as a second, broken underline. The row still scrolls
+ * by wheel, trackpad and keyboard — only the furniture is gone.
+ */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * A slim, always-there scrollbar, for boxes only a few lines tall.
+ *
+ * The overlay bar above is 12px and its thumb fades in only while the element
+ * is being scrolled. On a three-line description that is most of the box's
+ * width spent on a bar that never announces there is more to read. This one is
+ * narrow, and visible whenever the content overflows — which is the only time
+ * a browser draws it at all.
+ */
+.scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.scrollbar-slim::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-slim::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  min-height: 18px;
+}
+
+.scrollbar-slim::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted-foreground);
+}
