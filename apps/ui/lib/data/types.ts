@@ -49,7 +49,10 @@ export type WebAppSlug =
   | "1sat-market"
   | "tonicpow"
   | "jamify"
-  | "scribe";
+  | "scribe"
+  | "free-radio"
+  | "hexacities"
+  | "bsv-radar";
 
 export type HubAppSlug = NativeAppSlug | WebAppSlug;
 
@@ -458,6 +461,7 @@ export type EcosystemId =
   | "twetch"
   | "handcash"
   | "commonsource"
+  | "lamint"
   | "mycelia";
 
 /** table: ecosystems — a handle-issuing authority, per BRC-169 section 2.1 */

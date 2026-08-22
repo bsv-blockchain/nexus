@@ -66,6 +66,17 @@ if (process.env.NEXUS_USER_DATA) {
   app.setPath('userData', process.env.NEXUS_USER_DATA)
 }
 
+/**
+ * The app icon in DEVELOPMENT only.
+ *
+ * `build/icon.icns` is a buildResource: electron-builder stamps it into the packaged
+ * .app, and nothing reads it when the shell is started with `electron .` — so a dev run
+ * carried the stock Electron logo in the Dock and made a correct icon look like a
+ * broken one. Packaged builds skip this: their icon is already in the bundle, and
+ * build/ is not shipped, so the path would not resolve anyway.
+ */
+const DEV_ICON = app.isPackaged ? null : path.join(__dirname, '..', 'build', 'icon.png')
+
 let win = null
 let tabManager = null
 let router = null
@@ -89,6 +100,9 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1440,
     height: 900,
+    // Ignored on macOS — see DEV_ICON, the Dock is set instead — and undefined in a
+    // packaged app, which is the same as not passing it.
+    icon: DEV_ICON ?? undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload-chrome.cjs'),
       contextIsolation: true,
@@ -305,6 +319,15 @@ function serveChromeAssets() {
 
 app.whenReady().then(() => {
   boot('app-ready')
+  // Dock icon for a dev run. Guarded on the platform AND on app.dock existing, because
+  // the Dock API is macOS-only and a cosmetic touch must not be able to stop boot.
+  if (DEV_ICON && process.platform === 'darwin' && existsSync(DEV_ICON)) {
+    try {
+      app.dock?.setIcon(DEV_ICON)
+    } catch (err) {
+      boot('dock icon skipped: ' + (err && err.message))
+    }
+  }
   serveChromeAssets()
   try {
     createWindow()

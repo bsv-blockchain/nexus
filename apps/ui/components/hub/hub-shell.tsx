@@ -1,5 +1,6 @@
 "use client";
 
+import { FirstRun } from "@/components/hub/first-run";
 import { PhaseSwitcher } from "@/components/hub/phase-switcher";
 import { DEMO_SURFACES } from "@/lib/surfaces";
 import { AppCollections } from "@/components/hub/app-collections";
@@ -8,6 +9,7 @@ import { CommandPalette } from "@/components/hub/command-palette";
 import { DownloadsPanel } from "@/components/hub/downloads-panel";
 import { HubProvider, useHub } from "@/components/hub/hub-provider";
 import { ProfilesSidebar } from "@/components/hub/profiles-sidebar";
+import { TimelineSidebar } from "@/components/apps/timeline/timeline-sidebar";
 import { IconRail } from "@/components/hub/icon-rail";
 import { MainView } from "@/components/hub/main-view";
 import { MobileBrowser } from "@/components/hub/mobile-browser";
@@ -37,6 +39,10 @@ function LibraryPanel(): ReactNode {
       </div>
     );
   }
+  /* The Timeline's contextual column, in the slot every app's contextual column
+     uses. It is a view rather than an app, so `hasContextSidebar` further down
+     never sees it — this is where it gets its width. */
+  if (mainView === "timeline") return <TimelineSidebar />;
   if (libraryTab === "apps") return <AppCollections />;
   /* The profiles manager holds every profile now, so this column stops being a
      second copy of the active one and answers what is true across them. */
@@ -135,9 +141,30 @@ function Shell(): ReactNode {
           what we would ship first" is a conversation, not a feature. A shipped
           binary has one product state, so the chip has nothing to switch and the
           panel behind it lists features nobody in that build can reach. Gated
-          here rather than inside the component so that with the flag folded to
-          a literal false the whole thing leaves the bundle. */}
-      {DEMO_SURFACES && <PhaseSwitcher />}
+          here rather than inside the component so that with both flags folded to
+          literal false the whole thing leaves the bundle.
+
+          The `dev` half is why it appears in the Electron shell. `dev:wallet`
+          sets NEXT_PUBLIC_DEMO_DATA=0, which used to take the chip with it — so
+          the one build where you can see a real wallet was the one build with no
+          way to switch product state. A packaged binary is a production build
+          with the flag off, so it is still absent there, which is the part that
+          matters. The panel drops its own Data section when fixtures are
+          compiled out; see phase-switcher. */}
+      {(DEMO_SURFACES || process.env.NODE_ENV === "development") && (
+        <PhaseSwitcher />
+      )}
+      {/* Demo only. Its last card tells somebody a handle is free, and nothing
+          in a live build can know that — lib/handle-suggest says why, and
+          PROMOTING-DEMO-SURFACES.md says what would have to exist first.
+
+          The flag folds to a literal false, so this never RENDERS in a shipped
+          build, which is the part that matters. It does not leave the bundle:
+          the import above is static, so the module is still emitted — measured,
+          not assumed, and true of PhaseSwitcher above as well despite what its
+          comment says. Dropping it for real means a dynamic import, which is a
+          size question rather than an honesty one. */}
+      {DEMO_SURFACES && <FirstRun />}
     </div>
   );
 }

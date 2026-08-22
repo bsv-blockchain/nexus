@@ -4,6 +4,7 @@ import { Inspector } from "@/components/hub/inspector";
 import { useHub } from "@/components/hub/hub-provider";
 import { OriginChip } from "@/components/hub/origin-chip";
 import { getMockPage, type BrowserTab, type MockPage } from "@/lib/data";
+import { forgetShellTab, noteShellTab } from "@/lib/wallet-reach";
 import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -78,7 +79,20 @@ function browseBarHeight(): number {
  * below it already.
  */
 
-function NativeSiteFrame({ url }: { url: string }): ReactNode {
+function NativeSiteFrame({
+  url,
+  tabId,
+}: {
+  url: string;
+  /**
+   * The chrome's own id for the row this page belongs to.
+   *
+   * Passed only so a wallet call can be attributed back to a tab: the shell
+   * names its native tabs and the chrome names its rows, and this is the one
+   * place both ids are in scope. See lib/wallet-reach.
+   */
+  tabId?: string;
+}): ReactNode {
   const boxRef = useRef<HTMLDivElement>(null);
   const tabIdRef = useRef<string | null>(null);
 
@@ -129,6 +143,8 @@ function NativeSiteFrame({ url }: { url: string }): ReactNode {
         // A tab created after unmount would be orphaned above the chrome forever.
         if (disposed) return host.tabs.destroy(id);
         tabIdRef.current = id;
+        // Both ids are in scope for the first and only time here.
+        if (tabId) noteShellTab(id, tabId);
         return host.tabs.setActive(id).then(pushBounds);
       })
       .catch(() => {
@@ -160,9 +176,12 @@ function NativeSiteFrame({ url }: { url: string }): ReactNode {
       window.removeEventListener("scroll", pushBounds, true);
       const id = tabIdRef.current;
       tabIdRef.current = null;
-      if (id) void host.tabs.destroy(id);
+      if (id) {
+        forgetShellTab(id);
+        void host.tabs.destroy(id);
+      }
     };
-  }, [url]);
+  }, [url, tabId]);
 
   /*
    * `bg-background`, not `bg-canvas`. Nothing of this element is ever meant to be
@@ -285,7 +304,7 @@ function BrowserCanvas({
   // Inside a shell every real URL goes to the native layer — the mock/localOnly
   // fallbacks exist only because the web build cannot embed un-frameable hosts.
   if (hasShell) {
-    return <NativeSiteFrame key={tab.url} url={tab.url} />;
+    return <NativeSiteFrame key={tab.url} url={tab.url} tabId={tab.id} />;
   }
 
   const page = getMockPage(tab.url);

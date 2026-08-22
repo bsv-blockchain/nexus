@@ -157,23 +157,37 @@ function AppCard({
   /* App copy is data, so the chain's name is substituted rather than composed
      from a component. */
   const brandMode = useBrandMode();
+  /* Per card, not lifted: two open cards is a perfectly reasonable thing to
+     want, and a shared "which one is open" would close the first. */
+  const [expanded, setExpanded] = useState(false);
 
   return (
     <article
       /* One height for every tile, set by the tallest thing a card holds:
          a three-line description. Ragged card bottoms in a grid make the
          Connect buttons land on four different lines, and a row of buttons
-         you have to hunt for is worse than a little empty space. */
-      className={`bg-surface flex h-56 flex-col rounded-2xl p-4 ring-1 transition-shadow ${
-        selected ? "ring-accent" : "ring-transparent"
-      }`}
+         you have to hunt for is worse than a little empty space.
+
+         Until you open one. An expanded card is taller than its neighbours by
+         definition — you asked for the rest of a description that did not fit,
+         and the only way to honour that without moving the card is not to.
+         `min-h-52` rather than free height, so opening a card whose description
+         already fitted does not shrink it below the row it sits in.
+
+         52 rather than the 56 it was: once the description became exactly three
+         lines rather than whatever was left over, the card carried about 27px
+         of nothing under the Connect button. The folder tile matches, because
+         the two sit in the same grid. */
+      className={`bg-surface flex flex-col rounded-2xl p-4 ring-1 transition-shadow ${
+        expanded ? "min-h-52" : "h-52"
+      } ${selected ? "ring-accent" : "ring-transparent"}`}
     >
       <button
         type="button"
         onClick={() => onSelect(app)}
         onMouseEnter={() => onHover(app)}
         aria-label={`View ${app.name} details`}
-        className="focus-ring flex min-h-0 flex-1 flex-col text-left"
+        className="focus-ring flex shrink-0 flex-col text-left"
       >
         <div className="flex items-start gap-3">
           <span className="block shrink-0">
@@ -207,9 +221,31 @@ function AppCard({
             <DevBadge developer={app.developer} className="mt-0.5" />
           </div>
         </div>
-        <p className="text-muted-foreground mt-3 line-clamp-3 flex-1 overflow-hidden text-xs leading-relaxed">
-          {withBrand(app.description, brandMode)}
-        </p>
+      </button>
+      {/*
+        The description, on its own and scrollable.
+
+        Out of the select button rather than inside it, because it is now a
+        control of its own and a button inside a button is markup no browser
+        agrees on. Clicking it opens the card rather than the app: they are
+        different intentions, and the old card answered both with "open the
+        app".
+
+        Three lines exactly, by max-height rather than `line-clamp`. Clamping
+        hides the overflow so completely that the box cannot scroll, which is
+        the one thing wanted here — a bar appears only when there is more, so
+        the card says whether it is holding anything back.
+      */}
+      <button
+        type="button"
+        onClick={() => setExpanded((open) => !open)}
+        aria-expanded={expanded}
+        aria-label={`${expanded ? copy.collapseDescription : copy.expandDescription} ${app.name}`}
+        className={`focus-ring scrollbar-slim text-muted-foreground mt-3 min-h-0 flex-1 overflow-y-auto text-left text-xs leading-relaxed ${
+          expanded ? "max-h-none" : "max-h-[3.66rem]"
+        }`}
+      >
+        {withBrand(app.description, brandMode)}
       </button>
       {app.essential ? (
         <span
@@ -351,7 +387,10 @@ function CategoryFolder({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18, ease: EASE }}
-            className="focus-ring group bg-surface ring-border hover:ring-accent/50 flex h-56 w-full flex-col justify-between rounded-2xl p-4 text-left ring-1 transition-colors"
+            /* Same height as an app card: a folder is a tile in the same grid,
+               and one taller box in a row of shorter ones reads as a mistake
+               rather than as a different kind of thing. */
+            className="focus-ring group bg-surface ring-border hover:ring-accent/50 flex h-52 w-full flex-col justify-between rounded-2xl p-4 text-left ring-1 transition-colors"
           >
             {/* A folder is a tile in a grid of tiles, so its mark is the
                 size of the app icons around it and its name is read at the

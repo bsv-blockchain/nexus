@@ -14,6 +14,17 @@ export const themeConfig = {
 
 /** localStorage keys for client-persisted UI state */
 export const storageKeys = {
+  /**
+   * Whether developer surfaces are revealed across the app.
+   *
+   * Persisted, unlike everything in the settings store: that store's rule is
+   * about not remembering a policy it cannot enforce, and this is not a policy
+   * — it is whether you are shown a panel. Re-ticking it after every reload
+   * while building against it would be the only thing it reliably did.
+   */
+  developerMode: "nexus.developer-mode",
+  /** which first-run presets this install was set up with */
+  presets: "nexus.presets",
   /** the sites the user pinned to the rail */
   pinnedSites: "nexus.pinned-sites",
   /** what Messages anchors, globally and per conversation */

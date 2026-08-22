@@ -2,12 +2,7 @@
  * tables: courses, market_listings, vault_items, proposals — placeholder rows
  * for the additional hub apps. Messages data lives in ./messages.
  */
-import type {
-  Course,
-  MarketListing,
-  Proposal,
-  VaultItem,
-} from "./types";
+import type { Course, MarketListing, Proposal, VaultItem } from "./types";
 
 export const courses: Course[] = [
   {

@@ -63,6 +63,16 @@ function getServerSnapshot(): AppRepository[] {
   return getDefaultRepositories();
 }
 
+/**
+ * The current list, outside React.
+ *
+ * For callers that have to read-modify-write in an event handler — the first
+ * run's preset applier switches two sources on and must not clobber the rest.
+ */
+export function getRepositoriesSnapshot(): AppRepository[] {
+  return getSnapshot();
+}
+
 export function setRepositories(next: AppRepository[]): void {
   snapshot = next;
   try {

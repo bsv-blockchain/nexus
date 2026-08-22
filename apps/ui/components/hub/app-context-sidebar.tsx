@@ -37,6 +37,7 @@ import {
   FileText,
   Inbox,
   KeyRound,
+  Lock,
   PanelLeftClose,
   PenTool,
   Plus,
@@ -51,8 +52,14 @@ import {
   Upload,
   User,
   Vault as VaultIcon,
+  X,
   type LucideIcon,
 } from "lucide-react";
+import { motion } from "motion/react";
+import { toast } from "sonner";
+import { toggleConnection, useSettings } from "@/lib/settings-store";
+import { useVault } from "@/lib/vault-store";
+import { VaultLockButton } from "@/components/apps/vault/vault-lock-button";
 import type { ReactNode } from "react";
 
 /** Apps whose sidebar column is contextual (everything except Browse). */
@@ -257,20 +264,51 @@ const VAULT_KINDS: { id: string; label: string; icon: LucideIcon }[] = [
 
 function VaultSidebar(): ReactNode {
   const { vaultKind, setVaultKind } = useHub();
+  const { phase } = useVault();
   const items = getVaultItems();
+
+  /*
+   * A shut vault has no contents to filter.
+   *
+   * Listing the kinds and their counts beside a closed door tells anybody
+   * looking over your shoulder what is inside and how much of it — which is
+   * most of what a vault is for keeping to yourself. One row, saying the only
+   * true thing about it right now.
+   */
+  if (phase !== "open") {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+        <div className="text-muted-foreground flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm">
+          <Lock className="size-4 shrink-0" aria-hidden="true" />
+          <span className="flex-1 text-left">{content.vault.lock.locked}</span>
+        </div>
+      </div>
+    );
+  }
+
   const countOf = (id: string): number =>
     id === "all"
       ? items.length
       : items.filter((item: VaultItem) => item.kind === id).length;
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
-      {VAULT_KINDS.map((kind) => {
+      {VAULT_KINDS.map((kind, index) => {
         const active = vaultKind === kind.id;
         return (
-          <button
+          /* Staggered with the canvas beside it, on the same curve and the same
+             step, so opening the vault is one thing arriving in two columns
+             rather than two lists that happen to appear at once. */
+          <motion.button
             key={kind.id}
             type="button"
             onClick={() => setVaultKind(kind.id)}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{
+              duration: 0.34,
+              ease: [0.4, 0, 0.2, 1],
+              delay: 0.08 + index * 0.055,
+            }}
             className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm ${
               active
                 ? "bg-accent/15 font-medium text-foreground"
@@ -282,7 +320,7 @@ function VaultSidebar(): ReactNode {
             <span className="text-xs text-muted-foreground">
               {countOf(kind.id)}
             </span>
-          </button>
+          </motion.button>
         );
       })}
     </div>
@@ -748,37 +786,81 @@ function AppContextFooter({ slug }: { slug: AppSlug }): ReactNode {
 
 function ConnectSidebar(): ReactNode {
   const { connectSelected, setConnectSelected } = useHub();
-  const connections = getConnections();
+  const settings = useSettings();
+  /*
+   * Revoked sites leave this list rather than sitting in it greyed out.
+   *
+   * Safe to drop them because revoking still is not deleting: Settings › Sites
+   * lists them with their revoked state and the toggle back, and the toast below
+   * carries an Undo for the moment right after. This list answers "who can reach
+   * my wallet", and a row that cannot is a different question.
+   */
+  const connections = getConnections().filter(
+    (conn) => !settings.revokedConnections.includes(conn.id),
+  );
   const activeId = connectSelected ?? connections[0]?.id ?? null;
+  const copy = content.connect;
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
       {connections.map((conn) => {
         const active = conn.id === activeId;
+        const disconnect = (): void => {
+          toggleConnection(conn.id);
+          /* Selection would otherwise point at a row that is no longer here,
+             leaving the pane beside it showing a site this list denies. */
+          if (active) {
+            const next = connections.find((entry) => entry.id !== conn.id);
+            setConnectSelected(next?.id ?? null);
+          }
+          toast.success(conn.name, {
+            description: copy.disconnected,
+            action: {
+              label: content.hub.undo,
+              onClick: () => toggleConnection(conn.id),
+            },
+          });
+        };
         return (
-          <button
+          /* A row, not a button: the X is its own control, and a button inside a
+             button is neither valid nor clickable. */
+          <div
             key={conn.id}
-            type="button"
-            onClick={() => setConnectSelected(conn.id)}
-            className={`flex w-full items-center gap-2.5 rounded-lg p-2 text-left ${
+            className={`group relative flex items-center rounded-lg ${
               active ? "bg-accent/10" : "hover:bg-surface-hover"
             }`}
           >
-            <Favicon
-              url={conn.origin}
-              letter={conn.favicon}
-              color={conn.faviconColor}
-              size={22}
-              rounded="rounded-lg"
-            />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">
-                {conn.name}
+            <button
+              type="button"
+              onClick={() => setConnectSelected(conn.id)}
+              aria-current={active ? "true" : undefined}
+              className="focus-ring flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-2 text-left"
+            >
+              <Favicon
+                url={conn.origin}
+                letter={conn.favicon}
+                color={conn.faviconColor}
+                size={22}
+                rounded="rounded-lg"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate pr-6 text-sm font-medium">
+                  {conn.name}
+                </span>
+                <span className="block truncate pr-6 text-xs text-muted-foreground">
+                  {conn.origin.replace(/^https?:\/\//, "")}
+                </span>
               </span>
-              <span className="block truncate text-xs text-muted-foreground">
-                {conn.origin.replace(/^https?:\/\//, "")}
-              </span>
-            </span>
-          </button>
+            </button>
+            <button
+              type="button"
+              onClick={disconnect}
+              aria-label={`${copy.disconnect} ${conn.name}`}
+              title={copy.disconnect}
+              className="focus-ring absolute right-1.5 rounded p-1 text-muted-foreground opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-surface-hover hover:text-negative"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+            </button>
+          </div>
         );
       })}
     </div>
@@ -1019,7 +1101,13 @@ export function AppContextSidebar({ slug }: { slug: AppSlug }): ReactNode {
           {/* CTAs first, then the bar: the help button is the least urgent
               thing in the column and belongs furthest from the content. */}
           <AppContextFooter slug={slug} />
-          <AppHelpBar slug={slug} />
+          {/* The vault is the one app whose column carries a setting: when it
+              shuts itself again. It goes in the help bar's left slot, which is
+              where App repositories sits in the Apps column — same bar, same
+              corner, same kind of thing. */}
+          <AppHelpBar slug={slug}>
+            {slug === "vault" ? <VaultLockButton /> : null}
+          </AppHelpBar>
         </div>
       </div>
     </div>

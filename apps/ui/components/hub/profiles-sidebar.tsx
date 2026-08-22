@@ -17,11 +17,30 @@ import type { ReactNode } from "react";
 
 const copy = content.profiles.sidebar;
 
+/**
+ * The box a library column's top control wears.
+ *
+ * Shared by the stat tiles and by the buttons that sit above them here and in
+ * the Timeline's column, because those have to be the same height — a 32px
+ * button over a row of 47px tiles read as an afterthought stuck on top rather
+ * than the first item in a set.
+ *
+ * The height is stated rather than left to the content: the tiles get theirs
+ * from two lines of type and the buttons carry one, so nothing but a floor
+ * makes them agree. In rem so it moves with the root size.
+ */
+export const COLUMN_TILE =
+  "ring-border/60 grid min-h-[2.9375rem] place-items-center rounded-lg px-2 py-1.5 ring-1";
+
 function Stat({ value, label }: { value: string; label: string }): ReactNode {
   return (
-    <div className="bg-surface-raised ring-border/60 rounded-lg px-2 py-1.5 ring-1">
-      <p className="text-sm font-bold tabular-nums">{value}</p>
-      <p className="text-muted-foreground text-[10px]">{label}</p>
+    <div className={`${COLUMN_TILE} bg-surface-raised`}>
+      {/* A block inside the grid cell: the tile centres its content, and these
+          two lines are one thing, left-aligned against the tile's padding. */}
+      <div className="w-full">
+        <p className="text-sm font-bold tabular-nums">{value}</p>
+        <p className="text-muted-foreground text-[10px]">{label}</p>
+      </div>
     </div>
   );
 }
@@ -41,8 +60,15 @@ function Stat({ value, label }: { value: string; label: string }): ReactNode {
  * a time.
  */
 export function ProfilesSidebar(): ReactNode {
-  const { spaces, activeSpaceId, setActiveSpaceId, createSpace, toggleRail } =
-    useHub();
+  const {
+    spaces,
+    activeSpaceId,
+    setActiveSpaceId,
+    createSpace,
+    toggleRail,
+    mainView,
+    setMainView,
+  } = useHub();
   const settings = useSettings();
   useWallets();
 
@@ -71,16 +97,45 @@ export function ProfilesSidebar(): ReactNode {
         </h2>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="grid grid-cols-3 gap-1.5 px-0.5">
-          <Stat value={String(spaces.length)} label={copy.statProfiles} />
-          <Stat
-            value={`${settings.handles.length}/${MAX_HANDLES}`}
-            label={copy.statHandles}
-          />
-          <Stat value={String(wallets.length)} label={copy.statWallets} />
-        </div>
+      {/* Wearing the stat tile's shape at full width: this is the one thing in
+          the column that leaves it, and a tile reads as a destination where a
+          text link would read as one more row in the list below. */}
+      <button
+        type="button"
+        onClick={() => setMainView("timeline")}
+        aria-current={mainView === "timeline" ? "page" : undefined}
+        className={`focus-ring ${COLUMN_TILE} mx-0.5 text-center text-sm font-bold transition-colors ${
+          mainView === "timeline"
+            ? "bg-accent/15"
+            : "bg-surface-raised hover:bg-surface-hover"
+        }`}
+      >
+        {copy.viewFeed}
+      </button>
 
+      {/* Outside the scroller on purpose: the counts describe the whole column,
+          so they stay put while the thing they are counting scrolls past. */}
+      <div className="mt-2 grid shrink-0 grid-cols-3 gap-1.5 px-0.5">
+        <Stat value={String(spaces.length)} label={copy.statProfiles} />
+        <Stat
+          value={`${settings.handles.length}/${MAX_HANDLES}`}
+          label={copy.statHandles}
+        />
+        <Stat value={String(wallets.length)} label={copy.statWallets} />
+      </div>
+
+      {/*
+        The workspaces sit at the FOOT of what is left, not the top of it.
+
+        `mt-auto` on the content rather than `justify-end` on the scroller: the
+        two agree while everything fits and disagree the moment it does not. A
+        flex column that justifies to the end pushes its first child above the
+        top of its own scroll box, so a long list would start out of reach. An
+        auto margin collapses to nothing once the content is taller than the
+        box, which leaves the list scrolling normally from its first row.
+      */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div className="mt-auto">
         <h3 className="text-muted-foreground mt-4 px-1.5 text-[10px] font-bold tracking-wide uppercase">
           {copy.allProfiles}
         </h3>
@@ -130,9 +185,6 @@ export function ProfilesSidebar(): ReactNode {
             <h3 className="text-muted-foreground mt-4 px-1.5 text-[10px] font-bold tracking-wide uppercase">
               {copy.sharedTitle}
             </h3>
-            <p className="text-muted-foreground mt-1 px-1.5 text-[10px] text-pretty">
-              {copy.sharedHint}
-            </p>
             <ul className="mt-1.5">
               {shared.map((wallet) => {
                 const names = spaces
@@ -158,6 +210,7 @@ export function ProfilesSidebar(): ReactNode {
             </ul>
           </>
         )}
+        </div>
       </div>
 
       <div className="border-border/60 mt-2 border-t pt-2">

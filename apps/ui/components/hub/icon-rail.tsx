@@ -1,7 +1,6 @@
 "use client";
 
 import { AppTile, SiteTile } from "@/components/hub/app-icon";
-import { ShellVersion } from "@/components/hub/shell-version";
 import { GroupSettingsDialog } from "@/components/hub/group-settings-dialog";
 import {
   useHub,
@@ -19,15 +18,17 @@ import {
   type HubApp,
 } from "@/lib/data";
 import { refKey, sameRef } from "@/lib/rail/layout";
+import { useSettings } from "@/lib/settings-store";
 import { displayOrigin } from "@/lib/rail/origin";
 import type { PinnedSite } from "@/lib/rail/sites";
 import {
+  Cog,
   Folder,
   FolderMinus,
   Gift,
+  Globe,
   Layers,
   LayoutGrid,
-  Settings,
   type LucideIcon,
 } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
@@ -38,7 +39,14 @@ import { useRef, useState, type ReactNode } from "react";
  */
 const DRAG_MIME = "application/x-nexus-rail-ref";
 const LONG_PRESS_MS = 500;
-/** Soft dark outer glow, a touch stronger at the bottom — inactive apps only. */
+/**
+ * Soft dark outer glow, a touch stronger at the bottom — inactive app tiles.
+ *
+ * A tile is a rounded square of artwork, so a drop-shadow reads as the tile
+ * lifting off the rail. It does not read on a stroke glyph, where the same
+ * filter traces every line of the drawing and comes out as a smudge — which is
+ * why the chrome icons above the tiles do not take it.
+ */
 const ICON_GLOW =
   "[filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.22))_drop-shadow(0_3px_3px_rgba(0,0,0,0.32))]";
 
@@ -50,9 +58,9 @@ const systemTabs: {
 }[] = [
   {
     id: "spaces",
-    label: "Profiles",
+    label: "Workspaces",
     icon: Layers,
-    desc: "Switch between your profiles. Each keeps its own browser tabs, balances and identities.",
+    desc: "Switch between your workspaces. Each keeps its own browser tabs, balances and identities.",
   },
   {
     id: "apps",
@@ -229,6 +237,7 @@ export function IconRail(): ReactNode {
     openSettings,
     activeRef,
     openApp,
+    isInstalled,
     activeSpaceId,
     openLinkInBrowser,
     pinnedSites,
@@ -246,6 +255,16 @@ export function IconRail(): ReactNode {
       : id === "apps"
         ? mainView === "store"
         : libraryTab === "downloads";
+  /*
+   * Whether an app is the thing on screen at all.
+   *
+   * `activeRef` remembers the last app opened and keeps remembering it while
+   * Workspaces, Apps, Settings or the Timeline have the canvas — which is right
+   * for going back, and wrong for the rail: it lit Browse and Workspaces at the
+   * same time, so two buttons claimed to be where you are. An app tile is
+   * current only when an app is what you are looking at.
+   */
+  const canvasIsApp = mainView === "app";
   // Clicking a tab sets both the panel (libraryTab) and the main view.
   const openTabView = (id: LibraryTab): void => {
     setLibraryTab(id);
@@ -261,6 +280,59 @@ export function IconRail(): ReactNode {
       : railCollapsed
         ? "grayscale transition duration-200 group-hover:grayscale-0"
         : ICON_GLOW;
+  /*
+   * The pinned block: Workspaces, then Browse when it is pinned, then Apps.
+   *
+   * Built here rather than at module scope because two of the three now depend
+   * on state — whether Browse is pinned at all, and whether this workspace
+   * still has it connected. Disconnecting Browse takes the button with it,
+   * which is the point: the button is a place to reach the app, not a
+   * replacement for having it.
+   *
+   * `systemTabs` still carries the two that map onto a LibraryTab; Browse is
+   * not one of those — it opens an app rather than a panel — so it is added
+   * here with its own opener instead of being forced into that union.
+   */
+  const browsePinned = useSettings().browseAsButton && isInstalled("browser");
+  const pinned = [
+    {
+      ...systemTabs[0]!,
+      active: tabActive("spaces"),
+      open: () => openTabView("spaces"),
+    },
+    ...(browsePinned
+      ? [
+          {
+            id: "browse",
+            label: content.library.spaces.browse,
+            icon: Globe,
+            desc: content.library.spaces.browseDesc,
+            active:
+              canvasIsApp &&
+              activeRef.kind === "app" &&
+              activeRef.slug === "browser",
+            open: () => openApp("browser"),
+            /*
+             * Flat, like the two either side of it.
+             *
+             * It carried the app tiles' drop-shadow for a while, on the grounds
+             * that Browse is a real app rather than a shell surface. That reads
+             * on a tile — a rounded square of artwork with a shadow under it —
+             * and not on a stroke glyph, where the same filter follows every
+             * line of the drawing and comes out as a smudge round the icon.
+             * Workspaces and Apps sit either side wearing no shadow, so flat is
+             * also the consistent answer.
+             */
+          },
+        ]
+      : []),
+    {
+      ...systemTabs[1]!,
+      active: tabActive("apps"),
+      open: () => openTabView("apps"),
+    },
+  ];
+
   const unread = getUnreadRefs();
   const [dragging, setDragging] = useState<RailRef | null>(null);
   const [overTarget, setOverTarget] = useState<string | null>(null);
@@ -376,7 +448,7 @@ export function IconRail(): ReactNode {
     >
       {/* Pinned tabs — Profiles / Apps / Downloads stay at the top. */}
       <div className="flex w-full shrink-0 flex-col items-center gap-1 px-2 py-1">
-        {systemTabs.map((tab) => (
+        {pinned.map((tab) => (
           <div
             key={tab.id}
             onMouseEnter={(event) => showTip(event, tab.label, tab.desc)}
@@ -384,9 +456,9 @@ export function IconRail(): ReactNode {
           >
             <RailShell
               label={tab.label}
-              active={tabActive(tab.id)}
+              active={tab.active}
               compact={railCollapsed}
-              onClick={() => openTabView(tab.id)}
+              onClick={tab.open}
             >
               {/* The icon keeps its size; the box around it takes the 36px an
                   app tile below occupies. Bare, a 24px glyph sat six pixels
@@ -414,7 +486,7 @@ export function IconRail(): ReactNode {
             const ref = entry.ref;
             const resolved = resolve(ref);
             if (!resolved) return null;
-            const isActive = sameRef(activeRef, ref);
+            const isActive = canvasIsApp && sameRef(activeRef, ref);
             const prefix = `${refKey(ref)}:`;
             const zone = overTarget?.startsWith(prefix)
               ? overTarget.slice(prefix.length)
@@ -549,7 +621,7 @@ export function IconRail(): ReactNode {
                   {entry.members.map((member) => {
                     const resolved = resolve(member);
                     if (!resolved) return null;
-                    const isActive = sameRef(activeRef, member);
+                    const isActive = canvasIsApp && sameRef(activeRef, member);
                     return (
                       <button
                         key={refKey(member)}
@@ -592,9 +664,10 @@ export function IconRail(): ReactNode {
               ) : (
                 <RailShell
                   label={entry.name}
-                  active={entry.members.some((member) =>
-                    sameRef(activeRef, member)
-                  )}
+                  active={
+                    canvasIsApp &&
+                    entry.members.some((member) => sameRef(activeRef, member))
+                  }
                   compact={railCollapsed}
                   onClick={() => setExpandedGroup(entry.id)}
                   onDragOver={(event) => {
@@ -683,9 +756,6 @@ export function IconRail(): ReactNode {
         control you have to look for.
       */}
       <div className="flex w-full shrink-0 flex-col items-center gap-1 pt-3">
-        {/* Collapsed, the rail is 64px and there is no width to be had; the
-            version lives in Settings › About either way. */}
-        {!railCollapsed && <ShellVersion />}
         <div
           className={`flex w-full items-center ${
             railCollapsed
@@ -710,7 +780,7 @@ export function IconRail(): ReactNode {
                 : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
             }`}
           >
-            <Settings className="size-4" aria-hidden="true" />
+            <Cog className="size-4" aria-hidden="true" />
           </button>
           <button
             type="button"

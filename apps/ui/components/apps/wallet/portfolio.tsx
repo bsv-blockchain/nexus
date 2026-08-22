@@ -47,6 +47,26 @@ export function Spark({
 }
 
 /**
+ * One column per action, rather than a fixed three.
+ *
+ * Exchange is demo-only — see the comment beside `onExchange` in wallet-app —
+ * so a live wallet offers two buttons and the demo offers three. A hardcoded
+ * grid-cols-3 left the live pair at two thirds width with an empty cell beside
+ * them, which reads as a third control that failed to load rather than as a
+ * wallet that has two. Indexed by `actions.length`, so the widths follow what
+ * the build actually carries.
+ *
+ * Spelled out rather than interpolated: Tailwind scans source text, so a
+ * `grid-cols-${n}` it cannot read is a class it never generates.
+ */
+const ACTION_COLUMNS = [
+  "",
+  "grid-cols-1",
+  "grid-cols-2",
+  "grid-cols-3",
+] as const;
+
+/**
  * Portfolio header and the held-asset list.
  *
  * The total is struck across every asset through USD, since that is the only
@@ -109,7 +129,7 @@ export function Portfolio({
         ) : null}
 
         {actions.length > 0 && (
-          <div className="mt-5 grid grid-cols-3 gap-2">
+          <div className={`mt-5 grid gap-2 ${ACTION_COLUMNS[actions.length]}`}>
             {actions.map(({ label, icon: Icon, onClick }) => (
               <button
                 key={label}
@@ -117,7 +137,25 @@ export function Portfolio({
                 onClick={onClick}
                 className="focus-ring flex flex-col items-center gap-1.5 rounded-xl bg-surface-raised px-3 py-3 text-xs font-semibold ring-1 ring-border/60 transition-colors hover:bg-surface-hover"
               >
-                <Icon className="size-4 text-accent" aria-hidden="true" />
+                {/*
+                  Bigger, and mixed toward the foreground rather than sitting at
+                  the flat accent.
+
+                  `var(--foreground)` is near-black in a light theme and
+                  near-white in a dark one, so mixing the accent toward it
+                  darkens the mark on light and lightens it on dark by
+                  construction — no `dark:` variant, and it follows the custom
+                  per-workspace palettes the theme picker sets, which a pair of
+                  hardcoded colours would not.
+                */}
+                <Icon
+                  className="size-5"
+                  style={{
+                    color:
+                      "color-mix(in oklab, var(--accent) 62%, var(--foreground))",
+                  }}
+                  aria-hidden="true"
+                />
                 {label}
               </button>
             ))}

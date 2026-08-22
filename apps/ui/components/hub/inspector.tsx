@@ -2,6 +2,7 @@
 
 import { content } from "@/lib/data";
 import { setSetting, useSettings } from "@/lib/settings-store";
+import { useDeveloperMode } from "@/lib/developer-mode";
 import { ChevronDown, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
@@ -27,7 +28,11 @@ const CONSOLE: {
   text: string;
   source: string;
 }[] = [
-  { level: "log", text: "wallet.isAuthenticated() → true", source: "brc-100.js:24" },
+  {
+    level: "log",
+    text: "wallet.isAuthenticated() → true",
+    source: "brc-100.js:24",
+  },
   {
     level: "log",
     text: "requesting identity certificate for @crumbs",
@@ -43,7 +48,11 @@ const CONSOLE: {
     text: "Uncaught (in promise) SpendDeclined: over the per-page cap",
     source: "checkout.js:301",
   },
-  { level: "log", text: "listOutputs({ basket: 'tickets' }) → 3", source: "app.js:57" },
+  {
+    level: "log",
+    text: "listOutputs({ basket: 'tickets' }) → 3",
+    source: "app.js:57",
+  },
 ];
 
 const NETWORK: {
@@ -54,9 +63,27 @@ const NETWORK: {
   size: string;
 }[] = [
   { method: "GET", path: "/", status: 200, ms: 128, size: "14.2 kB" },
-  { method: "GET", path: "/_next/static/chunk.js", status: 200, ms: 41, size: "82.7 kB" },
-  { method: "POST", path: "/api/wallet/authenticate", status: 200, ms: 216, size: "412 B" },
-  { method: "POST", path: "/api/wallet/createAction", status: 402, ms: 88, size: "196 B" },
+  {
+    method: "GET",
+    path: "/_next/static/chunk.js",
+    status: 200,
+    ms: 41,
+    size: "82.7 kB",
+  },
+  {
+    method: "POST",
+    path: "/api/wallet/authenticate",
+    status: 200,
+    ms: 216,
+    size: "412 B",
+  },
+  {
+    method: "POST",
+    path: "/api/wallet/createAction",
+    status: 402,
+    ms: 88,
+    size: "196 B",
+  },
   { method: "GET", path: "/favicon.ico", status: 304, ms: 12, size: "0 B" },
 ];
 
@@ -67,8 +94,18 @@ const LOOKUPS: {
   ms: number;
 }[] = [
   { topic: "tm_identity", overlay: "overlay.bsvb.tech", outputs: 1, ms: 94 },
-  { topic: "tm_certificates", overlay: "overlay.bsvb.tech", outputs: 4, ms: 141 },
-  { topic: "ls_tickets", overlay: "overlay.market.example", outputs: 3, ms: 203 },
+  {
+    topic: "tm_certificates",
+    overlay: "overlay.bsvb.tech",
+    outputs: 4,
+    ms: 141,
+  },
+  {
+    topic: "ls_tickets",
+    overlay: "overlay.market.example",
+    outputs: 3,
+    ms: 203,
+  },
   { topic: "tm_did", overlay: "overlay.treechat.example", outputs: 0, ms: 77 },
 ];
 
@@ -100,9 +137,14 @@ function statusTone(status: number): string {
  */
 export function Inspector(): ReactNode {
   const settings = useSettings();
+  const developer = useDeveloperMode();
   const [tab, setTab] = useState<Tab>("console");
   const [collapsed, setCollapsed] = useState(false);
-  if (!settings.devTools) return null;
+  /* Both, not either: the master switch is what reveals this tool's own switch,
+     so turning the master off has to take the panel with it. Otherwise a
+     developer who tidies up leaves an inspector docked under every page with no
+     visible setting anywhere that explains it. */
+  if (!developer || !settings.devTools) return null;
 
   return (
     <section
@@ -207,7 +249,9 @@ export function Inspector(): ReactNode {
                   key={index}
                   className="border-border/40 flex items-center gap-3 border-b px-3 py-1.5"
                 >
-                  <span className="min-w-0 flex-1 truncate">{lookup.topic}</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {lookup.topic}
+                  </span>
                   <span className="text-muted-foreground min-w-0 flex-1 truncate">
                     {lookup.overlay}
                   </span>

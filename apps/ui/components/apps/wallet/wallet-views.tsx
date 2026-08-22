@@ -1,19 +1,23 @@
 "use client";
 
+import { Handle } from "@/components/apps/messages/ecosystem-tag";
 import { MemberAvatar } from "@/components/apps/messages/member-avatar";
 import { Spark } from "@/components/apps/wallet/portfolio";
 import { TokenMark, formatUnits } from "@/components/apps/wallet/token-mark";
+import { Sheet } from "@/components/apps/messages/sheet";
 import { Tooltip } from "@/components/hub/tooltip";
 import {
   content,
+  getCurrentMessageUser,
   getEcosystem,
   getMessagePerson,
   getPaymentLinks,
   getToken,
   type MessagePerson,
+  type PaymentLink,
   type WalletTransaction,
 } from "@/lib/data";
-import { whoisFor } from "@/lib/messages";
+import { formatFullDate, whoisFor } from "@/lib/messages";
 import {
   changeTone,
   groupByDay,
@@ -25,6 +29,8 @@ import {
 } from "@/lib/wallet";
 import { useHolding } from "@/lib/wallet-live";
 import {
+  Archive,
+  ArchiveRestore,
   ArrowDownLeft,
   ArrowLeft,
   ArrowUpRight,
@@ -33,10 +39,13 @@ import {
   Clock,
   Copy,
   ExternalLink,
+  Eye,
   Link2,
   Search,
   Users,
 } from "lucide-react";
+import { useCreatedPaymentLinks } from "@/lib/payment-links-store";
+import { toggleArchivedPaymentLink, useSettings } from "@/lib/settings-store";
 import { toast } from "sonner";
 import { useState, type ReactNode } from "react";
 
@@ -501,9 +510,23 @@ export function ActivityDetail({
 
 /* --------------------------------------------------------- payment links */
 
+const LINK_TABS = ["active", "archived"] as const;
+type LinkTab = (typeof LINK_TABS)[number];
+
 export function PaymentLinks({ onCreate }: { onCreate: () => void }): ReactNode {
   const copy = content.wallet;
-  const links = getPaymentLinks();
+  /* Made-this-session first, then the seeded ones. Concatenated here rather
+     than inside the accessor, so lib/data stays only what was written into it —
+     see lib/payment-links-store. */
+  const all = [...useCreatedPaymentLinks(), ...getPaymentLinks()];
+  const settings = useSettings();
+  const [tab, setTab] = useState<LinkTab>("active");
+  const [preview, setPreview] = useState<PaymentLink | null>(null);
+  const isArchived = (id: string): boolean =>
+    settings.archivedPaymentLinks.includes(id);
+  const links = all.filter((link) =>
+    tab === "archived" ? isArchived(link.id) : !isArchived(link.id),
+  );
 
   return (
     <Page
@@ -521,6 +544,48 @@ export function PaymentLinks({ onCreate }: { onCreate: () => void }): ReactNode 
       <p className="mb-3 text-sm text-pretty text-muted-foreground">
         {copy.linksHint}
       </p>
+
+      {/* Counts in the label, as the collectibles tabs do: the point of an
+          archive is that you stop looking at it, so the only thing worth saying
+          about it from here is how much is in there. */}
+      <div
+        role="tablist"
+        aria-label={copy.links}
+        className="mb-4 flex gap-1 border-b border-border"
+      >
+        {LINK_TABS.map((option) => {
+          const count = all.filter((link) =>
+            option === "archived" ? isArchived(link.id) : !isArchived(link.id),
+          ).length;
+          const selected = option === tab;
+          return (
+            <button
+              key={option}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => setTab(option)}
+              className={`focus-ring -mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm transition-colors ${
+                selected
+                  ? "border-foreground font-semibold text-foreground"
+                  : "border-transparent font-medium text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {copy.linkTabs[option]}
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {links.length === 0 && tab === "archived" && (
+        <p className="py-8 text-center text-sm text-muted-foreground">
+          {copy.noArchivedLinks}
+        </p>
+      )}
+
       <ul className="space-y-3">
         {links.map((link) => {
           const token = getToken(link.tokenId);
@@ -587,24 +652,138 @@ export function PaymentLinks({ onCreate }: { onCreate: () => void }): ReactNode 
                 </ul>
               )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  void navigator.clipboard?.writeText(
-                    `https://nexus.pay/${link.code}`,
-                  );
-                  toast.success(copy.linkCopied);
-                }}
-                className="focus-ring mt-3 flex w-full items-center justify-center gap-1.5 rounded-full border border-border px-3 py-2 text-xs font-semibold hover:bg-surface-hover"
-              >
-                <Copy className="size-3.5" aria-hidden="true" />
-                {copy.copyLink}
-              </button>
+              {/* Half, a quarter, a quarter — `flex-[2]` against two `flex-1`.
+                  Copying is what somebody came here to do, so it keeps the fill
+                  and twice the room; previewing and archiving are each a
+                  once-per-link act. */}
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(
+                      `https://nexus.pay/${link.code}`,
+                    );
+                    toast.success(copy.linkCopied);
+                  }}
+                  className="focus-ring bg-accent text-accent-foreground flex flex-2 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition-opacity hover:opacity-90"
+                >
+                  <Copy className="size-3.5" aria-hidden="true" />
+                  {copy.copyLink}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreview(link)}
+                  className="focus-ring flex flex-1 items-center justify-center gap-1.5 rounded-full border border-border px-3 py-2 text-xs font-semibold hover:bg-surface-hover"
+                >
+                  <Eye className="size-3.5" aria-hidden="true" />
+                  {copy.previewLink}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const archived = isArchived(link.id);
+                    toggleArchivedPaymentLink(link.id);
+                    toast.success(
+                      archived ? copy.linkRestored : copy.linkArchived,
+                      {
+                        description: link.description,
+                        action: {
+                          label: content.hub.undo,
+                          onClick: () => toggleArchivedPaymentLink(link.id),
+                        },
+                      },
+                    );
+                  }}
+                  className="focus-ring flex flex-1 items-center justify-center gap-1.5 rounded-full border border-border px-3 py-2 text-xs font-semibold hover:bg-surface-hover"
+                >
+                  {isArchived(link.id) ? (
+                    <ArchiveRestore className="size-3.5" aria-hidden="true" />
+                  ) : (
+                    <Archive className="size-3.5" aria-hidden="true" />
+                  )}
+                  {isArchived(link.id) ? copy.restoreLink : copy.archiveLink}
+                </button>
+              </div>
             </li>
           );
         })}
       </ul>
+
+      <LinkPreview link={preview} onClose={() => setPreview(null)} />
     </Page>
+  );
+}
+
+/**
+ * The payer's side of a link, as its owner cannot otherwise see it.
+ *
+ * Every value is the link's own — description, amount, asset, the date it stops
+ * accepting. Nothing is added: no payer count, no "3 people are viewing this",
+ * none of the things a hosted page would know and this one cannot.
+ *
+ * The Pay button is present and disabled, because it is the thing the payer's
+ * screen is mostly made of and a preview that left it out would be a preview of
+ * something else. Disabled rather than absent, and the note underneath says why.
+ */
+function LinkPreview({
+  link,
+  onClose,
+}: {
+  link: PaymentLink | null;
+  onClose: () => void;
+}): ReactNode {
+  const copy = content.wallet;
+  const token = link ? getToken(link.tokenId) : undefined;
+  /* The link's creator is whoever holds this wallet — links are made here and
+     nowhere else, so there is no other candidate and none to invent. */
+  const creator = getCurrentMessageUser();
+  return (
+    <Sheet open={Boolean(link)} onClose={onClose} label={copy.previewTitle}>
+      {link && (
+        <div className="space-y-4 p-4">
+          <p className="text-muted-foreground text-center font-mono text-xs">
+            nexus.pay/{link.code}
+          </p>
+          <div className="bg-surface rounded-2xl p-5 text-center">
+            {/* Who is asking, above what they are asking for.
+                A payer's first question is not the amount — it is whether this
+                link belongs to the person they think it does, and the qualified
+                handle is the part that answers it. Vela's rule, and the reason
+                links are addressed to handles rather than addresses. */}
+            <div className="flex flex-col items-center gap-1.5">
+              <MemberAvatar person={creator} size={44} />
+              <Handle
+                person={creator}
+                size={11}
+                className="max-w-full truncate text-xs text-muted-foreground"
+              />
+            </div>
+            <p className="mt-4 text-sm font-semibold text-pretty">
+              {link.description}
+            </p>
+            <p className="mt-3 flex items-center justify-center gap-2 text-2xl font-bold tracking-tight">
+              {token && <TokenMark token={token} size={20} />}
+              {link.amountUnits !== undefined && token
+                ? `${formatUnits(link.amountUnits, token.decimals)} ${token.symbol}`
+                : copy.payerChooses}
+            </p>
+            <p className="text-muted-foreground mt-2 text-xs">
+              {copy.previewAccepting} {formatFullDate(link.expiresAt)}
+            </p>
+            <button
+              type="button"
+              disabled
+              className="bg-accent text-accent-foreground mt-4 w-full rounded-full px-3 py-2 text-sm font-semibold opacity-40"
+            >
+              {copy.previewPay}
+            </button>
+          </div>
+          <p className="text-muted-foreground text-center text-[11px] leading-relaxed text-pretty">
+            {copy.previewNote}
+          </p>
+        </div>
+      )}
+    </Sheet>
   );
 }
 

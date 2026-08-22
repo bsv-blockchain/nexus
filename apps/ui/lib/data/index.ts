@@ -9,12 +9,7 @@
  * file. Functions are synchronous today; when Postgres lands they become
  * async server queries.
  */
-import {
-  courses,
-  marketListings,
-  proposals,
-  vaultItems,
-} from "./apps-content";
+import { courses, marketListings, proposals, vaultItems } from "./apps-content";
 import {
   chatMessages,
   chatThreads,
@@ -179,14 +174,16 @@ export function getEssentialAppSlugs(): HubApp["slug"][] {
     .filter((app) => app.essential)
     .map((app) => app.slug);
 }
-/** Apps in the "system" folder (browse, web3 connect). */
+/** Apps in the "system" folder (browse, connected apps). */
 export function getSystemAppSlugs(): HubApp["slug"][] {
   return getHubApps()
     .filter((app) => app.category === "system")
     .map((app) => app.slug);
 }
 export function isEssentialApp(slug: HubApp["slug"]): boolean {
-  return getHubApps().some((app) => app.slug === slug && app.essential === true);
+  return getHubApps().some(
+    (app) => app.slug === slug && app.essential === true
+  );
 }
 
 /*
@@ -209,7 +206,7 @@ export function getCollectionAppSlugs(id: CollectionId): HubApp["slug"][] {
   const shipped = new Set(getHubApps().map((app) => app.slug));
   if (id === "all") return [...shipped];
   return (appCollections.find((c) => c.id === id)?.apps ?? []).filter((slug) =>
-    shipped.has(slug),
+    shipped.has(slug)
   );
 }
 
@@ -326,19 +323,19 @@ export function getSigningKeys(): SigningKey[] {
 }
 export function getSignableDocuments(): SignableDocument[] {
   return [...signableDocuments].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
+    b.createdAt.localeCompare(a.createdAt)
   );
 }
 export function getSignEnvelopes(): SignEnvelope[] {
   return [...signEnvelopes].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
+    b.createdAt.localeCompare(a.createdAt)
   );
 }
 
 /* publications */
 export function getPublications(): Publication[] {
   return [...publications].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
+    b.createdAt.localeCompare(a.createdAt)
   );
 }
 export function getMintTiers(): MintTier[] {
@@ -348,11 +345,11 @@ export function getMintTiers(): MintTier[] {
 /* transactions */
 export function getChainTransactions(): ChainTransaction[] {
   return [...chainTransactions].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
+    b.createdAt.localeCompare(a.createdAt)
   );
 }
 export function getChainTransaction(
-  txid: string,
+  txid: string
 ): ChainTransaction | undefined {
   return chainTransactions.find((tx) => tx.txid === txid);
 }
@@ -360,7 +357,7 @@ export function getChainTransaction(
 /* mail */
 export function getMailMessages(): MailMessage[] {
   return [...mailMessages].sort((a, b) =>
-    b.receivedAt.localeCompare(a.receivedAt),
+    b.receivedAt.localeCompare(a.receivedAt)
   );
 }
 
@@ -423,7 +420,7 @@ export function getAttributeColor(key: string): string | undefined {
 /* payment_links + split_bills */
 export function getPaymentLinks(): PaymentLink[] {
   return [...paymentLinks].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
+    b.createdAt.localeCompare(a.createdAt)
   );
 }
 export function getPaymentLink(code: string): PaymentLink | undefined {
@@ -443,7 +440,7 @@ export function getWalletContacts(): MessagePerson[] {
   const threads = chatThreads;
   for (const thread of threads) {
     for (const message of chatMessages.filter(
-      (m) => m.conversationId === thread.id && m.senderId !== "me",
+      (m) => m.conversationId === thread.id && m.senderId !== "me"
     )) {
       const seen = order.get(message.senderId);
       const at = new Date(message.createdAt).getTime();
@@ -513,7 +510,7 @@ export function getChatThread(id: string): ChatThread | undefined {
 }
 /** The 1:1 conversation with a person, if one exists. */
 export function getChatThreadForPerson(
-  personId: string,
+  personId: string
 ): ChatThread | undefined {
   return allThreads().find((thread) => thread.personId === personId);
 }
@@ -526,8 +523,7 @@ export function getChatThreadForPerson(
 export function getThreadsWithPerson(personId: string): ChatThread[] {
   return getChatThreads().filter(
     (thread) =>
-      thread.personId === personId ||
-      thread.group?.memberIds.includes(personId),
+      thread.personId === personId || thread.group?.memberIds.includes(personId)
   );
 }
 
@@ -553,7 +549,7 @@ export function getCourses(): Course[] {
 /* market */
 export function getMarketListings(): MarketListing[] {
   return [...marketListings].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
+    b.createdAt.localeCompare(a.createdAt)
   );
 }
 

@@ -3,6 +3,8 @@
 import { AttestationsApp } from "@/components/apps/attestations-app";
 import { BasketsApp } from "@/components/apps/baskets-app";
 import { BrowserApp } from "@/components/apps/browser-app";
+import { TabStrip } from "@/components/hub/tab-strip";
+import { useSettings } from "@/lib/settings-store";
 import { ConnectApp } from "@/components/apps/connect-app";
 import { IdentityApp } from "@/components/apps/identity-app";
 import { LearnApp } from "@/components/apps/learn-app";
@@ -20,6 +22,7 @@ import { WebAppView } from "@/components/apps/web-app";
 import { AppTile } from "@/components/hub/app-icon";
 import { hasContextSidebar } from "@/components/hub/app-context-sidebar";
 import { SettingsApp } from "@/components/apps/settings-app";
+import { TimelineApp } from "@/components/apps/timeline-app";
 import { AppStore } from "@/components/hub/app-store";
 import { DetailPane } from "@/components/hub/detail-pane";
 import { GettingStartedPage } from "@/components/hub/getting-started-page";
@@ -217,6 +220,17 @@ function AppCanvas(): ReactNode {
   // (theme-reset restores the base light/dark palette). The launcher/empty
   // state is always themed.
   const resetTheme = Boolean(activeApp) && !signatureApps.has(activeApp!);
+  /*
+   * Tabs above the viewport, and only over a page.
+   *
+   * Gated on the browser rather than shown for every app because these are
+   * browser tabs: a strip of open pages above Messages labels nothing that is
+   * on screen. In vertical mode the library column draws them instead and this
+   * renders nothing at all — the two are exclusive, never stacked.
+   */
+  const showTabStrip =
+    useSettings().tabLayout === "horizontal" &&
+    (activeApp === "browser" || onSite);
   return (
     <div
       className={`flex min-h-0 flex-1 flex-col ${
@@ -250,6 +264,7 @@ function AppCanvas(): ReactNode {
           <AppMenu slug={app.slug} />
         </header>
       )}
+      {showTabStrip && <TabStrip />}
       {/* The app and its reference pane share the row, so opening the pane
           narrows the app rather than covering it. */}
       <div className="flex min-h-0 flex-1">
@@ -302,6 +317,17 @@ export function MainView(): ReactNode {
      it, and renders dark-theme text on a white sheet. */
   const showSettings = mainView === "settings";
   const showProfiles = mainView === "profiles";
+  /*
+   * Timeline: the feed, and the two columns that frame it.
+   *
+   * Reached on purpose rather than by having nothing else to show, which is
+   * what makes it a place you can return to and link to (?view=timeline)
+   * instead of a state you fall into. It replaced the wall of app tiles that
+   * used to sit here — the rail and the App Store both open apps better than a
+   * grid of icons did, and neither of them had anything to say about what has
+   * happened since you last looked.
+   */
+  const showTimeline = mainView === "timeline";
   const canvasIsBrowser = activeApp === "browser" && !activePage;
 
   /*
@@ -350,7 +376,7 @@ export function MainView(): ReactNode {
       <div className="flex h-full min-w-0 flex-1 gap-2">
         <main
           id="main-content"
-          className={`border-border flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-xl ${
+          className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl shadow-xl ${
             canvasIsBrowser ? "bg-canvas" : "bg-background"
           }`}
         >
@@ -358,7 +384,7 @@ export function MainView(): ReactNode {
         </main>
         <section
           aria-label={content.appMenu.pickApp}
-          className="border-border bg-background flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-xl"
+          className="bg-background flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl shadow-xl"
         >
           <SplitPaneHeader />
           <div className="min-h-0 flex-1">
@@ -372,8 +398,8 @@ export function MainView(): ReactNode {
   return (
     <main
       id="main-content"
-      className={`border-border flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-xl ${
-        !showStore && !showSettings && canvasIsBrowser
+      className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl shadow-xl ${
+        !showStore && !showSettings && !showTimeline && canvasIsBrowser
           ? "bg-canvas"
           : "bg-background"
       }`}
@@ -395,6 +421,11 @@ export function MainView(): ReactNode {
         <div className="min-h-0 flex-1">
           <GettingStartedPage />
         </div>
+      ) : showTimeline ? (
+        /* No DetailPane: the Timeline brings its own right-hand column, and two
+           panes on the same edge would be one too many places for a reference
+           to open. */
+        <TimelineApp />
       ) : showStore ? (
         /* Same row Settings uses: the store, then whatever pane is open beside
            it. Without this the Mods guide had a button and nowhere to render —

@@ -101,7 +101,7 @@ export const PHASE_FEATURES: PhaseFeature[] = [
   },
   {
     key: "connect",
-    label: "Web3 Connect",
+    label: "Connected Apps",
     phase: "now",
     impact: "medium",
     effort: "low",

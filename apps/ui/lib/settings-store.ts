@@ -44,6 +44,8 @@ export type ClearOnQuit = "nothing" | "history" | "everything";
 export type OpenLinksIn = "nexus" | "native";
 /** How long a tab sits untouched before it is filed away. */
 export type ArchiveAfter = 0 | 1 | 7 | 30;
+/** Where the open tabs are drawn. */
+export type TabLayout = "horizontal" | "vertical";
 
 export interface SettingsState {
   /* ---- Permissions ---------------------------------------------------- */
@@ -92,6 +94,29 @@ export interface SettingsState {
   translateOffer: boolean;
   /** days a tab may sit untouched before archiving; 0 never archives */
   archiveAfter: ArchiveAfter;
+  /**
+   * Whether tabs run across the top of the page or down the library column.
+   *
+   * A layout rather than a preference about ornament: horizontal moves the open
+   * tabs OUT of the sidebar and into a strip above the viewport, so the two
+   * modes must never both draw the list — a tab in two places is two tabs as
+   * far as anybody clicking is concerned. Spaces, folders and bookmarks stay in
+   * the column either way; only the tab list moves.
+   */
+  tabLayout: TabLayout;
+  /**
+   * Whether Browse is a pinned button rather than one of your apps.
+   *
+   * On, it leaves the app section of the rail and sits under Workspaces with
+   * the other things that are part of the client rather than installed into
+   * it — which is what browsing actually is here. Off, it is an app like any
+   * other and appears wherever it is connected.
+   *
+   * The two are exclusive on purpose: Browse in the pinned block AND in the
+   * app list is one thing with two doors, and the second door teaches that
+   * they are different places.
+   */
+  browseAsButton: boolean;
 
   /* ---- Autofill ------------------------------------------------------- */
   autofillAddresses: boolean;
@@ -115,6 +140,17 @@ export interface SettingsState {
    * than kept as a second inventory.
    */
   revokedConnections: string[];
+
+  /**
+   * Payment links the holder has put away, by id.
+   *
+   * Archiving is not closing. A link's `status` is what the link itself is doing
+   * — open, closed, expired — and belongs to the link; this is a note about
+   * whether its owner wants to look at it, and belongs here. A closed link with
+   * takings worth remembering stays out of the archive; an open one nobody used
+   * can go in.
+   */
+  archivedPaymentLinks: string[];
 
   /* ---- Shortcuts ------------------------------------------------------ */
   /**
@@ -210,6 +246,12 @@ const INITIAL: SettingsState = {
   openPdfsInNexus: true,
   translateOffer: true,
   archiveAfter: 7,
+  // Horizontal is the shipping default: a strip above the page is what a person
+  // arriving from another browser expects to find, and the column is then free
+  // to be a library rather than a tab list with bookmarks underneath it.
+  tabLayout: "horizontal",
+  // On by default: browsing is what this client is, not an app you added.
+  browseAsButton: true,
 
   autofillAddresses: true,
   autofillCards: false,
@@ -217,6 +259,7 @@ const INITIAL: SettingsState = {
   offerToSavePasswords: false,
 
   revokedConnections: [],
+  archivedPaymentLinks: [],
   keymap: {},
   handles: ["crumbs", "breadcrumbs"],
   activeHandle: {},
@@ -306,6 +349,18 @@ export function toggleConnection(id: string): void {
     revokedConnections: revoked
       ? state.revokedConnections.filter((entry) => entry !== id)
       : [...state.revokedConnections, id],
+  };
+  emit();
+}
+
+/** Puts a payment link away, or takes it back out. Reversible, like revoking. */
+export function toggleArchivedPaymentLink(id: string): void {
+  const archived = state.archivedPaymentLinks.includes(id);
+  state = {
+    ...state,
+    archivedPaymentLinks: archived
+      ? state.archivedPaymentLinks.filter((entry) => entry !== id)
+      : [...state.archivedPaymentLinks, id],
   };
   emit();
 }

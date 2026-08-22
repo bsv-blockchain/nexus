@@ -1,13 +1,7 @@
 /**
  * tables: spaces, space_items, tabs, favorites, pages — placeholder rows.
  */
-import type {
-  BrowserTab,
-  Favorite,
-  MockPage,
-  Space,
-  SpaceItem,
-} from "./types";
+import type { BrowserTab, Favorite, MockPage, Space, SpaceItem } from "./types";
 
 export const favorites: Favorite[] = [
   {
@@ -33,7 +27,7 @@ export const favorites: Favorite[] = [
 export const spaces: Space[] = [
   {
     id: "space-my-hub",
-    name: "My Profile",
+    name: "My Workspace",
     // "hub" renders the Nexus brand mark via SpaceIcon (default profile icon).
     /* One of the picker's own, like every other profile. The brand mark
        said "this is Nexus" on a thing that is one profile among several, and
@@ -201,5 +195,4 @@ export const mockPages: MockPage[] = [
     linkText: "Start learning",
     linkHref: "#",
   },
-
 ];

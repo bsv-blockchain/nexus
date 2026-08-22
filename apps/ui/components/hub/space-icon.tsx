@@ -117,7 +117,7 @@ export function SpaceIcon({
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src="/icons/nexus.png"
+        src="/icons/Nexus-logo-solid-BG2.png"
         alt=""
         width={size}
         height={size}

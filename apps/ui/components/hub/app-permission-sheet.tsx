@@ -13,6 +13,7 @@ import {
   getSystemAppSlugs,
 } from "@/lib/data";
 import { sameUrl } from "@/lib/tabs";
+import { useHostOverlay } from "@/lib/wallet-data";
 import {
   BadgeCheck,
   Check,
@@ -30,6 +31,11 @@ const LEARN_MORE_URL = "https://hub.bsvblockchain.org/brc/wallet/0116";
 /** Renders the install/uninstall permission bottom sheet, if one is pending. */
 export function AppPermissionSheet(): ReactNode {
   const { appPrompt } = useHub();
+  /* Held on the wrapper rather than inside `SheetBody`, so the page is uncovered
+     for the whole of the exit animation rather than the frame the body
+     unmounts. The browsed page is a native view above this document and would
+     otherwise paint straight through a full-screen sheet. */
+  useHostOverlay(Boolean(appPrompt));
   return (
     <AnimatePresence>
       {appPrompt && (
@@ -313,7 +319,7 @@ function SheetBody(): ReactNode {
         else installApp(app.slug);
       } else if (app.web) {
         const site = pinnedSites.find((entry) =>
-          sameUrl(entry.url, app.web!.url),
+          sameUrl(entry.url, app.web!.url)
         );
         if (site) unpinSite(site.id);
       } else {
