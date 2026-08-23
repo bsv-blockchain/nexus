@@ -95,6 +95,12 @@ export {
 } from "./handles";
 export { licence, type LicenceBlock } from "./licence";
 export {
+  legalDocuments,
+  legalUpdated,
+  type LegalDocument,
+  type LegalSection,
+} from "./legal";
+export {
   shortcutGroups,
   shortcuts,
   type Shortcut,

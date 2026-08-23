@@ -43,6 +43,8 @@ import {
   useDeveloperMode,
 } from "@/lib/developer-mode";
 import { resetFirstRun } from "@/lib/first-run";
+import { useIsDesktop } from "@/lib/use-is-desktop";
+import { startTour } from "@/lib/tour-store";
 import { AutofillPanel } from "@/components/apps/settings/autofill-panel";
 import { UpdatePanel } from "@/components/apps/settings/update-panel";
 import { PermissionsPanel } from "@/components/apps/settings/permissions-panel";
@@ -943,12 +945,30 @@ export function AppearancePanel(): ReactNode {
   const [confirmReplay, setConfirmReplay] = useState(false);
   const { spaces, setSpaceThemeColor, isInstalled, installApp } = useHub();
   const brandMode = useBrandMode();
+  /* The rail only exists above the `md` breakpoint — below it the tab bar along
+     the bottom is the navigation — so a switch about what the rail holds has
+     nothing to say on a phone. Hidden rather than disabled: a control that
+     cannot do anything here is not a control, it is a claim. */
+  const isDesktop = useIsDesktop();
   const custom = spaces.filter(
     (space) => space.themeColor && space.themeColor !== DEFAULT_ACCENT
   );
 
   return (
     <>
+      {/* First, because it is the only thing on this page that changes what the
+          window looks like rather than what it is coloured. */}
+      {isDesktop && (
+        <Group title={copy.railTitle} hint={copy.railHint}>
+          <Toggle
+            label={copy.railWorkspacesLabel}
+            hint={copy.railWorkspacesHint}
+            value={settings.workspacesInRail}
+            onChange={(next) => setSetting("workspacesInRail", next)}
+          />
+        </Group>
+      )}
+
       {/* Above the theme, because it is the thing somebody came here to find
           again — a welcome you cannot get back to is a demo you can only give
           once. Demo-gated to match the screen it replays: with fixtures
@@ -1004,10 +1024,14 @@ export function AppearancePanel(): ReactNode {
           {/* Named now and empty on purpose: the flow after the first run is
               next, and a section that appears later looks like a setting that
               moved. */}
+          {/* Runs the tour again for whatever presets this install was set up
+              with — the run is assembled from the saved answer, so it is the
+              same tour, not a generic one. */}
           <Row
             label={content.settings.onboarding.flowLabel}
             hint={content.settings.onboarding.flowHint}
-            value={content.settings.onboarding.soon}
+            value={content.settings.onboarding.replayTour}
+            onClick={startTour}
           />
         </Group>
       )}
@@ -1022,7 +1046,11 @@ export function AppearancePanel(): ReactNode {
         never about browsing at all, and a developer hunting for them had to
         guess which app owned them. One place, one switch to find it by.
       */}
-      <Group title={copy.devTitle} hint={copy.devHint}>
+      <Group
+        title={copy.devTitle}
+        hint={copy.devHint}
+        tour="settings-developer-tools"
+      >
         <Toggle
           label={copy.devModeLabel}
           hint={copy.devModeHint}

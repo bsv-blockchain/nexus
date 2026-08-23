@@ -21,15 +21,14 @@ import { useHub } from "@/components/hub/hub-provider";
 import {
   appsFor,
   developerModeFor,
-  managedApps,
   railPlanFor,
   reposFor,
   ALWAYS_APPS,
   type PresetId,
 } from "@/lib/data/presets";
 import type { RailEntry } from "@/lib/rail/layout";
-import type { HubAppSlug } from "@/lib/data/types";
 import { getHubApps, type AppRepository } from "@/lib/data";
+import { sameUrl } from "@/lib/tabs";
 import { setDeveloperMode } from "@/lib/developer-mode";
 import {
   getRepositoriesSnapshot,
@@ -38,7 +37,15 @@ import {
 import { useCallback } from "react";
 
 export function useApplyPresets(): (chosen: PresetId[]) => void {
-  const { installApp, uninstallApp, applyRailPlan, activeSpaceId } = useHub();
+  const {
+    installApp,
+    uninstallApp,
+    applyRailPlan,
+    activeSpaceId,
+    installedApps,
+    pinnedSites,
+    unpinSite,
+  } = useHub();
 
   return useCallback(
     (chosen: PresetId[]) => {
@@ -48,25 +55,31 @@ export function useApplyPresets(): (chosen: PresetId[]) => void {
        * Clear out first, so the profile is the answer and not the answer piled
        * on top of the last one.
        *
-       * Two sets go, and only from the active profile:
+       * Everything not wanted goes, rather than a named subset. Two earlier
+       * attempts were too narrow: clearing only the apps some preset lists left
+       * anything no preset mentions, and adding "third-party developers" still
+       * missed Vote, which is published by the BSV Association. Whose name is
+       * on an app says nothing about whether this answer asked for it.
        *
-       *   - apps a preset could have installed, when the new choice does not
-       *     want them. Picking Thinker and later re-running as a Gamer should
-       *     not leave Mail and Sign behind with no folder to live in.
-       *   - everything from a third-party developer. Somebody re-running the
-       *     welcome is asking for the workspace this preset describes, not that
-       *     workspace with whatever they had connected still hanging off it.
-       *
-       * Nexus's own apps that no preset manages — Roadmap, say — are left
-       * alone. They were not installed by an answer to this question, so they
-       * are not this question's to remove.
+       * `uninstallApp` refuses to remove an essential app, so the six that must
+       * survive do, whatever this asks for.
        */
-      const doomed = new Set<HubAppSlug>(managedApps());
-      for (const app of getHubApps()) {
-        if (app.developer === "third-party") doomed.add(app.slug);
-      }
-      for (const slug of doomed) {
+      for (const slug of installedApps) {
         if (!wantedApps.includes(slug)) uninstallApp(slug, activeSpaceId);
+      }
+
+      /*
+       * A web listing is connected by having its URL pinned, not by being in
+       * the installed list — see `isInstalled`. So uninstalling one does
+       * nothing at all, which is why Jamify and TonicPow kept their tiles
+       * through a first run that was supposed to have cleared them. The site is
+       * the thing to remove.
+       */
+      for (const app of getHubApps()) {
+        if (!app.web || wantedApps.includes(app.slug)) continue;
+        for (const site of pinnedSites) {
+          if (sameUrl(site.url, app.web.url)) unpinSite(site.id);
+        }
       }
 
       /* Installed before the rail is laid out, because `applyRailPlan`
@@ -110,6 +123,14 @@ export function useApplyPresets(): (chosen: PresetId[]) => void {
          developer tools they had already found and enabled. */
       if (developerModeFor(chosen)) setDeveloperMode(true);
     },
-    [installApp, uninstallApp, applyRailPlan, activeSpaceId]
+    [
+      installApp,
+      uninstallApp,
+      applyRailPlan,
+      activeSpaceId,
+      installedApps,
+      pinnedSites,
+      unpinSite,
+    ]
   );
 }

@@ -293,13 +293,21 @@ export function IconRail(): ReactNode {
    * not one of those — it opens an app rather than a panel — so it is added
    * here with its own opener instead of being forced into that union.
    */
-  const browsePinned = useSettings().browseAsButton && isInstalled("browser");
+  const settingsState = useSettings();
+  const browsePinned = settingsState.browseAsButton && isInstalled("browser");
   const pinned = [
-    {
-      ...systemTabs[0]!,
-      active: tabActive("spaces"),
-      open: () => openTabView("spaces"),
-    },
+    /* Workspaces is opt-in — see `workspacesInRail` in lib/settings-store. The
+       list of workspaces is in the column beside this rail whether or not the
+       button is here, so switching it off takes away a door, not the room. */
+    ...(settingsState.workspacesInRail
+      ? [
+          {
+            ...systemTabs[0]!,
+            active: tabActive("spaces"),
+            open: () => openTabView("spaces"),
+          },
+        ]
+      : []),
     ...(browsePinned
       ? [
           {
@@ -494,6 +502,15 @@ export function IconRail(): ReactNode {
             return (
               <div
                 key={refKey(ref)}
+                /* The handle the Guided Tour points at. A named attribute
+                   rather than a selector the tour has to guess: this element
+                   says what it is, and a refactor that moves it takes the name
+                   with it instead of silently breaking a card. */
+                data-tour={
+                  ref.kind === "app"
+                    ? `rail-${ref.slug}`
+                    : `rail-site-${ref.id}`
+                }
                 className="relative"
                 onMouseEnter={(event) =>
                   showTip(event, resolved.name, resolved.desc)
@@ -568,6 +585,9 @@ export function IconRail(): ReactNode {
           return (
             <div
               key={entry.id}
+              /* Preset folders keep the id the preset gave them, so a tour card
+                 can point at "the folder your answer created" by name. */
+              data-tour={`rail-group-${entry.id}`}
               className="relative"
               onContextMenu={(event) => {
                 event.preventDefault();

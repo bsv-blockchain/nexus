@@ -14,6 +14,7 @@ import { ShortcutsPanel } from "@/components/apps/settings/shortcuts-panel";
 import { DownloadsPane } from "@/components/hub/downloads-pane";
 import { useHub, type SettingsCategory } from "@/components/hub/hub-provider";
 import { LicencePane } from "@/components/hub/licence-pane";
+import { LegalPane } from "@/components/hub/legal-pane";
 import { ReleaseDetail, ReleaseList } from "@/components/hub/release-notes";
 import { RepositoriesButton } from "@/components/hub/repositories-button";
 import {
@@ -83,6 +84,8 @@ function PaneScreen({ kind, id }: { kind: string; id: string }): ReactNode {
       return <SiteSettingsPane />;
     case "licence":
       return <LicencePane />;
+    case "legal":
+      return <LegalPane />;
     case "release":
       return <ReleaseDetail version={id} />;
     case "releases":
@@ -105,6 +108,8 @@ function paneTitle(kind: string, id: string): string {
       return content.settings.sites.title;
     case "licence":
       return `${licence.name} ${licence.version}`;
+    case "legal":
+      return content.legal.title;
     case "release":
       return `${content.releases.whatsNewIn} v${id}`;
     case "releases":
@@ -121,6 +126,7 @@ const PANE_KINDS = new Set([
   "downloads",
   "sites",
   "licence",
+  "legal",
   "release",
   "releases",
 ]);

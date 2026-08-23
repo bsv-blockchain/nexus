@@ -30,9 +30,10 @@ import {
   LicencePane,
   LicencePaneFooter,
 } from "@/components/hub/licence-pane";
+import { LegalPane } from "@/components/hub/legal-pane";
 import { useHub, type AppSlug } from "@/components/hub/hub-provider";
 import { SidePane } from "@/components/hub/side-pane";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Scale } from "lucide-react";
 import {
   ClearDataPane,
   LanguagesPane,
@@ -192,6 +193,31 @@ export function DetailPane(): ReactNode {
         onClose={closeDetailPane}
       >
         <DownloadsPane />
+      </SidePane>
+    );
+  }
+
+  if (detailPane?.kind === "legal") {
+    return (
+      <SidePane
+        open
+        title={content.legal.title}
+        onClose={closeDetailPane}
+        /* Straight through to the licence, because the terms send you there
+           twice and a reader who wants it should not have to remember it lives
+           under About. */
+        footer={
+          <button
+            type="button"
+            onClick={() => openDetailPane({ kind: "licence", id: "" })}
+            className="focus-ring border-border text-muted-foreground hover:bg-surface-hover hover:text-foreground flex w-full items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-sm font-semibold"
+          >
+            <Scale className="size-4" aria-hidden="true" />
+            {content.legal.readLicence}
+          </button>
+        }
+      >
+        <LegalPane />
       </SidePane>
     );
   }

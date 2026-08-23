@@ -168,6 +168,8 @@ export interface DetailPane {
     | "onboarding"
     /** the licence this software is granted under */
     | "licence"
+    /** terms of use and privacy, as two tabs of one pane */
+    | "legal"
     /** one roadmap feature, `id` being its slug */
     | "feature"
     /** what each profile has downloaded */

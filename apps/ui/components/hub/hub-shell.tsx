@@ -1,7 +1,10 @@
 "use client";
 
 import { FirstRun } from "@/components/hub/first-run";
+import { useFirstRunSeen } from "@/lib/first-run";
 import { PhaseSwitcher } from "@/components/hub/phase-switcher";
+import { HelpCircle } from "@/components/hub/help-circle";
+import { GuidedTour } from "@/components/hub/guided-tour";
 import { DEMO_SURFACES } from "@/lib/surfaces";
 import { AppCollections } from "@/components/hub/app-collections";
 import { AppPermissionSheet } from "@/components/hub/app-permission-sheet";
@@ -15,12 +18,13 @@ import { MainView } from "@/components/hub/main-view";
 import { MobileBrowser } from "@/components/hub/mobile-browser";
 import { MobileSheet } from "@/components/hub/mobile-sheet";
 import { ShareModal } from "@/components/hub/share-modal";
+import { TitleBar } from "@/components/hub/title-bar";
 import { SpacesPanel } from "@/components/hub/spaces-panel";
 import { SettingsSidebar } from "@/components/apps/settings-app";
 import { CustomThemeProvider } from "@/components/hub/theme-provider";
 import { WalletGate } from "@/components/hub/wallet-gate";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 const slideEase = [0.4, 0, 0.2, 1] as const;
 
@@ -71,9 +75,41 @@ function DesktopSidebar(): ReactNode {
   // Clip only while the width animation runs; once settled, let popovers
   // (e.g. the browser-settings menu) overflow past the panel edge.
   const [clip, setClip] = useState(true);
+  const box = useRef<HTMLDivElement>(null);
+
+  /*
+   * Publishes its own width as `--sidebar-width`.
+   *
+   * The Workspaces columns scroll underneath this column, so they need to know
+   * how much of their left edge is covered — and that number is not a constant:
+   * it is the rail plus a panel that animates between 0 and 296, and it is 0
+   * below the `md` breakpoint where this whole column is display:none. Measured
+   * rather than recomputed, so the collapse animation carries the columns with
+   * it instead of jumping when it lands.
+   */
+  useEffect(() => {
+    const node = box.current;
+    if (!node) return;
+    const root = document.documentElement;
+    const observer = new ResizeObserver(() => {
+      root.style.setProperty(
+        "--sidebar-width",
+        `${node.getBoundingClientRect().width}px`
+      );
+    });
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--sidebar-width");
+    };
+  }, []);
 
   return (
-    <div className="flex h-full pl-2">
+    /* Opaque and above the canvas, because something scrolls under it now.
+       `bg-background` is what was showing through before, so this changes
+       nothing to look at — it just stops the columns showing through the gap
+       between the rail and the panel. */
+    <div ref={box} className="bg-background relative z-20 flex h-full pl-2">
       <IconRail />
       <AnimatePresence initial={false}>
         {!railCollapsed && (
@@ -101,6 +137,7 @@ function DesktopSidebar(): ReactNode {
 
 function Shell(): ReactNode {
   const { toggleRail } = useHub();
+  const firstRunSeen = useFirstRunSeen();
   // Pushes the mobile canvas back behind the matte while a browser sheet is open.
   const [pageDimmed, setPageDimmed] = useState(false);
 
@@ -118,6 +155,9 @@ function Shell(): ReactNode {
 
   return (
     <div className="flex h-dvh flex-col">
+      {/* Nothing at all outside the desktop shell. */}
+      <TitleBar />
+
       <div className="flex min-h-0 flex-1">
         <div className="hidden md:block">
           <DesktopSidebar />
@@ -154,6 +194,11 @@ function Shell(): ReactNode {
       {(DEMO_SURFACES || process.env.NODE_ENV === "development") && (
         <PhaseSwitcher />
       )}
+      {/* Not demo-gated, unlike the chip beside it: help is the one thing a
+          shipped build needs most. Held back until the welcome is done, so it
+          does not sit over the first run competing for the same attention. */}
+      {firstRunSeen && <HelpCircle />}
+      <GuidedTour />
       {/* Demo only. Its last card tells somebody a handle is free, and nothing
           in a live build can know that — lib/handle-suggest says why, and
           PROMOTING-DEMO-SURFACES.md says what would have to exist first.

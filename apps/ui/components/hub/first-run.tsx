@@ -7,7 +7,9 @@ import { markFirstRunSeen, useFirstRunSeen } from "@/lib/first-run";
 import { PresetPicker } from "@/components/hub/preset-picker";
 import { useApplyPresets } from "@/components/hub/use-apply-presets";
 import { setChosenPresets } from "@/lib/presets-store";
+import { startTour } from "@/lib/tour-store";
 import { useHostOverlay } from "@/lib/wallet-data";
+import { toast } from "sonner";
 import { checkHandle, suggestHandle } from "@/lib/handle-suggest";
 import { useReducedMotion } from "@/lib/motion";
 import { addHandle, useSettings } from "@/lib/settings-store";
@@ -406,6 +408,24 @@ function Presets(): ReactNode {
           /* Unmounted only once it is invisible; `markFirstRunSeen` is what
              takes this whole tree away. */
           window.setTimeout(() => markFirstRunSeen(), reduced ? 0 : 520);
+          /*
+           * The invitation, two seconds after the feed arrives.
+           *
+           * Not immediately: the point of those two seconds is that somebody
+           * gets to see the workspace they just built before being offered a
+           * tour of it. `Infinity` because an offer that expires while you are
+           * reading the screen it is about is an offer nobody took.
+           */
+          window.setTimeout(() => {
+            toast(content.tour.invite, {
+              description: content.tour.inviteBody,
+              duration: Number.POSITIVE_INFINITY,
+              action: {
+                label: content.tour.inviteAction,
+                onClick: () => startTour(),
+              },
+            });
+          }, 2000);
         }}
       />
     </motion.div>

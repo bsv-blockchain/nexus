@@ -25,6 +25,10 @@ export const storageKeys = {
   developerMode: "nexus.developer-mode",
   /** which first-run presets this install was set up with */
   presets: "nexus.presets",
+  /** true once the Guided Tour has been finished or skipped */
+  tourTaken: "nexus.tour-taken",
+  /** true once the help circle has been hovered, which stops it pulsing */
+  helpSeen: "nexus.help-seen",
   /** the sites the user pinned to the rail */
   pinnedSites: "nexus.pinned-sites",
   /** what Messages anchors, globally and per conversation */

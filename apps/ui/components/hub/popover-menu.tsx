@@ -65,9 +65,23 @@ export function PopoverMenu({
   /* Placed from the trigger's own rect, flush with the chosen edge and nudged
      back inside the viewport if that would overflow it. */
   const menuWidth = width ?? MENU_WIDTH;
+  /*
+   * Opens downward, and flips up when there is no room.
+   *
+   * Automatic rather than a prop: a caller cannot know where its trigger will
+   * be. The help circle is pinned to the bottom of the window, so a menu that
+   * only ever opened downward opened entirely off screen — and any trigger low
+   * enough has the same problem.
+   *
+   * `bottom` rather than a computed `top`, so the flip does not need the
+   * menu's height, which is not known until it has rendered.
+   */
+  const flip = anchor ? window.innerHeight - anchor.bottom < 320 : false;
   const rect = anchor
     ? {
-        top: anchor.bottom + 8,
+        ...(flip
+          ? { bottom: window.innerHeight - anchor.top + 8 }
+          : { top: anchor.bottom + 8 }),
         left: Math.max(
           8,
           align === "end"
@@ -93,7 +107,7 @@ export function PopoverMenu({
         role="menu"
         aria-label={label}
         style={{
-          ...(rect ? { top: rect.top, left: rect.left } : {}),
+          ...(rect ? rect : {}),
           ...(width ? { width } : {}),
         }}
         /* `min-w-56` only where no width was given: with one, it is the floor

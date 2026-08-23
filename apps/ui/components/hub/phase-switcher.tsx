@@ -156,7 +156,10 @@ export function PhaseSwitcher(): ReactNode {
        below the breakpoint where the bar exists. */
     <div
       ref={box}
-      className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-[70] md:bottom-4"
+      /* `right-18`, not `right-4`: the help circle owns the corner now and this
+         sits to its left. Both are fixed to the same spot otherwise, and the
+         chip would have been underneath it. */
+      className="fixed right-18 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-[70] md:bottom-4"
     >
       <AnimatePresence>
         {open && (
@@ -187,45 +190,45 @@ export function PhaseSwitcher(): ReactNode {
                 the build cannot honour — the same "control that spends a tap to
                 say no" the Exchange action was dropped for. */}
             {DEMO_DATA_COMPILED_IN && (
-            <div className="border-border/60 border-b p-3">
-              <p className="text-muted-foreground pb-1.5 text-[10px] font-semibold tracking-[1px] uppercase">
-                Data
-              </p>
-              <div
-                role="group"
-                aria-label="Data source"
-                className="bg-surface ring-border/60 grid grid-cols-2 gap-0.5 rounded-lg p-0.5 ring-1"
-              >
-                {DATA_MODES.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    aria-pressed={dataMode === option}
-                    onClick={() => chooseDataMode(option)}
-                    className={`focus-ring rounded-md px-2 py-1.5 text-xs font-semibold transition-colors ${
-                      dataMode === option
-                        ? "bg-accent/20 text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <span className="flex items-center justify-center gap-1.5">
-                      {option === "live" && <LiveDot />}
-                      {DATA_MODE_LABELS[option]}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              {/* Live in a demo build is the honest empty screen, not a broken
+              <div className="border-border/60 border-b p-3">
+                <p className="text-muted-foreground pb-1.5 text-[10px] font-semibold tracking-[1px] uppercase">
+                  Data
+                </p>
+                <div
+                  role="group"
+                  aria-label="Data source"
+                  className="bg-surface ring-border/60 grid grid-cols-2 gap-0.5 rounded-lg p-0.5 ring-1"
+                >
+                  {DATA_MODES.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      aria-pressed={dataMode === option}
+                      onClick={() => chooseDataMode(option)}
+                      className={`focus-ring rounded-md px-2 py-1.5 text-xs font-semibold transition-colors ${
+                        dataMode === option
+                          ? "bg-accent/20 text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <span className="flex items-center justify-center gap-1.5">
+                        {option === "live" && <LiveDot />}
+                        {DATA_MODE_LABELS[option]}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {/* Live in a demo build is the honest empty screen, not a broken
                   one. Said here because the difference between "no service
                   answers this" and "this failed" is invisible once the rows are
                   gone, and somebody who flipped the switch a minute ago has
                   already forgotten they did. */}
-              <p className="text-muted-foreground mt-1.5 text-[10px] leading-relaxed text-pretty">
-                {dataMode === "demo"
-                  ? "Fixtures. Every surface has rows to show."
-                  : "Only what a service can answer. Empty states are correct here."}
-              </p>
-            </div>
+                <p className="text-muted-foreground mt-1.5 text-[10px] leading-relaxed text-pretty">
+                  {dataMode === "demo"
+                    ? "Fixtures. Every surface has rows to show."
+                    : "Only what a service can answer. Empty states are correct here."}
+                </p>
+              </div>
             )}
 
             <div className="border-border/60 border-b p-3">

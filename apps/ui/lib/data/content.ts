@@ -1855,6 +1855,7 @@ export const content = {
       flowLabel: "Guided setup",
       flowHint: "The longer walk-through that follows the welcome.",
       soon: "Not built yet",
+      replayTour: "Run it again",
     },
     title: "Settings",
     soon: "Coming soon",
@@ -2032,8 +2033,11 @@ export const content = {
       hint: "Sites, tabs and downloads.",
       browseTitle: "Browse",
       browseAsButtonLabel: "Pin Browse to the rail",
+      /* No longer "sits under Workspaces": that button is opt-in now, so on most
+         installs Browse is the top of the pinned block rather than under
+         anything. See `workspacesInRail` in lib/settings-store. */
       browseAsButtonHint:
-        "Sits under Workspaces instead of among your apps. Turn off to keep it as an app.",
+        "Sits at the top of the rail instead of among your apps. Turn off to keep it as an app.",
       sitesTitle: "Sites",
       tabsTitle: "Tabs",
       tabLayoutHorizontal: "Horizontal tabs",
@@ -2157,6 +2161,13 @@ export const content = {
         "The page inspector and the overlay inspector both live in it.",
       devConnectBrowse: "Connect Browse",
       devBrowseConnected: "Browse is connected",
+      /* The rail's own contents. Desktop only, because there is no rail on a
+         phone to put a button on. */
+      railTitle: "Workspaces in rail",
+      railHint: "Whether the rail has a button for them.",
+      railWorkspacesLabel: "Show Workspaces",
+      railWorkspacesHint:
+        "Puts it back at the top of the rail. Your workspaces are in the column beside it either way.",
       themeTitle: "Theme",
       themeHint: "Light, dark, or whatever this device is set to.",
       modeLight: "Light",
@@ -2190,6 +2201,57 @@ export const content = {
    * that actually ship, and the one piece of chrome the rest hangs off. Nothing
    * here promises a feature this build does not have.
    */
+  /* The Guided Tour's chrome — everything that is not a card's own words. */
+  /* The desktop shell's own strip, above the app. */
+  titleBar: {
+    updateNow: "Update now",
+    home: "Home",
+    newWorkspace: "New workspace",
+    minimize: "Minimise",
+    maximize: "Maximise",
+    restore: "Restore",
+    close: "Close",
+  },
+  tour: {
+    of: "of",
+    start: "Get started",
+    next: "Next",
+    previous: "Previous",
+    skip: "Skip",
+    close: "Close",
+    gotIt: "Got it",
+    dismiss: "Close the tour",
+    invite: "Take the tour",
+    inviteBody: "Two minutes on what you just set up.",
+    inviteAction: "Start",
+  },
+  /* The help circle, bottom right, and everything it offers. */
+  /* The terms-and-privacy pane. The documents themselves are in
+     lib/data/legal.ts; this is only the chrome around them. */
+  legal: {
+    title: "Legal summary",
+    updated: "Last updated",
+    disclaimer:
+      "A summary written to be read, not a substitute for the licence or for advice. Where this and the licence disagree, the licence is the one that binds.",
+    readLicence: "Read the software licence",
+  },
+  help: {
+    label: "Help & resources",
+    restartTour: "Restart Guided Tour",
+    helpCentre: "Help Center",
+    helpCentreUrl: "https://nexus.free/help",
+    community: "Ask the community",
+    communityUrl: "https://bsvblockchain.org/forum/nexus",
+    videos: "YouTube videos",
+    videosUrl: "https://www.youtube.com/@placeholder",
+    releaseNotes: "Release notes",
+    legal: "Legal summary",
+    feedback: "Submit feedback",
+    abuse: "Report abuse",
+    shortcuts: "Keyboard shortcuts",
+    shortcutsKeys: "⌃⇧?",
+    guidedSetup: "Guided setup",
+  },
   firstRun: {
     /* The preset picker, which is the last thing the first run asks. */
     presets: {
@@ -2287,6 +2349,34 @@ export const content = {
     cancel: "Cancel",
     suggest: "Suggest a feature",
     suggestHint: "Costs 1,000 sats, so the board stays worth reading.",
+    /* Feedback, which is the other thing somebody standing at a roadmap wants
+       to do. Free, because it is not asking for anybody's time — but signed,
+       so a board of anonymous complaints is not what gets read. */
+    feedback: "Submit feedback",
+    feedbackHint: "Free to send, signed with your keys.",
+    feedbackSummaryPlaceholder: "In one line",
+    /* A template rather than a prompt. "What happened" gets a sentence; three
+       numbered lines get the three things somebody actually needs to repeat it,
+       and they are already in the order they should be written in. Newlines
+       survive in a placeholder, so the shape is visible before anyone types. */
+    feedbackBodyPlaceholder:
+      "1. What you did\n2. What happened\n3. What you expected",
+    /* The field's name, separately: the placeholder is three lines now, and a
+       three-line accessible name is read out as one long run of words. */
+    feedbackBodyLabel: "Detail",
+    feedbackSign: "Sign and send",
+    feedbackSent: "Feedback signed and sent",
+    feedbackSentBody: "Signed as {handle}.",
+    /* What the sheet says once it has done the thing, instead of vanishing.
+       A sheet that closes on submit leaves somebody staring at the board it
+       came from, wondering whether the button worked. */
+    feedbackSentTitle: "Signed and sent",
+    feedbackSentDetail:
+      "It went out signed as {handle}. Nothing was charged, and nothing lands on the public board.",
+    suggestedTitle: "Your feature is on the board",
+    suggestedDetail:
+      "It sits in Fundable at zero, like everything else. Share it and it can be funded.",
+    done: "Done",
     fund: "Fund this feature",
     fundCaveat:
       "A signal, not an order. Funding weighs on what gets picked up next; it does not buy the work.",

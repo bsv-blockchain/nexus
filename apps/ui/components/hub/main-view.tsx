@@ -349,7 +349,26 @@ export function MainView(): ReactNode {
        render into and looked broken. */
     return (
       <div className="flex h-full min-w-0 flex-1">
-        <div className="h-full min-w-0 flex-1 overflow-x-auto">
+        {/*
+         * The columns run the full width of the window and scroll *under* the
+         * rail and its panel, rather than stopping at their edge.
+         *
+         * The negative margin reclaims the space the sidebar is standing on and
+         * the padding gives it straight back, so the first column still starts
+         * beside the panel while the track it slides along carries on behind
+         * it. Without this a wide set of workspaces ends at a hard edge, which
+         * reads as the end of the list rather than as the edge of a window.
+         *
+         * `--sidebar-width` is published by DesktopSidebar and is 0 on a phone,
+         * where there is no sidebar to hide behind — see hub-shell.
+         */}
+        <div
+          style={{
+            marginLeft: "calc(var(--sidebar-width, 0px) * -1)",
+            paddingLeft: "var(--sidebar-width, 0px)",
+          }}
+          className="h-full min-w-0 flex-1 overflow-x-auto"
+        >
           <ProfilesManager />
         </div>
         <DetailPane />

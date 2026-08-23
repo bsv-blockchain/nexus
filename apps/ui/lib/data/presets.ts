@@ -34,6 +34,11 @@ export const ALWAYS_APPS: HubAppSlug[] = [
   "connect",
   "wallet",
   "vault",
+  /* Last, and always. It was already essential and default-installed, so it
+     could never be removed — but it was not named here, which left it appended
+     after the preset folders by whatever order the rail happened to reconcile.
+     Named, it has a place instead of a leftover position. */
+  "roadmap",
 ];
 
 /**
@@ -188,27 +193,6 @@ export function appsFor(chosen: PresetId[]): HubAppSlug[] {
     }
   }
   return out;
-}
-
-/**
- * Every app any preset can install.
- *
- * The set the first run owns, and therefore the set it is allowed to take away
- * again. Without it, choosing Thinker and then re-running and choosing Gamer
- * would leave Mail, Sign and Learn installed with no folder to sit in — the old
- * preset's apps loose on the rail, which is not "the rail is updated" by any
- * reading. Apps outside this set are somebody's own doing and are never
- * touched.
- */
-export function managedApps(): HubAppSlug[] {
-  const out = new Set<HubAppSlug>(SHARED_SINGLES);
-  for (const preset of presets) {
-    for (const app of preset.group.apps) out.add(app);
-  }
-  /* Never the always-on six, even if a preset lists one: they are not the first
-     run's to remove. */
-  for (const app of ALWAYS_APPS) out.delete(app);
-  return [...out];
 }
 
 /** Repo ids a set of presets switches on, deduped. */

@@ -95,14 +95,92 @@ const updater = createUpdater({
   onEvent: (state) => router?.emit('update.state', state)
 })
 
+/** The height of our own bar, shared with the renderer's CSS. */
+const TITLEBAR_HEIGHT = 40
+
+/**
+ * How tall macOS's own three buttons are, which is not something it will tell
+ * us. Only used to centre them in a bar of our height — `trafficLightPosition`
+ * takes the top-left of their box, so without this they sit high.
+ */
+const TRAFFIC_LIGHT_SIZE = 12
+
+/**
+ * Three platforms, two modes.
+ *
+ * macOS and Windows keep the OS's own buttons and we draw everything else
+ * around them. On Windows that is not cosmetic: Snap Layouts, the flyout under
+ * the maximize button, only exists while the OS owns that button, and a
+ * hand-rolled maximize loses it silently.
+ *
+ * Linux is frameless and we draw the buttons. The overlay API exists there in
+ * this Electron, but Linux window managers disagree about where controls belong
+ * and whether they honour a hint at all — GNOME on the right, others on the
+ * left, tiling WMs ignoring the question. Owning them is the predictable
+ * answer, and predictable beats native when native has no single answer.
+ */
+function windowChrome() {
+  if (process.platform === 'darwin') {
+    return {
+      titleBarStyle: 'hiddenInset',
+      trafficLightPosition: {
+        x: 16,
+        y: (TITLEBAR_HEIGHT - TRAFFIC_LIGHT_SIZE) / 2
+      }
+    }
+  }
+  if (process.platform === 'win32') {
+    return {
+      titleBarStyle: 'hidden',
+      titleBarOverlay: {
+        // Transparent, so the strip takes the renderer's colour and nothing has
+        // to be kept in step with the theme except the glyphs.
+        color: '#00000000',
+        symbolColor: '#e5e5e5',
+        height: TITLEBAR_HEIGHT
+      }
+    }
+  }
+  return { frame: false }
+}
+
+/**
+ * Minimise, maximise and close, for Linux where we draw the buttons.
+ *
+ * Registered once at module scope rather than per window: `ipcMain.handle`
+ * throws on a duplicate channel, and macOS rebuilds the window on `activate`.
+ */
+ipcMain.handle('nexus:window', (event, action) => {
+  const target = BrowserWindow.fromWebContents(event.sender)
+  // Can be null if the window died between the click and the message arriving.
+  if (!target || target.isDestroyed()) return { ok: false, error: 'no-window' }
+  try {
+    if (action === 'minimize') target.minimize()
+    else if (action === 'toggle-maximize') {
+      target.isMaximized() ? target.unmaximize() : target.maximize()
+    } else if (action === 'close') target.close()
+    else return { ok: false, error: `unknown action: ${action}` }
+    return { ok: true, maximized: target.isMaximized() }
+  } catch (error) {
+    return { ok: false, error: String(error) }
+  }
+})
+
 function createWindow() {
   boot('createWindow')
   win = new BrowserWindow({
     width: 1440,
     height: 900,
+    // Below this the overlay arithmetic stops making sense: the workspace strip
+    // has nowhere to go and the window controls start overlapping it.
+    minWidth: 720,
+    // Painted before the renderer mounts, so the window does not flash white on
+    // the way in. Matches the dark theme's canvas.
+    backgroundColor: '#0f0d15',
     // Ignored on macOS — see DEV_ICON, the Dock is set instead — and undefined in a
     // packaged app, which is the same as not passing it.
     icon: DEV_ICON ?? undefined,
+    ...windowChrome(),
     webPreferences: {
       preload: path.join(__dirname, 'preload-chrome.cjs'),
       contextIsolation: true,
@@ -175,6 +253,28 @@ function createWindow() {
 
   boot('router-ready')
   ipcMain.on('nexus:host:out', (_event, msg) => router.handle(msg))
+
+  /*
+   * The traffic lights come and go with fullscreen on macOS.
+   *
+   * The renderer reserves space for them on the left. Enter fullscreen and they
+   * are gone, so without this the bar keeps an 80px hole where they used to be.
+   */
+  const sendFullscreen = (value) => {
+    if (win && !win.isDestroyed()) win.webContents.send('nexus:fullscreen', value)
+  }
+  win.on('enter-full-screen', () => sendFullscreen(true))
+  win.on('leave-full-screen', () => sendFullscreen(false))
+
+  /* Same for maximised: the user can maximise by dragging to a screen edge, and
+     the renderer's own button state would never hear about it. */
+  const sendMaximized = () => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('nexus:maximized', win.isMaximized())
+    }
+  }
+  win.on('maximize', sendMaximized)
+  win.on('unmaximize', sendMaximized)
 
   // AFTER first paint, not before. resume() starts with safeStorage, which is
   // SYNCHRONOUS keychain access on this thread — and on a build whose code signature

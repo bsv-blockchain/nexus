@@ -4,9 +4,14 @@
  * Everything Settings can change, in one place.
  *
  * Same module-store shape as {@link file://./command-effects.ts}: a value read
- * through `useSyncExternalStore`, a server snapshot that matches the prerender,
- * and no persistence. Nothing here is written to disk — a prototype that
- * remembers you blocked a camera would be claiming to have a camera policy.
+ * through `useSyncExternalStore` and a server snapshot that matches the
+ * prerender.
+ *
+ * It is written to `localStorage`, because a preference that forgets itself on
+ * every reload is not a preference. That does mean the store now remembers
+ * answers this build cannot act on — a camera set to "block" is a note, not a
+ * policy, since nothing here holds a camera. Better a note that survives than
+ * a switch that lies about being a switch by resetting itself.
  *
  * The point of keeping it in one store rather than in each panel's `useState` is
  * that several of these are read outside the panel that sets them. Developer
@@ -117,6 +122,19 @@ export interface SettingsState {
    * they are different places.
    */
   browseAsButton: boolean;
+  /**
+   * Whether Workspaces has a button at the top of the rail.
+   *
+   * Off by default, which is not the same as saying workspaces are hidden. The
+   * list of them is already in the column beside the rail, every one of them
+   * carries its own menu, and the desktop shell now names them along its top
+   * strip. A rail button on top of all that is a fourth door onto a room most
+   * people only visit to add a second workspace.
+   *
+   * Kept as a setting rather than removed, because somebody who lives in four
+   * workspaces at once wants it exactly where it was.
+   */
+  workspacesInRail: boolean;
 
   /* ---- Autofill ------------------------------------------------------- */
   autofillAddresses: boolean;
@@ -252,6 +270,9 @@ const INITIAL: SettingsState = {
   tabLayout: "horizontal",
   // On by default: browsing is what this client is, not an app you added.
   browseAsButton: true,
+  // Off by default. See the field above for why a button nobody asked for is
+  // not the same thing as a feature nobody can reach.
+  workspacesInRail: false,
 
   autofillAddresses: true,
   autofillCards: false,
@@ -275,10 +296,127 @@ const INITIAL: SettingsState = {
   updateChannel: "stable",
 };
 
-let state: SettingsState = INITIAL;
+/**
+ * Where it is kept, and which shape is kept there.
+ *
+ * Versioned so that a rename or a retyped field is a discarded blob rather than
+ * a crash on somebody's next launch: an unrecognised version is dropped and the
+ * defaults stand. Bump it when a field changes meaning, not when one is added —
+ * added fields are handled by `restore` merging over the defaults.
+ */
+const STORE_KEY = "nexus.settings";
+const STORE_VERSION = 1;
+
+/**
+ * Saved settings, laid over the defaults.
+ *
+ * The two permission maps are merged key by key rather than replaced, so a
+ * capability added after somebody last saved arrives with its default instead
+ * of as `undefined` — which every reader of those maps would then have to guard
+ * against forever.
+ */
+function restore(saved: Partial<SettingsState>): SettingsState {
+  return {
+    ...INITIAL,
+    ...saved,
+    capabilities: { ...INITIAL.capabilities, ...(saved.capabilities ?? {}) },
+    walletCapabilities: {
+      ...INITIAL.walletCapabilities,
+      ...(saved.walletCapabilities ?? {}),
+    },
+  };
+}
+
+function load(): SettingsState {
+  /* Undefined during the prerender, which is the whole reason
+     `getSettingsServerSnapshot` exists — see the note on it below. */
+  if (typeof window === "undefined") return INITIAL;
+  try {
+    const raw = window.localStorage.getItem(STORE_KEY);
+    if (!raw) return INITIAL;
+    const saved = JSON.parse(raw) as {
+      v?: number;
+      state?: Partial<SettingsState>;
+    };
+    if (saved.v !== STORE_VERSION || !saved.state) return INITIAL;
+    return restore(saved.state);
+  } catch {
+    /* Corrupt, or storage that refuses to be read. The defaults are always a
+       valid answer, and a settings store that throws takes the app with it. */
+    return INITIAL;
+  }
+}
+
+function write(value: SettingsState): boolean {
+  try {
+    window.localStorage.setItem(
+      STORE_KEY,
+      JSON.stringify({ v: STORE_VERSION, state: value }),
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function save(): void {
+  if (typeof window === "undefined") return;
+  if (write(state)) return;
+  /*
+   * One retry without the avatar.
+   *
+   * It is the only field here that can be megabytes — a data URL rather than a
+   * reference — so it is also the only one that can push the whole blob past
+   * the quota. Dropping it costs a picture; not retrying would silently stop
+   * saving every other setting for as long as that picture is set, which is the
+   * kind of failure nobody would connect back to uploading an avatar.
+   */
+  write({ ...state, avatar: null });
+}
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Coalesced, because some of these are dragged rather than clicked.
+ *
+ * A zoom stepper held down emits on every frame, and serialising the whole
+ * store sixty times a second to record a number that is still moving is work
+ * for nothing. The flush below is what makes the delay safe.
+ */
+function scheduleSave(): void {
+  if (typeof window === "undefined") return;
+  if (saveTimer !== null) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    save();
+  }, 150);
+}
+
+if (typeof window !== "undefined") {
+  /* `pagehide` rather than `beforeunload`: it fires on the paths that one
+     misses, including a tab being frozen on mobile, and it does not block the
+     unload. Without it, a setting changed in the last 150ms of a session is a
+     setting that was never really changed. */
+  window.addEventListener("pagehide", () => {
+    if (saveTimer === null) return;
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    save();
+  });
+}
+
+let state: SettingsState = load();
 const listeners = new Set<() => void>();
 
+/**
+ * Notify, and remember.
+ *
+ * Saving lives here rather than in each setter because every mutation in this
+ * file already ends by calling it, and there are two dozen of them. A setter
+ * added later gets persistence by doing the one thing it has to do anyway.
+ */
 function emit(): void {
+  scheduleSave();
   for (const listener of listeners) listener();
 }
 
@@ -291,6 +429,14 @@ export function getSettings(): SettingsState {
   return state;
 }
 
+/**
+ * What the prerender saw, which is never what storage holds.
+ *
+ * React renders the hydration pass from this and then re-reads `getSettings`,
+ * so restored settings arrive one render later instead of tearing the HTML.
+ * Returning the live state here would make the server's markup and the client's
+ * first paint disagree for anybody who has ever changed a setting.
+ */
 export function getSettingsServerSnapshot(): SettingsState {
   return INITIAL;
 }

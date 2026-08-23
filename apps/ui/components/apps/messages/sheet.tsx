@@ -16,6 +16,7 @@ export function Sheet({
   children,
   footer,
   side = false,
+  full = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -30,6 +31,14 @@ export function Sheet({
    * panel would be the whole screen anyway.
    */
   side?: boolean;
+  /**
+   * Drop the `max-w-md` cap and fill the width.
+   *
+   * For sheets that are a list of destinations rather than a card of content:
+   * a menu narrower than the sheet it replaced reads as a smaller thing having
+   * opened, not as the same list in a different frame.
+   */
+  full?: boolean;
 }): ReactNode {
   useEffect(() => {
     if (!open) return;
@@ -66,7 +75,7 @@ export function Sheet({
             animate={{ y: 0, x: 0 }}
             exit={side ? { y: "100%" } : { y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 320 }}
-            className={`relative flex w-full max-w-md flex-col overflow-hidden bg-surface-raised text-foreground shadow-[0_-12px_90px_-8px_rgba(0,0,0,0.55)] ring-1 ring-black/10 dark:shadow-[0_-12px_90px_-4px_rgba(0,0,0,0.95)] dark:ring-white/10 ${
+            className={`relative flex w-full flex-col overflow-hidden bg-surface-raised text-foreground shadow-[0_-12px_90px_-8px_rgba(0,0,0,0.55)] ring-1 ring-black/10 dark:shadow-[0_-12px_90px_-4px_rgba(0,0,0,0.95)] dark:ring-white/10 ${full ? "" : "max-w-md"} ${
               side
                 ? "max-h-[92dvh] rounded-t-3xl sm:h-full sm:max-h-none sm:rounded-t-none sm:rounded-l-3xl"
                 : "max-h-[92dvh] rounded-t-3xl"

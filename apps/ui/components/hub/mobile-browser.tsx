@@ -23,6 +23,8 @@ import {
 import { refKey } from "@/lib/rail/layout";
 import type { PinnedSite } from "@/lib/rail/sites";
 import { DEMO_SURFACES } from "@/lib/surfaces";
+import { HelpSheet } from "@/components/hub/help-circle";
+import { content as allContent } from "@/lib/data";
 import { useHostOverlay } from "@/lib/wallet-data";
 import {
   AlignLeft,
@@ -34,20 +36,21 @@ import {
   Gift,
   Layers,
   LayoutGrid,
+  LifeBuoy,
   Link2,
   Mic,
   Monitor,
   Pin,
   Plus,
-  Search,
   RotateCw,
+  Search,
   Settings,
   Share,
   TextSearch,
   Type,
+  type LucideIcon,
   VenetianMask,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import {
   AnimatePresence,
@@ -381,9 +384,11 @@ function SheetShell({
 function UrlDetailsSheet({
   onClose,
   onOpenAddress,
+  onOpenHelp,
 }: {
   onClose: () => void;
   onOpenAddress: () => void;
+  onOpenHelp: () => void;
 }): ReactNode {
   const {
     activeTab,
@@ -509,6 +514,24 @@ function UrlDetailsSheet({
             </span>
           </button>
         ))}
+      </div>
+
+      {/* Help sits outside the demo gate below, because it is the one row here
+          that does something: on a phone there is no floating "?" to reach the
+          same menu from, so this is the only way to it. */}
+      <div className="mt-3 space-y-2">
+        <button
+          type="button"
+          onClick={onOpenHelp}
+          className="focus-ring flex w-full items-center gap-3 rounded-2xl bg-surface px-4 py-3.5 text-sm font-medium ring-1 ring-border"
+        >
+          <LifeBuoy className="size-5 text-muted-foreground" aria-hidden="true" />
+          <span className="flex-1 text-left">{allContent.help.label}</span>
+          <ChevronRight
+            className="size-4 text-muted-foreground"
+            aria-hidden="true"
+          />
+        </button>
       </div>
 
       {/* Rows. Both are demo-only: neither has anything behind it yet, and a row
@@ -1386,7 +1409,10 @@ type Sheet =
   | "address"
   | "switcher"
   | "settings"
-  | "sync";
+  | "sync"
+  /* Owned here rather than inside the details sheet: opening it has to CLOSE
+     that one, and a sheet cannot outlive the component that renders it. */
+  | "help";
 
 /**
  * Arc-style mobile browser chrome: a floating bottom bar plus the page-options,
@@ -1517,7 +1543,11 @@ export function MobileBrowser({
               setIncognito(false);
               setSheet("address");
             }}
+            onOpenHelp={() => setSheet("help")}
           />
+        )}
+        {sheet === "help" && (
+          <HelpSheet key="help" open onClose={close} />
         )}
         {sheet === "address" && (
           <AddressSheet

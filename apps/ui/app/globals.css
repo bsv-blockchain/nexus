@@ -804,3 +804,48 @@ html [data-sonner-toaster] [data-sonner-toast] [data-description] {
 .scrollbar-slim::-webkit-scrollbar-thumb:hover {
   background-color: var(--muted-foreground);
 }
+
+/*
+ * The desktop shell's own strip, and the parts of it the platform has already
+ * spoken for.
+ *
+ * `--titlebar-height` is the strip. The two insets are the ends that belong to
+ * the operating system rather than to us:
+ *
+ *   - macOS draws its traffic lights inside our window. `hiddenInset` moves
+ *     them; it does not reserve room for them, so we do. In fullscreen they go
+ *     away entirely and the reservation goes with them, which is why the
+ *     fullscreen rule exists rather than a single constant.
+ *   - Windows draws minimise/maximise/close as an overlay on the right and
+ *     reports where through `env(titlebar-area-*)`. Read rather than assumed:
+ *     the width of that overlay changes with the display language and with
+ *     whether the window is snapped.
+ *   - Linux gets neither, because the strip draws those three buttons itself
+ *     there. Both insets stay at the plain padding.
+ *
+ * `data-platform` and `data-fullscreen` are written onto <html> by
+ * lib/desktop-window.ts. Outside the shell neither exists, the defaults hold,
+ * and nothing is drawn anyway.
+ */
+:root {
+  --titlebar-height: 40px;
+  --titlebar-inset-left: 0.5rem;
+  --titlebar-inset-right: 0.5rem;
+}
+
+html[data-platform="darwin"] {
+  /* Three 12px lights from x=16, 20px apart, plus a gap before our own
+     controls start. Measured against the real window, not derived. */
+  --titlebar-inset-left: 78px;
+}
+
+html[data-platform="darwin"][data-fullscreen="true"] {
+  --titlebar-inset-left: 0.5rem;
+}
+
+html[data-platform="win32"] {
+  --titlebar-inset-left: calc(env(titlebar-area-x, 0px) + 0.5rem);
+  --titlebar-inset-right: calc(
+    100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 0.5rem
+  );
+}
