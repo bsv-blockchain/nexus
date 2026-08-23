@@ -21,11 +21,13 @@ import { useHub } from "@/components/hub/hub-provider";
 import {
   appsFor,
   developerModeFor,
+  presets,
   railPlanFor,
   reposFor,
   ALWAYS_APPS,
   type PresetId,
 } from "@/lib/data/presets";
+import { setChosenPresets, useChosenPresets } from "@/lib/presets-store";
 import type { RailEntry } from "@/lib/rail/layout";
 import { getHubApps, type AppRepository } from "@/lib/data";
 import { sameUrl } from "@/lib/tabs";
@@ -129,6 +131,125 @@ export function useApplyPresets(): (chosen: PresetId[]) => void {
       applyRailPlan,
       activeSpaceId,
       installedApps,
+      pinnedSites,
+      unpinSite,
+    ]
+  );
+}
+
+/**
+ * One preset on or off, from the App Store column.
+ *
+ * Not `useApplyPresets` with a different argument. That one is the first run's:
+ * it clears everything the answer does not name, because the answer IS the
+ * workspace at that moment. Doing the same from a settings-shaped column would
+ * mean flicking one switch and losing every app somebody had connected by hand
+ * since, which is not what a switch on a card promises.
+ *
+ * So this applies the difference instead, and applies all four of the things a
+ * preset is made of rather than only its apps:
+ *
+ *   1. the apps it adds, or the ones only it wanted
+ *   2. its folder on the rail
+ *   3. the app sources it needs
+ *   4. the settings it flips
+ *
+ * The rail is rebuilt from the presets that remain rather than edited in place,
+ * and `applyRailPlan` appends anything present that the plan forgot — so an app
+ * connected by hand keeps its tile through a toggle. A folder made by hand does
+ * not survive as a folder; its apps come back as singles.
+ */
+export function useTogglePreset(): (id: PresetId, on: boolean) => void {
+  const chosen = useChosenPresets();
+  const {
+    installApp,
+    uninstallApp,
+    applyRailPlan,
+    activeSpaceId,
+    pinnedSites,
+    unpinSite,
+  } = useHub();
+
+  return useCallback(
+    (id: PresetId, on: boolean) => {
+      /* Build order, not tap order — the same rule the picker follows, so a
+         rail built here and a rail built by the welcome come out identical. */
+      const next = presets
+        .map((preset) => preset.id)
+        .filter((entry) => (entry === id ? on : chosen.includes(entry)));
+
+      const keep = appsFor(next);
+      const going = appsFor([id]).filter((slug) => !keep.includes(slug));
+
+      if (on) {
+        for (const slug of keep) installApp(slug, activeSpaceId);
+      } else {
+        /* Only what nothing else still wants. Maker and Gamer both bring BSV
+           Radar; switching one off must not take it from the other. */
+        for (const slug of going) uninstallApp(slug, activeSpaceId);
+        /* A web listing is connected by having its URL pinned rather than by
+           being in the installed list, so uninstalling one does nothing at all
+           — the site is the thing to remove. Same trap as the first run's. */
+        for (const app of getHubApps()) {
+          if (!app.web || !going.includes(app.slug)) continue;
+          for (const site of pinnedSites) {
+            if (sameUrl(site.url, app.web.url)) unpinSite(site.id);
+          }
+        }
+      }
+
+      const entries: RailEntry[] = [
+        ...ALWAYS_APPS.map(
+          (slug): RailEntry => ({ type: "single", ref: { kind: "app", slug } })
+        ),
+        ...railPlanFor(next).map(
+          (entry): RailEntry =>
+            entry.type === "group"
+              ? {
+                  type: "group",
+                  id: entry.id,
+                  name: entry.name,
+                  members: entry.apps.map((slug) => ({
+                    kind: "app" as const,
+                    slug,
+                  })),
+                }
+              : { type: "single", ref: { kind: "app", slug: entry.app } }
+        ),
+      ];
+      applyRailPlan(entries);
+
+      /*
+       * Sources and settings follow the remaining presets exactly, in both
+       * directions.
+       *
+       * The first run only ever switches these on, on the grounds that nobody
+       * picking Thinker expects their developer tools turned off. A switch is a
+       * different promise: leaving Game Center in the store, or the inspectors
+       * in every app, after somebody has just switched Gamer or Developer off
+       * makes the switch look like it did not work.
+       */
+      const wanted = reposFor(next);
+      const touched = reposFor([id]);
+      setRepositories(
+        getRepositoriesSnapshot().map((repo: AppRepository) =>
+          wanted.includes(repo.id)
+            ? { ...repo, enabled: true }
+            : touched.includes(repo.id)
+              ? { ...repo, enabled: false }
+              : repo
+        )
+      );
+      if (developerModeFor([id])) setDeveloperMode(developerModeFor(next));
+
+      setChosenPresets(next);
+    },
+    [
+      chosen,
+      installApp,
+      uninstallApp,
+      applyRailPlan,
+      activeSpaceId,
       pinnedSites,
       unpinSite,
     ]

@@ -1428,7 +1428,14 @@ export const content = {
       "Baskets group your wallet's outputs by protocol for building apps.",
   },
   appStore: {
-    collectionsTitle: "Collections",
+    /* Named for what they are. "Collections" was a word this app used nowhere
+       else; these five are the first run's presets, and the three below them
+       are the repositories the store already calls sources. */
+    presetsTitle: "Nexus Presets",
+    sourcesTitle: "App repositories",
+    /* Shown on a folded section, so closing one saves room without losing the
+       answer. */
+    collectionsOn: "{on} of {total} on",
     reorderCollections: "Reorder collections",
     enableAll: "Connect all",
     disableAll: "Disconnect all",
@@ -1487,8 +1494,9 @@ export const content = {
     installSubtitle: "Connect to your Nexus",
     permsIntro: "If you add this app, it can:",
     permsIntroCollapsed: "If you add this app, it can use",
-    permsIntroCollection: "If you enable these apps, they can:",
-    permsIntroCollectionCollapsed: "If you enable these apps, they can use",
+    permsIntroCollection: "If you turn on this setup, its apps can:",
+    permsIntroCollectionCollapsed:
+      "If you turn on this setup, its apps can use",
     learnMore: "Learn more",
     perm1: "Verify your identity to sign you in",
     perm2: "Request payments, small ones auto-approved, large ones ask you",

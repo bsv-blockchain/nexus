@@ -386,10 +386,16 @@ export const hubApps: HubApp[] = [
   /* ------------------------------------------------------------------
    * Websites, listed as apps.
    *
-   * No `iconSrc`: their marks come from their own favicons, with a letter
-   * tile behind that — a bundled icon would be us drawing somebody else's
-   * logo. `embeds` is what each host actually answers to being framed,
-   * checked rather than assumed; the two that say no open in Browse.
+   * `iconSrc` is the site's own mark, taken from the largest one it publishes
+   * — a manifest icon or an apple-touch-icon, never a 16px favicon.ico
+   * upscaled — and squared on transparency without cropping. Still their logo,
+   * not one we drew: the file in /public/app-icons is their artwork at a size
+   * that survives a 52px tile, which is the whole reason to carry it rather
+   * than fetch it. A listing with no published mark keeps `iconSrc: ""` and
+   * falls back to its favicon, then to a letter tile.
+   *
+   * `embeds` is what each host actually answers to being framed, checked
+   * rather than assumed; the two that say no open in Browse.
    * ------------------------------------------------------------------ */
 
   {
@@ -402,7 +408,7 @@ export const hubApps: HubApp[] = [
     tagline: "Idle clicker, real sats",
     developer: "third-party",
     popularity: 44,
-    iconSrc: "",
+    iconSrc: "/app-icons/cookie-clucker.png",
     accent: "#f59e0b",
     defaultInstalled: false,
     category: "gaming",
@@ -425,7 +431,7 @@ export const hubApps: HubApp[] = [
     tagline: "Play for stakes",
     developer: "third-party",
     popularity: 38,
-    iconSrc: "",
+    iconSrc: "/app-icons/pelf.png",
     accent: "#10b981",
     defaultInstalled: false,
     category: "gaming",
@@ -448,7 +454,7 @@ export const hubApps: HubApp[] = [
     tagline: "One pixel at a time",
     developer: "third-party",
     popularity: 41,
-    iconSrc: "",
+    iconSrc: "/app-icons/pixel-war.png",
     accent: "#ef4444",
     defaultInstalled: false,
     category: "gaming",
@@ -471,7 +477,7 @@ export const hubApps: HubApp[] = [
     tagline: "Buy and sell anything",
     developer: "third-party",
     popularity: 47,
-    iconSrc: "",
+    iconSrc: "/app-icons/omnibazaar.png",
     accent: "#8b5cf6",
     defaultInstalled: false,
     category: "marketplace",
@@ -691,7 +697,7 @@ export const hubApps: HubApp[] = [
     tagline: "Every app on the chain",
     developer: "third-party",
     popularity: 57,
-    iconSrc: "",
+    iconSrc: "/app-icons/bsv-radar.png",
     accent: "#22d3ee",
     defaultInstalled: false,
     category: "productivity",

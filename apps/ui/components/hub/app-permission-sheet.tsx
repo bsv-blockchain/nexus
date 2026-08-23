@@ -10,8 +10,9 @@ import {
   getCollectionAppSlugs,
   getEssentialAppSlugs,
   getHubApp,
-  getSystemAppSlugs,
 } from "@/lib/data";
+import { useTogglePreset } from "@/components/hub/use-apply-presets";
+import { isPresetCollection } from "@/lib/data/collections";
 import { sameUrl } from "@/lib/tabs";
 import { useHostOverlay } from "@/lib/wallet-data";
 import {
@@ -240,8 +241,8 @@ function SheetBody(): ReactNode {
     pinnedSites,
     bulkSetInstalled,
     presetGroup,
-    ungroupRef,
   } = useHub();
+  const togglePreset = useTogglePreset();
   const copy = content.appStore;
   const [identify, setIdentify] = useState(true);
   const [operate, setOperate] = useState(true);
@@ -326,39 +327,41 @@ function SheetBody(): ReactNode {
         uninstallApp(app.slug);
       }
     } else if (collection) {
-      const slugs = getCollectionAppSlugs(collection.id);
-      const essentialSlugs = new Set(getEssentialAppSlugs());
-      const systemSlugs = getSystemAppSlugs();
-      const systemSet = new Set(systemSlugs);
-      const bundlesWeb = collection.bundlesWeb === true;
-      if (install) {
-        // Persona bundles also pull in the Web apps.
-        const targets = bundlesWeb ? [...slugs, ...systemSlugs] : slugs;
-        bulkSetInstalled(targets, true);
-        if (collection.id !== "all") {
-          // Persona folders fold in the Web apps; other collections keep them
-          // out. Essential apps are never grouped.
-          const grouped = targets.filter((slug) =>
-            bundlesWeb
-              ? !essentialSlugs.has(slug)
-              : !essentialSlugs.has(slug) && !systemSet.has(slug)
-          );
-          /* Refs, not slugs: the rail holds both built-in apps and connected
-             sites, so a folder is a list of refs even when everything in it
-             happens to be an app. */
+      /*
+       * A preset card hands the whole thing over.
+       *
+       * The sheet used to install the listed apps and drop them in a folder
+       * named after the collection, which was the right shape when a collection
+       * was only a list of apps. A preset is four things — apps, a folder, the
+       * sources it needs, the settings it flips — and reimplementing the first
+       * one here would leave a card that half-works and drifts from the welcome
+       * screen the moment either changes. See use-apply-presets.
+       */
+      const preset = isPresetCollection(collection.id);
+      if (preset) {
+        togglePreset(preset, install);
+      } else {
+        /* Essentials, and anything else that is a plain list. `uninstallApp`
+           refuses to remove an essential app, so the switch-off path is a no-op
+           for this one by construction rather than by a guard here. */
+        const slugs = getCollectionAppSlugs(collection.id);
+        const essentialSlugs = new Set(getEssentialAppSlugs());
+        if (install) {
+          bulkSetInstalled(slugs, true);
           presetGroup(
             collection.name,
-            grouped.map((slug) => ({ kind: "app" as const, slug }))
+            slugs
+              .filter((slug) => !essentialSlugs.has(slug))
+              /* Refs, not slugs: the rail holds both built-in apps and
+                 connected sites, so a folder is a list of refs even when
+                 everything in it happens to be an app. */
+              .map((slug) => ({ kind: "app" as const, slug }))
           );
-        }
-      } else {
-        // Only essential apps are protected; Web apps can be switched off.
-        const removable = slugs.filter((slug) => !essentialSlugs.has(slug));
-        bulkSetInstalled(removable, false);
-        // Disabling a persona returns the shared Web apps to standalone
-        // instead of leaving them orphaned in the persona's folder.
-        if (bundlesWeb) {
-          for (const slug of systemSlugs) ungroupRef({ kind: "app", slug });
+        } else {
+          bulkSetInstalled(
+            slugs.filter((slug) => !essentialSlugs.has(slug)),
+            false
+          );
         }
       }
     }

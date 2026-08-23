@@ -117,26 +117,101 @@ export type StoreCategory =
   | "social"
   | "wallets";
 
-/** table: app_collections — persona bundles that install several apps at once */
+/**
+ * table: app_collections — the setups offered in the App Store's column.
+ *
+ * These are the first run's presets, plus the one thing everybody gets whether
+ * they picked anything or not. Ids past "all" and "essentials" are `PresetId`
+ * values verbatim, so a card here and a card on the welcome screen are the same
+ * card — see lib/data/collections.ts, which builds this list from the presets
+ * rather than restating them. Restated here as literals only to keep this
+ * module free of an import cycle; collections.ts asserts the two agree.
+ */
 export type CollectionId =
   | "all"
-  | "core"
   | "essentials"
-  | "consumer"
-  | "knowledge"
-  | "creator"
-  | "developer";
+  | "thinker"
+  | "maker"
+  | "developer"
+  | "gamer"
+  /* Repository ids, verbatim from lib/data/repositories.ts. A catalogue card is
+     the repository, so giving it a second id would mean keeping two in step. */
+  | "repo-bsv"
+  | "repo-handcash"
+  | "repo-1sat";
+
+/**
+ * What a card is, which decides what its switch does.
+ *
+ * `preset` applies a whole setup — apps, rail folder, sources, settings.
+ * `always` is Essentials, which is on by definition and cannot be switched.
+ * `repository` turns an app source on or off; nothing is installed either way.
+ */
+export type CollectionKind = "preset" | "always" | "repository";
 
 export interface AppCollection {
   id: CollectionId;
+  kind: CollectionKind;
   name: string;
+  /**
+   * The line under the name, where a card has one worth reading.
+   *
+   * Catalogue cards use it for the repository's own note — "More from BSVA",
+   * "Featured 3rd party" — which is the only thing about a source that is not
+   * already written across its banner.
+   */
+  note?: string;
   description: string;
-  /** lucide icon name */
+  /** lucide icon name, for the places that draw a glyph rather than the card */
   icon: string;
-  /** apps toggled by this collection ("all" ignores this and uses every app) */
+  /** apps this connects ("all" ignores this and uses every app) */
   apps: HubAppSlug[];
-  /** persona bundle: also installs the Web apps and folds them into its rail folder */
-  bundlesWeb?: boolean;
+  /**
+   * The clip behind the card, and the frame it rests on.
+   *
+   * `video` is absent on Essentials, which is not a preset and has no clip of
+   * its own; it carries only a `poster`. The preset's accent is deliberately
+   * NOT here: the welcome screen grades its clips to it and the column does
+   * not, so carrying it would be an unused field that reads like a promise.
+   */
+  video?: string;
+  /** the still shown while the clip is not playing */
+  poster?: string;
+  /**
+   * Where in the clip that still was taken, in seconds.
+   *
+   * The card seeks back to it when the pointer leaves, so the frame you get
+   * before hovering and the frame you get after are the same one. Without it a
+   * card would rest on whatever it happened to be paused on.
+   */
+  posterAt?: number;
+  /**
+   * Stills to fade through while the pointer is on the card.
+   *
+   * Essentials has no clip of its own, so it borrows the welcome's opening
+   * sequence: the paintings that flicker behind the logo. `poster` is the one
+   * it rests on and is the first of these.
+   */
+  stills?: string[];
+  /**
+   * `object-position` down the source, 0 to 1.
+   *
+   * Per card, because these are portrait clips cropped to a wide slot and the
+   * subject is at a different height in each — one value for all of them put
+   * the reader's head above the slot and the gamer's below it. Picked by eye
+   * against the real crop; see the note in app-collections.tsx.
+   */
+  focus?: number;
+  /**
+   * Shown on, and not switchable.
+   *
+   * Essentials, and only Essentials: it is what every setup gets whatever was
+   * picked, so a switch on it would be a switch whose off position does not
+   * exist. Declared rather than inferred from whether every app in it is
+   * `essential` — four of the seven are not, and that rule would have let the
+   * card quietly disconnect Browse.
+   */
+  locked?: boolean;
 }
 
 /** table: hub_apps — installable apps shown in the icon rail / Apps manager */

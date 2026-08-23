@@ -6,6 +6,7 @@ import { PRIMARY_CTA } from "@/components/hub/cta";
 import { DEMO_SURFACES } from "@/lib/surfaces";
 import { DevBadge } from "@/components/hub/dev-badge";
 import { useBrandMode, withBrand } from "@/lib/brand";
+import { CollectionRow } from "@/components/hub/app-collections";
 import { useHub } from "@/components/hub/hub-provider";
 import { PopoverMenu } from "@/components/hub/popover-menu";
 import { Tooltip } from "@/components/hub/tooltip";
@@ -648,6 +649,14 @@ export function AppStore(): ReactNode {
               ? collection.description
               : copy.storeSubtitle}
           </p>
+
+          {/* The setups. A column beside the store on a desktop — see
+              hub-shell's LibraryPanel — and a row here on a phone, where that
+              column does not exist. `md:hidden` lives inside the component, so
+              this is one line either way. */}
+          <div className="mt-5">
+            <CollectionRow />
+          </div>
 
           {/* Search + sort + filter */}
           <div className="mt-4 flex flex-wrap items-center gap-2">
