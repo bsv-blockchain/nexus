@@ -3144,14 +3144,27 @@ export const content = {
     start: "Start",
     pause: "Pause",
     reset: "Start it over",
-    /* One a day, chosen by the date. Short enough to read without deciding to,
-       which is the only length that works under a photograph. */
+    quoteAnother: "Another",
+    /*
+     * One per workspace, not one per day.
+     *
+     * A workspace is a context somebody is in for weeks, so the line under the
+     * photograph is part of what that context feels like rather than a fact
+     * about the date — Work and Personal saying the same thing on the same
+     * Tuesday was the tell that it was decoration. Which one is drawn from the
+     * workspace's own id, so it is stable without anything being stored, and
+     * the refresh beside it writes an override for anybody who disagrees.
+     *
+     * Three to seven words. Under a mountain, at the bottom of the screen, a
+     * sentence long enough to need reading twice is a sentence nobody reads
+     * once — and the one that used to sit here ran to sixteen.
+     */
     quotes: [
-      "Slow progress is better than no progress.",
       "The work is the point.",
+      "Let the light in.",
+      "Slow progress is better than no progress.",
       "Begin, and the rest is easier.",
       "You can do anything, but not everything.",
-      "What you do every day matters more than what you do once in a while.",
       "Well begun is half done.",
       "Doing beats planning to.",
     ],

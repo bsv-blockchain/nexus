@@ -52,6 +52,14 @@ export interface HomeState {
    * without being asked. Off hides the figure and keeps the button.
    */
   showBalance: boolean;
+  /**
+   * A quote somebody chose, per workspace, where they chose one.
+   *
+   * Absent means the workspace keeps the line its own id draws — see
+   * `quoteFor`. Only a press of the refresh writes here, so the map stays empty
+   * for anybody who never disagreed with what they were given.
+   */
+  quoteBySpace: Record<string, number>;
 }
 
 /** Twenty-five minutes on, five off, which is the shape everybody means. */
@@ -76,6 +84,7 @@ const INITIAL: HomeState = {
   sessions: 0,
   sessionsDay: "",
   showBalance: true,
+  quoteBySpace: {},
 };
 
 /** Local, not UTC: "today" is the day where the person is, not at Greenwich. */
@@ -177,6 +186,36 @@ export function setNote(note: string): void {
 /** Focus blocks finished today, which is zero on any day but the one recorded. */
 export function sessionsFor(day: string): number {
   return state.sessionsDay === day ? state.sessions : 0;
+}
+
+/**
+ * Which line this workspace shows, out of `count`.
+ *
+ * Drawn from the id rather than stored, so two workspaces differ from the
+ * moment they exist and neither has to be written down to stay that way. A
+ * hash, not `Math.random()`: random would be a different quote on every render,
+ * which is a flicker rather than a workspace's own line.
+ */
+export function quoteFor(spaceId: string, count: number): number {
+  const chosen = state.quoteBySpace[spaceId];
+  if (chosen !== undefined) return chosen % count;
+  let hash = 0;
+  for (const char of spaceId) hash = (hash * 31 + char.charCodeAt(0)) | 0;
+  return Math.abs(hash) % count;
+}
+
+/**
+ * A different one, at random, and never the one already showing.
+ *
+ * Pressing refresh and getting the same sentence back reads as a broken button,
+ * so the current index is taken out of the draw rather than left in it.
+ */
+export function shuffleQuote(spaceId: string, count: number): void {
+  if (count <= 1) return;
+  const current = quoteFor(spaceId, count);
+  let next = current;
+  while (next === current) next = Math.floor(Math.random() * count);
+  set({ quoteBySpace: { ...state.quoteBySpace, [spaceId]: next } });
 }
 
 export function toggleBalance(): void {

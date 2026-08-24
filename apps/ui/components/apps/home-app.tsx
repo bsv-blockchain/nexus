@@ -45,6 +45,8 @@ import {
   setTimerMode,
   startTimer,
   tickTimer,
+  quoteFor,
+  shuffleQuote,
   toggleBalance,
   toggleGoal,
   toggleTask,
@@ -63,6 +65,7 @@ import {
   Pause,
   Play,
   Plus,
+  RefreshCcw,
   RotateCcw,
   X,
 } from "lucide-react";
@@ -190,15 +193,9 @@ function Stage(): ReactNode {
   const handle = activeHandleFor(activeSpaceId);
   const name = person.name.split(" ")[0] || handle || "";
 
-  /* One a day rather than one a load: a quote that changes every time you open
-     a tab is decoration, and one that lasts the day is something you can end up
-     agreeing with. */
-  const quote =
-    copy.quotes[
-      Math.abs(
-        [...day].reduce((sum, char) => sum + char.charCodeAt(0), 0),
-      ) % copy.quotes.length
-    ]!;
+  /* The workspace's own line, not the day's. See `quoteFor` — it is drawn from
+     the id, so Work and Personal never open on the same sentence. */
+  const quote = copy.quotes[quoteFor(activeSpaceId, copy.quotes.length)]!;
 
   return (
     <div className="relative h-full overflow-hidden rounded-2xl">
@@ -313,8 +310,21 @@ function Stage(): ReactNode {
           )}
         </div>
 
-        <p className="absolute inset-x-8 bottom-8 text-sm italic drop-shadow-md">
-          “{quote}”
+        {/* The refresh sits ON the line rather than under it, and only appears
+            to a pointer that has found it: a button permanently beside a quote
+            is a button competing with the quote. Always present for the
+            keyboard, which has no hover to reveal it. */}
+        <p className="group absolute inset-x-8 bottom-8 flex items-center justify-center gap-2 text-sm italic drop-shadow-md">
+          <span>“{quote}”</span>
+          <button
+            type="button"
+            onClick={() => shuffleQuote(activeSpaceId, copy.quotes.length)}
+            aria-label={copy.quoteAnother}
+            title={copy.quoteAnother}
+            className="focus-ring shrink-0 rounded-md p-1 text-white/70 opacity-0 transition-opacity hover:text-white focus-visible:opacity-100 group-hover:opacity-100"
+          >
+            <RefreshCcw className="size-3.5" aria-hidden="true" />
+          </button>
         </p>
       </div>
     </div>
