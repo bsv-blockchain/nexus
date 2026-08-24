@@ -227,10 +227,16 @@ export function WhoisCard({
             className="mt-0.5 text-xs text-muted-foreground"
           />
           {/* Same size as the handle above it, and closer to it: the two are
-              one block of identification, not a heading and a sentence. */}
-          <p className="mt-0.5 mb-2 text-xs text-muted-foreground">
-            {person.role}
-          </p>
+              one block of identification, not a heading and a sentence. Absent
+              when unset rather than an empty line, which would push the block
+              apart to say nothing. */}
+          {person.role.trim() ? (
+            <p className="text-muted-foreground mt-0.5 mb-2 text-xs">
+              {person.role}
+            </p>
+          ) : (
+            <div className="mb-2" />
+          )}
         </div>
       </div>
 
@@ -244,20 +250,32 @@ export function WhoisCard({
         </p>
       )}
 
-      <Section title={copy.whois.about}>
-        {/* As written, breaks included: people write their own bio in
-            paragraphs, and running them together is not our call. */}
-        <p className="text-sm leading-relaxed whitespace-pre-line text-pretty">
-          {person.bio}
-        </p>
-        {/* Actions sit directly under the bio: once you know who someone is, the
-            next thing you want is to do something about it. The web profile is
-            one of these rather than a full-width button of its own. */}
-        <div className="mt-3">
-          {/* No "open full profile" here: this is it. */}
+      {/*
+        The bio, and the things you can do about the person.
+
+        Two things in one section, and only one of them can be empty. An unset
+        bio drops the heading and the paragraph and keeps the actions, because
+        the actions are not "about" anybody — they are the reason most people
+        opened this card, and burying them behind a bio somebody never wrote
+        would punish the reader for the subject's silence.
+      */}
+      {person.bio.trim() ? (
+        <Section title={copy.whois.about}>
+          {/* As written, breaks included: people write their own bio in
+              paragraphs, and running them together is not our call. */}
+          <p className="text-sm leading-relaxed whitespace-pre-line text-pretty">
+            {person.bio}
+          </p>
+          <div className="mt-3">
+            {/* No "open full profile" here: this is it. */}
+            <ProfileActionsRow person={person} hideProfile />
+          </div>
+        </Section>
+      ) : (
+        <div className="border-border border-t py-3.5">
           <ProfileActionsRow person={person} hideProfile />
         </div>
-      </Section>
+      )}
 
       {person.registeredAt && (
         <Section title={copy.whois.registered}>
@@ -276,24 +294,20 @@ export function WhoisCard({
         </Section>
       )}
 
-      <Section title={copy.whois.expertise}>
-        {person.expertise?.length ? (
+      {person.expertise?.length ? (
+        <Section title={copy.whois.expertise}>
           <ul className="flex flex-wrap gap-1.5">
             {person.expertise.map((tag) => (
               <li
                 key={tag}
-                className="rounded-full bg-surface px-2 py-0.5 text-xs"
+                className="bg-surface rounded-full px-2 py-0.5 text-xs"
               >
                 {tag}
               </li>
             ))}
           </ul>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            {copy.whois.noExpertise}
-          </p>
-        )}
-      </Section>
+        </Section>
+      ) : null}
 
       {/*
         The places somebody points people at.
@@ -413,8 +427,8 @@ export function WhoisCard({
         </Section>
       )}
 
-      <Section title={copy.whois.contactInfo}>
-        {hasContact ? (
+      {hasContact && (
+        <Section title={copy.whois.contactInfo}>
           <div>
             {contact.email && (
               <ContactLine
@@ -437,14 +451,12 @@ export function WhoisCard({
                 value={`@${contact.github}`}
               />
             )}
-            <p className="mt-2 text-[11px] text-pretty text-muted-foreground">
+            <p className="text-muted-foreground mt-2 text-[11px] text-pretty">
               {copy.whois.contactNote}
             </p>
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">{copy.whois.noContact}</p>
-        )}
-      </Section>
+        </Section>
+      )}
 
       <Section title={copy.whois.recentConversations}>
         {recent.length > 0 ? (

@@ -1103,12 +1103,9 @@ export const content = {
       email: "Email",
       phone: "Phone",
       github: "GitHub",
-      noContact: "Nothing published.",
       contactNote:
         "Published by the ecosystem host, which does not attest to it. Check another way before acting on it.",
       noConversations: "No conversations yet.",
-      noExpertise: "Not stated.",
-      noLinks: "None yet.",
       /* relative ages, e.g. "4 years 3 months ago" */
       age: {
         year: "year",
