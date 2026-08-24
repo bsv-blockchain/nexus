@@ -1921,6 +1921,14 @@ export const content = {
 
   /** the settings surface the rail's gear opens */
   settings: {
+    /* The Settings guide, which is the one guide built from the app rather
+       than written here — only its framing lives in content. */
+    guide: {
+      blurb:
+        "Everything this client can be told to do, in ten places. Each one below says what it decides; the button takes you there.",
+      open: "Open {name}",
+      here: "You are here",
+    },
     /* The first-run controls. Kept in Settings rather than a hidden gesture
        because the people who most need to replay it are the ones showing it to
        somebody else. */

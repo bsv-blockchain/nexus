@@ -203,7 +203,9 @@ export interface DetailPane {
     /** the form for a new payment link; `id` is unused */
     | "new-payment-link"
     /** the form for raising a split; `id` is unused */
-    | "new-split";
+    | "new-split"
+    /** what each Settings category is for; `id` is unused */
+    | "settings-guide";
   /** MessagePerson id, or conversation id, per `kind` */
   id: string;
 }

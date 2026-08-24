@@ -1,6 +1,7 @@
 "use client";
 
 import { Favicon } from "@/components/hub/favicon";
+import { AppHelpBar } from "@/components/hub/app-help-bar";
 import { IdentitySigil } from "@/components/hub/identity-sigil";
 import { QrBlock } from "@/components/hub/qr-block";
 import { ShellVersion } from "@/components/hub/shell-version";
@@ -255,6 +256,66 @@ function resolveCategory(requested: SettingsCategory): SettingsCategory {
  * destinations that change the canvas — so Settings is one more thing the rail
  * opens rather than a mode with its own rules.
  */
+/**
+ * What each Settings category is for, and the way into it.
+ *
+ * Built from `SETTINGS_CATEGORIES` rather than written out again in lib/data,
+ * which is where every other guide lives. Two reasons: the list is filtered per
+ * build — Wallet only exists in a live one — so a fixture copy would describe
+ * categories this install does not have; and a hand-written second list is a
+ * list that goes stale the first time somebody adds a category and forgets.
+ *
+ * Each row opens the thing it describes. A guide you have to read and then go
+ * and find the subject of is a guide that has made you do the work twice.
+ */
+function SettingsGuidePane(): ReactNode {
+  const { settingsCategory, setSettingsCategory } = useHub();
+  const current = resolveCategory(settingsCategory);
+  const copy = content.settings.guide;
+
+  return (
+    <div>
+      <div className="border-border/60 border-b p-4">
+        <p className="text-muted-foreground text-[11px] leading-relaxed text-pretty">
+          {copy.blurb}
+        </p>
+      </div>
+      <ul className="divide-border/60 divide-y">
+        {SETTINGS_CATEGORIES.map(({ id, label, hint, icon: Icon }) => {
+          const here = id === current;
+          return (
+            <li key={id} className="flex items-start gap-2.5 p-4">
+              <span className="bg-muted text-muted-foreground grid size-7 shrink-0 place-items-center rounded-lg">
+                <Icon className="size-3.5" aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">{label}</p>
+                <p className="text-muted-foreground mt-0.5 text-[11px] leading-relaxed text-pretty">
+                  {hint}
+                </p>
+                {/* The one you are already reading says so rather than
+                    offering to take you where you are. */}
+                <button
+                  type="button"
+                  disabled={here}
+                  onClick={() => setSettingsCategory(id)}
+                  className="focus-ring border-border hover:bg-surface-hover mt-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold disabled:pointer-events-none disabled:opacity-45"
+                >
+                  {here ? copy.here : copy.open.replace("{name}", label)}
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+export function SettingsGuide(): ReactNode {
+  return <SettingsGuidePane />;
+}
+
 export function SettingsSidebar(): ReactNode {
   const {
     settingsCategory: requestedCategory,
@@ -315,6 +376,11 @@ export function SettingsSidebar(): ReactNode {
           );
         })}
       </div>
+      {/* The same bar every app's column ends with, so the way into a guide is
+          in one place across the shell rather than in one place per screen.
+          Nothing on the left of it: Settings has no second control to put
+          there, and an empty slot is not a reason to invent one. */}
+      <AppHelpBar slug="settings" pane={{ kind: "settings-guide", id: "" }} />
     </div>
   );
 }

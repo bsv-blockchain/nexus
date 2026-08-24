@@ -30,7 +30,11 @@ export type OnboardingSlug =
   | "timeline"
   /* Focus is a view rather than an app, like the Timeline and the store, so it
      needs a slug of its own here to have a guide at all. */
-  | "focus";
+  | "focus"
+  /* Settings has no fixture guide — its pane is built from the category list in
+     the component, because that list is filtered per build. The slug exists so
+     the help bar at the foot of its column has something to be about. */
+  | "settings";
 
 /**
  * The band at the top of the pane.

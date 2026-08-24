@@ -1,6 +1,7 @@
 "use client";
 
 import { ChainPolicyButton } from "@/components/apps/messages/chain-policy";
+import { SettingsGuide } from "@/components/apps/settings-app";
 import {
   NewPaymentLinkFooter,
   NewPaymentLinkPane,
@@ -104,6 +105,18 @@ export function DetailPane(): ReactNode {
         footer={<AppOnboardingFooter slug={slug} />}
       >
         <AppOnboardingPane slug={slug} />
+      </SidePane>
+    );
+  }
+
+  if (detailPane?.kind === "settings-guide") {
+    return (
+      <SidePane
+        open
+        title={content.settings.title}
+        onClose={closeDetailPane}
+      >
+        <SettingsGuide />
       </SidePane>
     );
   }
