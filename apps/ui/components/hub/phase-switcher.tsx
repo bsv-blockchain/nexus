@@ -1,6 +1,13 @@
 "use client";
 
 import {
+  getContentMode,
+  getContentModeServerSnapshot,
+  setContentMode,
+  subscribeContentMode,
+  type ContentMode,
+} from "@/lib/content-mode";
+import {
   DEMO_DATA_COMPILED_IN,
   resolveDataMode,
   setDataMode,
@@ -70,6 +77,19 @@ function chooseDataMode(next: DataMode): void {
   window.location.reload();
 }
 
+/**
+ * Same reasoning, same reload — see `chooseDataMode` above.
+ *
+ * `isEmptyContent()` is read inside the data accessors, which are plain
+ * functions called during render by eighty-odd components, none of which
+ * subscribe. Flipping it in place emptied the ones that happened to re-render
+ * and left the rest showing a ledger the wallet says is gone.
+ */
+function chooseContentMode(next: ContentMode): void {
+  setContentMode(next);
+  window.location.reload();
+}
+
 function Level({
   label,
   value,
@@ -135,6 +155,15 @@ export function PhaseSwitcher(): ReactNode {
       window.removeEventListener("keydown", onKey);
     };
   }, [open]);
+
+  /* Above the mount guard, unlike `resolveDataMode` below it: a hook cannot sit
+     after an early return, and this one is safe to call on the server because
+     it has a snapshot for it. */
+  const contentMode = useSyncExternalStore(
+    subscribeContentMode,
+    getContentMode,
+    getContentModeServerSnapshot,
+  );
 
   if (!mounted) return null;
 
@@ -227,6 +256,44 @@ export function PhaseSwitcher(): ReactNode {
                   {dataMode === "demo"
                     ? "Fixtures. Every surface has rows to show."
                     : "Only what a service can answer. Empty states are correct here."}
+                </p>
+              </div>
+            )}
+
+            {/* What is IN the fixtures, as against where they come from. The
+                two sit together because from a demo's point of view they are
+                one question — what will this screen show — and apart because
+                only one of them is about whether a service answered. */}
+            {DEMO_DATA_COMPILED_IN && (
+              <div className="border-border/60 border-b p-3">
+                <p className="text-muted-foreground pb-1.5 text-[10px] font-semibold tracking-[1px] uppercase">
+                  History
+                </p>
+                <div
+                  role="group"
+                  aria-label="Account history"
+                  className="bg-surface ring-border/60 grid grid-cols-2 gap-0.5 rounded-lg p-0.5 ring-1"
+                >
+                  {(["empty", "seeded"] as const).map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      aria-pressed={contentMode === option}
+                      onClick={() => chooseContentMode(option)}
+                      className={`focus-ring rounded-md px-2 py-1.5 text-xs font-semibold transition-colors ${
+                        contentMode === option
+                          ? "bg-accent/20 text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {option === "empty" ? "New user" : "Lived in"}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-muted-foreground mt-1.5 text-[10px] leading-relaxed text-pretty">
+                  {contentMode === "empty"
+                    ? "What somebody sees an hour after installing. The feed still has posts, because everyone's does."
+                    : "Somebody else's inbox, ledger and vault. For screenshots and walkthroughs."}
                 </p>
               </div>
             )}

@@ -10,6 +10,7 @@
  * async server queries.
  */
 import { courses, marketListings, proposals, vaultItems } from "./apps-content";
+import { isEmptyContent } from "@/lib/content-mode";
 import {
   chatMessages,
   chatThreads,
@@ -163,6 +164,19 @@ export { conversationNotes } from "./notes";
  * identity function. See lib/surfaces.ts for what "shipped" means.
  */
 /**
+ * What a surface returns when this session has no history of its own.
+ *
+ * Read here rather than at each of the eighty-odd call sites, because "empty"
+ * has to mean the same thing everywhere or the screens disagree about whether
+ * you are a new user. See lib/content-mode for what is emptied and what is not
+ * — the short version is that anything that could only exist because you used
+ * the app goes, and anything that is simply the world stays.
+ */
+function whenSeeded<T>(rows: T[]): T[] {
+  return isEmptyContent() ? [] : rows;
+}
+
+/**
  * Whether the Timeline is in the catalogue at all.
  *
  * Off until somebody asks for it in Preferences. Pushed in rather than read
@@ -244,10 +258,10 @@ export function getIdentityCertificates(): IdentityCertificate[] {
 
 /* connections (Connect app) + output_baskets (Baskets app) */
 export function getConnections(): Connection[] {
-  return connections;
+  return whenSeeded(connections);
 }
 export function getOutputBaskets(): OutputBasket[] {
-  return outputBaskets;
+  return whenSeeded(outputBaskets);
 }
 
 /* spaces */
@@ -327,6 +341,20 @@ export function getDownloads(spaceId?: string): DownloadItem[] {
 
 /* wallet */
 export function getWalletAccounts(): WalletAccount[] {
+  /*
+   * One wallet, empty, rather than none.
+   *
+   * A person who installed this an hour ago HAS a wallet — the shell makes one
+   * — they just have not been paid yet. Returning nothing would put every
+   * screen into "no wallet connected", which is a different and much rarer
+   * state, and would take the switcher, the handle row and the pay flow with
+   * it. So the four seeded accounts become the one you would actually have,
+   * with nothing in it.
+   */
+  if (isEmptyContent()) {
+    const first = walletAccounts[0];
+    return first ? [{ ...first, locked: false, balanceSatoshis: 0 }] : [];
+  }
   return walletAccounts;
 }
 /** The everyday wallet, for the surfaces that predate there being several. */
@@ -336,6 +364,7 @@ export function getWalletAccount(): WalletAccount {
   return account;
 }
 export function getWalletTransactions(accountId: string): WalletTransaction[] {
+  if (isEmptyContent()) return [];
   return walletTransactions
     .filter((tx) => tx.accountId === accountId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -368,7 +397,7 @@ export function getMintTiers(): MintTier[] {
 
 /* transactions */
 export function getChainTransactions(): ChainTransaction[] {
-  return [...chainTransactions].sort((a, b) =>
+  return [...whenSeeded(chainTransactions)].sort((a, b) =>
     b.createdAt.localeCompare(a.createdAt)
   );
 }
@@ -380,6 +409,7 @@ export function getChainTransaction(
 
 /* mail */
 export function getMailMessages(): MailMessage[] {
+  if (isEmptyContent()) return [];
   return [...mailMessages].sort((a, b) =>
     b.receivedAt.localeCompare(a.receivedAt)
   );
@@ -429,6 +459,7 @@ export function getTokenBySymbol(symbol: string): Token | undefined {
 export function getTokenBalances(
   accountId?: string,
 ): { token: Token; units: number }[] {
+  if (isEmptyContent()) return [];
   const rows = tokenBalances.filter(
     (row) => accountId === undefined || row.accountId === accountId,
   );
@@ -454,6 +485,7 @@ export function getTokenBalances(
  * holding — a share card, a search — rather than about one key.
  */
 export function getCollectibles(accountId?: string): Collectible[] {
+  if (isEmptyContent()) return [];
   return accountId === undefined
     ? collectibles
     : collectibles.filter((item) => item.accountId === accountId);
@@ -475,6 +507,7 @@ export function getAttributeColor(key: string): string | undefined {
 /* payment_links + split_bills */
 /** Links that pay into one wallet, newest first. */
 export function getPaymentLinks(accountId?: string): PaymentLink[] {
+  if (isEmptyContent()) return [];
   return [...paymentLinks]
     .filter((link) => accountId === undefined || link.accountId === accountId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -484,6 +517,7 @@ export function getPaymentLink(code: string): PaymentLink | undefined {
 }
 /** Splits settling through one wallet, newest first. */
 export function getSplitBills(accountId?: string): SplitBill[] {
+  if (isEmptyContent()) return [];
   return [...splitBills]
     .filter((bill) => accountId === undefined || bill.accountId === accountId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -495,6 +529,9 @@ export function getSplitBills(accountId?: string): SplitBill[] {
  * recently you exchanged messages, with favourites being the most recent.
  */
 export function getWalletContacts(accountId?: string): MessagePerson[] {
+  /* No address book. The people themselves still exist — the Timeline is full
+     of them — but "who have I paid" is a fact about having paid somebody. */
+  if (isEmptyContent()) return [];
   /*
    * Narrowed to the people this wallet has actually moved money with.
    *
@@ -571,7 +608,10 @@ export function addChatThread(thread: ChatThread): void {
 }
 
 function allThreads(): ChatThread[] {
-  return [...chatThreads, ...sessionThreads];
+  /* Seeded threads go; ones started this session stay. A conversation you
+     opened a minute ago is not somebody else's history, and watching it vanish
+     because the mode says "new user" would be the switch eating your work. */
+  return [...whenSeeded(chatThreads), ...sessionThreads];
 }
 
 /** Every conversation, newest activity first. */
@@ -634,6 +674,7 @@ export function getMarketListings(): MarketListing[] {
 
 /* vault */
 export function getVaultItems(): VaultItem[] {
+  if (isEmptyContent()) return [];
   return [...vaultItems].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
