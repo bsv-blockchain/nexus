@@ -75,7 +75,11 @@ export const SPACE_ICON_GROUPS: {
   {
     label: "Lifestyle",
     icons: [
-      { name: "House", Icon: House },
+      /* No House. The strip already has a house on it — the Home button at the
+         far left, which goes to whichever homescreen this install uses — and a
+         workspace wearing the same glyph two tabs along is two different
+         destinations drawn identically. `SpaceIcon` still renders one, because
+         an install made before this could be carrying it. */
       { name: "Coffee", Icon: Coffee },
       { name: "Music", Icon: Music },
       { name: "Camera", Icon: Camera },
@@ -90,7 +94,15 @@ export const SPACE_ICON_GROUPS: {
   },
 ];
 
-const ICON_LOOKUP: Record<string, LucideIcon> = {};
+/**
+ * Everything that can be DRAWN, which is a longer list than what can be picked.
+ *
+ * House left the picker — the strip's own Home button wears that glyph, and a
+ * workspace two tabs along wearing it too is two destinations drawn the same —
+ * but an install made before that is still carrying `lucide:House` on a
+ * workspace, and a stored value the renderer cannot resolve is a blank tab.
+ */
+const ICON_LOOKUP: Record<string, LucideIcon> = { House };
 for (const group of SPACE_ICON_GROUPS) {
   for (const icon of group.icons) ICON_LOOKUP[icon.name] = icon.Icon;
 }

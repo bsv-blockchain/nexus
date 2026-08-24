@@ -50,6 +50,7 @@ import {
   quoteFor,
   shuffleQuote,
   toggleBalance,
+  toggleCard,
   toggleGoal,
   toggleTask,
   today,
@@ -62,6 +63,7 @@ import { activeHandleFor, useSettings } from "@/lib/settings-store";
 import { motion } from "motion/react";
 import {
   Check,
+  ChevronDown,
   Eye,
   EyeOff,
   Pause,
@@ -341,11 +343,14 @@ function Stage(): ReactNode {
 /* ------------------------------------------------------------------- right */
 
 function Card({
+  id,
   title,
   children,
   action,
   grow = false,
 }: {
+  /** stable key for whether this card is shut; see `toggleCard` */
+  id: string;
   title: string;
   children: ReactNode;
   action?: ReactNode;
@@ -359,17 +364,48 @@ function Card({
    */
   grow?: boolean;
 }): ReactNode {
+  const { collapsed } = useHome();
+  const shut = collapsed[id] === true;
+  /* A shut card cannot also be the one taking up the slack, or shutting it
+     would leave the column with a tall empty header. */
+  const filling = grow && !shut;
+
   return (
     <section
       className={`bg-surface rounded-2xl p-4 ${
-        grow ? "flex min-h-40 flex-1 flex-col" : ""
+        filling ? "flex min-h-40 flex-1 flex-col" : ""
       }`}
     >
+      {/*
+        The whole heading is the control, not a chevron beside it.
+
+        A 14px target at the end of a row somebody has to aim at is the reason
+        collapsible panels feel fiddly; the row is already the width of the card
+        and is doing nothing else. `action` stays outside the button so the count
+        beside Tasks is readable rather than another thing being pressed.
+      */}
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">{title}</h2>
+        <button
+          type="button"
+          onClick={() => toggleCard(id)}
+          aria-expanded={!shut}
+          className="focus-ring -m-1 flex min-w-0 flex-1 items-center gap-1.5 rounded-md p-1 text-left"
+        >
+          <ChevronDown
+            className={`text-muted-foreground size-3.5 shrink-0 transition-transform ${
+              shut ? "-rotate-90" : ""
+            }`}
+            aria-hidden="true"
+          />
+          <h2 className="min-w-0 flex-1 text-sm font-semibold">{title}</h2>
+        </button>
         {action}
       </div>
-      <div className={`mt-3 ${grow ? "min-h-0 flex-1" : ""}`}>{children}</div>
+      {!shut && (
+        <div className={`mt-3 ${filling ? "min-h-0 flex-1" : ""}`}>
+          {children}
+        </div>
+      )}
     </section>
   );
 }
@@ -381,6 +417,7 @@ function Tasks(): ReactNode {
 
   return (
     <Card
+      id="tasks"
       title={copy.tasks}
       action={
         <span className="text-muted-foreground text-xs tabular-nums">
@@ -454,7 +491,7 @@ function Tasks(): ReactNode {
 function Note(): ReactNode {
   const { note } = useHome();
   return (
-    <Card title={copy.note} grow>
+    <Card id="note" title={copy.note} grow>
       <textarea
         value={note}
         onChange={(event) => setNote(event.target.value)}
@@ -524,7 +561,7 @@ function Timer(): ReactNode {
   const secs = timerLeft % 60;
 
   return (
-    <Card title={copy.timer}>
+    <Card id="timer" title={copy.timer}>
       <div className="flex flex-col items-center">
         <div className="bg-muted flex rounded-full p-0.5 text-[11px] font-semibold">
           {(["focus", "break"] as const).map((mode) => (
@@ -605,7 +642,7 @@ export function HomeApp(): ReactNode {
             <Note />
             {/* Last, because it is the only card here that is asking for
                 something rather than holding something of yours. */}
-            <Card title={syncCopy.title}>
+            <Card id="sync" title={syncCopy.title}>
               <NexusSyncPitch />
             </Card>
           </>

@@ -181,7 +181,18 @@ export function TitleBar(): ReactNode {
           const apps = installedFor(space.id).length;
           const tab = (
             <Control
-              onClick={() => setActiveSpaceId(space.id)}
+              /*
+               * Going somewhere either way.
+               *
+               * On a tab you are not in, that is the workspace. On the one you
+               * are already in, switching is a no-op — so the press did
+               * nothing, which is the worst thing a button in a title bar can
+               * do. It opens the workspaces screen instead, which is where you
+               * go to do anything ABOUT the workspace you are in.
+               */
+              onClick={() =>
+                active ? openProfilesManager() : setActiveSpaceId(space.id)
+              }
               aria-current={active ? "page" : undefined}
               className={`relative flex h-full max-w-48 min-w-0 items-center gap-2 px-3 text-xs font-medium transition-colors ${
                 active

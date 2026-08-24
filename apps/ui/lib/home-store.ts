@@ -60,6 +60,13 @@ export interface HomeState {
    * for anybody who never disagreed with what they were given.
    */
   quoteBySpace: Record<string, number>;
+  /**
+   * Which cards in the column are shut, by card id.
+   *
+   * Absent means open, so the default state is written nowhere and a card added
+   * later arrives open without anything having to say so.
+   */
+  collapsed: Record<string, boolean>;
 }
 
 /** Twenty-five minutes on, five off, which is the shape everybody means. */
@@ -85,6 +92,7 @@ const INITIAL: HomeState = {
   sessionsDay: "",
   showBalance: true,
   quoteBySpace: {},
+  collapsed: {},
 };
 
 /** Local, not UTC: "today" is the day where the person is, not at Greenwich. */
@@ -216,6 +224,10 @@ export function shuffleQuote(spaceId: string, count: number): void {
   let next = current;
   while (next === current) next = Math.floor(Math.random() * count);
   set({ quoteBySpace: { ...state.quoteBySpace, [spaceId]: next } });
+}
+
+export function toggleCard(id: string): void {
+  set({ collapsed: { ...state.collapsed, [id]: !state.collapsed[id] } });
 }
 
 export function toggleBalance(): void {

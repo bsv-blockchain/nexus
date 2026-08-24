@@ -943,8 +943,15 @@ export function AppearancePanel(): ReactNode {
   const settings = useSettings();
   const developer = useDeveloperMode();
   const [confirmReplay, setConfirmReplay] = useState(false);
-  const { spaces, setSpaceThemeColor, isInstalled, installApp, uninstallApp } =
-    useHub();
+  const {
+    spaces,
+    setSpaceThemeColor,
+    isInstalled,
+    installApp,
+    uninstallApp,
+    mainView,
+    setMainView,
+  } = useHub();
   const brandMode = useBrandMode();
   /* The rail only exists above the `md` breakpoint — below it the tab bar along
      the bottom is the navigation — so a switch about what the rail holds has
@@ -964,7 +971,34 @@ export function AppearancePanel(): ReactNode {
       <Group title={copy.homeTitle} hint={copy.homeHint}>
         <Choice
           value={settings.homescreen}
-          onPick={(next) => setSetting("homescreen", next)}
+          onPick={(next) => {
+            setSetting("homescreen", next);
+            /*
+             * Asking for the Timeline is asking for there to BE one.
+             *
+             * The two switches in this group can contradict each other: promote
+             * the Timeline to an app, disconnect it, then choose it here, and
+             * the answer was silently ignored — `homeView` has nothing to show,
+             * so it keeps handing back Focus. Picking it as your homescreen is
+             * unambiguous, so it reconnects rather than arguing.
+             */
+            if (next === "timeline" && !isInstalled("timeline")) {
+              installApp("timeline");
+            }
+            /*
+             * And go there, if you are looking at the other one.
+             *
+             * The setting decides what Home MEANS, and `?view=home` and
+             * `?view=timeline` each name one of them outright — so answering
+             * the question while standing on the losing screen changed
+             * everything except what was in front of you. Only when the canvas
+             * is already a homescreen: picking a homescreen from Settings is
+             * not a request to leave Settings.
+             */
+            if (mainView === "home" || mainView === "timeline") {
+              setMainView(next === "focus" ? "home" : "timeline");
+            }
+          }}
           options={[
             {
               id: "timeline" as const,
