@@ -56,6 +56,9 @@ function LibraryPanel(): ReactNode {
      has no column of its own — its list, note and timer are in the pane on the
      right — so it falls back to the workspace's, like every other view. */
   if (mainView === "timeline" && timelineHere) return <TimelineSidebar />;
+  /* Home has no column of its own — its list, note and timer are in the pane on
+     the right — so it takes the workspace's, like every other view. */
+  if (mainView === "home") return <SpacesPanel />;
   if (libraryTab === "apps") return <AppCollections />;
   /* The profiles manager holds every profile now, so this column stops being a
      second copy of the active one and answers what is true across them. */

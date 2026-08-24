@@ -336,6 +336,9 @@ export function MainView(): ReactNode {
    * happened since you last looked.
    */
   const showTimeline = mainView === "timeline";
+  /* Asked for by name. `?view=timeline` still falls back to it, but that is a
+     fallback rather than the only door. */
+  const showHome = mainView === "home";
   /*
    * Whether there is a Timeline to show.
    *
@@ -414,6 +417,7 @@ export function MainView(): ReactNode {
     !showSettings &&
     !showProfiles &&
     !showTimeline &&
+    !showHome &&
     isDesktop
   ) {
     return (
@@ -443,7 +447,7 @@ export function MainView(): ReactNode {
     <main
       id="main-content"
       className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden ${
-        !showStore && !showSettings && !showTimeline && canvasIsBrowser
+        !showStore && !showSettings && !showTimeline && !showHome && canvasIsBrowser
           ? "bg-canvas"
           : "bg-background"
       }`}
@@ -465,6 +469,8 @@ export function MainView(): ReactNode {
         <div className="min-h-0 flex-1">
           <GettingStartedPage />
         </div>
+      ) : showHome ? (
+        <HomeApp />
       ) : showTimeline ? (
         /*
          * The Timeline, or the dashboard where there is no Timeline to show.

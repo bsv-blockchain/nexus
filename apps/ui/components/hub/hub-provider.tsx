@@ -69,7 +69,11 @@ export type MainViewKind =
   | "store"
   | "profiles"
   | "settings"
-  | "timeline";
+  | "timeline"
+  /* The dashboard. Its own view rather than only what `timeline` falls back to,
+     so it can be linked to, returned to and pointed at — a screen defined by
+     the thing it replaces is a screen nobody can ask for. */
+  | "home";
 
 /**
  * A page this space has been on, as the command bar needs it.
@@ -267,6 +271,7 @@ const VIEWS: Record<string, MainViewKind> = {
   profiles: "profiles",
   settings: "settings",
   timeline: "timeline",
+  home: "home",
   /* The launcher's old address. Timeline took the slot the wall of app tiles
      used to hold, so a link somebody already has still lands somewhere true —
      it just rewrites itself to ?view=timeline on arrival. */
@@ -277,6 +282,7 @@ const VIEW_SLUGS: Partial<Record<MainViewKind, string>> = {
   profiles: "profiles",
   settings: "settings",
   timeline: "timeline",
+  home: "home",
 };
 
 function urlAppSlug(): string | null {

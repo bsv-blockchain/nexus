@@ -24,9 +24,13 @@
  * two different landscapes would be two different products saying it.
  */
 
+import { useWalletAccountId } from "@/components/apps/wallet/use-wallet-account";
 import { AppHelpBar } from "@/components/hub/app-help-bar";
 import { useHub } from "@/components/hub/hub-provider";
-import { content } from "@/lib/data";
+import { content, getChatThreads, getUnreadCount } from "@/lib/data";
+import { usd } from "@/lib/wallet";
+import { usePortfolio } from "@/lib/wallet-live";
+import { getWallet, labelOf, useWallets } from "@/lib/wallets-store";
 import {
   addTask,
   BREAK_SECONDS,
@@ -93,6 +97,63 @@ function greeting(hour: number): string {
   if (hour < 12) return copy.morning;
   if (hour < 18) return copy.afternoon;
   return copy.evening;
+}
+
+/**
+ * The two figures in the corner.
+ *
+ * Momentum puts the weather and a step count here. Neither is a thing this app
+ * knows, and a screen whose rule is "one true line about your day" cannot open
+ * with an invented 12°. These are the two numbers somebody glancing at a home
+ * screen actually wants: how much is waiting for them, and how much they have.
+ *
+ * Both are buttons, because a figure you cannot act on is decoration — the
+ * count opens Messages and the balance opens Payments.
+ */
+function Corner(): ReactNode {
+  const { openApp } = useHub();
+  useWallets();
+  const accountId = useWalletAccountId();
+  const { total } = usePortfolio(accountId);
+  const wallet = getWallet(accountId);
+
+  const unread = getChatThreads().reduce(
+    (sum, thread) => sum + getUnreadCount(thread.id),
+    0,
+  );
+
+  return (
+    <div className="absolute top-6 right-7 flex items-start gap-7 text-white">
+      {unread > 0 && (
+        <button
+          type="button"
+          onClick={() => openApp("messages")}
+          aria-label={copy.openMessages}
+          className="focus-ring rounded-lg text-right transition-opacity hover:opacity-80"
+        >
+          <span className="block text-2xl font-semibold tabular-nums drop-shadow-md">
+            {unread}
+          </span>
+          <span className="block text-xs drop-shadow-md">{copy.unread}</span>
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => openApp("wallet")}
+        aria-label={copy.openWallet}
+        className="focus-ring rounded-lg text-right transition-opacity hover:opacity-80"
+      >
+        <span className="block text-2xl font-semibold tabular-nums drop-shadow-md">
+          {usd(total)}
+        </span>
+        <span className="block text-xs drop-shadow-md">
+          {wallet
+            ? copy.balance.replace("{wallet}", labelOf(wallet))
+            : copy.balanceNone}
+        </span>
+      </button>
+    </div>
+  );
 }
 
 /* ------------------------------------------------------------------ centre */
@@ -162,6 +223,8 @@ function Stage(): ReactNode {
             "radial-gradient(ellipse 70% 55% at 50% 45%, rgba(0,0,0,0.55), rgba(0,0,0,0.28) 55%, transparent 78%)",
         }}
       />
+
+      <Corner />
 
       <div className="relative flex h-full flex-col items-center justify-center px-8 text-center text-white">
         <motion.div

@@ -3095,6 +3095,14 @@ export const content = {
     afternoon: "Good afternoon",
     evening: "Good evening",
     goalAsk: "What is your focus for today?",
+    /* Two figures, top right, where Momentum puts the weather and a step count.
+       Both of those would be invented here; these are things this app already
+       knows, which is the only reason they earn the corner. */
+    unread: "unread",
+    balance: "in {wallet}",
+    balanceNone: "no wallet",
+    openMessages: "Open Messages",
+    openWallet: "Open Payments",
     goalDone: "Mark today's focus done",
     goalClear: "Set a different focus",
     tasks: "Tasks",
