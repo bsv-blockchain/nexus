@@ -3158,6 +3158,10 @@ export const content = {
      * Three to seven words. Under a mountain, at the bottom of the screen, a
      * sentence long enough to need reading twice is a sentence nobody reads
      * once — and the one that used to sit here ran to sixteen.
+     *
+     * Twenty-seven of them, which is the number that makes the per-workspace
+     * draw work: with seven, two workspaces landed on the same line often
+     * enough to look like a bug rather than a coincidence.
      */
     quotes: [
       "The work is the point.",
@@ -3167,6 +3171,26 @@ export const content = {
       "You can do anything, but not everything.",
       "Well begun is half done.",
       "Doing beats planning to.",
+      "Start before you feel ready.",
+      "Small things, done often.",
+      "Finish one thing today.",
+      "Attention is the whole game.",
+      "The hard part is starting.",
+      "Leave it better than you found it.",
+      "One thing at a time.",
+      "Depth beats speed.",
+      "The plan is not the work.",
+      "Protect the first hour.",
+      "Progress hides in ordinary days.",
+      "Make room for the quiet.",
+      "Nothing good is built quickly.",
+      "Say no more often.",
+      "Begin badly, but begin.",
+      "Today is enough to carry.",
+      "Notice what you keep avoiding.",
+      "Half an hour, uninterrupted.",
+      "Let the hard thing be first.",
+      "Come back to it tomorrow.",
     ],
   },
 
