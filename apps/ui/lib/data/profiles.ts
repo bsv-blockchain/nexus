@@ -23,15 +23,19 @@ export const profiles: MessagePerson[] = [
     name: "Crumbs",
     handle: "crumbs",
     ecosystem: "nexus",
-    role: "Overlay engineer",
+    role: "Story teller",
     bio: "Builds overlay services and payment rails on BSV. Keeps one foot in the food-network world.",
     organization: "Nexus",
-    city: "Amsterdam",
+    city: "Zug",
     photo: "/avatars/fox1.png",
     avatarColors: ["#4353ff", "#0ea5e9", "#16a34a"],
     registeredAt: "2022-04-01T09:00:00.000Z",
-    expertise: ["Overlay services", "Payment rails", "SPV"],
-    contact: { email: "vincent@nexus.example", github: "crumbs" },
+    expertise: ["Product design", "Business development", "Philosophy"],
+    links: [
+      { label: "Portfolio", url: "https://crumbs.example" },
+      { label: "Writing", url: "https://crumbs.example/notes" },
+    ],
+    contact: { email: "crumbs@nexus.free", github: "crumbs" },
   },
   {
     /*
@@ -54,6 +58,7 @@ export const profiles: MessagePerson[] = [
     avatarColors: ["#f59e0b", "#ec4899", "#8b5cf6"],
     registeredAt: "2024-09-16T09:00:00.000Z",
     expertise: ["Interface design", "Typography", "Receipts"],
+    links: [{ label: "Studio", url: "https://breadcrumbs.example" }],
     contact: { email: "studio@breadcrumbs.example", github: "breadcrumbs" },
   },
 ];

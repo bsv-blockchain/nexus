@@ -763,6 +763,19 @@ export interface AttestedSocial {
   handle: string;
 }
 
+/**
+ * One row of somebody's "link in bio".
+ *
+ * A label as well as a URL, because a bare address is a thing to read rather
+ * than a thing to press: "Portfolio" says what is on the other side and
+ * `https://…` makes you work it out. The label is what the card draws; the URL
+ * is what it opens.
+ */
+export interface ProfileLink {
+  label: string;
+  url: string;
+}
+
 export interface MessagePerson {
   id: string;
   name: string;
@@ -790,6 +803,14 @@ export interface MessagePerson {
    * have been linked, which is the common case.
    */
   socials?: AttestedSocial[];
+  /**
+   * The handful of places this person points people at.
+   *
+   * Ordered, because the first one is the one somebody actually wants found.
+   * Absent means none set, which is the common case and renders as nothing
+   * rather than as an empty heading.
+   */
+  links?: ProfileLink[];
   /** avatar image path; `null` falls back to the generated colour tile */
   photo: string | null;
   /** colour stops for the generated fallback avatar */

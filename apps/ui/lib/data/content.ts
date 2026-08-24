@@ -1082,9 +1082,15 @@ export const content = {
         "Display name and avatar are supplied by the ecosystem host and are not attested.",
       localIdentity: "A Nexus identity, with no external profile to open.",
       /* section headings, each divided by a rule */
-      about: "About",
+      /* "Bio" rather than "About", so the card and the field that fills it
+         are called the same thing. */
+      about: "Bio",
       registered: "Registered",
-      expertise: "Expertise",
+      /* "Interests" rather than "Expertise": one is a claim about competence
+         that nobody can check, the other is a statement about attention that
+         does not need checking. */
+      expertise: "Interests",
+      links: "Links",
       lastSeen: "Last seen",
       contactInfo: "Contact",
       recentConversations: "Recent conversations",
@@ -1102,6 +1108,7 @@ export const content = {
         "Published by the ecosystem host, which does not attest to it. Check another way before acting on it.",
       noConversations: "No conversations yet.",
       noExpertise: "Not stated.",
+      noLinks: "None yet.",
       /* relative ages, e.g. "4 years 3 months ago" */
       age: {
         year: "year",
@@ -2621,12 +2628,21 @@ export const content = {
     handle: "Handle",
     role: "Role",
     bio: "Bio",
+    /* Interests moved up here with the bio, so "Who you are" holds the three
+       things somebody writes about themselves and "Where you are" holds the two
+       facts about where they sit. */
+    expertise: "Interests",
+    expertiseHint: "Separate with commas.",
+    linksLabel: "Link in bio",
+    linksHint: "A name, and where it goes. Shown as buttons on your card.",
+    linkLabel: "Label",
+    linkUrl: "Link",
+    linkAdd: "Add another link",
+    linkRemove: "Remove this link",
     whereTitle: "Where you are",
-    whereHint: "Context under the name, and what you are known for.",
+    whereHint: "Context under the name.",
     organization: "Organisation",
     city: "City",
-    expertise: "Known for",
-    expertiseHint: "Separate with commas.",
     contactTitle: "Off-protocol contact",
     contactHint:
       "Published beside your handle. Nothing here is attested \u2014 it is a claim, like the display name.",

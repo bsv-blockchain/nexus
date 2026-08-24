@@ -41,6 +41,7 @@ import {
   whoisFor,
 } from "@/lib/messages";
 import {
+  ExternalLink,
   BadgeCheck,
   CalendarDays,
   ChevronDown,
@@ -171,8 +172,20 @@ export function WhoisCard({
   compact?: boolean;
 }): ReactNode {
   const copy = content.messages;
-  const { openApp, closeDetailPane, setMessageThread, conversationIcons } =
-    useHub();
+  const {
+    openApp,
+    closeDetailPane,
+    setMessageThread,
+    conversationIcons,
+    openLinkInBrowser,
+    activeSpaceId,
+  } = useHub();
+  /* Somebody else's site opens where somebody else's sites open — a tab in
+     Browse, with the address bar and the back button that come with it. */
+  const openLink = (url: string): void => {
+    openLinkInBrowser(activeSpaceId, url.startsWith("http") ? url : `https://${url}`);
+    closeDetailPane();
+  };
   const who = whoisFor(person);
   const eco = getEcosystem(person.ecosystem);
   const presence = presenceFor(person.id);
@@ -280,6 +293,38 @@ export function WhoisCard({
           </p>
         )}
       </Section>
+
+      {/*
+        The places somebody points people at.
+
+        Buttons rather than a list of addresses: the label is the useful half —
+        "Portfolio" says what is on the other side where `https://…` makes you
+        work it out — and pressing it is what anybody wants to do with it.
+        Absent when nobody has set any, rather than a heading over "None yet",
+        because an empty section on a stranger's card is a fact about the form
+        rather than about them.
+      */}
+      {person.links?.length ? (
+        <Section title={copy.whois.links}>
+          <ul className="flex flex-wrap gap-1.5">
+            {person.links.map((link) => (
+              <li key={`${link.label}${link.url}`}>
+                <button
+                  type="button"
+                  onClick={() => openLink(link.url)}
+                  className="focus-ring border-border bg-surface hover:bg-surface-hover flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold"
+                >
+                  {link.label || link.url}
+                  <ExternalLink
+                    className="text-muted-foreground size-3"
+                    aria-hidden="true"
+                  />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
 
       <Section title={copy.whois.lastSeen}>
         <p className="flex items-center gap-2 text-sm">

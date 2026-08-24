@@ -19,6 +19,7 @@ import { WhoisCard } from "@/components/apps/messages/whois-card";
 import { TabRow, Tab } from "@/components/hub/tab-row";
 import { useHub } from "@/components/hub/hub-provider";
 import { content } from "@/lib/data";
+import type { ProfileLink } from "@/lib/data/types";
 import {
   addProfile,
   connectProfile,
@@ -27,7 +28,7 @@ import {
   updateProfile,
   useProfiles,
 } from "@/lib/profiles-store";
-import { Check, Plus, Trash2 } from "lucide-react";
+import { Check, Plus, Trash2, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 const copy = content.profilesPanel;
@@ -106,6 +107,23 @@ export function ProfilesPanel(): ReactNode {
               multiline
               onChange={(value) => updateProfile(selected.id, { bio: value })}
             />
+            <Field
+              label={copy.expertise}
+              hint={copy.expertiseHint}
+              value={(selected.expertise ?? []).join(", ")}
+              onChange={(value) =>
+                updateProfile(selected.id, {
+                  expertise: value
+                    .split(",")
+                    .map((tag) => tag.trim())
+                    .filter(Boolean),
+                })
+              }
+            />
+            <LinksField
+              links={selected.links ?? []}
+              onChange={(links) => updateProfile(selected.id, { links })}
+            />
           </Group>
 
           <Group title={copy.whereTitle} hint={copy.whereHint}>
@@ -120,19 +138,6 @@ export function ProfilesPanel(): ReactNode {
               label={copy.city}
               value={selected.city}
               onChange={(value) => updateProfile(selected.id, { city: value })}
-            />
-            <Field
-              label={copy.expertise}
-              hint={copy.expertiseHint}
-              value={(selected.expertise ?? []).join(", ")}
-              onChange={(value) =>
-                updateProfile(selected.id, {
-                  expertise: value
-                    .split(",")
-                    .map((tag) => tag.trim())
-                    .filter(Boolean),
-                })
-              }
             />
           </Group>
 
@@ -209,6 +214,90 @@ export function ProfilesPanel(): ReactNode {
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * The link-in-bio rows, and the button that adds one.
+ *
+ * A label and a URL together, because they are one fact: a bare address is a
+ * thing to read rather than a thing to press. Rows are added rather than a
+ * fixed number offered — most people have one and some have five, and a form
+ * with five empty pairs in it reads as five things you have failed to fill in.
+ *
+ * A row with neither field filled is dropped on the way out, so adding one and
+ * changing your mind costs nothing and leaves nothing behind.
+ */
+function LinksField({
+  links,
+  onChange,
+}: {
+  links: ProfileLink[];
+  onChange: (next: ProfileLink[]) => void;
+}): ReactNode {
+  const copy = content.profilesPanel;
+  const rows = links.length > 0 ? links : [{ label: "", url: "" }];
+
+  const write = (next: ProfileLink[]): void =>
+    onChange(next.filter((row) => row.label.trim() || row.url.trim()));
+
+  return (
+    <div className="px-3 py-2.5">
+      <p className="text-sm font-medium">{copy.linksLabel}</p>
+      <p className="text-muted-foreground mt-0.5 text-[11px] text-pretty">
+        {copy.linksHint}
+      </p>
+      <div className="mt-2 space-y-2">
+        {rows.map((row, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <input
+              value={row.label}
+              onChange={(event) =>
+                write(
+                  rows.map((entry, i) =>
+                    i === index ? { ...entry, label: event.target.value } : entry,
+                  ),
+                )
+              }
+              placeholder={copy.linkLabel}
+              aria-label={copy.linkLabel}
+              className="focus-ring border-border bg-surface min-w-0 flex-1 rounded-lg border px-2.5 py-1.5 text-sm outline-none"
+            />
+            <input
+              value={row.url}
+              onChange={(event) =>
+                write(
+                  rows.map((entry, i) =>
+                    i === index ? { ...entry, url: event.target.value } : entry,
+                  ),
+                )
+              }
+              placeholder={copy.linkUrl}
+              aria-label={copy.linkUrl}
+              inputMode="url"
+              className="focus-ring border-border bg-surface min-w-0 flex-[2] rounded-lg border px-2.5 py-1.5 text-sm outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => write(rows.filter((_, i) => i !== index))}
+              aria-label={copy.linkRemove}
+              title={copy.linkRemove}
+              className="focus-ring text-muted-foreground hover:text-foreground shrink-0 rounded-md p-1"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={() => onChange([...links, { label: "", url: "" }])}
+        className="focus-ring text-muted-foreground hover:text-foreground mt-2 flex items-center gap-1.5 rounded-md text-xs font-semibold"
+      >
+        <Plus className="size-3.5" aria-hidden="true" />
+        {copy.linkAdd}
+      </button>
+    </div>
   );
 }
 
