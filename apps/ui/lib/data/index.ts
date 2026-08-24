@@ -162,8 +162,26 @@ export { conversationNotes } from "./notes";
  * so narrowing here narrows all of them at once. In a demo build the filter is the
  * identity function. See lib/surfaces.ts for what "shipped" means.
  */
+/**
+ * Whether the Timeline is in the catalogue at all.
+ *
+ * Off until somebody asks for it in Preferences. Pushed in rather than read
+ * out, because this module is fixtures and reaching into the settings store
+ * from here would make every catalogue read depend on a client store — the
+ * same shape, and the same reason, as `setBsvPricing` in lib/wallet.
+ *
+ * @see lib/settings-store.ts `timelineAsApp`, which is what calls this
+ */
+let timelineListed = false;
+
+export function setTimelineListed(on: boolean): void {
+  timelineListed = on;
+}
+
 export function getHubApps(): HubApp[] {
-  return shippedApps(hubApps);
+  return shippedApps(hubApps).filter(
+    (app) => app.slug !== "timeline" || timelineListed,
+  );
 }
 export function getHubApp(slug: HubApp["slug"]): HubApp | undefined {
   return getHubApps().find((app) => app.slug === slug);

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Timeline">
+  <defs>
+    <linearGradient id="timeline-ground" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0ea5e9" />
+      <stop offset="1" stop-color="#22d3ee" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#timeline-ground)" />
+  <!-- A column of posts, newest at the top and each one shorter than the last:
+       the glyph is a feed read downwards, which is what the app is. The dots
+       are the authors, so the mark says "people" as well as "list" — the same
+       way Roadmap's three columns say "board". -->
+  <g fill="#ffffff">
+    <circle cx="134" cy="160" r="30" />
+    <rect x="188" y="140" width="190" height="40" rx="20" />
+    <circle cx="134" cy="256" r="30" opacity="0.72" />
+    <rect x="188" y="236" width="142" height="40" rx="20" opacity="0.72" />
+    <circle cx="134" cy="352" r="30" opacity="0.42" />
+    <rect x="188" y="332" width="96" height="40" rx="20" opacity="0.42" />
+  </g>
+</svg>

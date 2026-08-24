@@ -2254,6 +2254,12 @@ export const content = {
       railWorkspacesLabel: "Show Workspaces",
       railWorkspacesHint:
         "Puts it back at the top of the rail. Your workspaces are in the column beside it either way.",
+      timelineLabel: "Show Timeline as app",
+      /* Says what turning it on costs as well as what it gives: the Timeline
+         stops being a screen nothing can take away, which is the point and also
+         the surprise. */
+      timelineHint:
+        "Gives it a tile on the rail and a listing in the App Store, so it can be disconnected like anything else. Home shows your dashboard instead.",
       themeTitle: "Theme",
       themeHint: "Light, dark, or whatever this device is set to.",
       modeLight: "Light",
@@ -3075,6 +3081,45 @@ export const content = {
          otherwise. */
       footnote: "Permissions are scoped to this workspace's wallet.",
     },
+  },
+
+  /**
+   * The home screen, for when the Timeline is not it.
+   *
+   * Short and unbranded on purpose: this screen is mostly a photograph and one
+   * question, and every extra word on it is a word between somebody and their
+   * morning.
+   */
+  home: {
+    morning: "Good morning",
+    afternoon: "Good afternoon",
+    evening: "Good evening",
+    goalAsk: "What is your focus for today?",
+    goalDone: "Mark today's focus done",
+    goalClear: "Set a different focus",
+    tasks: "Tasks",
+    tasksLeft: "{n} left",
+    taskNew: "New task",
+    taskRemove: "Remove",
+    note: "Notes",
+    notePlaceholder: "Anything worth keeping.",
+    focus: "Focus",
+    focusMode: "Focus",
+    breakMode: "Break",
+    start: "Start",
+    pause: "Pause",
+    reset: "Start it over",
+    /* One a day, chosen by the date. Short enough to read without deciding to,
+       which is the only length that works under a photograph. */
+    quotes: [
+      "Slow progress is better than no progress.",
+      "The work is the point.",
+      "Begin, and the rest is easier.",
+      "You can do anything, but not everything.",
+      "What you do every day matters more than what you do once in a while.",
+      "Well begun is half done.",
+      "Doing beats planning to.",
+    ],
   },
 
   /** shell chrome that is not any one app's */

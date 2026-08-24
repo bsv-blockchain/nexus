@@ -943,7 +943,8 @@ export function AppearancePanel(): ReactNode {
   const settings = useSettings();
   const developer = useDeveloperMode();
   const [confirmReplay, setConfirmReplay] = useState(false);
-  const { spaces, setSpaceThemeColor, isInstalled, installApp } = useHub();
+  const { spaces, setSpaceThemeColor, isInstalled, installApp, uninstallApp } =
+    useHub();
   const brandMode = useBrandMode();
   /* The rail only exists above the `md` breakpoint — below it the tab bar along
      the bottom is the navigation — so a switch about what the rail holds has
@@ -965,6 +966,22 @@ export function AppearancePanel(): ReactNode {
             hint={copy.railWorkspacesHint}
             value={settings.workspacesInRail}
             onChange={(next) => setSetting("workspacesInRail", next)}
+          />
+          {/* Beside it because it is the same question — what the rail holds —
+              and because both answers change what the window opens on. */}
+          <Toggle
+            label={copy.timelineLabel}
+            hint={copy.timelineHint}
+            value={settings.timelineAsApp}
+            onChange={(next) => {
+              setSetting("timelineAsApp", next);
+              /* Connected on the way in, so the tile it promises is there when
+                 the switch finishes moving. Turning it off leaves the listing
+                 disconnected rather than deleting it, which is what every other
+                 app does and what makes turning it back on cheap. */
+              if (next) installApp("timeline");
+              else uninstallApp("timeline");
+            }}
           />
         </Group>
       )}

@@ -712,6 +712,31 @@ export const hubApps: HubApp[] = [
     createdAt: "2026-07-30T09:00:00.000Z",
   },
   {
+    id: "app-timeline",
+    slug: "timeline",
+    name: "Timeline",
+    shortName: "Timeline",
+    description:
+      "Posts from the people and ecosystems you follow, and a place to say something back.",
+    tagline: "What people are saying",
+    developer: "nexus",
+    popularity: 88,
+    iconSrc: "/icons/timeline.svg",
+    accent: "#0ea5e9",
+    /* Not connected out of the box. It is the home screen until somebody asks
+       for it as an app, and a listing that arrives already installed would put
+       a second way into the same screen on the rail of every install. */
+    defaultInstalled: false,
+    category: "social",
+    categories: ["social", "media"],
+    version: "2026.08.1",
+    repoId: "repo-nexus",
+    reviews: 1_940,
+    rating: 4.7,
+    publisher: "Nexus",
+    createdAt: "2026-08-20T09:00:00.000Z",
+  },
+  {
     id: "app-clndr",
     slug: "clndr",
     /* Spelled in full and read as "Clndr", which is how the publisher writes

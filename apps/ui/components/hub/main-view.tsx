@@ -24,6 +24,7 @@ import { AppName } from "@/components/hub/app-name";
 import { hasContextSidebar } from "@/components/hub/app-context-sidebar";
 import { SettingsApp } from "@/components/apps/settings-app";
 import { TimelineApp } from "@/components/apps/timeline-app";
+import { HomeApp } from "@/components/apps/home-app";
 import { AppStore } from "@/components/hub/app-store";
 import { DetailPane } from "@/components/hub/detail-pane";
 import { GettingStartedPage } from "@/components/hub/getting-started-page";
@@ -102,6 +103,7 @@ const appViews: Record<NativeAppSlug, () => ReactNode> = {
   identity: IdentityApp,
   attestations: AttestationsApp,
   roadmap: RoadmapApp,
+  timeline: TimelineApp,
 };
 
 /** Whether anything can draw this app — a view we ship, or a site to frame. */
@@ -314,7 +316,8 @@ function SplitCanvas(): ReactNode {
 
 /** The right-hand canvas: Getting Started, app store, Profiles manager, or the active app. */
 export function MainView(): ReactNode {
-  const { activeApp, activePage, mainView, splitApp } = useHub();
+  const { activeApp, activePage, mainView, splitApp, isInstalled } = useHub();
+  const settings = useSettings();
   const isDesktop = useIsDesktop();
   const showStore = mainView === "store";
   /* Settings paints on the app background, never the browser page's. Without
@@ -333,6 +336,16 @@ export function MainView(): ReactNode {
    * happened since you last looked.
    */
   const showTimeline = mainView === "timeline";
+  /*
+   * Whether there is a Timeline to show.
+   *
+   * Two ways there is not: the listing is switched off in Preferences and the
+   * feed is simply the home screen — which is the default and shows the feed —
+   * or it is switched on, which makes it an app, and the app has since been
+   * disconnected. Only the second takes it away, which is the whole point of
+   * promoting it: a screen you cannot remove is not a screen you chose.
+   */
+  const timelineHere = !settings.timelineAsApp || isInstalled("timeline");
   const canvasIsBrowser = activeApp === "browser" && !activePage;
 
   /*
@@ -453,10 +466,24 @@ export function MainView(): ReactNode {
           <GettingStartedPage />
         </div>
       ) : showTimeline ? (
+        /*
+         * The Timeline, or the dashboard where there is no Timeline to show.
+         *
+         * `view=timeline` is what Home, the Workspaces panel and the end of the
+         * first run all reach for, so it is the name of the HOME SCREEN rather
+         * than of one app — and the screen behind that name has to survive the
+         * app being disconnected. It is: promoted to an app and then removed,
+         * this falls back to the dashboard, which answers the question somebody
+         * opening a window at nine in the morning is actually asking.
+         */
+        timelineHere ? (
         /* No DetailPane: the Timeline brings its own right-hand column, and two
            panes on the same edge would be one too many places for a reference
            to open. */
-        <TimelineApp />
+          <TimelineApp />
+        ) : (
+          <HomeApp />
+        )
       ) : showStore ? (
         /* Same row Settings uses: the store, then whatever pane is open beside
            it. Without this the Mods guide had a button and nowhere to render —

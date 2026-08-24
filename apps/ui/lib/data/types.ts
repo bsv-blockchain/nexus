@@ -26,7 +26,8 @@ export type NativeAppSlug =
   | "mail"
   | "identity"
   | "attestations"
-  | "roadmap";
+  | "roadmap"
+  | "timeline";
 
 /**
  * Listings that are somebody else's website.

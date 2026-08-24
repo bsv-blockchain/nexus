@@ -20,6 +20,7 @@
  * setting, it is a light.
  */
 
+import { setTimelineListed } from "@/lib/data";
 import { useSyncExternalStore } from "react";
 
 /** What a capability does when a page asks for it. */
@@ -135,6 +136,19 @@ export interface SettingsState {
    * workspaces at once wants it exactly where it was.
    */
   workspacesInRail: boolean;
+  /**
+   * Whether the Timeline is an app rather than only the home screen.
+   *
+   * Off by default, which is the shape it has always had: a view with no icon,
+   * reached from Workspaces and from Home. On, it becomes a listing like any
+   * other — a tile on the rail, a card in the store, a row in a workspace's
+   * connections — and therefore something that can be disconnected. Which is
+   * the point: the screen you land on should be a choice, and it cannot be one
+   * while the only way to it is a view nothing can remove.
+   *
+   * @see lib/data/index.ts `setTimelineListed` — how the catalogue learns
+   */
+  timelineAsApp: boolean;
 
   /* ---- Autofill ------------------------------------------------------- */
   autofillAddresses: boolean;
@@ -281,6 +295,8 @@ const INITIAL: SettingsState = {
   // Off by default. See the field above for why a button nobody asked for is
   // not the same thing as a feature nobody can reach.
   workspacesInRail: false,
+  // See the field above. Off is the behaviour every install has had until now.
+  timelineAsApp: false,
 
   autofillAddresses: true,
   autofillCards: false,
@@ -424,6 +440,9 @@ if (typeof window !== "undefined") {
 }
 
 let state: SettingsState = load();
+/* Once at module load, for the value that came back from storage. `emit` covers
+   every change after this, but nothing has emitted yet. */
+setTimelineListed(state.timelineAsApp);
 const listeners = new Set<() => void>();
 
 /**
@@ -435,6 +454,10 @@ const listeners = new Set<() => void>();
  */
 function emit(): void {
   scheduleSave();
+  /* The catalogue is a plain function with no way to subscribe, so it is told
+     rather than asked. Here rather than in the setter, so a value restored from
+     storage lands as well as one somebody just changed. */
+  setTimelineListed(state.timelineAsApp);
   for (const listener of listeners) listener();
 }
 

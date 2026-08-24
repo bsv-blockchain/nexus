@@ -22,6 +22,7 @@ import { TitleBar } from "@/components/hub/title-bar";
 import { SpacesPanel } from "@/components/hub/spaces-panel";
 import { SettingsSidebar } from "@/components/apps/settings-app";
 import { CustomThemeProvider } from "@/components/hub/theme-provider";
+import { useSettings } from "@/lib/settings-store";
 import { WalletGate } from "@/components/hub/wallet-gate";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -29,7 +30,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 const slideEase = [0.4, 0, 0.2, 1] as const;
 
 function LibraryPanel(): ReactNode {
-  const { libraryTab, mainView } = useHub();
+  const { libraryTab, mainView, isInstalled } = useHub();
+  const settings = useSettings();
+  /* See MainView, which decides the canvas from the same two facts. */
+  const timelineHere = !settings.timelineAsApp || isInstalled("timeline");
   // Settings takes the panel as well as the canvas: the categories are the only
   // way to move around it, so they have to be where every other app's list is.
   if (mainView === "settings") {
@@ -46,7 +50,12 @@ function LibraryPanel(): ReactNode {
   /* The Timeline's contextual column, in the slot every app's contextual column
      uses. It is a view rather than an app, so `hasContextSidebar` further down
      never sees it — this is where it gets its width. */
-  if (mainView === "timeline") return <TimelineSidebar />;
+  /* The Timeline's own column, but only while there is a Timeline. Once the
+     app has been disconnected the canvas is the home dashboard, and a column of
+     feed filters beside it would be filtering a feed that is not there. Home
+     has no column of its own — its list, note and timer are in the pane on the
+     right — so it falls back to the workspace's, like every other view. */
+  if (mainView === "timeline" && timelineHere) return <TimelineSidebar />;
   if (libraryTab === "apps") return <AppCollections />;
   /* The profiles manager holds every profile now, so this column stops being a
      second copy of the active one and answers what is true across them. */
