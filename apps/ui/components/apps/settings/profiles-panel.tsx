@@ -247,22 +247,49 @@ function LinksField({
       <p className="text-muted-foreground mt-0.5 text-[11px] text-pretty">
         {copy.linksHint}
       </p>
+      {/*
+        One block per link, rather than two fields on a row.
+
+        Side by side, a label and a URL read as two settings that happen to be
+        adjacent — and the URL, which is the longer of the two by far, gets
+        whatever width the label leaves. Stacked inside a box they read as what
+        they are: one thing, with a name and a destination.
+      */}
       <div className="mt-2 space-y-2">
         {rows.map((row, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <input
-              value={row.label}
-              onChange={(event) =>
-                write(
-                  rows.map((entry, i) =>
-                    i === index ? { ...entry, label: event.target.value } : entry,
-                  ),
-                )
-              }
-              placeholder={copy.linkLabel}
-              aria-label={copy.linkLabel}
-              className="focus-ring border-border bg-surface min-w-0 flex-1 rounded-lg border px-2.5 py-1.5 text-sm outline-none"
-            />
+          <div
+            key={index}
+            className="border-border bg-surface space-y-2 rounded-lg border p-2.5"
+          >
+            <div className="flex items-center gap-2">
+              <input
+                value={row.label}
+                onChange={(event) =>
+                  write(
+                    rows.map((entry, i) =>
+                      i === index
+                        ? { ...entry, label: event.target.value }
+                        : entry,
+                    ),
+                  )
+                }
+                placeholder={copy.linkLabel}
+                aria-label={copy.linkLabel}
+                className="focus-ring border-border bg-background min-w-0 flex-1 rounded-lg border px-2.5 py-1.5 text-sm outline-none"
+              />
+              {/* Beside the label rather than under both fields: it removes the
+                  block, and the top of a block is where you look to be rid of
+                  it. */}
+              <button
+                type="button"
+                onClick={() => write(rows.filter((_, i) => i !== index))}
+                aria-label={copy.linkRemove}
+                title={copy.linkRemove}
+                className="focus-ring text-muted-foreground hover:text-foreground shrink-0 rounded-md p-1"
+              >
+                <X className="size-3.5" aria-hidden="true" />
+              </button>
+            </div>
             <input
               value={row.url}
               onChange={(event) =>
@@ -275,17 +302,8 @@ function LinksField({
               placeholder={copy.linkUrl}
               aria-label={copy.linkUrl}
               inputMode="url"
-              className="focus-ring border-border bg-surface min-w-0 flex-[2] rounded-lg border px-2.5 py-1.5 text-sm outline-none"
+              className="focus-ring border-border bg-background w-full rounded-lg border px-2.5 py-1.5 text-sm outline-none"
             />
-            <button
-              type="button"
-              onClick={() => write(rows.filter((_, i) => i !== index))}
-              aria-label={copy.linkRemove}
-              title={copy.linkRemove}
-              className="focus-ring text-muted-foreground hover:text-foreground shrink-0 rounded-md p-1"
-            >
-              <X className="size-3.5" aria-hidden="true" />
-            </button>
           </div>
         ))}
       </div>

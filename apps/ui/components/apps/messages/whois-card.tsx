@@ -18,6 +18,7 @@ import {
   getEffectsServerSnapshot,
   subscribeEffects,
 } from "@/lib/command-effects";
+import { Favicon } from "@/components/hub/favicon";
 import { useHub } from "@/components/hub/hub-provider";
 import { groupIconOf } from "@/lib/group-icon";
 import { Tooltip } from "@/components/hub/tooltip";
@@ -306,17 +307,32 @@ export function WhoisCard({
       */}
       {person.links?.length ? (
         <Section title={copy.whois.links}>
-          <ul className="flex flex-wrap gap-1.5">
+          {/* One per line and full width, rather than pills that wrap. Two
+              labels of different lengths on one row read as a tag cloud — a
+              description of somebody — where these are destinations, and a
+              destination wants to look like a thing you press. */}
+          <ul className="flex flex-col gap-1.5">
             {person.links.map((link) => (
               <li key={`${link.label}${link.url}`}>
                 <button
                   type="button"
                   onClick={() => openLink(link.url)}
-                  className="focus-ring border-border bg-surface hover:bg-surface-hover flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold"
+                  className="focus-ring border-border bg-surface hover:bg-surface-hover relative flex w-full items-center justify-center rounded-full border px-9 py-1.5 text-xs font-semibold"
                 >
-                  {link.label || link.url}
+                  {/* Absolute, so the label is centred on the BUTTON rather
+                      than on what is left of it once a mark and a chevron have
+                      taken their share. */}
+                  <Favicon
+                    url={link.url}
+                    letter={(link.label || link.url).slice(0, 1).toUpperCase()}
+                    color="#4353ff"
+                    size={16}
+                    rounded="rounded-full"
+                    className="absolute left-2"
+                  />
+                  <span className="truncate">{link.label || link.url}</span>
                   <ExternalLink
-                    className="text-muted-foreground size-3"
+                    className="text-muted-foreground absolute right-3 size-3"
                     aria-hidden="true"
                   />
                 </button>
