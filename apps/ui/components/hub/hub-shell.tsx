@@ -1,6 +1,12 @@
 "use client";
 
 import { FirstRun } from "@/components/hub/first-run";
+import {
+  getContentMode,
+  getContentModeServerSnapshot,
+  hydrateContentMode,
+  subscribeContentMode,
+} from "@/lib/content-mode";
 import { useFirstRunSeen } from "@/lib/first-run";
 import { PhaseSwitcher } from "@/components/hub/phase-switcher";
 import { HelpCircle } from "@/components/hub/help-circle";
@@ -26,7 +32,13 @@ import { CustomThemeProvider } from "@/components/hub/theme-provider";
 import { useSettings } from "@/lib/settings-store";
 import { WalletGate } from "@/components/hub/wallet-gate";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 
 const slideEase = [0.4, 0, 0.2, 1] as const;
 
@@ -233,6 +245,24 @@ function Shell(): ReactNode {
 }
 
 export function HubShell(): ReactNode {
+  /*
+   * Adopt the stored content mode, once, after the first paint.
+   *
+   * Subscribed as well as triggered: the mode is read inside the data
+   * accessors, which are plain functions that eighty-odd components call during
+   * render and none of them subscribe to. Holding it here means the one state
+   * change re-renders the whole shell and every accessor is asked again — which
+   * is what makes the correction arrive without a reload.
+   *
+   * See lib/content-mode for why both sides have to start empty.
+   */
+  useSyncExternalStore(
+    subscribeContentMode,
+    getContentMode,
+    getContentModeServerSnapshot,
+  );
+  useEffect(hydrateContentMode, []);
+
   return (
     <HubProvider>
       <CustomThemeProvider>
