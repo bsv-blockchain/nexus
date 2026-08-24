@@ -148,7 +148,7 @@ export function FocusSidebar(): ReactNode {
       </div>
 
       <div className="mt-auto">
-        <AppHelpBar slug="timeline" />
+        <AppHelpBar slug="focus" />
       </div>
     </div>
   );

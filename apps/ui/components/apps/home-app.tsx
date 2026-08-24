@@ -15,7 +15,8 @@
  * content — the same three columns, so switching between them does not move
  * the furniture.
  *
- *   left     the workspace's own column, unchanged, rendered by LibraryPanel
+ *   left     Focus's own column — the date, what is left, sessions, and the
+ *            way into this guide, like every other app's column
  *   centre   the photograph and the day
  *   right    the tasks, the note and the timer
  *
@@ -25,7 +26,7 @@
  */
 
 import { useWalletAccountId } from "@/components/apps/wallet/use-wallet-account";
-import { AppHelpBar } from "@/components/hub/app-help-bar";
+import { DetailPane } from "@/components/hub/detail-pane";
 import { useHub } from "@/components/hub/hub-provider";
 import { content, getChatThreads, getUnreadCount } from "@/lib/data";
 import { usd } from "@/lib/wallet";
@@ -107,7 +108,11 @@ function Corner(): ReactNode {
   );
 
   return (
-    <div className="absolute top-6 right-7 flex items-start gap-7 text-white">
+    /* `z-10`, because the block that carries the clock is a later sibling that
+       fills the whole stage — transparent, and so invisible, but still the
+       thing under the pointer everywhere including up here. Without this the
+       eye and both figures looked live and were not. */
+    <div className="absolute top-6 right-7 z-10 flex items-start gap-7 text-white">
       {unread > 0 && (
         <button
           type="button"
@@ -559,20 +564,29 @@ function Timer(): ReactNode {
 /* -------------------------------------------------------------------- page */
 
 export function HomeApp(): ReactNode {
+  const { detailPane } = useHub();
   return (
     <div className="flex h-full min-h-0 gap-2 p-2">
       <div className="min-h-0 min-w-0 flex-1">
         <Stage />
       </div>
-      {/* The same right-hand column the Timeline has, at the same width, so the
-          two screens are the same screen with a different middle. */}
+      {/*
+        The same right-hand column the Timeline has, at the same width, so the
+        two screens are the same screen with a different middle — and it gives
+        the same slot up to a reference pane for the same reason. The guide
+        opened from the left column has to appear somewhere, and a third column
+        beside these two would leave the photograph a strip.
+      */}
       <aside className="hidden w-80 shrink-0 flex-col gap-2 overflow-y-auto lg:flex">
-        <Tasks />
-        <Timer />
-        <Note />
-        <div className="mt-auto">
-          <AppHelpBar slug="timeline" />
-        </div>
+        {detailPane ? (
+          <DetailPane />
+        ) : (
+          <>
+            <Tasks />
+            <Timer />
+            <Note />
+          </>
+        )}
       </aside>
     </div>
   );

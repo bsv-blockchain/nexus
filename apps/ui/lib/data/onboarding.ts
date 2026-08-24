@@ -23,7 +23,14 @@ type AppSlug = HubApp["slug"];
  * pane, one help button, and the store's entry is written the same way as
  * everything else's.
  */
-export type OnboardingSlug = AppSlug | "store" | "profiles" | "timeline";
+export type OnboardingSlug =
+  | AppSlug
+  | "store"
+  | "profiles"
+  | "timeline"
+  /* Focus is a view rather than an app, like the Timeline and the store, so it
+     needs a slug of its own here to have a guide at all. */
+  | "focus";
 
 /**
  * The band at the top of the pane.
@@ -79,6 +86,51 @@ function band(slug: string, alt: string): OnboardingMedia {
 }
 
 export const appOnboarding: AppOnboarding[] = [
+  {
+    slug: "focus",
+    title: "Focus",
+    headline: "One day at a time, over a photograph.",
+    features: [
+      {
+        id: "goal",
+        title: "One line for the day",
+        summary: "Written in the morning, struck through in the evening.",
+        body: "A day holds one thing you will remember having done, so the screen asks for one rather than for a list. It is kept with the date it was written on: yesterday's is not a goal you failed, it is a goal that expired, so the screen asks again rather than showing you somebody else's Tuesday.",
+      },
+      {
+        id: "tasks",
+        title: "A list, and a note",
+        summary: "The small things, beside the one big thing.",
+        body: "The list is for what has to happen today and nothing else — it is not a project tracker, and the column beside it counts what is left rather than what has ever been on it. Clear what is finished when the list stops being what is left and starts being a history.",
+        steps: [
+          "Type into the last row to add a task; press Enter to keep it.",
+          "Clear what is finished from the column on the left.",
+        ],
+      },
+      {
+        id: "timer",
+        title: "Twenty-five minutes, counted",
+        summary: "Focus, then break, and the column keeps the score.",
+        body: "The timer is the ordinary pomodoro, and the only thing it does differently is remember. Every finished focus block is a mark in the column — breaks do not count, because a break you sat through is not work — so at the end of the day there is a number where usually there is only a feeling.",
+        steps: [
+          "The count resets overnight, like the goal.",
+          "Only whole finished blocks count; stopping early does not.",
+        ],
+      },
+      {
+        id: "corner",
+        title: "What is waiting, and what you have",
+        summary: "Unread messages and your wallet, in the corner.",
+        body: "The two figures are real: the unread count is the same one the rail's dot reads, and the balance is the wallet this workspace spends from, named underneath so it is never the wrong one. The eye shuts the balance without moving anything, for the times somebody is reading over your shoulder.",
+      },
+      {
+        id: "swap",
+        title: "Or have the feed instead",
+        summary: "Preferences decides what a window opens on.",
+        body: "Focus and the Timeline answer different questions — what am I doing today, and what has happened since I last looked — and neither is right for everybody. Preferences carries the choice under Homescreen, and the first run makes a guess from what you said you were there for.",
+      },
+    ],
+  },
   {
     slug: "timeline",
     title: "Timeline",
