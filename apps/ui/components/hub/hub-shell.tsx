@@ -19,6 +19,7 @@ import { MobileBrowser } from "@/components/hub/mobile-browser";
 import { MobileSheet } from "@/components/hub/mobile-sheet";
 import { ShareModal } from "@/components/hub/share-modal";
 import { TitleBar } from "@/components/hub/title-bar";
+import { FocusSidebar } from "@/components/apps/home/focus-sidebar";
 import { SpacesPanel } from "@/components/hub/spaces-panel";
 import { SettingsSidebar } from "@/components/apps/settings-app";
 import { CustomThemeProvider } from "@/components/hub/theme-provider";
@@ -56,9 +57,9 @@ function LibraryPanel(): ReactNode {
      has no column of its own — its list, note and timer are in the pane on the
      right — so it falls back to the workspace's, like every other view. */
   if (mainView === "timeline" && timelineHere) return <TimelineSidebar />;
-  /* Home has no column of its own — its list, note and timer are in the pane on
-     the right — so it takes the workspace's, like every other view. */
-  if (mainView === "home") return <SpacesPanel />;
+  /* Its own, and not filters: there is nothing on Focus to narrow. See the note
+     on the component for what a contextual column says instead. */
+  if (mainView === "home") return <FocusSidebar />;
   if (libraryTab === "apps") return <AppCollections />;
   /* The profiles manager holds every profile now, so this column stops being a
      second copy of the active one and answers what is true across them. */

@@ -36,6 +36,22 @@ export interface HomeState {
   timerLeft: number;
   timerRunning: boolean;
   timerMode: "focus" | "break";
+  /**
+   * Focus blocks finished today, and the day they were finished on.
+   *
+   * Kept with a date for the same reason the goal is: four sessions is a good
+   * Tuesday and a meaningless number on Wednesday morning.
+   */
+  sessions: number;
+  sessionsDay: string;
+  /**
+   * Whether the balance in the corner is readable.
+   *
+   * A home screen is the one screen somebody else is most likely to be looking
+   * at over a shoulder, and it is the only screen in this app that shows money
+   * without being asked. Off hides the figure and keeps the button.
+   */
+  showBalance: boolean;
 }
 
 /** Twenty-five minutes on, five off, which is the shape everybody means. */
@@ -57,6 +73,9 @@ const INITIAL: HomeState = {
   timerLeft: FOCUS_SECONDS,
   timerRunning: false,
   timerMode: "focus",
+  sessions: 0,
+  sessionsDay: "",
+  showBalance: true,
 };
 
 /** Local, not UTC: "today" is the day where the person is, not at Greenwich. */
@@ -155,6 +174,20 @@ export function setNote(note: string): void {
   set({ note });
 }
 
+/** Focus blocks finished today, which is zero on any day but the one recorded. */
+export function sessionsFor(day: string): number {
+  return state.sessionsDay === day ? state.sessions : 0;
+}
+
+export function toggleBalance(): void {
+  set({ showBalance: !state.showBalance });
+}
+
+/** Drops what is finished, so the list is what is left rather than a history. */
+export function clearDoneTasks(): void {
+  set({ tasks: state.tasks.filter((task) => !task.done) });
+}
+
 /* ---- the timer ---------------------------------------------------------- */
 
 export function startTimer(): void {
@@ -175,10 +208,20 @@ export function tickTimer(): void {
   /* Run out: swap sides and stop. Rolling straight into the next block would
      start a break nobody asked for and, worse, start it unwatched. */
   const next = state.timerMode === "focus" ? "break" : "focus";
+  /* Only a finished FOCUS block counts. A break you sat through is not work,
+     and a counter that rewards both is a counter that means nothing. */
+  const finished = state.timerMode === "focus";
+  const day = today(new Date());
   set({
     timerMode: next,
     timerLeft: next === "focus" ? FOCUS_SECONDS : BREAK_SECONDS,
     timerRunning: false,
+    ...(finished
+      ? {
+          sessions: (state.sessionsDay === day ? state.sessions : 0) + 1,
+          sessionsDay: day,
+        }
+      : {}),
   });
 }
 

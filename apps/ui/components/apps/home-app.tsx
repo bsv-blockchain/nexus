@@ -45,53 +45,33 @@ import {
   setTimerMode,
   startTimer,
   tickTimer,
+  toggleBalance,
   toggleGoal,
   toggleTask,
   today,
   useHome,
 } from "@/lib/home-store";
+import { useMinute } from "@/lib/clock";
 import { useReducedMotion } from "@/lib/motion";
 import { profileFor, useProfiles } from "@/lib/profiles-store";
 import { activeHandleFor, useSettings } from "@/lib/settings-store";
 import { motion } from "motion/react";
-import { Check, Pause, Play, Plus, RotateCcw, X } from "lucide-react";
+import {
+  Check,
+  Eye,
+  EyeOff,
+  Pause,
+  Play,
+  Plus,
+  RotateCcw,
+  X,
+} from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
 const copy = content.home;
 
 /** The photograph, and the reason it is this one — see the note at the top. */
 const BACKDROP = "/images/ricardo-gomez-angel-58uZCE8zrdk-unsplash.jpg";
-
-/**
- * A clock that is a clock.
- *
- * Ticks on the minute rather than the second: the figure is 72px of the screen
- * and a digit changing every second in the corner of the eye is a thing to
- * watch instead of a thing to know the time by. Aligned to the next minute on
- * mount rather than every sixty seconds from whenever the component happened to
- * mount, so it turns over when the minute does.
- */
-function useNow(): Date {
-  const [now, setNow] = useState<Date | null>(null);
-  useEffect(() => {
-    const set = (): void => setNow(new Date());
-    set();
-    const toMinute = 60_000 - (Date.now() % 60_000);
-    let interval: ReturnType<typeof setInterval> | undefined;
-    const timeout = setTimeout(() => {
-      set();
-      interval = setInterval(set, 60_000);
-    }, toMinute);
-    return () => {
-      clearTimeout(timeout);
-      if (interval) clearInterval(interval);
-    };
-  }, []);
-  /* Null until the first effect, because the server has no clock the client
-     will agree with and a hydration mismatch on the largest text on the page is
-     the one place it is guaranteed to be seen. */
-  return now ?? new Date(0);
-}
 
 function greeting(hour: number): string {
   if (hour < 12) return copy.morning;
@@ -112,6 +92,7 @@ function greeting(hour: number): string {
  */
 function Corner(): ReactNode {
   const { openApp } = useHub();
+  const { showBalance } = useHome();
   useWallets();
   const accountId = useWalletAccountId();
   const { total } = usePortfolio(accountId);
@@ -137,21 +118,46 @@ function Corner(): ReactNode {
           <span className="block text-xs drop-shadow-md">{copy.unread}</span>
         </button>
       )}
-      <button
-        type="button"
-        onClick={() => openApp("wallet")}
-        aria-label={copy.openWallet}
-        className="focus-ring rounded-lg text-right transition-opacity hover:opacity-80"
-      >
-        <span className="block text-2xl font-semibold tabular-nums drop-shadow-md">
-          {usd(total)}
-        </span>
-        <span className="block text-xs drop-shadow-md">
-          {wallet
-            ? copy.balance.replace("{wallet}", labelOf(wallet))
-            : copy.balanceNone}
-        </span>
-      </button>
+      {/*
+        The figure and the eye are two controls, not one.
+
+        A home screen is the likeliest screen in this app for somebody else to
+        be reading over a shoulder, and the only one that shows money without
+        being asked to. Hiding it leaves the row exactly where it was — same
+        width, same wallet name underneath — because a balance that disappears
+        takes the layout with it and announces that there was something to hide.
+      */}
+      <div className="flex items-start gap-2">
+        <button
+          type="button"
+          onClick={() => openApp("wallet")}
+          aria-label={copy.openWallet}
+          className="focus-ring rounded-lg text-right transition-opacity hover:opacity-80"
+        >
+          <span className="block text-2xl font-semibold tabular-nums drop-shadow-md">
+            {showBalance ? usd(total) : "••••"}
+          </span>
+          <span className="block text-xs drop-shadow-md">
+            {wallet
+              ? copy.balance.replace("{wallet}", labelOf(wallet))
+              : copy.balanceNone}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={toggleBalance}
+          aria-pressed={!showBalance}
+          aria-label={showBalance ? copy.balanceHide : copy.balanceShow}
+          title={showBalance ? copy.balanceHide : copy.balanceShow}
+          className="focus-ring mt-1.5 rounded-md p-1 text-white/70 transition-colors hover:text-white"
+        >
+          {showBalance ? (
+            <Eye className="size-4" aria-hidden="true" />
+          ) : (
+            <EyeOff className="size-4" aria-hidden="true" />
+          )}
+        </button>
+      </div>
     </div>
   );
 }
@@ -159,7 +165,10 @@ function Corner(): ReactNode {
 /* ------------------------------------------------------------------ centre */
 
 function Stage(): ReactNode {
-  const now = useNow();
+  /* Once a minute, from the one timer the app keeps — see lib/clock. A digit
+     changing every second at this size is a thing to watch instead of a thing
+     to read the time by. */
+  const now = new Date(useMinute());
   /* Subscribed, not read: `goalFor` and `activeHandleFor` both reach into
      module state, so without these the greeting and the goal would keep
      whatever they were rendered with. */
@@ -482,7 +491,7 @@ function Timer(): ReactNode {
   const secs = timerLeft % 60;
 
   return (
-    <Card title={copy.focus}>
+    <Card title={copy.timer}>
       <div className="flex flex-col items-center">
         <div className="bg-muted flex rounded-full p-0.5 text-[11px] font-semibold">
           {(["focus", "break"] as const).map((mode) => (

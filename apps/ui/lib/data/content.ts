@@ -2249,11 +2249,22 @@ export const content = {
       devBrowseConnected: "Browse is connected",
       /* The rail's own contents. Desktop only, because there is no rail on a
          phone to put a button on. */
-      railTitle: "Workspaces in rail",
-      railHint: "Whether the rail has a button for them.",
+      /* "Rail" rather than "Workspaces in rail": the group holds two switches
+         now and neither of them is only about workspaces. */
+      railTitle: "Rail",
+      railHint:
+        "Workspaces & Timeline in rail as native experiences or as apps.",
       railWorkspacesLabel: "Show Workspaces",
       railWorkspacesHint:
         "Puts it back at the top of the rail. Your workspaces are in the column beside it either way.",
+      homeTitle: "Homescreen",
+      homeHint: "What a new window opens on.",
+      homeTimeline: "Timeline",
+      homeTimelineHint:
+        "Posts from the people and ecosystems you follow, and what has happened since you last looked.",
+      homeFocus: "Focus",
+      homeFocusHint:
+        "Your day: one goal, a list, a note and a timer, over a photograph.",
       timelineLabel: "Show Timeline as app",
       /* Says what turning it on costs as well as what it gives: the Timeline
          stops being a screen nothing can take away, which is the point and also
@@ -3103,6 +3114,19 @@ export const content = {
     balanceNone: "no wallet",
     openMessages: "Open Messages",
     openWallet: "Open Payments",
+    balanceShow: "Show the balance",
+    balanceHide: "Hide the balance",
+    /* The column beside it. Not filters — there is nothing to filter — but the
+       three facts the screen produces and does not otherwise keep. */
+    columnTitle: "Focus",
+    columnToday: "Today",
+    columnNoGoal: "No focus set yet.",
+    columnDone: "Done",
+    columnOf: "{done} of {total}",
+    columnClear: "Clear what is finished",
+    columnSessions: "Sessions",
+    columnNoSessions: "Twenty-five minutes at a time.",
+    columnSessionsHint: "Each one is a finished twenty-five minutes.",
     goalDone: "Mark today's focus done",
     goalClear: "Set a different focus",
     tasks: "Tasks",
@@ -3111,7 +3135,10 @@ export const content = {
     taskRemove: "Remove",
     note: "Notes",
     notePlaceholder: "Anything worth keeping.",
-    focus: "Focus",
+    /* The card, which is not the screen: the screen is Focus and the column
+       says so, and two headings reading "Focus" one above the other would say
+       nothing about which was which. */
+    timer: "Timer",
     focusMode: "Focus",
     breakMode: "Break",
     start: "Start",

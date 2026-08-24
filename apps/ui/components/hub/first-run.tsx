@@ -9,6 +9,8 @@ import { useApplyPresets } from "@/components/hub/use-apply-presets";
 import { setChosenPresets } from "@/lib/presets-store";
 import { startTour } from "@/lib/tour-store";
 import { useHostOverlay } from "@/lib/wallet-data";
+import { homeView } from "@/lib/home-view";
+import { getSettings } from "@/lib/settings-store";
 import { toast } from "sonner";
 import { checkHandle, suggestHandle } from "@/lib/handle-suggest";
 import { useReducedMotion } from "@/lib/motion";
@@ -403,9 +405,16 @@ function Presets(): ReactNode {
         onDone={(chosen) => {
           setChosenPresets(chosen);
           applyPresets(chosen);
-          /* Set before the fade rather than after, so the feed is already
-             there to be revealed. */
-          setMainView("timeline");
+          /* Set before the fade rather than after, so the screen is already
+             there to be revealed. Which screen is the applier's answer, taken
+             back out of settings rather than recomputed here — it has just
+             written it from the very presets this passed in. */
+          setMainView(
+            homeView(
+              getSettings().homescreen,
+              !getSettings().timelineAsApp,
+            ),
+          );
           setLeaving(true);
           /* Unmounted only once it is invisible; `markFirstRunSeen` is what
              takes this whole tree away. */

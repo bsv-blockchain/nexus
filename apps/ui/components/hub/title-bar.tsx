@@ -23,6 +23,8 @@
 
 import { useHub } from "@/components/hub/hub-provider";
 import { useCustomTheme } from "@/components/hub/theme-provider";
+import { homeView } from "@/lib/home-view";
+import { useSettings } from "@/lib/settings-store";
 import { SpaceIcon } from "@/components/hub/space-icon";
 import { Tooltip } from "@/components/hub/tooltip";
 import { content } from "@/lib/data";
@@ -105,8 +107,15 @@ export function TitleBar(): ReactNode {
     setActiveSpaceId,
     setMainView,
     openProfilesManager,
+    isInstalled,
   } = useHub();
   const update = useUpdateState();
+  const settings = useSettings();
+  /* Home is a question, not a destination — see lib/home-view. */
+  const home = homeView(
+    settings.homescreen,
+    !settings.timelineAsApp || isInstalled("timeline"),
+  );
 
   /* Nothing at all outside the shell, including during the server render. */
   if (!platform) return null;
@@ -146,7 +155,7 @@ export function TitleBar(): ReactNode {
           /* Home is the Timeline of whichever workspace is current — the one
              place in the app that is about everything rather than about one
              app. It does not change workspace on the way. */
-          onClick={() => setMainView("timeline")}
+          onClick={() => setMainView(home)}
           aria-label={copy.home}
           className="hover:bg-surface-hover px-4"
         >

@@ -959,6 +959,27 @@ export function AppearancePanel(): ReactNode {
     <>
       {/* First, because it is the only thing on this page that changes what the
           window looks like rather than what it is coloured. */}
+      {/* Above the rail, because it answers the bigger question: what you see
+          when the window opens, rather than what is down the side of it. */}
+      <Group title={copy.homeTitle} hint={copy.homeHint}>
+        <Choice
+          value={settings.homescreen}
+          onPick={(next) => setSetting("homescreen", next)}
+          options={[
+            {
+              id: "timeline" as const,
+              label: copy.homeTimeline,
+              hint: copy.homeTimelineHint,
+            },
+            {
+              id: "focus" as const,
+              label: copy.homeFocus,
+              hint: copy.homeFocusHint,
+            },
+          ]}
+        />
+      </Group>
+
       {isDesktop && (
         <Group title={copy.railTitle} hint={copy.railHint}>
           <Toggle

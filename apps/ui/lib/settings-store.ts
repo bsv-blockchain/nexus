@@ -149,6 +149,17 @@ export interface SettingsState {
    * @see lib/data/index.ts `setTimelineListed` — how the catalogue learns
    */
   timelineAsApp: boolean;
+  /**
+   * Which screen Home opens on.
+   *
+   * The Timeline is a room with other people in it; Focus is a room with your
+   * own day in it. Both are reasonable first things to see and neither is
+   * reasonable for everybody, so this is asked rather than assumed — seeded
+   * from the presets on the way in, and changeable in Preferences after.
+   *
+   * @see components/hub/use-apply-presets.ts — what the first run seeds it with
+   */
+  homescreen: "timeline" | "focus";
 
   /* ---- Autofill ------------------------------------------------------- */
   autofillAddresses: boolean;
@@ -297,6 +308,9 @@ const INITIAL: SettingsState = {
   workspacesInRail: false,
   // See the field above. Off is the behaviour every install has had until now.
   timelineAsApp: false,
+  /* The feed, for anybody who never answers the question. The first run
+     overwrites this from the presets before it is ever read. */
+  homescreen: "timeline",
 
   autofillAddresses: true,
   autofillCards: false,

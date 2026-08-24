@@ -4,6 +4,7 @@ import { WalletMark } from "@/components/apps/wallet/wallet-switcher";
 import { AppHelpBar } from "@/components/hub/app-help-bar";
 import { useHub } from "@/components/hub/hub-provider";
 import { useCreateWorkspace } from "@/components/hub/use-create-workspace";
+import { homeView } from "@/lib/home-view";
 import { SpaceIcon } from "@/components/hub/space-icon";
 import { content, MAX_HANDLES } from "@/lib/data";
 import { activeHandleFor, useSettings } from "@/lib/settings-store";
@@ -68,9 +69,15 @@ export function ProfilesSidebar(): ReactNode {
     toggleRail,
     mainView,
     setMainView,
+    isInstalled,
   } = useHub();
   const createWorkspace = useCreateWorkspace();
   const settings = useSettings();
+  /* The same question the title bar's Home asks — see lib/home-view. */
+  const home = homeView(
+    settings.homescreen,
+    !settings.timelineAsApp || isInstalled("timeline"),
+  );
   useWallets();
 
   const wallets = allWallets();
@@ -103,10 +110,10 @@ export function ProfilesSidebar(): ReactNode {
           text link would read as one more row in the list below. */}
       <button
         type="button"
-        onClick={() => setMainView("timeline")}
-        aria-current={mainView === "timeline" ? "page" : undefined}
+        onClick={() => setMainView(home)}
+        aria-current={mainView === home ? "page" : undefined}
         className={`focus-ring ${COLUMN_TILE} mx-0.5 text-center text-sm font-bold transition-colors ${
-          mainView === "timeline"
+          mainView === home
             ? "bg-accent/15"
             : "bg-surface-raised hover:bg-surface-hover"
         }`}
