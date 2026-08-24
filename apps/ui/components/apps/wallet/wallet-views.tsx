@@ -1,6 +1,7 @@
 "use client";
 
 import { Handle } from "@/components/apps/messages/ecosystem-tag";
+import { useWalletAccountId } from "@/components/apps/wallet/use-wallet-account";
 import { MemberAvatar } from "@/components/apps/messages/member-avatar";
 import {
   PriceChart,
@@ -600,7 +601,8 @@ export function PaymentLinks({
   /* Made-this-session first, then the seeded ones. Concatenated here rather
      than inside the accessor, so lib/data stays only what was written into it —
      see lib/payment-links-store. */
-  const all = [...useCreatedPaymentLinks(), ...getPaymentLinks()];
+  const accountId = useWalletAccountId();
+  const all = [...useCreatedPaymentLinks(), ...getPaymentLinks(accountId)];
   const settings = useSettings();
   const [tab, setTab] = useState<LinkTab>("active");
   const [preview, setPreview] = useState<PaymentLink | null>(null);

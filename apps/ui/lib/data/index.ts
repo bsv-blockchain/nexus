@@ -399,8 +399,12 @@ export function getTokenBySymbol(symbol: string): Token | undefined {
   const needle = symbol.trim().toLowerCase();
   return tokens.find((t) => t.symbol.toLowerCase() === needle);
 }
-export function getTokenBalances(): { token: Token; units: number }[] {
+/** What one wallet holds, or the union of all of them when none is named. */
+export function getTokenBalances(
+  accountId?: string,
+): { token: Token; units: number }[] {
   return tokenBalances
+    .filter((row) => accountId === undefined || row.accountId === accountId)
     .map(({ tokenId, units }) => {
       const token = getToken(tokenId);
       return token ? { token, units } : null;
@@ -409,11 +413,24 @@ export function getTokenBalances(): { token: Token; units: number }[] {
 }
 
 /* collectibles */
-export function getCollectibles(): Collectible[] {
-  return collectibles;
+/**
+ * What one wallet holds, or everything when no wallet is named.
+ *
+ * Every reader in the Wallet app passes an account, because a wallet you have
+ * selected showing another wallet's items is the bug this argument exists to
+ * prevent. It stays optional for the readers that are genuinely about the whole
+ * holding — a share card, a search — rather than about one key.
+ */
+export function getCollectibles(accountId?: string): Collectible[] {
+  return accountId === undefined
+    ? collectibles
+    : collectibles.filter((item) => item.accountId === accountId);
 }
-export function getCollectiblesIn(bucket: CollectibleBucket): Collectible[] {
-  return collectibles.filter((item) => item.bucket === bucket);
+export function getCollectiblesIn(
+  bucket: CollectibleBucket,
+  accountId?: string,
+): Collectible[] {
+  return getCollectibles(accountId).filter((item) => item.bucket === bucket);
 }
 export function getCollectible(id: string): Collectible | undefined {
   return collectibles.find((item) => item.id === id);
@@ -424,16 +441,20 @@ export function getAttributeColor(key: string): string | undefined {
 }
 
 /* payment_links + split_bills */
-export function getPaymentLinks(): PaymentLink[] {
-  return [...paymentLinks].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt)
-  );
+/** Links that pay into one wallet, newest first. */
+export function getPaymentLinks(accountId?: string): PaymentLink[] {
+  return [...paymentLinks]
+    .filter((link) => accountId === undefined || link.accountId === accountId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 export function getPaymentLink(code: string): PaymentLink | undefined {
   return paymentLinks.find((link) => link.code === code);
 }
-export function getSplitBills(): SplitBill[] {
-  return [...splitBills].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+/** Splits settling through one wallet, newest first. */
+export function getSplitBills(accountId?: string): SplitBill[] {
+  return [...splitBills]
+    .filter((bill) => accountId === undefined || bill.accountId === accountId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 /**
@@ -441,7 +462,27 @@ export function getSplitBills(): SplitBill[] {
  * you have paid is a handle you can message and vice versa. Ordered by how
  * recently you exchanged messages, with favourites being the most recent.
  */
-export function getWalletContacts(): MessagePerson[] {
+export function getWalletContacts(accountId?: string): MessagePerson[] {
+  /*
+   * Narrowed to the people this wallet has actually moved money with.
+   *
+   * Derived from the ledger rather than stored: a contact list is a fact about
+   * what a key has done, and a second table saying who a wallet "knows" would
+   * be free to disagree with the transactions that are the evidence. A wallet
+   * with no payments to a handle shows the directory unfiltered, because an
+   * empty Contacts tab teaches nothing about what the tab is for.
+   */
+  if (accountId !== undefined) {
+    const handles = new Set(
+      walletTransactions
+        .filter((tx) => tx.accountId === accountId)
+        .map((tx) => tx.counterparty.replace(/^@/, "").toLowerCase()),
+    );
+    const paid = messagePeople.filter((person) =>
+      handles.has(person.handle.toLowerCase()),
+    );
+    if (paid.length > 0) return paid;
+  }
   const order = new Map<string, number>();
   const threads = chatThreads;
   for (const thread of threads) {

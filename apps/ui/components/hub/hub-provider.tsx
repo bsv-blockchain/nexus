@@ -28,7 +28,13 @@ import {
   type RoadmapStatus,
   type SpaceProfile,
 } from "@/lib/data";
-import { useSettings } from "@/lib/settings-store";
+import { pruneHandlesTo, useSettings } from "@/lib/settings-store";
+import {
+  nextWorkspaceName,
+  pickUnused,
+  WORKSPACE_ICONS,
+} from "@/lib/data/workspace-defaults";
+import { pruneWalletsTo } from "@/lib/wallets-store";
 import { isVisibleInPhase, usePhase } from "@/lib/phase";
 import {
   reconcileRail,
@@ -647,7 +653,8 @@ interface HubState {
     targetId: string,
     position: "before" | "after"
   ) => void;
-  createSpace: () => void;
+  /** returns the new workspace's id, so a caller can finish dressing it */
+  createSpace: () => string;
   deleteSpace: (id: string) => void;
   addSpaceFolder: (spaceId: string) => void;
   addLiveFolder: (spaceId: string, title: string, icon: string) => void;
@@ -1161,6 +1168,24 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   const [identityKeys, setIdentityKeys] =
     useState<IdentityKey[]>(getIdentityKeys);
   const [spaces, setSpaces] = useState<Space[]>(getSpaces);
+  /*
+   * Hand back what a profile that no longer exists was holding.
+   *
+   * Only one profile may wear a handle, so a claim that outlives its claimant
+   * takes the name with it — greyed out on behalf of somewhere nobody can
+   * visit, with no way left to free it. Two ways that happens: a profile is
+   * deleted, and a reload, since settings are persisted and profiles are not.
+   * Both are the same reconciliation, so it is done here rather than on the
+   * delete path, where only the first would be caught.
+   *
+   * Here because this is the only part of the app that knows which profiles are
+   * real; the stores hold assignments and take the list as told.
+   */
+  useEffect(() => {
+    const ids = spaces.map((space) => space.id);
+    pruneHandlesTo(ids);
+    pruneWalletsTo(ids);
+  }, [spaces]);
   const [spaceItemsBySpace, setSpaceItemsBySpace] = useState<
     Record<string, SpaceItem[]>
   >(seedSpaceItemsBySpace);
@@ -2155,14 +2180,27 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     []
   );
 
+  /*
+   * Named, marked and (by the caller) coloured, rather than "New Profile".
+   *
+   * Four workspaces called "New Profile" with the same house on them is four
+   * rows nobody can tell apart, and the fix costs nothing to somebody who was
+   * going to rename it anyway. Name and mark are decided here because this is
+   * where the existing ones are in scope; the colour is not, because the theme
+   * store sits INSIDE this provider — see `useCreateWorkspace`, which is what
+   * the buttons actually call.
+   */
   const createSpace = useCallback(() => {
     const id = newId("space");
     setSpaces((current) => [
       ...current,
       {
         id,
-        name: "New Profile",
-        emoji: "lucide:House",
+        name: nextWorkspaceName(current.map((space) => space.name)),
+        emoji: pickUnused(
+          WORKSPACE_ICONS,
+          current.map((space) => space.emoji),
+        ),
         sortOrder: current.length,
         createdAt: new Date().toISOString(),
       },
@@ -2176,6 +2214,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     setLibraryTab("spaces");
     // Surface the new profile in the manager.
     setMainView("profiles");
+    return id;
   }, []);
 
   const createIdentityKey = useCallback(() => {

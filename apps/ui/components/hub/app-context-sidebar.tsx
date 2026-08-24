@@ -1,9 +1,11 @@
 "use client";
 
 import { ConversationList } from "@/components/apps/messages/conversation-list";
+import { AppName } from "@/components/hub/app-name";
 import { RoadmapSidebar } from "@/components/apps/roadmap/roadmap-sidebar";
 import { SuggestFeature } from "@/components/apps/roadmap/suggest-feature";
 import { WALLET_SECTIONS } from "@/components/apps/wallet-app";
+import { WalletColumnHeader } from "@/components/apps/wallet/wallet-column";
 import { Tooltip } from "@/components/hub/tooltip";
 import { Favicon } from "@/components/hub/favicon";
 import { AppHelpBar } from "@/components/hub/app-help-bar";
@@ -113,7 +115,7 @@ function Header({ slug }: { slug: AppSlug }): ReactNode {
       {/* No app tile: the rail already shows which app is open, in the same
           mark, a few pixels to the left. Twice is not clearer. */}
       <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">
-        {app.name}
+        <AppName app={app} />
       </h2>
       {slug === "messages" && (
         <>
@@ -702,7 +704,9 @@ function SpendSidebar(): ReactNode {
   };
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-      <div className="flex flex-col gap-0.5">
+      {/* Above Cash, because everything under it is "…of this wallet". */}
+      <WalletColumnHeader />
+      <div className="-mt-4 flex flex-col gap-0.5">
         {WALLET_SECTIONS.map(({ id, label, icon: Icon }) => {
           const active = walletSection === id;
           return (

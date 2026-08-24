@@ -139,37 +139,25 @@ export function WalletTrigger({
   onOpen: () => void;
   className?: string;
 }): ReactNode {
-  const { activeSpaceId, spaces } = useHub();
+  const { activeSpaceId } = useHub();
   useWallets();
   const wallet = activeWalletFor(activeSpaceId);
   if (!wallet || !switchable()) return null;
-  const handle = handleFor(
-    wallet,
-    activeSpaceId,
-    spaces.map((space) => space.id)
-  );
   return (
     <button
       type="button"
       onClick={onOpen}
       aria-haspopup="dialog"
-      /* Bigger than it was, because it carries two lines now rather than one:
-         the wallet's name, and the handle its money goes out under. It sits
-         level with the portfolio total, which is the largest figure on the
-         screen, and a small control beside a large number reads as an
-         afterthought rather than as the thing that chooses whose number it is. */
+      /* One line again. It used to carry the handle under the wallet's name,
+         which made one control state two facts that are set in different places
+         and changed for different reasons — and gave the row that changes the
+         wallet a second line nobody could press on its own. The handle has its
+         own row now; see wallet-column. */
       className={`focus-ring border-border bg-surface hover:bg-surface-hover flex items-center gap-3 rounded-xl border py-2 pr-3.5 pl-2 text-left ${className}`}
     >
       <WalletMark wallet={wallet} size={40} />
-      <span className="min-w-0">
-        <span className="block truncate text-base font-bold">
-          {labelOf(wallet)}
-        </span>
-        {handle && (
-          <span className="text-muted-foreground block truncate text-xs">
-            {handle}
-          </span>
-        )}
+      <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-base font-bold">
+        {labelOf(wallet)}
       </span>
       <ChevronDown
         className="text-muted-foreground size-4.5 shrink-0"

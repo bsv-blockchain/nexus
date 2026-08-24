@@ -214,6 +214,12 @@ export const content = {
     openMarket: "Open Market",
     noCollectibles: "Nothing held yet.",
     links: "Payment links",
+    /* The wallet column's handle row. "Paying as" rather than "Handle": the row
+       is about the name money leaves under, which is the only reason a wallet
+       has anything to say about a handle at all. */
+    payingAs: "Paying as",
+    disconnectHandle: "Disconnect this handle",
+    handleOff: "No longer the handle for",
     newLink: "New link",
     linksHint:
       "A link anyone can pay, without needing your address. Share it, and payments land against your handle.",
@@ -1354,6 +1360,16 @@ export const content = {
         "The names people reach you by. Up to five, and each workspace answers to one of them.",
       active: "Active here",
       useHere: "Use here",
+      /* Where the name is now. A handle is one identity, so taking it here is
+         the same act as taking it off there — and saying which workspace that
+         is turns "Use here" from a switch into a decision. */
+      heldBy: "Held by {name}",
+      moveTitle: "@{handle} is on {name}",
+      moveBody:
+        "A handle answers for one workspace at a time. Using it here takes it off {name}, which is left without one until you give it another.",
+      moveCancel: "Leave it there",
+      moveConfirm: "Use it here",
+      movedFrom: "Moved off {name}",
       addTitle: "Claim another",
       marketTitle: "Handles for sale",
       marketHint:
@@ -3038,6 +3054,16 @@ export const content = {
       essential: "Essential",
       unknownRepo: "Unknown source",
       nowOn: "Now the handle for",
+      /* On the row rather than after the click: a picker that looks like a free
+         choice and then asks a question is a picker that made you read the
+         question. This way the sheet confirms something you already knew. */
+      heldBy: "Held by {name}",
+      moveTitle: "@{handle} is on {name}",
+      moveBody:
+        "A handle answers for one workspace at a time. Connecting it here takes it off {name}, which is left without one until you give it another.",
+      moveCancel: "Leave it there",
+      moveConfirm: "Move it here",
+      movedFrom: "Moved off {name}",
       disconnected: "Disconnected from",
       noApps: "No apps connected.",
       /* Apps are still connected for the whole Nexus rather than per workspace,

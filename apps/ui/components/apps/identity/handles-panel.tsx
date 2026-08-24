@@ -309,6 +309,13 @@ function ShareCard(): ReactNode {
   useHostOverlay(sheet);
   const link = `https://nexus.build/@${handle}`;
 
+  /* Nothing to hand anybody. A workspace made a moment ago answers to no
+     handle, and this card is entirely about the name — a sigil of "", an "@"
+     on its own and a link ending in a slash-at read as a card that failed to
+     load rather than one with nothing to say. The list above is where a handle
+     gets connected, so the card comes back the moment there is one. */
+  if (!handle) return null;
+
   const attested = linkedAccounts.filter((account) =>
     account.id in settings.linked
       ? settings.linked[account.id]

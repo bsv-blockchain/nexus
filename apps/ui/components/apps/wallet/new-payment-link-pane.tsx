@@ -1,6 +1,8 @@
 "use client";
 
 import { TokenMark } from "@/components/apps/wallet/token-mark";
+import { useHub } from "@/components/hub/hub-provider";
+import { activeWalletFor } from "@/lib/wallets-store";
 import { ConnectPicker } from "@/components/hub/connect-picker";
 import { content, getTokens } from "@/lib/data";
 import { createPaymentLink } from "@/lib/payment-links-store";
@@ -109,6 +111,10 @@ export function NewPaymentLinkPane({
 }: {
   onCreated: (linkId: string, description: string) => void;
 }): ReactNode {
+  /* Which wallet this lands in: the one the workspace is spending from, which
+     is also the one whose list the new row has to appear in. */
+  const { activeSpaceId } = useHub();
+  const walletId = activeWalletFor(activeSpaceId)?.id ?? "";
   const copy = content.wallet.newLinkPane;
   const tokens = getTokens();
   const current = useDraft();
@@ -135,12 +141,15 @@ export function NewPaymentLinkPane({
       onSubmit={(event) => {
         event.preventDefault();
         if (!isReady(draft)) return;
-        const link = createPaymentLink({
-          description: draft.description.trim(),
-          tokenId: draft.tokenId,
-          ...(draft.kind === "fixed" ? { amountUnits: amountOf(draft) } : {}),
-          expiresInDays: draft.expiresInDays,
-        });
+        const link = createPaymentLink(
+          {
+            description: draft.description.trim(),
+            tokenId: draft.tokenId,
+            ...(draft.kind === "fixed" ? { amountUnits: amountOf(draft) } : {}),
+            expiresInDays: draft.expiresInDays,
+          },
+          walletId,
+        );
         onCreated(link.id, link.description);
       }}
     >

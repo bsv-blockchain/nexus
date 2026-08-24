@@ -163,9 +163,14 @@ function Shell(): ReactNode {
           <DesktopSidebar />
         </div>
 
+        {/* Flush to the window, not floating in it. The canvas used to sit
+            inset with the workspace's own gradient showing round all four
+            edges, which framed every screen in a colour that was about the
+            workspace rather than about what was on it — and cost a strip of
+            room on all sides of the one region that is never wide enough. */}
         <div
           data-dimmed={pageDimmed}
-          className="flex min-w-0 flex-1 origin-bottom p-2 transition-transform duration-300 ease-out data-[dimmed=true]:max-md:scale-[0.93] md:py-2 md:pr-2 md:pl-0"
+          className="flex min-w-0 flex-1 origin-bottom transition-transform duration-300 ease-out data-[dimmed=true]:max-md:scale-[0.93]"
         >
           <MainView />
         </div>

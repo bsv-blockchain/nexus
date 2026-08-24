@@ -106,7 +106,7 @@ export const presets: Preset[] = [
     group: {
       id: "preset-thinker",
       name: "Productivity",
-      apps: ["mail", "signer", "learn"],
+      apps: ["mail", "signer", "learn", "clndr"],
     },
   },
   {

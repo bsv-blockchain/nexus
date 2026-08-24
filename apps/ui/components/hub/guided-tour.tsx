@@ -23,6 +23,8 @@
  * @see lib/data/tour.ts — the cards, and the rules for assembling a run
  */
 
+import { CharacterLoop } from "@/components/hub/character-loop";
+import { Clip } from "@/components/hub/preset-picker";
 import { useHub } from "@/components/hub/hub-provider";
 import { TourArtwork } from "@/components/hub/tour-art";
 import { content } from "@/lib/data";
@@ -108,6 +110,27 @@ function Run({
 
   const fade = reduced ? { duration: 0 } : { duration: 0.24 };
 
+  /*
+   * Faces on both ends of the run.
+   *
+   * The opening card is narrowed to the answers this person actually gave, so
+   * the tour starts on the setups they picked. `CharacterLoop` always carries
+   * the one everybody gets, which is what keeps the card from being an empty
+   * frame for somebody who picked nothing.
+   *
+   * The closing card is all four, every time, and it is the welcome's own reel
+   * rather than a playlist: a fixed set is better served by one file than by
+   * four with a seam between them. The run ends on everybody rather than on
+   * the same subset it opened with, which is the difference between "here is
+   * yours" and "here is the whole thing" — the words on the card.
+   */
+  const visual =
+    card.kind === "start" ? (
+      <CharacterLoop chosen={chosen} poster="/first-run/welcome.jpg" />
+    ) : card.kind === "end" ? (
+      <Clip src="/first-run/welcome.mp4" poster="/first-run/welcome.jpg" />
+    ) : null;
+
   return (
     <>
       {/*
@@ -137,6 +160,7 @@ function Run({
             index={index}
             total={total}
             footer={footer}
+            {...(visual ? { visual } : {})}
           />
         ) : (
           <SheetCard
@@ -144,6 +168,7 @@ function Run({
             index={index}
             total={total}
             footer={footer}
+            {...(visual ? { visual } : {})}
           />
         )
       ) : (
@@ -224,7 +249,8 @@ function CentredCard({
   index,
   total,
   footer,
-}: Omit<CardProps, "card">): ReactNode {
+  visual,
+}: Omit<CardProps, "card"> & { visual?: ReactNode }): ReactNode {
   const reduced = useReducedMotion();
 
   return (
@@ -258,7 +284,13 @@ function CentredCard({
             className="mt-7"
           />
         </div>
-        <Placeholder className="hidden min-h-72 md:block" />
+        {visual ? (
+          <div className="hidden min-h-72 overflow-hidden md:block">
+            {visual}
+          </div>
+        ) : (
+          <Placeholder className="hidden min-h-72 md:block" />
+        )}
       </div>
     </motion.div>
   );
@@ -270,7 +302,8 @@ function SheetCard({
   index,
   total,
   footer,
-}: Omit<CardProps, "card">): ReactNode {
+  visual,
+}: Omit<CardProps, "card"> & { visual?: ReactNode }): ReactNode {
   const reduced = useReducedMotion();
 
   return (
@@ -288,7 +321,11 @@ function SheetCard({
       }
       className="bg-surface-raised ring-border fixed inset-x-0 bottom-0 z-[120] flex max-h-[92dvh] flex-col overflow-hidden rounded-t-3xl shadow-2xl ring-1"
     >
-      <Placeholder className="h-52 w-full shrink-0" />
+      {visual ? (
+        <div className="h-52 w-full shrink-0 overflow-hidden">{visual}</div>
+      ) : (
+        <Placeholder className="h-52 w-full shrink-0" />
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
         <h2 className="text-xl font-semibold tracking-tight">{words.title}</h2>
         <Body

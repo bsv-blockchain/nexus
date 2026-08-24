@@ -1,6 +1,7 @@
 "use client";
 
 import { CollectibleArt } from "@/components/apps/wallet/collectible-art";
+import { useWalletAccountId } from "@/components/apps/wallet/use-wallet-account";
 
 import { Collectible3DCard } from "@/components/apps/wallet/collectible-card-3d";
 import { Sheet } from "@/components/apps/messages/sheet";
@@ -727,7 +728,10 @@ export function Collectibles({
   const [openOrg, setOpenOrg] = useState<string | null>(null);
   const [burned, setBurned] = useState<string[]>([]);
 
-  const all = getCollectibles().filter((item) => !burned.includes(item.id));
+  const accountId = useWalletAccountId();
+  const all = getCollectibles(accountId).filter(
+    (item) => !burned.includes(item.id),
+  );
   const open = openId ? all.find((item) => item.id === openId) : null;
 
   if (open) {

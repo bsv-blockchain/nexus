@@ -25,6 +25,7 @@
  */
 
 import { MemberAvatar } from "@/components/apps/messages/member-avatar";
+import { useWalletAccountId } from "@/components/apps/wallet/use-wallet-account";
 import { ProfileHovercard } from "@/components/apps/messages/profile-hovercard";
 import { TokenMark, formatUnits } from "@/components/apps/wallet/token-mark";
 import { useHub } from "@/components/hub/hub-provider";
@@ -468,7 +469,8 @@ export function Splits(): ReactNode {
   const raised = useRaisedSplits();
   useShareStatuses();
 
-  const all = [...raised, ...getSplitBills()];
+  const accountId = useWalletAccountId();
+  const all = [...raised, ...getSplitBills(accountId)];
   const open = openId ? all.find((bill) => bill.id === openId) : null;
 
   if (open) {

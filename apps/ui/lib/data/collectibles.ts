@@ -178,6 +178,7 @@ export const lockedStakes: Record<
 export const collectibles: Collectible[] = [
   {
     id: "naka-329",
+    accountId: "acct-cold",
     bucket: "permanent",
     name: "Naka Motor Club #329",
     org: NAKA_MOTOR.collection,
@@ -247,6 +248,7 @@ export const collectibles: Collectible[] = [
   },
   {
     id: "naka-1872",
+    accountId: "acct-cold",
     bucket: "permanent",
     name: "Naka Motor Club #1872",
     org: NAKA_MOTOR.collection,
@@ -316,6 +318,7 @@ export const collectibles: Collectible[] = [
   },
   {
     id: "naka-2121",
+    accountId: "acct-work",
     bucket: "permanent",
     name: "The Guardian",
     org: NAKA_MOTOR.collection,
@@ -392,6 +395,7 @@ export const collectibles: Collectible[] = [
   },
   {
     id: "naka-822",
+    accountId: "acct-work",
     bucket: "permanent",
     name: "Naka Motor Club #822",
     org: NAKA_MOTOR.collection,
@@ -461,6 +465,7 @@ export const collectibles: Collectible[] = [
   },
   {
     id: "naka-510",
+    accountId: "acct-work",
     bucket: "permanent",
     name: "Naka Motor Club #510",
     org: NAKA_MOTOR.collection,
@@ -530,6 +535,7 @@ export const collectibles: Collectible[] = [
   },
   {
     id: "naka-585",
+    accountId: "acct-work",
     bucket: "permanent",
     name: "Naka Motor Club #585",
     org: NAKA_MOTOR.collection,
@@ -600,6 +606,7 @@ export const collectibles: Collectible[] = [
 
   {
     id: "rare-hat-69",
+    accountId: "acct-work",
     bucket: "permanent",
     name: "Hat 69",
     org: RARE_HAT.collection,
@@ -619,6 +626,7 @@ export const collectibles: Collectible[] = [
 
   {
     id: "rarepepes-3213121",
+    accountId: "acct-shared",
     bucket: "permanent",
     name: "Vapor Pepe",
     org: "Counterfeit Rares",
@@ -636,6 +644,7 @@ export const collectibles: Collectible[] = [
   },
   {
     id: "rarepepes-3213122",
+    accountId: "acct-shared",
     bucket: "permanent",
     name: "Green Herring",
     org: "Counterfeit Rares",
@@ -653,6 +662,7 @@ export const collectibles: Collectible[] = [
   },
   {
     id: "rarepepes-3213123",
+    accountId: "acct-main",
     bucket: "permanent",
     name: "Cypher Pepe 2028",
     org: "Counterfeit Rares",
@@ -670,6 +680,7 @@ export const collectibles: Collectible[] = [
   },
   {
     id: "rarepepes-3213124",
+    accountId: "acct-main",
     bucket: "permanent",
     name: "Coomedian",
     org: "Counterfeit Rares",
@@ -687,6 +698,7 @@ export const collectibles: Collectible[] = [
   },
   {
     id: "rarepepes-3213125",
+    accountId: "acct-main",
     bucket: "permanent",
     name: "Pepe Homo",
     org: "Counterfeit Rares",
@@ -704,6 +716,7 @@ export const collectibles: Collectible[] = [
   },
   {
     id: "nexushack-prize-942842",
+    accountId: "acct-main",
     bucket: "permanent",
     name: "NexusChain 1st Prize",
     org: "NexusChain",
@@ -722,6 +735,7 @@ export const collectibles: Collectible[] = [
   },
   {
     id: "coingeek-masterclass-4412144",
+    accountId: "acct-main",
     bucket: "permanent",
     name: "CoinGeek Master Class",
     org: "CoinGeek",
@@ -740,6 +754,7 @@ export const collectibles: Collectible[] = [
   },
   {
     id: "bitcoin-monasteries-ticket-017764",
+    accountId: "acct-main",
     bucket: "finite",
     name: "Bitcoin Monasteries Movie Ticket",
     org: "Mind's Eye Cinema",
@@ -760,6 +775,7 @@ export const collectibles: Collectible[] = [
   },
   {
     id: "soho-gold-membership-4412141",
+    accountId: "acct-main",
     bucket: "finite",
     name: "SOHO Gold Membership",
     org: "SOHO",
@@ -778,6 +794,7 @@ export const collectibles: Collectible[] = [
   },
   {
     id: "cyborg-theocracy-ticket-017650",
+    accountId: "acct-main",
     bucket: "expired",
     name: "Cyborg Theocracy Movie Ticket",
     org: "Mind's Eye Cinema",
@@ -799,6 +816,7 @@ export const collectibles: Collectible[] = [
   },
   {
     id: "high-roller-vip-942842",
+    accountId: "acct-main",
     bucket: "expired",
     name: "The High Roller Casino VIP",
     org: "The High Roller",

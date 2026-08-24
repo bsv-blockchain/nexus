@@ -27,9 +27,6 @@ export interface WalletsState {
   unlocked: string[];
 }
 
-/** What a profile falls back to before anybody has chosen for it. */
-const DEFAULT_WALLET = "acct-main";
-
 /**
  * Seeded so the two profiles do not start out identical.
  *
@@ -76,10 +73,16 @@ export function getWallet(id: string): WalletAccount | undefined {
   return allWallets().find((wallet) => wallet.id === id);
 }
 
-/** The one wallet a profile is using, or undefined if it has none left. */
+/**
+ * The one wallet a profile is using, or undefined where it has none.
+ *
+ * No fallback. A profile made a second ago was arriving already spending from
+ * whichever wallet happened to be first, which is a connection nobody made and
+ * the sort a person only discovers by sending money from it.
+ */
 export function activeWalletFor(spaceId: string): WalletAccount | undefined {
-  const chosen = state.byProfile[spaceId] ?? DEFAULT_WALLET;
-  return getWallet(chosen) ?? allWallets()[0];
+  const chosen = state.byProfile[spaceId];
+  return chosen ? getWallet(chosen) : undefined;
 }
 
 /** Points a profile at a wallet. Replaces whatever it was using. */
@@ -88,11 +91,28 @@ export function setActiveWallet(spaceId: string, id: string): void {
   emit();
 }
 
+/**
+ * Forgets the wallets of profiles that no longer exist.
+ *
+ * Less urgent than the handle equivalent, since sharing a wallet is allowed and
+ * a stale claim only ever miscounts the shared list — but a store holding
+ * connections for profiles nobody can open is a store that will eventually be
+ * asked one of those questions. Driven from hub-provider, which knows which
+ * profiles are real.
+ */
+export function pruneWalletsTo(liveSpaceIds: string[]): void {
+  const live = new Set(liveSpaceIds);
+  const stale = Object.keys(state.byProfile).filter((id) => !live.has(id));
+  if (stale.length === 0) return;
+  const byProfile = { ...state.byProfile };
+  for (const id of stale) delete byProfile[id];
+  state.byProfile = byProfile;
+  emit();
+}
+
 /** Which profiles are using a wallet — the same one may serve several. */
 export function profilesUsing(id: string, spaceIds: string[]): string[] {
-  return spaceIds.filter(
-    (spaceId) => (state.byProfile[spaceId] ?? DEFAULT_WALLET) === id,
-  );
+  return spaceIds.filter((spaceId) => state.byProfile[spaceId] === id);
 }
 
 /**

@@ -341,6 +341,34 @@ function createWindow() {
     })
   }
 
+  /*
+   * The chrome is loading a new document, so every tab it opened is stale.
+   *
+   * Tab views are children of the WINDOW, not of the renderer that asked for
+   * them, so they outlive it. The chrome creates one when its browse pane mounts
+   * and destroys it when the pane unmounts — a contract that covers every route
+   * change inside the single-page app and none of the ways a document itself
+   * goes away: a reload, a crash recovery, a dev-server refresh, the shell being
+   * pointed somewhere else. Each one leaves a page parented to the window with
+   * nothing left that can address it, still painting above the chrome on every
+   * screen, because a WebContentsView is a native sibling and no z-index reaches
+   * over one. They accumulate, one per load.
+   *
+   * `isMainFrame` and `!isSameDocument` together are what make this safe to hang
+   * off navigation at all: the chrome is a single-page app that pushes state on
+   * every view change, and reaping on those would close the very tab the pane
+   * had just asked for. Only a real document load gets here.
+   */
+  win.webContents.on('did-start-navigation', (details) => {
+    /* Read off the event object rather than the positional arguments beside it,
+       which Electron has deprecated. */
+    if (!details.isMainFrame || details.isSameDocument) return
+    const stale = tabManager.count()
+    if (stale === 0) return
+    boot(`chrome navigating — closing ${stale} stale tab view(s)`)
+    tabManager.destroyAll()
+  })
+
   win.webContents.on('did-finish-load', () => boot(`did-finish-load ${win.webContents.getURL()}`))
   win.webContents.on('did-fail-load', (_e, code, desc, url) => boot(`did-fail-load ${code} ${desc} ${url}`))
   win.webContents.on('preload-error', (_e, file, err) => boot(`preload-error ${file} ${err && err.message}`))

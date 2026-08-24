@@ -33,8 +33,8 @@ export interface Holding {
  * tokens can only be worth what this file says, and BSV can be checked against
  * any exchange in the world.
  */
-export function holdings(): Holding[] {
-  return getTokenBalances()
+export function holdings(accountId?: string): Holding[] {
+  return getTokenBalances(accountId)
     .map(({ token, units }) => {
       const rate = usdPerUnitOf(token);
       return { token, units, usd: rate === null ? null : units * rate };
@@ -45,14 +45,14 @@ export function holdings(): Holding[] {
     });
 }
 
-export function portfolioUsd(): number {
-  return holdings().reduce((total, h) => total + (h.usd ?? 0), 0);
+export function portfolioUsd(accountId?: string): number {
+  return holdings(accountId).reduce((total, h) => total + (h.usd ?? 0), 0);
 }
 
 /** Value-weighted 24h move across the whole portfolio. */
-export function portfolioChange24h(): number {
-  const rows = holdings();
-  const total = portfolioUsd();
+export function portfolioChange24h(accountId?: string): number {
+  const rows = holdings(accountId);
+  const total = portfolioUsd(accountId);
   if (total === 0) return 0;
   return rows.reduce(
     (sum, h) => sum + change24hOf(h.token) * ((h.usd ?? 0) / total),
@@ -60,8 +60,8 @@ export function portfolioChange24h(): number {
   );
 }
 
-export function holdingOf(tokenId: string): Holding | undefined {
-  return holdings().find((h) => h.token.id === tokenId);
+export function holdingOf(tokenId: string, accountId?: string): Holding | undefined {
+  return holdings(accountId).find((h) => h.token.id === tokenId);
 }
 
 /** `$3,412.88`, or an em dash when there is no price to render. */

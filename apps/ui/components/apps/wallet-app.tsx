@@ -1,6 +1,8 @@
 "use client";
 
 import { AppMenu } from "@/components/hub/app-menu";
+import { useWalletAccountId } from "@/components/apps/wallet/use-wallet-account";
+import { getWallet } from "@/lib/wallets-store";
 import { Portfolio } from "@/components/apps/wallet/portfolio";
 import {
   WalletSwitcher,
@@ -108,7 +110,11 @@ export function WalletApp(): ReactNode {
   const walletSection = WALLET_SECTIONS.some((s) => s.id === requestedSection)
     ? requestedSection
     : "cash";
-  const account = getWalletAccount();
+  /* The wallet the workspace is spending from, not `walletAccounts[0]`. Cash
+     and Activity both read this, and reading the first row meant switching
+     wallet changed the switcher and nothing else on the screen. */
+  const selectedId = useWalletAccountId();
+  const account = (selectedId ? getWallet(selectedId) : undefined) ?? getWalletAccount();
   const { walletTransactions: fromCommands } = useCommandEffects();
   const copy = content.wallet;
 
@@ -283,7 +289,13 @@ export function WalletApp(): ReactNode {
       default:
         return (
           <Portfolio
-            wallet={<WalletTrigger onOpen={() => setSwitching(true)} />}
+            /* Phones only. The column carries it at md+, and a second copy
+               level with the balance is the placement this moved away from. */
+            wallet={
+              <span className="md:hidden">
+                <WalletTrigger onOpen={() => setSwitching(true)} />
+              </span>
+            }
             onOpenToken={openToken}
             {...(hidePayActions
               ? {}

@@ -17,6 +17,8 @@
  */
 
 import { MemberAvatar } from "@/components/apps/messages/member-avatar";
+import { useHub } from "@/components/hub/hub-provider";
+import { activeWalletFor } from "@/lib/wallets-store";
 import { formatUnits } from "@/components/apps/wallet/token-mark";
 import { content, getTokens, getWalletContacts } from "@/lib/data";
 import { createSplit } from "@/lib/splits-store";
@@ -122,6 +124,10 @@ export function NewSplitPane({
 }: {
   onCreated: (splitId: string, description: string) => void;
 }): ReactNode {
+  /* Which wallet this lands in: the one the workspace is spending from, which
+     is also the one whose list the new row has to appear in. */
+  const { activeSpaceId } = useHub();
+  const walletId = activeWalletFor(activeSpaceId)?.id ?? "";
   const copy = content.wallet.splits;
   const tokens = getTokens();
   const current = useDraft();
@@ -163,7 +169,8 @@ export function NewSplitPane({
             tokenId: draft.tokenId,
             shares: sharesOf(draft, decimals),
           },
-          new Date().toISOString()
+          new Date().toISOString(),
+          walletId
         );
         onCreated(split.id, split.description);
       }}

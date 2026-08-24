@@ -1,6 +1,7 @@
 "use client";
 
 import { AppTile, SiteTile } from "@/components/hub/app-icon";
+import { AppName } from "@/components/hub/app-name";
 import { GroupSettingsDialog } from "@/components/hub/group-settings-dialog";
 import {
   useHub,
@@ -21,6 +22,7 @@ import {
 import { refKey, sameRef } from "@/lib/rail/layout";
 import { useSettings } from "@/lib/settings-store";
 import { displayOrigin } from "@/lib/rail/origin";
+import { sameUrl } from "@/lib/tabs";
 import type { PinnedSite } from "@/lib/rail/sites";
 import {
   Cog,
@@ -102,10 +104,13 @@ function getUnreadRefs(): Set<string> {
  * code below asks the kind exactly once, when it picks the tile.
  */
 type Resolved =
-  | { kind: "app"; label: string; name: string; desc: string; app: HubApp }
+  /* `label` is a node and `name` is not: the caption under a tile is the one
+     place a name is drawn rather than read, and the tooltip, the aria-label and
+     the remove button all want the plain string. See components/hub/app-name. */
+  | { kind: "app"; label: ReactNode; name: string; desc: string; app: HubApp }
   | {
       kind: "site";
-      label: string;
+      label: ReactNode;
       name: string;
       desc: string;
       site: PinnedSite;
@@ -125,7 +130,7 @@ function resolveRef(ref: RailRef, sites: PinnedSite[]): Resolved | null {
     return app
       ? {
           kind: "app",
-          label: app.shortName,
+          label: <AppName app={app} short />,
           name: app.name,
           desc: app.description,
           app,
@@ -133,15 +138,22 @@ function resolveRef(ref: RailRef, sites: PinnedSite[]): Resolved | null {
       : null;
   }
   const site = sites.find((candidate) => candidate.id === ref.id);
-  return site
-    ? {
-        kind: "site",
-        label: site.title,
-        name: site.title,
-        desc: displayOrigin(site.url),
-        site,
-      }
-    : null;
+  if (!site) return null;
+  /* The listing behind a pinned URL, if the store has one. Connecting a web
+     listing pins its URL, so from here on the rail holds a site and knows only
+     a title — which is the plain string, and loses a publisher's wordmark on
+     the way. Matched on the URL because that is the only thing the two halves
+     share, exactly as SiteTile already matches the mark. */
+  const listed = getHubApps().find(
+    (app) => app.web && sameUrl(app.web.url, site.url),
+  );
+  return {
+    kind: "site",
+    label: listed ? <AppName app={listed} short /> : site.title,
+    name: site.title,
+    desc: displayOrigin(site.url),
+    site,
+  };
 }
 
 /** The one place the two kinds of slot draw differently. */
@@ -192,7 +204,7 @@ function RailShell({
   onDragLeave,
   onDrop,
 }: {
-  label: string;
+  label: ReactNode;
   active: boolean;
   onClick: () => void;
   children: ReactNode;

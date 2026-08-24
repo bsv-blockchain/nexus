@@ -67,6 +67,10 @@ export const defaultRepositories: AppRepository[] = [
     official: true,
     note: "More from BSVA",
     website: "https://bsvblockchain.org",
+    /* The association's own mark rather than the generated "B". A source is
+       chosen by sight in a list of five, and a letter in a box is what every
+       source without an icon already looks like. */
+    iconSrc: "/icons/bsv-association.png",
     versions: [
       { version: "2026.06", releasedAt: "2026-06-18T09:00:00.000Z" },
       { version: "2026.04", releasedAt: "2026-04-15T09:00:00.000Z" },

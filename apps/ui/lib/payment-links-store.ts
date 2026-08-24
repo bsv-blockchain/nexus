@@ -55,13 +55,20 @@ function nextCode(): string {
  * `createdAt` and `expiresAt` are taken from the clock at the moment of the
  * call, which is the one honest source for them here.
  */
-export function createPaymentLink(draft: PaymentLinkDraft): PaymentLink {
+export function createPaymentLink(
+  draft: PaymentLinkDraft,
+  /* The wallet the money will land in. Passed rather than read here because a
+     store has no view of which workspace is asking, and a link filed against
+     the wrong wallet is a link that vanishes from the list that made it. */
+  accountId: string,
+): PaymentLink {
   const now = new Date();
   const expires = new Date(
     now.getTime() + draft.expiresInDays * 24 * 60 * 60 * 1000
   );
   const link: PaymentLink = {
     id: `pl-draft-${seq + 1}`,
+    accountId,
     code: nextCode(),
     description: draft.description,
     tokenId: draft.tokenId,

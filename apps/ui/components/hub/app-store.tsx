@@ -2,6 +2,7 @@
 
 import { AppDetailPanel } from "@/components/hub/app-detail-panel";
 import { AppTile } from "@/components/hub/app-icon";
+import { AppName } from "@/components/hub/app-name";
 import { PRIMARY_CTA } from "@/components/hub/cta";
 import { DEMO_SURFACES } from "@/lib/surfaces";
 import { DevBadge } from "@/components/hub/dev-badge";
@@ -198,7 +199,9 @@ function AppCard({
           </span>
           <div className="min-w-0 flex-1">
             <span className="flex items-center gap-1.5">
-              <h3 className="truncate text-sm font-semibold">{app.name}</h3>
+              <h3 className="truncate text-sm font-semibold">
+                <AppName app={app} />
+              </h3>
               {isNew && (
                 <span className="bg-accent text-accent-foreground shrink-0 rounded-full px-1.5 py-px text-[9px] font-bold tracking-wide uppercase">
                   {content.appStore.newLabel}

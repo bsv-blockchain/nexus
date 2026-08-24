@@ -113,9 +113,15 @@ function nextId(): string {
 }
 
 /** Raise a split. Newest first, like the links list. */
-export function createSplit(draft: SplitDraft, now: string): SplitBill {
+export function createSplit(
+  draft: SplitDraft,
+  now: string,
+  /* The wallet the shares settle into; see the note on createPaymentLink. */
+  accountId: string,
+): SplitBill {
   const split: SplitBill = {
     id: nextId(),
+    accountId,
     description: draft.description.trim(),
     tokenId: draft.tokenId,
     totalUnits: draft.shares.reduce((sum, share) => sum + share.units, 0),

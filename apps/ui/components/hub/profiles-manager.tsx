@@ -2,6 +2,7 @@
 
 import { PRIMARY_CTA } from "@/components/hub/cta";
 import { useHub } from "@/components/hub/hub-provider";
+import { useCreateWorkspace } from "@/components/hub/use-create-workspace";
 import { SpaceContent } from "@/components/hub/space-content";
 import {
   SpaceDragProvider,
@@ -69,7 +70,8 @@ function columnTheme(
  * with an edit affordance, a drag handle to reorder, and an options menu.
  */
 export function ProfilesManager(): ReactNode {
-  const { spaces, moveSpace, createSpace } = useHub();
+  const { spaces, moveSpace } = useHub();
+  const createWorkspace = useCreateWorkspace();
   /*
    * Every profile, the active one included.
    *
@@ -165,7 +167,7 @@ export function ProfilesManager(): ReactNode {
           onFocus={consumeNewWorkspaceRequest}
           onClick={() => {
             consumeNewWorkspaceRequest();
-            createSpace();
+            createWorkspace();
           }}
           aria-label={content.newItemMenu.newSpace}
           className={`focus-ring relative flex size-10 items-center justify-center rounded-full ${PRIMARY_CTA}`}

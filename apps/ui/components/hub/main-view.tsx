@@ -20,6 +20,7 @@ import { VoteApp } from "@/components/apps/vote-app";
 import { WalletApp } from "@/components/apps/wallet-app";
 import { WebAppView } from "@/components/apps/web-app";
 import { AppTile } from "@/components/hub/app-icon";
+import { AppName } from "@/components/hub/app-name";
 import { hasContextSidebar } from "@/components/hub/app-context-sidebar";
 import { SettingsApp } from "@/components/apps/settings-app";
 import { TimelineApp } from "@/components/apps/timeline-app";
@@ -144,7 +145,9 @@ function LauncherTile({
       <span className="bg-surface-raised ring-border/60 group-hover:ring-accent/50 flex size-18 items-center justify-center rounded-3xl shadow-sm ring-1 transition-all group-hover:-translate-y-0.5 group-hover:shadow-lg">
         <AppTile app={app} size={44} />
       </span>
-      <span className="text-sm font-semibold">{app.shortName}</span>
+      <span className="text-sm font-semibold">
+        <AppName app={app} short />
+      </span>
       <span
         className={`-mt-1 h-4 text-xs opacity-0 transition-opacity group-hover:opacity-100 ${
           hintAccent ? "text-accent font-semibold" : "text-muted-foreground"
@@ -240,7 +243,9 @@ function AppCanvas(): ReactNode {
       {app && app.slug !== "browser" && !selfChromedApps.has(app.slug) && (
         <header className="border-border flex shrink-0 items-center gap-2 border-b px-5 py-3">
           <AppTile app={app} size={24} />
-          <h1 className="min-w-0 flex-1 text-sm font-semibold">{app.name}</h1>
+          <h1 className="min-w-0 flex-1 text-sm font-semibold">
+            <AppName app={app} />
+          </h1>
           {/* Offered where something has been written for this app *and* its
               column does not already carry the button. Two ways into one pane,
               a few hundred pixels apart, teaches that they are different
@@ -379,23 +384,30 @@ export function MainView(): ReactNode {
   /*
    * Two apps, side by side, and never more.
    *
-   * Only while an app is showing: the store and the profiles manager are
-   * already multi-column screens, and a split inside one of those is a third
-   * set of columns nobody asked for. Only on a desktop layout, because below it
-   * a split is two half-width apps, which is neither of them.
+   * Only while an app is showing: the store, the profiles manager and the
+   * Timeline are already multi-column screens, and a split inside one of those
+   * is a third set of columns nobody asked for. Only on a desktop layout,
+   * because below it a split is two half-width apps, which is neither of them.
+   *
+   * The Timeline was missing from that list, and `split=` survives in the
+   * address bar — so once a second pane had been opened, asking for the Timeline
+   * kept showing the split instead. Worse when the left half was Browse: a live
+   * page is a native view painting above this document, so the screen somebody
+   * asked for was behind a website they had not.
    */
   if (
     splitApp !== null &&
     !showStore &&
     !showSettings &&
     !showProfiles &&
+    !showTimeline &&
     isDesktop
   ) {
     return (
       <div className="flex h-full min-w-0 flex-1 gap-2">
         <main
           id="main-content"
-          className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl shadow-xl ${
+          className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden ${
             canvasIsBrowser ? "bg-canvas" : "bg-background"
           }`}
         >
@@ -403,7 +415,7 @@ export function MainView(): ReactNode {
         </main>
         <section
           aria-label={content.appMenu.pickApp}
-          className="bg-background flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl shadow-xl"
+          className="bg-background flex h-full min-w-0 flex-1 flex-col overflow-hidden"
         >
           <SplitPaneHeader />
           <div className="min-h-0 flex-1">
@@ -417,7 +429,7 @@ export function MainView(): ReactNode {
   return (
     <main
       id="main-content"
-      className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl shadow-xl ${
+      className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden ${
         !showStore && !showSettings && !showTimeline && canvasIsBrowser
           ? "bg-canvas"
           : "bg-background"

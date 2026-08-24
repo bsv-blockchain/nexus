@@ -104,10 +104,41 @@ export const tokens: Token[] = [
 ];
 
 /** What the signed-in user holds. Balances are units, not satoshis. */
-export const tokenBalances: { tokenId: string; units: number }[] = [
-  { tokenId: "bsv", units: 34.2180455 },
-  { tokenId: "usdsv", units: 320 },
-  { tokenId: "eursv", units: 240 },
-  { tokenId: "nutri", units: 1240 },
-  { tokenId: "nex", units: 310 },
+/**
+ * What each wallet holds, rather than what "the wallet" holds.
+ *
+ * Per account because a wallet IS a balance — a switcher that changes the name
+ * above the number and not the number is a switcher that does nothing. The four
+ * read as four different jobs, which is the point of having four:
+ *
+ *   Everyday    a hundred dollars or so of BSV and a little of everything else
+ *   Cold storage the base asset and nothing else, because savings do not shop
+ *   Work         invoiced in and out, so mostly held in the pegged stablecoins
+ *   Household    all but empty, in the credits the apps charge in
+ *
+ * `units` is the token's own unit throughout — see `Token.decimals`. A second
+ * chain arrives as more rows here against a token that declares it, rather than
+ * as a second table; the accountId is what keeps that honest.
+ */
+export const tokenBalances: {
+  accountId: string;
+  tokenId: string;
+  units: number;
+}[] = [
+  /* Everyday — 5.88 BSV is about $100 at the fallback rate. */
+  { accountId: "acct-main", tokenId: "bsv", units: 5.8824 },
+  { accountId: "acct-main", tokenId: "usdsv", units: 42 },
+  { accountId: "acct-main", tokenId: "nex", units: 310 },
+
+  /* Cold storage — one asset, a lot of it, and nothing that moves. */
+  { accountId: "acct-cold", tokenId: "bsv", units: 120 },
+
+  /* Work — a float in BSV, and the money it invoices in. */
+  { accountId: "acct-work", tokenId: "bsv", units: 1.485 },
+  { accountId: "acct-work", tokenId: "usdsv", units: 320 },
+  { accountId: "acct-work", tokenId: "eursv", units: 240 },
+
+  /* Household — nearly nothing, in the credits it spends on apps. */
+  { accountId: "acct-shared", tokenId: "bsv", units: 0.0214 },
+  { accountId: "acct-shared", tokenId: "nutri", units: 1240 },
 ];

@@ -53,7 +53,8 @@ export type WebAppSlug =
   | "scribe"
   | "free-radio"
   | "hexacities"
-  | "bsv-radar";
+  | "bsv-radar"
+  | "clndr";
 
 export type HubAppSlug = NativeAppSlug | WebAppSlug;
 
@@ -239,6 +240,17 @@ export interface HubApp {
   slug: HubAppSlug;
   name: string;
   shortName: string;
+  /**
+   * Draw the name's vowels at reduced opacity.
+   *
+   * For a publisher whose wordmark is the word with its vowels dropped —
+   * clndr.im spells itself Calendar and lets you read the consonants. Stored as
+   * a flag rather than as markup in `name`, because `name` is also what search
+   * matches on, what a screen reader announces and what a toast quotes; a field
+   * that is sometimes a string and sometimes a fragment would have to be
+   * handled at all thirty-odd places one of those is read.
+   */
+  quietVowels?: boolean;
   description: string;
   /** two or three word subtitle for tiles and tooltips */
   tagline: string;
@@ -400,6 +412,17 @@ export interface WalletAccount {
    * pretend that is impossible — but they can never be this.
    */
   identifier: string;
+  /**
+   * Which chain the balance is denominated in.
+   *
+   * Absent means BSV, which is every wallet here today and is why every amount
+   * in this file is named `...Satoshis`. It is declared rather than assumed so
+   * that a second chain is a row in a table instead of a rename across the app:
+   * a wallet on another chain sets this, and the amount fields keep meaning
+   * "the chain's smallest unit". `WalletTransaction.tokenId` is the same seam
+   * one level down, for assets carried ON a chain.
+   */
+  chain?: "bsv";
   /** the two stops of the wallet's gradient, so it is known by sight */
   colors: [string, string];
   /** a picture, where one has been set; without it the gradient carries it */
@@ -636,6 +659,15 @@ export interface CollectibleTrait {
 
 export interface Collectible {
   id: string;
+  /**
+   * The wallet holding it.
+   *
+   * An item is held by a key, not by a person, so "my collectibles" is only
+   * ever the union of what each wallet holds — and a wallet you have selected
+   * should show you its own. Required rather than optional: an unattributed
+   * row would show up under every wallet, which is the bug this prevents.
+   */
+  accountId: string;
   bucket: CollectibleBucket;
   name: string;
   /** issuing organisation; items sharing one are bundled in the grid */
@@ -674,6 +706,8 @@ export interface Collectible {
 /** table: payment_links — a shareable request anyone can pay */
 export interface PaymentLink {
   id: string;
+  /** the wallet the money lands in */
+  accountId: string;
   /** last path segment of the shared link */
   code: string;
   description: string;
@@ -694,6 +728,8 @@ export interface PaymentLink {
 /** table: split_bills — an amount divided across handles, with who has paid */
 export interface SplitBill {
   id: string;
+  /** the wallet the shares settle into, or out of when somebody else raised it */
+  accountId: string;
   description: string;
   tokenId: string;
   totalUnits: number;

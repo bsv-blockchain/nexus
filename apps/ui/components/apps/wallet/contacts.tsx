@@ -1,6 +1,7 @@
 "use client";
 
 import { Handle } from "@/components/apps/messages/ecosystem-tag";
+import { useWalletAccountId } from "@/components/apps/wallet/use-wallet-account";
 import { MemberAvatar } from "@/components/apps/messages/member-avatar";
 import { ProfileHovercard } from "@/components/apps/messages/profile-hovercard";
 import { Tooltip } from "@/components/hub/tooltip";
@@ -85,7 +86,7 @@ export function Contacts({
   const [tab, setTab] = useState<"favourites" | "all">("favourites");
   const [query, setQuery] = useState("");
 
-  const all = getWalletContacts();
+  const all = getWalletContacts(useWalletAccountId());
   const { favourites: starred } = useCommandEffects();
   const favourites = all.filter((person) => starred.includes(person.id));
 

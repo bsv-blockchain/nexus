@@ -1,6 +1,7 @@
 "use client";
 
 import { TokenMark, formatUnits } from "@/components/apps/wallet/token-mark";
+import { useWalletAccountId } from "@/components/apps/wallet/use-wallet-account";
 import { content } from "@/lib/data";
 import { useBsvHistory } from "@/lib/exchange-rate";
 import {
@@ -109,7 +110,12 @@ export function Portfolio({
   wallet?: ReactNode;
 }): ReactNode {
   const copy = content.wallet;
-  const { rows, total, change, loading, error, mode } = usePortfolio();
+  /* Scoped to the wallet the column names. Reading the whole fixture meant the
+     headline figure was the same number under every wallet, which made the
+     switcher look broken rather than look like it had switched. */
+  const { rows, total, change, loading, error, mode } = usePortfolio(
+    useWalletAccountId(),
+  );
   // Sparklines and 24h percentages are fixture properties. A live balance has
   // neither, and a flat line next to "0.00%" reads as a real quote rather than as
   // missing data.

@@ -2,6 +2,7 @@
 
 import { WalletMark } from "@/components/apps/wallet/wallet-switcher";
 import { AppTile } from "@/components/hub/app-icon";
+import { AppName } from "@/components/hub/app-name";
 import { ConnectPicker } from "@/components/hub/connect-picker";
 import { RepoMark } from "@/components/hub/repo-section";
 import { Tooltip } from "@/components/hub/tooltip";
@@ -9,6 +10,7 @@ import { useHub } from "@/components/hub/hub-provider";
 import { content, getHubApps, getSpaces } from "@/lib/data";
 import {
   activeHandleFor,
+  handleHeldElsewhere,
   setHandleFor,
   useSettings,
 } from "@/lib/settings-store";
@@ -20,7 +22,9 @@ import {
   walletsByRecent,
 } from "@/lib/wallets-store";
 import { useRepositories } from "@/lib/repositories-store";
-import { ChevronDown, Lock } from "lucide-react";
+import { Sheet } from "@/components/apps/messages/sheet";
+import { ArrowLeftRight, ChevronDown, Lock } from "lucide-react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { useState, type ReactNode } from "react";
 
@@ -142,6 +146,12 @@ export function ProfileConnections({ spaceId }: { spaceId: string }): ReactNode 
 
   const handle = activeHandleFor(spaceId);
   const wallet = activeWalletFor(spaceId);
+  /* A pick that would take a handle off another workspace, held until it has
+     been agreed to. Null the rest of the time, which is also what keeps the
+     sheet out of the tree on the server. */
+  const [moving, setMoving] = useState<
+    { handle: string; fromId: string; fromName: string } | undefined
+  >(undefined);
   /* This profile's apps, not the active profile's. A column is about the
      profile it names, and reading the active one made every column show the
      same six. */
@@ -172,6 +182,13 @@ export function ProfileConnections({ spaceId }: { spaceId: string }): ReactNode 
     (app) => !here.includes(app.slug) && usedBy(app.slug) !== "",
   );
   const space = spaces.find((entry) => entry.id === spaceId);
+  /** The workspace already wearing a handle, where it is not this one. */
+  const holderOf = (entry: string): (typeof spaces)[number] | undefined => {
+    const held = handleHeldElsewhere(entry, spaceId);
+    return held === undefined
+      ? undefined
+      : spaces.find((other) => other.id === held);
+  };
 
   return (
     <div className="pb-2">
@@ -187,12 +204,34 @@ export function ProfileConnections({ spaceId }: { spaceId: string }): ReactNode 
             }
             /* Newest first: the handle somebody just claimed is the one they
                are most likely pointing a profile at. */
-            options={[...settings.handles].reverse().map((entry) => ({
-              id: entry,
-              label: `@${entry}`,
-              mark: handleMark(entry === handle),
-            }))}
+            options={[...settings.handles].reverse().map((entry) => {
+              /* One workspace at most, since a handle is one identity. Named on
+                 the row rather than left to be discovered: taking it is allowed,
+                 but it is a move, and "Work has it" is what makes that legible
+                 before the click rather than after it. */
+              const holder = holderOf(entry);
+              return {
+                id: entry,
+                label: `@${entry}`,
+                mark: handleMark(entry === handle),
+                ...(holder
+                  ? { hint: copy.heldBy.replace("{name}", holder.name) }
+                  : {}),
+              };
+            })}
             onPick={(id) => {
+              const holder = holderOf(id);
+              /* Somebody else's: ask, and let the sheet do it. Free: just
+                 connect it, because a confirmation for a move that costs
+                 nothing is a dialog that teaches people to dismiss dialogs. */
+              if (holder) {
+                setMoving({
+                  handle: id,
+                  fromId: holder.id,
+                  fromName: holder.name,
+                });
+                return;
+              }
               setHandleFor(spaceId, id);
               toast.success(`@${id}`, {
                 description: `${copy.nowOn} ${space?.name ?? ""}`.trim(),
@@ -293,7 +332,7 @@ export function ProfileConnections({ spaceId }: { spaceId: string }): ReactNode 
               <AppTile app={app} size={28} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px] font-medium">
-                  {app.name}
+                  <AppName app={app} />
                 </span>
                 {/* Where it came from, not what it is to us. "Essential" said
                     the same thing on three rows and told nobody anything they
@@ -347,6 +386,74 @@ export function ProfileConnections({ spaceId }: { spaceId: string }): ReactNode 
       <p className="text-muted-foreground mt-3 px-1.5 text-[10px] text-pretty">
         {copy.footnote}
       </p>
+
+      {/*
+        Taking a handle off somewhere else, agreed to first.
+
+        Portalled to the body for the same reason the picker's menu is: a column
+        carries its own profile's palette as CSS variables, so a full-screen
+        surface rendered inside one would come up wearing the colours of
+        whichever column opened it rather than the app's.
+      */}
+      {moving !== undefined &&
+        createPortal(
+          <Sheet
+            open
+            onClose={() => setMoving(undefined)}
+            label={copy.moveTitle
+              .replace("{handle}", moving.handle)
+              .replace("{name}", moving.fromName)}
+            footer={
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMoving(undefined)}
+                  className="focus-ring border-border hover:bg-surface-hover flex-1 rounded-full border px-4 py-2.5 text-sm font-semibold"
+                >
+                  {copy.moveCancel}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHandleFor(spaceId, moving.handle);
+                    toast.success(`@${moving.handle}`, {
+                      description:
+                        `${copy.nowOn} ${space?.name ?? ""} · ${copy.movedFrom.replace("{name}", moving.fromName)}`.trim(),
+                      /* The move is one call and so is putting it back, which
+                         makes an undo honest rather than a second confirmation
+                         wearing a different hat. */
+                      action: {
+                        label: content.hub.undo,
+                        onClick: () =>
+                          setHandleFor(moving.fromId, moving.handle),
+                      },
+                    });
+                    setMoving(undefined);
+                  }}
+                  className="focus-ring bg-accent text-accent-foreground flex-1 rounded-full px-4 py-2.5 text-sm font-bold transition-opacity hover:opacity-90"
+                >
+                  {copy.moveConfirm}
+                </button>
+              </div>
+            }
+          >
+            <div className="space-y-2 px-5 pt-3 pb-4">
+              <h2 className="flex items-start gap-2 text-base font-bold">
+                <ArrowLeftRight
+                  className="text-warning mt-0.5 size-4 shrink-0"
+                  aria-hidden="true"
+                />
+                {copy.moveTitle
+                  .replace("{handle}", moving.handle)
+                  .replace("{name}", moving.fromName)}
+              </h2>
+              <p className="text-muted-foreground text-sm text-pretty">
+                {copy.moveBody.replace("{name}", moving.fromName)}
+              </p>
+            </div>
+          </Sheet>,
+          document.body,
+        )}
     </div>
   );
 }

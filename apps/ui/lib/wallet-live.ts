@@ -64,7 +64,13 @@ function bsvToken(): Token {
   };
 }
 
-export function usePortfolio(): Portfolio {
+/**
+ * The portfolio of one wallet.
+ *
+ * `accountId` narrows the fixture holdings; the live path ignores it, because a
+ * live build has exactly one wallet and reads its balance from the shell.
+ */
+export function usePortfolio(accountId?: string): Portfolio {
   const accounts = useWalletAccounts();
   /*
    * Subscribed to, not merely read.
@@ -92,9 +98,9 @@ export function usePortfolio(): Portfolio {
 
   if (accounts.mode === "demo") {
     return {
-      rows: holdings(),
-      total: portfolioUsd(),
-      change: portfolioChange24h(),
+      rows: holdings(accountId),
+      total: portfolioUsd(accountId),
+      change: portfolioChange24h(accountId),
       loading: false,
       mode: "demo",
       error: null,

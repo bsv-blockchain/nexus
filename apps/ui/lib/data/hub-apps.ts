@@ -712,6 +712,34 @@ export const hubApps: HubApp[] = [
     createdAt: "2026-07-30T09:00:00.000Z",
   },
   {
+    id: "app-clndr",
+    slug: "clndr",
+    /* Spelled in full and read as "Clndr", which is how the publisher writes
+       it: the vowels are set at a third of the weight rather than left out, so
+       the word is still the word for anybody searching, quoting or hearing it
+       and only the eye does the dropping. See `quietVowels`. */
+    name: "Calendar",
+    shortName: "Calendar",
+    quietVowels: true,
+    description:
+      "A calendar that lives on the chain. Share a Clndr link, take bookings, and keep every invitation yours.",
+    tagline: "Time, on the chain",
+    developer: "third-party",
+    popularity: 44,
+    iconSrc: "/app-icons/clndr.png",
+    accent: "#3b53c9",
+    defaultInstalled: false,
+    category: "productivity",
+    categories: ["productivity", "social"],
+    web: { url: "https://www.clndr.im/home", embeds: true },
+    version: "2026.08.1",
+    repoId: "repo-tlon",
+    reviews: 86,
+    rating: 4.4,
+    publisher: "Clndr",
+    createdAt: "2026-08-14T09:00:00.000Z",
+  },
+  {
     id: "app-bsv-radar",
     slug: "bsv-radar",
     name: "BSV Radar",

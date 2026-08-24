@@ -3,6 +3,7 @@
 import { WalletMark } from "@/components/apps/wallet/wallet-switcher";
 import { AppHelpBar } from "@/components/hub/app-help-bar";
 import { useHub } from "@/components/hub/hub-provider";
+import { useCreateWorkspace } from "@/components/hub/use-create-workspace";
 import { SpaceIcon } from "@/components/hub/space-icon";
 import { content, MAX_HANDLES } from "@/lib/data";
 import { activeHandleFor, useSettings } from "@/lib/settings-store";
@@ -64,11 +65,11 @@ export function ProfilesSidebar(): ReactNode {
     spaces,
     activeSpaceId,
     setActiveSpaceId,
-    createSpace,
     toggleRail,
     mainView,
     setMainView,
   } = useHub();
+  const createWorkspace = useCreateWorkspace();
   const settings = useSettings();
   useWallets();
 
@@ -158,8 +159,17 @@ export function ProfilesSidebar(): ReactNode {
                       {space.name}
                     </span>
                     <span className="text-muted-foreground block truncate text-[10px]">
+                      {/* A dash on either side where nothing is connected. A
+                          workspace made a moment ago has neither, and "@" on
+                          its own is a handle that looks like it failed to load
+                          rather than one that was never chosen. */}
                       {copy.rowSummary
-                        .replace("{handle}", `@${activeHandleFor(space.id)}`)
+                        .replace(
+                          "{handle}",
+                          activeHandleFor(space.id)
+                            ? `@${activeHandleFor(space.id)}`
+                            : "—",
+                        )
                         .replace(
                           "{wallet}",
                           activeWalletFor(space.id)
@@ -216,7 +226,7 @@ export function ProfilesSidebar(): ReactNode {
       <div className="border-border/60 mt-2 border-t pt-2">
         <button
           type="button"
-          onClick={createSpace}
+          onClick={createWorkspace}
           /* The wallet's secondary actions, in a narrower column: a raised
              surface with a hairline ring rather than an outline on nothing.
              Two secondary buttons in one product should not be two shapes. */

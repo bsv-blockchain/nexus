@@ -194,7 +194,15 @@ export interface SettingsState {
    * Which handle each profile answers to.
    *
    * Per profile rather than global, since that is what profiles are for — Work
-   * and Personal wearing the same name defeats having both.
+   * and Personal wearing the same name defeats having both. That is also why
+   * it is exclusive: a handle is one identity, and two profiles answering to it
+   * is the exact thing the separation exists to prevent.
+   *
+   * A profile missing from this map has no handle rather than falling back to
+   * the first one held. Falling back meant a profile made a second ago arrived
+   * already wearing somebody's name, which is both untrue and the one state
+   * exclusivity cannot survive — every new profile would collide with the
+   * oldest one.
    */
   activeHandle: Record<string, string>;
   /** handles offered for sale, and the asking price in dollars */
@@ -283,7 +291,12 @@ const INITIAL: SettingsState = {
   archivedPaymentLinks: [],
   keymap: {},
   handles: ["crumbs", "breadcrumbs"],
-  activeHandle: {},
+  /* The shipped profiles wear one each. A prototype where both answer to the
+     same name demonstrates nothing about why a profile has a handle, and with
+     the fallback gone something has to say what they start as. Space ids are
+     written out rather than derived, the same way wallets-store seeds its two —
+     see lib/data/spaces.ts. */
+  activeHandle: { "space-my-hub": "crumbs", "space-work": "breadcrumbs" },
   listedForSale: {},
   avatar: null,
   previousHandle: null,
@@ -324,6 +337,11 @@ function restore(saved: Partial<SettingsState>): SettingsState {
       ...INITIAL.walletCapabilities,
       ...(saved.walletCapabilities ?? {}),
     },
+    /* Merged for the same reason the permission maps are: absence used to mean
+       "the first handle" and now means "none", so a blob saved before the
+       seeded profiles were written down would leave them nameless. What
+       somebody actually chose still wins. */
+    activeHandle: { ...INITIAL.activeHandle, ...(saved.activeHandle ?? {}) },
   };
 }
 
@@ -523,30 +541,107 @@ export function setShortcut(id: string, keys: string[] | null): void {
 /** How long a surrendered handle is held before anybody else can take it. */
 export const HANDLE_GRACE_MS = 60_000;
 
-/** The handle a profile answers to, falling back to the first one held. */
+/** The handle a profile answers to, or "" where it has none yet. */
 export function activeHandleFor(spaceId: string): string {
-  return state.activeHandle[spaceId] ?? state.handles[0] ?? "";
+  return state.activeHandle[spaceId] ?? "";
+}
+
+/**
+ * The profile already wearing a handle, if it is not this one.
+ *
+ * The question every caller actually asks — "would taking this cost somebody
+ * else theirs?" — and the answer both controls need to say so out loud, since
+ * "Work has it" is what turns connecting a handle from a switch into a
+ * decision. Taking it is allowed; taking it silently is not.
+ */
+export function handleHeldElsewhere(
+  handle: string,
+  spaceId: string,
+): string | undefined {
+  return Object.entries(state.activeHandle).find(
+    ([entry, worn]) => entry !== spaceId && worn === handle,
+  )?.[0];
+}
+
+/**
+ * The map with one handle worn by one profile and nobody else.
+ *
+ * The exclusivity rule, in the one place both ways of connecting a handle go
+ * through. Enforced by the store rather than by whichever view happens to be
+ * rendering, because an invariant kept in the views lasts until somebody adds
+ * a third view.
+ */
+function wearing(handle: string, spaceId: string): Record<string, string> {
+  const next = { ...state.activeHandle };
+  for (const [entry, worn] of Object.entries(next)) {
+    if (worn === handle) delete next[entry];
+  }
+  next[spaceId] = handle;
+  return next;
 }
 
 /** Adds a handle to the portfolio and points the given profile at it. */
 export function addHandle(handle: string, spaceId: string): void {
   const next = handle.trim().toLowerCase().replace(/^@/, "");
-  if (state.handles.includes(next)) {
-    state = { ...state, activeHandle: { ...state.activeHandle, [spaceId]: next } };
-    emit();
-    return;
-  }
   state = {
     ...state,
-    handles: [...state.handles, next],
-    activeHandle: { ...state.activeHandle, [spaceId]: next },
+    handles: state.handles.includes(next)
+      ? state.handles
+      : [...state.handles, next],
+    activeHandle: wearing(next, spaceId),
   };
   emit();
 }
 
-/** Points a profile at a handle already held. */
+/**
+ * Takes a profile's handle off it, leaving it with none.
+ *
+ * The other half of `setHandleFor`. A handle is the name a profile answers to,
+ * and there has to be a way back to answering to nothing — otherwise the only
+ * route out of a handle you did not mean to connect is to connect a different
+ * one, which is not the same thing.
+ */
+export function clearHandleFor(spaceId: string): void {
+  if (!(spaceId in state.activeHandle)) return;
+  const { [spaceId]: _gone, ...rest } = state.activeHandle;
+  state = { ...state, activeHandle: rest };
+  emit();
+}
+
+/**
+ * Forgets the handles of profiles that no longer exist.
+ *
+ * Settings survive a reload and profiles do not, so a profile made in one
+ * session leaves its handle claimed by an id nothing answers to any more — and
+ * because the claim is exclusive, that handle would be locked out of every
+ * profile forever, greyed with the name of nowhere. Reconciled by the one part
+ * of the app that knows which profiles are real; see hub-provider.
+ */
+export function pruneHandlesTo(liveSpaceIds: string[]): void {
+  const live = new Set(liveSpaceIds);
+  const stale = Object.keys(state.activeHandle).filter((id) => !live.has(id));
+  if (stale.length === 0) return;
+  const activeHandle = { ...state.activeHandle };
+  for (const id of stale) delete activeHandle[id];
+  state = { ...state, activeHandle };
+  emit();
+}
+
+/**
+ * Points a profile at a handle already held, taking it off whoever had it.
+ *
+ * Always a move, never a copy: a handle is one identity, so connecting it
+ * somewhere is the same act as disconnecting it from where it was. The profile
+ * it came from is left with none rather than handed the next name along — see
+ * the note on `activeHandle` for why that is the safer of the two.
+ *
+ * It moves without asking because it is not the thing that asks. The two
+ * controls that call it — the profile column's picker and Identity's handle
+ * list — put the consequence in front of somebody first, since "@crumbs is on
+ * Work" is only a surprise if you find out afterwards.
+ */
 export function setHandleFor(spaceId: string, handle: string): void {
-  state = { ...state, activeHandle: { ...state.activeHandle, [spaceId]: handle } };
+  state = { ...state, activeHandle: wearing(handle, spaceId) };
   emit();
 }
 
@@ -560,8 +655,12 @@ export function releaseHandleFrom(handle: string, now: number): void {
   if (state.handles.length <= 1) return;
   const handles = state.handles.filter((entry) => entry !== handle);
   const activeHandle = { ...state.activeHandle };
+  /* Left with no handle rather than handed the next one along. Moving them all
+     to `handles[0]` was how one release could put three profiles on one name,
+     and it also decided on somebody's behalf which identity a profile should
+     wear next — which is the one choice this control has no business making. */
   for (const [spaceId, active] of Object.entries(activeHandle)) {
-    if (active === handle) activeHandle[spaceId] = handles[0]!;
+    if (active === handle) delete activeHandle[spaceId];
   }
   const listed = { ...state.listedForSale };
   delete listed[handle];

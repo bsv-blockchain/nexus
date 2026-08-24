@@ -22,13 +22,17 @@
  */
 
 import { useHub } from "@/components/hub/hub-provider";
+import { useCustomTheme } from "@/components/hub/theme-provider";
 import { SpaceIcon } from "@/components/hub/space-icon";
 import { Tooltip } from "@/components/hub/tooltip";
 import { content } from "@/lib/data";
 import { useDesktopWindow } from "@/lib/desktop-window";
 import { installUpdate, useUpdateState } from "@/lib/update-data";
 import { requestNewWorkspace } from "@/lib/workspace-request";
+import { useReducedMotion } from "@/lib/motion";
+import { themeGradient } from "@/lib/theme";
 import { House, Minus, Plus, Square, X } from "lucide-react";
+import { motion } from "motion/react";
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
 
 const copy = content.titleBar;
@@ -41,6 +45,57 @@ const copy = content.titleBar;
  */
 const DRAG = { WebkitAppRegion: "drag" } as CSSProperties;
 const NO_DRAG = { WebkitAppRegion: "no-drag" } as CSSProperties;
+
+/** The default stops, for a workspace that has never been given a theme. */
+const DEFAULT_STOPS = ["#4353ff", "#5b6aff"];
+
+/**
+ * A workspace's own colours, along the bottom of its tab.
+ *
+ * On the tabs you are NOT in, which is the opposite of where a selected marker
+ * usually goes and is the point: the active tab is already told apart by its
+ * raised surface, and it does not need saying twice. What the strip could not
+ * say was which of the OTHER tabs was which — six workspaces reading as six
+ * greys, distinguishable only by a name that truncates at 48px. The colour is
+ * the same one the workspace paints its whole chrome in, so the strip becomes a
+ * legend for the thing you are about to switch to.
+ *
+ * The animation runs the way the eye expects a thing to leave: activating a tab
+ * drops its mark out through the bottom edge, and the tab you just left grows
+ * one up from that same edge. Two marks are in flight at once and they move in
+ * opposite directions, which is what makes the swap legible rather than a pair
+ * of unrelated fades.
+ */
+function ThemeUnderline({
+  spaceId,
+  active,
+}: {
+  spaceId: string;
+  active: boolean;
+}): ReactNode {
+  const { profileTheme } = useCustomTheme();
+  const reduced = useReducedMotion();
+  const stops = profileTheme(spaceId) ?? DEFAULT_STOPS;
+  return (
+    <motion.span
+      aria-hidden="true"
+      /* `scaleY` from the bottom edge rather than a height or a y-offset: a
+         transform is composited, and this sits in a strip that is being dragged
+         around the screen. */
+      initial={false}
+      animate={{ scaleY: active ? 0 : 1 }}
+      transition={reduced ? { duration: 0 } : { duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+      style={{
+        /* Horizontal, so a two- or three-stop theme reads as its own spread of
+           colour rather than as whichever stop happened to be first. A solid
+           theme renders one colour, which `themeGradient` already handles. */
+        backgroundImage: themeGradient(stops).replace("140deg", "90deg"),
+        transformOrigin: "bottom",
+      }}
+      className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px]"
+    />
+  );
+}
 
 export function TitleBar(): ReactNode {
   const { platform, ownsControls, maximized, run } = useDesktopWindow();
@@ -110,7 +165,7 @@ export function TitleBar(): ReactNode {
               <Control
                 onClick={() => setActiveSpaceId(space.id)}
                 aria-current={active ? "page" : undefined}
-                className={`flex max-w-48 min-w-0 items-center gap-2 px-3 text-xs font-medium transition-colors ${
+                className={`relative flex max-w-48 min-w-0 items-center gap-2 px-3 text-xs font-medium transition-colors ${
                   active
                     ? "bg-surface-raised text-foreground"
                     : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
@@ -118,6 +173,7 @@ export function TitleBar(): ReactNode {
               >
                 <SpaceIcon value={space.emoji} size={14} />
                 <span className="truncate">{space.name}</span>
+                <ThemeUnderline spaceId={space.id} active={active} />
               </Control>
               <Divider />
             </div>
