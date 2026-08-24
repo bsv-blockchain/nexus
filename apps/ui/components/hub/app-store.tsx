@@ -44,7 +44,9 @@ import {
   StoreFilterPane,
   type StoreFilters,
 } from "@/components/hub/store-filter";
+import { ALWAYS_APPS } from "@/lib/data/presets";
 import { useEffect, useState, type ReactNode } from "react";
+import { useHostOverlay } from "@/lib/wallet-data";
 
 /** Ordered category groupings for the Available section, with headings. */
 const CATEGORY_ORDER: { id: AppCategory; label: string }[] = [
@@ -509,6 +511,10 @@ export function AppStore(): ReactNode {
   const [filterOpen, setFilterOpen] = useState(false);
   // The app whose detail sheet is open (reflows the grid on desktop).
   const [selectedSlug, setSelectedSlug] = useState<HubApp["slug"] | null>(null);
+  /* Holds the shell's page layer down while this is up: a browsed page is a
+     native view that paints above this document, so no z-index reaches over
+     it. See lib/wallet-data. */
+  useHostOverlay(selectedSlug !== null);
   const [collapsed, setCollapsed] = useState(false);
   const repos = useEnabledRepositories();
   const [versionByRepo, setVersionByRepo] = useState<Record<string, string>>(
@@ -591,12 +597,28 @@ export function AppStore(): ReactNode {
       categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
     }
   }
+  /*
+   * The client's own apps keep the order the rail gives them.
+   *
+   * `ALWAYS_APPS` is the order every install lays its rail out in, and it is
+   * deliberate down to Roadmap being last. Sorting those same apps by
+   * "trending" inside the Essentials folder put them in a different order from
+   * the rail two columns away on the same screen, and made the newest of them
+   * lead a folder that is not a what's-new list. Everything else keeps
+   * whichever sort is chosen.
+   */
+  const railOrder = (app: HubApp): number => {
+    const at = (ALWAYS_APPS as string[]).indexOf(app.slug);
+    return at === -1 ? Number.MAX_SAFE_INTEGER : at;
+  };
   const groupByCategory = (
     list: HubApp[]
   ): { id: AppCategory; label: string; apps: HubApp[] }[] =>
     CATEGORY_ORDER.map((category) => ({
       ...category,
-      apps: list.filter((app) => app.category === category.id),
+      apps: list
+        .filter((app) => app.category === category.id)
+        .sort((a, b) => railOrder(a) - railOrder(b)),
     })).filter((group) => group.apps.length > 0);
 
   /*

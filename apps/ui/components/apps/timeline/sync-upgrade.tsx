@@ -20,6 +20,7 @@
  * the next one has not really covered anything.
  */
 
+import { usdForSatoshis, useUsdPerBsv } from "@/lib/exchange-rate";
 import { useHub } from "@/components/hub/hub-provider";
 import { useHostOverlay } from "@/lib/wallet-data";
 import { content } from "@/lib/data";
@@ -90,8 +91,11 @@ function Sheet(): ReactNode {
   /* Prepaying the period, less the bitcoin discount. */
   const walletTotal = plan.now * (1 - WALLET_DISCOUNT);
   const wallet = activeWalletFor(activeSpaceId);
+  /* Priced at what bitcoin is worth now, not at a rate written into a fixture:
+     this figure decides whether somebody can pay from their wallet. */
+  const usdPerBsv = useUsdPerBsv();
   const balance = wallet
-    ? (wallet.balanceSatoshis / 100_000_000) * wallet.fiatRate
+    ? usdForSatoshis(wallet.balanceSatoshis, usdPerBsv)
     : 0;
   /* `isUnlocked` only tracks wallets opened this session, so a wallet that was
      never sealed is not in it — the seal itself is `wallet.locked`. Reading the

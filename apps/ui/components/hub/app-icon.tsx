@@ -1,9 +1,9 @@
 "use client";
 
 import { Favicon } from "@/components/hub/favicon";
-import type { HubApp } from "@/lib/data";
+import { getHubApps, type HubApp } from "@/lib/data";
 import type { PinnedSite } from "@/lib/rail/sites";
-import { faviconColorFor } from "@/lib/tabs";
+import { faviconColorFor, sameUrl } from "@/lib/tabs";
 import { Folder, Globe, Palette, Pin, type LucideIcon } from "lucide-react";
 
 const DEFAULT_ACCENT = "#4353ff";
@@ -47,7 +47,8 @@ export function AppTile({
   size,
   className = "",
 }: {
-  app: Pick<HubApp, "iconSrc" | "name"> & Partial<Pick<HubApp, "web" | "accent">>;
+  app: Pick<HubApp, "iconSrc" | "name"> &
+    Partial<Pick<HubApp, "web" | "accent">>;
   size: number;
   className?: string;
 }): React.ReactNode {
@@ -96,6 +97,26 @@ export function SiteTile({
   size: number;
   className?: string;
 }): React.ReactNode {
+  /*
+   * A site the store lists is drawn as that listing.
+   *
+   * Connecting a web listing pins its URL, and the rail then holds a site ref
+   * rather than an app ref — so everything past that point knew only a title
+   * and a URL and fell back to `/favicon.ico`, then to a letter. Every
+   * third-party listing in the catalogue was a coloured letter on the rail
+   * while its own mark sat unused in the very same row of the store.
+   *
+   * Matched on the URL because that is the only thing the two halves share; a
+   * listing with no bundled mark falls through to the favicon exactly as
+   * before, which is still right for a site somebody pinned themselves.
+   */
+  const listed = getHubApps().find(
+    (app) => app.iconSrc && app.web && sameUrl(app.web.url, site.url)
+  );
+  if (listed) {
+    return <AppTile app={listed} size={size} className={className} />;
+  }
+
   return (
     <Favicon
       url={site.url}

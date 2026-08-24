@@ -24,11 +24,16 @@
  * 4. No drag, wheel or pointer handling at all. This sits inside a deck that
  *    pages on horizontal swipe, and two things cannot own the same gesture.
  *
- * 5. Particle counts are a fraction of the original's, and both systems stop
+ * 5. The beam's position is a prop rather than the middle of the box. Cards
+ *    resolve on the side they have already crossed to, so where the beam sits
+ *    decides how much of the strip is readable names and how much is still
+ *    code — see `beamAt`.
+ *
+ * 6. Particle counts are a fraction of the original's, and both systems stop
  *    under `prefers-reduced-motion`. It is a background on a card that already
  *    sits over a live WebGL shader, not the whole page.
  *
- * 6. styled-jsx replaced by Tailwind and a keyframe in globals.css; the file
+ * 7. styled-jsx replaced by Tailwind and a keyframe in globals.css; the file
  *    also fixed a literal newline inside the code generator's string.
  */
 
@@ -76,6 +81,7 @@ export function ScannerCardStream({
   cardHeight = 202,
   cardGap = 32,
   speed = 66,
+  beamAt = 0.5,
   bandOffsetY = -34,
   openingLead = 0.24,
   active = true,
@@ -88,6 +94,15 @@ export function ScannerCardStream({
   cardGap?: number;
   /** Pixels per second the line travels, rightward. */
   speed?: number;
+  /**
+   * Where the beam stands, as a fraction of the container's width.
+   *
+   * The cards travel rightward and are resolved on the side they have already
+   * crossed to, so this is really a split: everything right of it reads as a
+   * name, everything left of it is still code. A half gives an even argument;
+   * moving it left gives more of the strip to the answer than to the puzzle.
+   */
+  beamAt?: number;
   /**
    * How far the band sits off the container's middle, in pixels.
    *
@@ -251,8 +266,12 @@ export function ScannerCardStream({
       life: number;
       decay: number;
     };
+    /* Everything about the beam reads from here rather than from the middle of
+       the box: the sparks it throws, where the line is entered, and which side
+       of it a card is on. */
+    const beamPx = width * beamAt;
     const spark = (): Spark => ({
-      x: width / 2 + (Math.random() - 0.5) * 3,
+      x: beamPx + (Math.random() - 0.5) * 3,
       y: Math.random() * height,
       vx: Math.random() * 0.7 + 0.15,
       vy: (Math.random() - 0.5) * 0.3,
@@ -285,9 +304,7 @@ export function ScannerCardStream({
     /* Folded into the loop's own range, [-span, 0), so entering the card puts
        the line somewhere the wrap could also have put it. */
     const wrapInto = (at: number): number => ((at % span) - span) % span;
-    const opening = wrapInto(
-      width / 2 - span + cardGap + cardWidth * openingLead
-    );
+    const opening = wrapInto(beamPx - span + cardGap + cardWidth * openingLead);
     let position = opening;
     let last = performance.now();
     let frame = 0;
@@ -327,9 +344,11 @@ export function ScannerCardStream({
       }
 
       // Which side of the beam each card is on decides how much of it has
-      // resolved. Left of the beam is scanned (face); right is still code.
+      // resolved. The line travels rightward, so the side a card has already
+      // crossed to — the RIGHT — is the scanned one, and everything still to
+      // the left of the beam is code.
       const hostRect = hostRef.current!.getBoundingClientRect();
-      const beamX = hostRect.left + width / 2;
+      const beamX = hostRect.left + beamPx;
       scanning = false;
       line.querySelectorAll<HTMLElement>("[data-card]").forEach((wrapper) => {
         const rect = wrapper.getBoundingClientRect();
@@ -404,7 +423,7 @@ export function ScannerCardStream({
       renderer.dispose();
       sparks = [];
     };
-  }, [box, cards, cardWidth, cardGap, speed, openingLead, reduced]);
+  }, [box, cards, cardWidth, cardGap, speed, beamAt, openingLead, reduced]);
 
   return (
     <div
@@ -493,8 +512,9 @@ export function ScannerCardStream({
         blinks out between cards reads as a fault.
       */}
       <span
-        className="pointer-events-none absolute top-1/2 left-1/2 w-px rounded-full bg-gradient-to-b from-transparent via-white/80 to-transparent"
+        className="pointer-events-none absolute top-1/2 w-px rounded-full bg-gradient-to-b from-transparent via-white/80 to-transparent"
         style={{
+          left: `${beamAt * 100}%`,
           height: `${cardHeight + 48}px`,
           /* Rides with the band: a beam left on the middle of the box would
              cut the cards off centre. */

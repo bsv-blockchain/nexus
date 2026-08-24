@@ -6,6 +6,7 @@
  * so a portfolio total can be struck across assets that have nothing else in
  * common.
  */
+import { getBsvChange, getBsvRates, getUsdPerBsv } from "@/lib/exchange-rate";
 import {
   getToken,
   getTokenBalances,
@@ -26,12 +27,18 @@ export interface Holding {
 /**
  * Held assets, most valuable first, with BSV always pinned to the top.
  *
- * Fixture-side only — a live wallet's single holding is assembled in wallet-live.ts
- * from the shell's balance, so every price here is a fixture price by definition.
+ * Fixture-side only — a live wallet's single holding is assembled in
+ * wallet-live.ts from the shell's balance. Every price here is a fixture price
+ * EXCEPT bitcoin's, which `usdPerUnitOf` takes from the market: the invented
+ * tokens can only be worth what this file says, and BSV can be checked against
+ * any exchange in the world.
  */
 export function holdings(): Holding[] {
   return getTokenBalances()
-    .map(({ token, units }) => ({ token, units, usd: units * token.usdPerUnit }))
+    .map(({ token, units }) => {
+      const rate = usdPerUnitOf(token);
+      return { token, units, usd: rate === null ? null : units * rate };
+    })
     .sort((a, b) => {
       if (a.token.base !== b.token.base) return a.token.base ? -1 : 1;
       return (b.usd ?? 0) - (a.usd ?? 0);
@@ -48,8 +55,8 @@ export function portfolioChange24h(): number {
   const total = portfolioUsd();
   if (total === 0) return 0;
   return rows.reduce(
-    (sum, h) => sum + h.token.change24h * ((h.usd ?? 0) / total),
-    0,
+    (sum, h) => sum + change24hOf(h.token) * ((h.usd ?? 0) / total),
+    0
   );
 }
 
@@ -120,6 +127,15 @@ export function usdPerUnitOf(token: Token): number | null {
   if (pricing.mode === "live") {
     return token.id === "bsv" ? pricing.usdPerBsv : null;
   }
+  /*
+   * Bitcoin is priced from the market in demo mode too.
+   *
+   * The other symbols here are invented and their fixture prices are the only
+   * ones they can have, but BSV is a real asset with a real price, and quoting
+   * a stale one under a balance somebody can check elsewhere is the one figure
+   * on this screen that can be caught out. See lib/exchange-rate.
+   */
+  if (token.id === "bsv") return getUsdPerBsv();
   return token.usdPerUnit;
 }
 
@@ -130,7 +146,20 @@ export function txUsd(tx: WalletTransaction): number | null {
   return rate === null ? null : txUnits(tx) * rate;
 }
 
-const DAY_MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAY_MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
 /**
  * Group transactions under day headings, newest first — Vela's activity shape.
@@ -140,10 +169,10 @@ const DAY_MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct",
  * "3 weeks ago" and never matching between server and client.
  */
 export function groupByDay(
-  transactions: WalletTransaction[],
+  transactions: WalletTransaction[]
 ): { label: string; items: WalletTransaction[] }[] {
   const sorted = [...transactions].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
+    b.createdAt.localeCompare(a.createdAt)
   );
   const newest = sorted[0]?.createdAt.slice(0, 10);
   const groups = new Map<string, WalletTransaction[]>();
@@ -171,6 +200,34 @@ export function groupByDay(
 }
 
 /**
+ * What an asset did today, in percent.
+ *
+ * The mirror of `usdPerUnitOf`, and for the same reason: bitcoin is a real
+ * asset whose move anyone can check against an exchange, and the invented
+ * symbols beside it have only the numbers the fixtures gave them. Live where
+ * there is a live answer, fixture where there is not.
+ */
+export function change24hOf(token: Token): number {
+  if (token.id !== "bsv") return token.change24h;
+  return getBsvChange() ?? token.change24h;
+}
+
+/**
+ * The series a sparkline draws.
+ *
+ * A month of real daily closes for bitcoin; the deterministic wobble below for
+ * everything else. Both are normalised by `sparkPath`, so one returns dollars
+ * and the other returns numbers around 1 and the drawing does not care.
+ */
+export function sparkSeries(token: Token, points = 30): number[] {
+  if (token.id === "bsv") {
+    const closes = getBsvRates();
+    if (closes.length >= 2) return closes;
+  }
+  return sparkline(token, points);
+}
+
+/**
  * A deterministic 30-point series for a token's sparkline, shaped so it ends
  * consistently with the token's 24h move. No randomness — the chart must be
  * identical on server and client.
@@ -179,27 +236,73 @@ export function sparkline(token: Token, points = 30): number[] {
   let seed = 0;
   for (const char of token.id) seed = (seed * 31 + char.charCodeAt(0)) % 997;
   const drift = token.change24h / 100;
+  /*
+   * The wobble is a fraction of the token's own move, not a fixed 3.5%.
+   *
+   * At a fixed amplitude the wobble swamped the drift for every asset here —
+   * a stablecoin at 0.00% drew the same dramatic oscillation as a token up
+   * 3.1%, because the shape came from the token's id and nothing else. Beside
+   * bitcoin's real closes that reads as a chart of nothing. Tied to the move,
+   * a flat asset draws flat.
+   */
+  const amplitude = Math.min(0.02, Math.abs(drift) * 0.6);
   return Array.from({ length: points }, (_, i) => {
     const t = i / (points - 1);
-    // A repeatable wobble plus the drift, so the line trends the right way.
-    const wobble = Math.sin((seed + i * 17) * 0.7) * 0.035;
+    // Repeatable, so the chart is identical on server and client.
+    /* Two harmonics rather than one. A single sine is obvious as a sine at
+       the size the asset's own page draws it, and a series that announces
+       itself as generated is worse than one that simply is. */
+    const phase = (seed + i * 17) * 0.7;
+    const wobble =
+      (Math.sin(phase) * 0.7 + Math.sin(phase * 2.3 + seed) * 0.3) * amplitude;
     return 1 + drift * t + wobble;
   });
+}
+
+/**
+ * The smallest move that fills the box, as a fraction of the series' level.
+ *
+ * Below this the line is drawn proportionally smaller and centred instead. A
+ * sparkline scaled purely to its own min and max always fills its height, so
+ * an asset that moved a hundredth of a percent draws the same swing as one
+ * that moved thirty — the chart would be a picture of rounding error.
+ */
+const MIN_SPARK_SPAN = 0.02;
+
+/**
+ * The same geometry as an SVG path command string.
+ *
+ * A `<path>` rather than a `<polyline>` because the draw-on animation works by
+ * dashing the stroke against `pathLength`, and Chromium honours that attribute
+ * on a path — on a polyline the dash lengths stayed in user units, so a line
+ * meant to be drawing itself rendered as five evenly spaced ticks.
+ */
+export function sparkD(
+  values: number[],
+  width: number,
+  height: number
+): string {
+  const points = sparkPath(values, width, height).split(" ");
+  return points.map((point, i) => `${i === 0 ? "M" : "L"}${point}`).join(" ");
 }
 
 /** Sparkline points as an SVG polyline string. */
 export function sparkPath(
   values: number[],
   width: number,
-  height: number,
+  height: number
 ): string {
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const span = max - min || 1;
+  const mid = (min + max) / 2;
+  const level =
+    Math.abs(values.reduce((sum, value) => sum + value, 0) / values.length) ||
+    1;
+  const span = Math.max(max - min, level * MIN_SPARK_SPAN);
   return values
     .map((value, index) => {
       const x = (index / (values.length - 1)) * width;
-      const y = height - ((value - min) / span) * height;
+      const y = height / 2 - ((value - mid) / span) * height;
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");

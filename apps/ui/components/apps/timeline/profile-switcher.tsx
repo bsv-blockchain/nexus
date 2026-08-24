@@ -19,6 +19,7 @@ import { connectProfile, profileFor, useProfiles } from "@/lib/profiles-store";
 import { Check, Pencil } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type { ReactNode } from "react";
+import { useHostOverlay } from "@/lib/wallet-data";
 
 const copy = content.timeline.switcher;
 
@@ -43,6 +44,11 @@ function Sheet({
   anchor: DOMRect;
   onClose: () => void;
 }): ReactNode {
+  /* Holds the shell's page layer down while this is up: a browsed page is a
+     native view that paints above this document, so no z-index reaches over
+     it. See lib/wallet-data. */
+  useHostOverlay(true);
+
   const isDesktop = useIsDesktop();
   const state = useProfiles();
   const { activeSpaceId, setMainView, setSettingsCategory } = useHub();

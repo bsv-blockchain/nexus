@@ -39,6 +39,7 @@ import {
 } from "@/lib/data";
 import { isPresetCollection } from "@/lib/data/collections";
 import { useReducedMotion } from "@/lib/motion";
+import { AnimatePresence, motion } from "motion/react";
 import { useChosenPresets } from "@/lib/presets-store";
 import {
   getRepositoriesSnapshot,
@@ -407,18 +408,33 @@ function Card({
             </span>
           </span>
         ) : (
-          <span className="absolute inset-y-0 left-0 flex max-w-[78%] flex-col justify-center gap-0.5 p-3 text-white">
-            <span className="text-sm font-semibold">{collection.name}</span>
-            {/* Count at rest, names under the pointer. Swapped rather than
-                stacked: the card is a fixed 96px and a third line would either
-                overflow it or shrink the name that identifies it. Two lines at
-                most, so a setup with seven apps trails off rather than growing
-                the card. */}
-            <span className="text-[11px] leading-snug text-white/75 group-focus-within:hidden group-hover:hidden">
-              {slugs.length} app{slugs.length === 1 ? "" : "s"}
-            </span>
-            <span className="line-clamp-2 hidden text-[11px] leading-snug text-white/85 group-focus-within:block group-hover:block">
-              {names}
+          <span className="absolute inset-y-0 left-0 flex max-w-[82%] items-center gap-2.5 p-3 text-white">
+            {/* Whose setup this is. The three cards below carry somebody else's
+                banner, so the ones that ship with the app say so — otherwise
+                "Thinker" stands unattributed next to Handcash. The file is a
+                fixed off-white and the words beside it are white, so it goes in
+                as artwork rather than through the mask other surfaces use to
+                ink it in a palette. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/icons/Nexus-logo-white.svg"
+              alt=""
+              aria-hidden="true"
+              className="size-8 shrink-0 opacity-90"
+            />
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="text-sm font-semibold">{collection.name}</span>
+              {/* Count at rest, names under the pointer. Swapped rather than
+                  stacked: the card is a fixed 96px and a third line would
+                  either overflow it or shrink the name that identifies it. Two
+                  lines at most, so a setup with seven apps trails off rather
+                  than growing the card. */}
+              <span className="text-[11px] leading-snug text-white/75 group-focus-within:hidden group-hover:hidden">
+                {slugs.length} app{slugs.length === 1 ? "" : "s"}
+              </span>
+              <span className="line-clamp-2 hidden text-[11px] leading-snug text-white/85 group-focus-within:block group-hover:block">
+                {names}
+              </span>
             </span>
           </span>
         )}
@@ -485,14 +501,29 @@ function useActiveCount(cards: AppCollection[]): number {
  * one thing a reader wants from a section they have closed — a bare title would
  * make folding it a way to lose information rather than a way to save room.
  */
+/* The cards arrive one after another rather than all at once: a fold that
+   opens onto five finished cards reads as a jump cut, and 45ms of stagger is
+   enough to make it read as the section unpacking itself. */
+const CARD_LIST = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.045, delayChildren: 0.03 } },
+};
+const CARD_ITEM = {
+  hidden: { opacity: 0, y: 10, scale: 0.97 },
+  visible: { opacity: 1, y: 0, scale: 1 },
+};
+
 function Section({
   title,
   cards,
+  defaultOpen = true,
 }: {
   title: string;
   cards: AppCollection[];
+  defaultOpen?: boolean;
 }): ReactNode {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(defaultOpen);
+  const reduced = useReducedMotion();
   const active = useActiveCount(cards);
 
   return (
@@ -516,13 +547,28 @@ function Section({
             .replace("{total}", String(cards.length))}
         </span>
       </button>
-      {open && (
-        <div className="mt-1.5 space-y-2">
-          {cards.map((collection) => (
-            <Card key={collection.id} collection={collection} />
-          ))}
-        </div>
-      )}
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="cards"
+            className="mt-1.5 space-y-2 overflow-hidden"
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+            {...(reduced ? {} : { variants: CARD_LIST })}
+          >
+            {cards.map((collection) => (
+              <motion.div
+                key={collection.id}
+                {...(reduced ? {} : { variants: CARD_ITEM })}
+                transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <Card collection={collection} />
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }
@@ -540,7 +586,11 @@ export function AppCollections(): ReactNode {
           without room to spare the ring was sliced off along the top and left
           edges of the scroller. */}
       <div className="scrollbar-slim min-h-0 flex-1 space-y-3 overflow-y-auto p-1">
-        <Section title={copy.presetsTitle} cards={setups} />
+        {/* The presets start folded. By the time anybody is in the store that
+            question has been answered — on the welcome screen, on the way in —
+            and the card that matters here is a source they have not seen. The
+            count on the folded heading still says what was chosen. */}
+        <Section title={copy.presetsTitle} cards={setups} defaultOpen={false} />
         <Section title={copy.sourcesTitle} cards={sources} />
       </div>
 

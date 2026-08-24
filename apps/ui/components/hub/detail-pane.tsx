@@ -5,11 +5,13 @@ import {
   NewPaymentLinkFooter,
   NewPaymentLinkPane,
 } from "@/components/apps/wallet/new-payment-link-pane";
-import { removePaymentLink } from "@/lib/payment-links-store";
 import {
-  ReleaseDetail,
-  ReleaseList,
-} from "@/components/hub/release-notes";
+  NewSplitFooter,
+  NewSplitPane,
+} from "@/components/apps/wallet/new-split-pane";
+import { removePaymentLink } from "@/lib/payment-links-store";
+import { removeSplit } from "@/lib/splits-store";
+import { ReleaseDetail, ReleaseList } from "@/components/hub/release-notes";
 import { ConversationSettings } from "@/components/apps/messages/conversation-settings";
 import { NewConversation } from "@/components/apps/messages/new-conversation";
 import { ProfileActionsProvider } from "@/components/apps/messages/profile-hovercard";
@@ -26,18 +28,12 @@ import { FeatureDetail } from "@/components/apps/roadmap/feature-detail";
 import { DownloadsPane } from "@/components/hub/downloads-pane";
 import { SiteSettingsPane } from "@/components/hub/site-settings-pane";
 import { currentFeature } from "@/lib/roadmap-effects";
-import {
-  LicencePane,
-  LicencePaneFooter,
-} from "@/components/hub/licence-pane";
+import { LicencePane, LicencePaneFooter } from "@/components/hub/licence-pane";
 import { LegalPane } from "@/components/hub/legal-pane";
 import { useHub, type AppSlug } from "@/components/hub/hub-provider";
 import { SidePane } from "@/components/hub/side-pane";
 import { ChevronRight, Scale } from "lucide-react";
-import {
-  ClearDataPane,
-  LanguagesPane,
-} from "@/components/hub/settings-panes";
+import { ClearDataPane, LanguagesPane } from "@/components/hub/settings-panes";
 import { groupIconOf } from "@/lib/group-icon";
 import {
   content,
@@ -185,6 +181,30 @@ export function DetailPane(): ReactNode {
     );
   }
 
+  if (detailPane?.kind === "new-split") {
+    return (
+      <SidePane
+        open
+        title={content.wallet.splits.newTitle}
+        onClose={closeDetailPane}
+        footer={<NewSplitFooter />}
+      >
+        <NewSplitPane
+          onCreated={(splitId, description) => {
+            closeDetailPane();
+            toast.success(content.wallet.splits.raised, {
+              description,
+              action: {
+                label: content.hub.undo,
+                onClick: () => removeSplit(splitId),
+              },
+            });
+          }}
+        />
+      </SidePane>
+    );
+  }
+
   if (detailPane?.kind === "downloads") {
     return (
       <SidePane
@@ -286,7 +306,7 @@ export function DetailPane(): ReactNode {
                   openDetailPane({ kind: "person", id: subject.id })
                 }
                 aria-label={`${subject.name} — ${content.messages.viewProfile}`}
-                className="focus-ring mb-3 -mx-2 flex w-[calc(100%+1rem)] items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-surface-hover"
+                className="focus-ring hover:bg-surface-hover -mx-2 mb-3 flex w-[calc(100%+1rem)] items-center gap-2.5 rounded-lg px-2 py-1.5 text-left"
               >
                 <MemberAvatar person={subject} size={36} />
                 <div className="min-w-0 flex-1">
@@ -294,11 +314,11 @@ export function DetailPane(): ReactNode {
                   <Handle
                     person={subject}
                     size={11}
-                    className="mt-0.5 max-w-full truncate text-[11px] text-muted-foreground"
+                    className="text-muted-foreground mt-0.5 max-w-full truncate text-[11px]"
                   />
                 </div>
                 <ChevronRight
-                  className="size-4 shrink-0 text-muted-foreground"
+                  className="text-muted-foreground size-4 shrink-0"
                   aria-hidden="true"
                 />
               </button>
@@ -308,7 +328,7 @@ export function DetailPane(): ReactNode {
               <VouchFacepile
                 person={subject}
                 open
-                className="rounded-xl border border-border"
+                className="border-border rounded-xl border"
               />
             </div>
           </ProfileActionsProvider>

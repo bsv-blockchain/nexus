@@ -4,7 +4,7 @@ import { ScrollStack } from "@/components/hub/vendor/scroll-stack";
 import dynamic from "next/dynamic";
 import { content, getMessagePeople } from "@/lib/data";
 import { markFirstRunSeen, useFirstRunSeen } from "@/lib/first-run";
-import { PresetPicker } from "@/components/hub/preset-picker";
+import { Clip, PresetPicker } from "@/components/hub/preset-picker";
 import { useApplyPresets } from "@/components/hub/use-apply-presets";
 import { setChosenPresets } from "@/lib/presets-store";
 import { startTour } from "@/lib/tour-store";
@@ -181,7 +181,9 @@ const STEPS = [
   { key: "welcome", image: "/first-run/welcome.jpg" },
   { key: "browse", image: "/first-run/browse.jpg" },
   { key: "pay", image: "/first-run/pay.jpg" },
-  { key: "workspaces", image: "/first-run/workspaces.jpg" },
+  /* PNG rather than JPG: this one is a product render of the devices on black,
+     not a photograph, and JPG rings around the crisp UI edges inside them. */
+  { key: "workspaces", image: "/first-run/workspaces.png" },
 ] as const;
 
 /**
@@ -1002,6 +1004,13 @@ function Run({
                               <div className="absolute inset-0">
                                 <ScannerCardStream
                                   cards={HANDLE_CARDS}
+                                  /* A third in rather than the middle. The
+                                     cards resolve on the side they have
+                                     crossed to, so this gives two thirds of
+                                     the strip to readable names and a third to
+                                     the code they came out of — which is the
+                                     ratio the sentence is making. */
+                                  beamAt={1 / 3}
                                   /* Rewinds when this card is reached, so it
                                      is always entered at its opening rather
                                      than wherever it drifted to while somebody
@@ -1009,6 +1018,31 @@ function Run({
                                   active={index === 2}
                                   reduced={Boolean(reduced)}
                                   className="h-full w-full"
+                                />
+                              </div>
+                            ),
+                          }
+                        : {})}
+                      {...(step.key === "welcome"
+                        ? {
+                            /*
+                              The four people the presets are named for, in six
+                              seconds.
+
+                              Cut from the same clips the preset picker plays,
+                              so the first thing you see and the question three
+                              screens later are the same faces — the welcome is
+                              introducing them rather than showing stock. The
+                              loop closes on the frame it opens on, so it can
+                              run under the title indefinitely without a seam.
+                              The still stays as the poster, for the moment
+                              before the video has arrived.
+                            */
+                            backdrop: (
+                              <div className="absolute inset-0">
+                                <Clip
+                                  src="/first-run/welcome.mp4"
+                                  poster={step.image}
                                 />
                               </div>
                             ),
@@ -1055,6 +1089,11 @@ function Run({
                     onShuffle={() =>
                       setHandle(suggestHandle(taken, Math.random()))
                     }
+                    /* The card asks the question, so the card can answer it.
+                       The footer's Finish is still there and still works; this
+                       is the one under the thing you just typed, which is
+                       where a hand already is. */
+                    onFinish={finish}
                   />
                 </ScrollStack>
               </div>
@@ -1155,11 +1194,13 @@ function HandleCard({
   verdict,
   onChange,
   onShuffle,
+  onFinish,
 }: {
   value: string;
   verdict: ReturnType<typeof checkHandle>;
   onChange: (next: string) => void;
   onShuffle: () => void;
+  onFinish: () => void;
 }): ReactNode {
   const copy = content.firstRun.handle;
   const tone =
@@ -1228,6 +1269,19 @@ function HandleCard({
         <p className="text-muted-foreground max-w-[38ch] text-[11px] leading-relaxed text-balance">
           {copy.changeNote}
         </p>
+
+        {/* Only once the name is actually free. Disabled rather than hidden, so
+            the way out of this card is in the same place whether or not what
+            has been typed will do — a button that appears when you get it right
+            is a button nobody was looking for while getting it wrong. */}
+        <button
+          type="button"
+          onClick={onFinish}
+          disabled={verdict !== "ok"}
+          className="focus-ring border-foreground text-foreground hover:bg-foreground hover:text-background rounded-full border px-6 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-30"
+        >
+          {content.firstRun.finish}
+        </button>
       </ShareBackdrop>
     </article>
   );
@@ -1297,11 +1351,21 @@ function Footer({
         ))}
       </div>
 
+      {/* Filled while there are cards left, outlined on the last one.
+
+          The accent is what says "keep going"; the end of the run is not more
+          of the same and should not shout the same way. `border-foreground`
+          rather than black or white literally, so it is near-black on a light
+          theme and white on a dark one without either being written down. */}
       <button
         type="button"
         onClick={onNext}
         disabled={last && !canFinish}
-        className="focus-ring bg-accent text-accent-foreground relative rounded-full px-5 py-2 text-sm font-semibold transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-40"
+        className={`focus-ring relative rounded-full px-5 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-40 ${
+          last
+            ? "border-foreground text-foreground hover:bg-foreground hover:text-background border"
+            : "bg-accent text-accent-foreground hover:opacity-90"
+        }`}
       >
         {last ? copy.finish : copy.next}
       </button>

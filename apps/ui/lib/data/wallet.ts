@@ -1,6 +1,8 @@
 /**
  * tables: wallet_accounts, wallet_transactions — placeholder rows.
  */
+import { FALLBACK_USD_PER_BSV } from "@/lib/exchange-rate";
+
 import type { WalletAccount, WalletTransaction } from "./types";
 
 /**
@@ -26,7 +28,7 @@ export const walletAccounts: WalletAccount[] = [
     colors: ["#4353ff", "#22d3ee"],
     balanceSatoshis: 482_310_450,
     fiatCurrency: "USD",
-    fiatRate: 52.4,
+    fiatRate: FALLBACK_USD_PER_BSV,
     createdAt: "2026-01-12T09:00:00.000Z",
   },
   {
@@ -41,7 +43,7 @@ export const walletAccounts: WalletAccount[] = [
     locked: true,
     balanceSatoshis: 1_240_000_000,
     fiatCurrency: "USD",
-    fiatRate: 52.4,
+    fiatRate: FALLBACK_USD_PER_BSV,
     createdAt: "2026-01-12T09:00:00.000Z",
   },
   {
@@ -52,7 +54,7 @@ export const walletAccounts: WalletAccount[] = [
     colors: ["#7c3aed", "#f472b6"],
     balanceSatoshis: 61_420_800,
     fiatCurrency: "USD",
-    fiatRate: 52.4,
+    fiatRate: FALLBACK_USD_PER_BSV,
     createdAt: "2026-02-04T09:00:00.000Z",
   },
   {
@@ -63,7 +65,7 @@ export const walletAccounts: WalletAccount[] = [
     colors: ["#f59e0b", "#ef4444"],
     balanceSatoshis: 8_905_300,
     fiatCurrency: "USD",
-    fiatRate: 52.4,
+    fiatRate: FALLBACK_USD_PER_BSV,
     createdAt: "2026-03-19T09:00:00.000Z",
   },
 ];

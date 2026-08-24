@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
+import { useHostOverlay } from "@/lib/wallet-data";
 import { useEffect, type ReactNode } from "react";
 
 /**
@@ -40,6 +41,21 @@ export function Sheet({
    */
   full?: boolean;
 }): ReactNode {
+  /*
+   * Hold the shell's page layer down while this is up.
+   *
+   * A browsed page is a native view in both shells — a WebContentsView on the
+   * desktop, a native web view on mobile — and a native view is a sibling of
+   * this document that always paints ABOVE it. No z-index reaches over one, so
+   * without this the surface renders perfectly and is then completely hidden
+   * behind whatever tab happens to be open.
+   *
+   * Held by the primitive rather than by each caller, because "remember to call
+   * useHostOverlay" is a rule that gets forgotten exactly once and then fails
+   * silently. A no-op in a plain browser, which has no page layer to hide.
+   */
+  useHostOverlay(open);
+
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -75,7 +91,7 @@ export function Sheet({
             animate={{ y: 0, x: 0 }}
             exit={side ? { y: "100%" } : { y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 320 }}
-            className={`relative flex w-full flex-col overflow-hidden bg-surface-raised text-foreground shadow-[0_-12px_90px_-8px_rgba(0,0,0,0.55)] ring-1 ring-black/10 dark:shadow-[0_-12px_90px_-4px_rgba(0,0,0,0.95)] dark:ring-white/10 ${full ? "" : "max-w-md"} ${
+            className={`bg-surface-raised text-foreground relative flex w-full flex-col overflow-hidden shadow-[0_-12px_90px_-8px_rgba(0,0,0,0.55)] ring-1 ring-black/10 dark:shadow-[0_-12px_90px_-4px_rgba(0,0,0,0.95)] dark:ring-white/10 ${full ? "" : "max-w-md"} ${
               side
                 ? "max-h-[92dvh] rounded-t-3xl sm:h-full sm:max-h-none sm:rounded-t-none sm:rounded-l-3xl"
                 : "max-h-[92dvh] rounded-t-3xl"
@@ -85,11 +101,11 @@ export function Sheet({
               className={`flex shrink-0 justify-center pt-2.5 ${side ? "sm:hidden" : ""}`}
               aria-hidden="true"
             >
-              <span className="h-1 w-9 rounded-full bg-muted-foreground/30" />
+              <span className="bg-muted-foreground/30 h-1 w-9 rounded-full" />
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
             {footer && (
-              <div className="shrink-0 border-t border-border bg-surface-raised px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              <div className="border-border bg-surface-raised shrink-0 border-t px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 {footer}
               </div>
             )}

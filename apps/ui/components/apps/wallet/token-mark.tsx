@@ -26,7 +26,14 @@ export function TokenMark({
         className={`grid shrink-0 place-items-center overflow-hidden rounded-full ring-1 ring-black/10 ${className}`}
         style={{ width: size, height: size }}
       >
-        <svg viewBox="0 0 4 3" style={{ width: size, height: size }}>
+        {/* Cropped to the circle rather than fitted inside it. A 4:3 flag
+            letterboxed into a square left flat bands top and bottom, so the
+            mark read as a flag on a badge instead of as a round flag. */}
+        <svg
+          viewBox="0 0 4 3"
+          preserveAspectRatio="xMidYMid slice"
+          style={{ width: size, height: size }}
+        >
           {flag}
         </svg>
       </span>
@@ -55,9 +62,16 @@ export function TokenMark({
     );
   }
 
-  // Ecosystem-derived marks are square-ish logos; give them a plate so a
-  // dark glyph stays visible on a dark surface.
-  const plate = !token.icon;
+  /*
+   * The icon fills the circle, and the circle clips it.
+   *
+   * It used to be inset to 72% on a plate of the token's colour, which was
+   * meant for a dark glyph on a dark surface. Every icon that reaches here is
+   * a picture with its own background, so what that produced was a coloured
+   * ring around a square with visible corners. A logo that genuinely is a
+   * glyph on nothing says so with `plate`, and gets one.
+   */
+  const plate = token.plate;
   return (
     <span
       aria-hidden="true"
@@ -65,18 +79,14 @@ export function TokenMark({
       style={{
         width: size,
         height: size,
-        ...(plate ? { background: token.color } : {}),
+        ...(plate ? { background: plate } : {}),
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={icon}
         alt=""
-        style={
-          plate
-            ? { width: size * 0.72, height: size * 0.72, objectFit: "contain" }
-            : { width: size, height: size }
-        }
+        style={{ width: size, height: size, objectFit: "cover" }}
       />
     </span>
   );

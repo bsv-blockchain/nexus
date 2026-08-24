@@ -23,6 +23,7 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
 import { useState, type ReactNode } from "react";
+import { useHostOverlay } from "@/lib/wallet-data";
 
 /** Middle-truncate a key to first 5 … last 5 characters. */
 function shortKey(key: string): string {
@@ -168,6 +169,10 @@ export function IdentityApp(): ReactNode {
   const certificates = [...fromCommands, ...getIdentityCertificates()];
   const copy = content.identity;
   const [sheetBadge, setSheetBadge] = useState<IdentityKey | null>(null);
+  /* Holds the shell's page layer down while this is up: a browsed page is a
+     native view that paints above this document, so no z-index reaches over
+     it. See lib/wallet-data. */
+  useHostOverlay(sheetBadge !== null);
   const [renameBadge, setRenameBadge] = useState<IdentityKey | null>(null);
   const openRename = (badge: IdentityKey): void => {
     setSheetBadge(null);

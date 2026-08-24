@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useState, type ReactNode } from "react";
+import { useHostOverlay } from "@/lib/wallet-data";
 
 const EASE = [0.4, 0, 0.2, 1] as const;
 
@@ -35,6 +36,10 @@ export function GettingStartedPage(): ReactNode {
   const reduce = useReducedMotion();
   const [activeStep, setActiveStep] = useState(0);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  /* Holds the shell's page layer down while this is up: a browsed page is a
+     native view that paints above this document, so no z-index reaches over
+     it. See lib/wallet-data. */
+  useHostOverlay(shortcutsOpen);
 
   // Hold the sharp photo ~1s longer before the blur + content animate in.
   const HOLD = 1;
@@ -88,12 +93,7 @@ export function GettingStartedPage(): ReactNode {
             ? { opacity: 1, filter: "blur(34px)" }
             : {
                 opacity: [0, 1, 1, 1],
-                filter: [
-                  "blur(0px)",
-                  "blur(0px)",
-                  "blur(0px)",
-                  "blur(34px)",
-                ],
+                filter: ["blur(0px)", "blur(0px)", "blur(0px)", "blur(34px)"],
               }
         }
         transition={
@@ -139,7 +139,9 @@ export function GettingStartedPage(): ReactNode {
                             <Icon className="size-4" aria-hidden="true" />
                           </span>
                           <div>
-                            <h3 className="text-base font-bold">{step.title}</h3>
+                            <h3 className="text-base font-bold">
+                              {step.title}
+                            </h3>
                             <p className="mt-1 text-sm text-[#5b6484]">
                               {step.body}
                             </p>
@@ -209,7 +211,10 @@ function PreviewWindow(): ReactNode {
           <span aria-hidden="true">›</span>
           <span>Preview</span>
         </div>
-        <div className="mt-3 h-6 w-3/4 rounded bg-black/10" aria-hidden="true" />
+        <div
+          className="mt-3 h-6 w-3/4 rounded bg-black/10"
+          aria-hidden="true"
+        />
         <div className="mt-2 h-4 w-1/2 rounded bg-black/5" aria-hidden="true" />
         <div
           className="mt-4 h-40 rounded-xl bg-linear-to-br from-[#4353ff] via-[#7c86ff] to-[#22d3ee]"

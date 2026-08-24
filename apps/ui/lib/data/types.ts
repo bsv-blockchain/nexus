@@ -45,9 +45,10 @@ export type WebAppSlug =
   | "pixel-war"
   | "omnibazaar"
   | "soundbase"
-  | "tonicpow-handcash"
   | "1sat-market"
   | "tonicpow"
+  | "handcash-market"
+  | "theme-token"
   | "jamify"
   | "scribe"
   | "free-radio"
@@ -581,6 +582,12 @@ export interface Token {
   ecosystem: EcosystemId | null;
   /** own mark; null falls back to the issuing ecosystem's */
   icon: string | null;
+  /**
+   * What to draw behind the mark, for an icon that is a glyph rather than a
+   * picture. Absent means the icon fills the circle on its own — which is what
+   * a full-bleed logo wants, and what a transparent one must not have.
+   */
+  plate?: string;
   /** brand tint, for generated tiles and accents */
   color: string;
   decimals: number;
@@ -596,6 +603,15 @@ export interface Token {
   blurb: string;
   /** minting protocol, e.g. BSV-21 or 1Sat */
   protocol: string;
+  /** where that protocol is documented, when it has a home worth opening */
+  protocolUrl?: string;
+  /**
+   * Who issued it, where that is neither an ecosystem in this app nor nobody.
+   * Bitcoin has an author and no issuing company, which "Independent" says
+   * poorly.
+   */
+  issuer?: string;
+  issuerUrl?: string;
   usdPerUnit: number;
   /** 24h move as a percentage */
   change24h: number;
@@ -682,6 +698,20 @@ export interface SplitBill {
   tokenId: string;
   totalUnits: number;
   createdAt: string;
+  /**
+   * Who raised it, when it was not you.
+   *
+   * Absent means this is yours and the shares are owed TO you. Set means
+   * somebody else divided an amount and named you in it, so one of the shares
+   * is yours to pay. The same row either way — a split is one object seen from
+   * two ends, and modelling the second as its own table would let the two
+   * disagree about what was owed.
+   */
+  raisedBy?: string;
+  /** which share is yours, on a split somebody else raised */
+  yourShareUnits?: number;
+  /** what your own share is doing, on a split somebody else raised */
+  yourShareStatus?: "paid" | "pending" | "failed";
   shares: {
     personId: string;
     units: number;

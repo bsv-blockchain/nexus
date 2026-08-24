@@ -50,6 +50,108 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: "2026.0.6",
+    date: "2026-08-23",
+    headline: "Arriving, and being asked what you are here for.",
+    features: [
+      {
+        id: "first-run",
+        title: "A welcome that asks a question",
+        summary: "Five cards, a handle, and then the setup you pick.",
+        body: "Opening a client with everything switched on is a wall of apps nobody chose. The welcome opens on the four people the presets are named for, says what this is over three more pictures, asks for a handle, and then asks what you are here for — Thinker, Maker, Developer, Gamer, as many as you like. The answer is not a theme: it lays out the rail, connects the apps, switches on the catalogues those apps come from, and turns on Developer Tools if you asked for them.",
+        steps: [
+          "Pick as many presets as you like, or none — the plain setup is a real answer.",
+          "Setting one moves the strip on to the next you have not answered.",
+          "Run it again whenever you like from Preferences, under Onboarding.",
+        ],
+      },
+      {
+        id: "guided-tour",
+        title: "A guided tour that points",
+        summary:
+          "Cards built from the presets you chose, over the real screen.",
+        body: "Ten cards at most, assembled from your answer rather than a fixed script: four everybody gets — your handle, your inbox, getting paid, the vault — and one for each preset, about the thing that preset is for. Each card puts the screen it is describing behind itself and points at the piece of interface it means, scrolling it into view first so the pointer always lands on something you can see.",
+        steps: [
+          "It offers itself a couple of seconds after the welcome ends.",
+          "Restart it any time from the help circle, bottom right.",
+        ],
+      },
+      {
+        id: "timeline",
+        title: "A Timeline to read",
+        summary:
+          "The feed, with saved posts, lists, mutes and your own activity.",
+        body: "Posts open into threads, replies and reposts and likes are yours to make, and everything you do lands in Activity with a date range and a filter by app. Timestamps carry the block height they were written at, so a post can be checked against the chain rather than taken on trust.",
+      },
+      {
+        id: "workspaces",
+        title: "Workspaces, and a strip that names them",
+        summary:
+          "Profiles are Workspaces, and the desktop shell says which you are in.",
+        body: "A workspace keeps its own tabs, wallet, name and connected apps. The desktop shell now carries a strip above the app with an Update button when one is waiting, Home, every workspace by name, and a plus that opens Workspaces with its own control brought into sight. macOS keeps its traffic lights, Windows keeps its own buttons and Snap Layouts, and Linux is frameless with the three drawn here.",
+        steps: [
+          "Workspaces columns scroll under the rail rather than stopping at its edge.",
+          "The rail's Workspaces button is optional — see Preferences.",
+        ],
+      },
+      {
+        id: "app-store",
+        title: "The store's column is the setups you chose",
+        summary: "Nexus Presets and the sources worth featuring, as cards.",
+        body: "The column used to carry its own personas, which were the same idea as the presets and had drifted from them. It is the presets themselves now, reading the answer you gave on the way in, so a card here is already on if you picked it there. Below them, three catalogues wearing their own banner; their switch adds a source and installs nothing.",
+        steps: [
+          "Tapping a card scopes the store to what it holds.",
+          "The switch applies the whole setup, and takes it away again.",
+        ],
+      },
+      {
+        id: "add-to-rail",
+        title: "Add to rail",
+        summary: "Keep the page you are on, with its own name and mark.",
+        body: "Connecting a web listing has always meant pinning its address; this is the same act reached from the page itself, in the address bar and in the phone's sheet. The name is the site's own, cut back from its page title, and the mark is the largest icon that origin publishes rather than a 16px favicon stretched to fit. It appears in Connected Apps like any other connection, and removing it there takes it off the rail.",
+        steps: ["Hold any rail tile to reveal a cross that disconnects it."],
+      },
+      {
+        id: "live-rate",
+        title: "Bitcoin priced at what it costs",
+        summary:
+          "One live rate and a real chart, from the chain's own explorer.",
+        body: "Three different prices for BSV were written into this build, all of them stale, and one of them was printed to the reader as the rate they were being charged at. Every figure now reads a single live rate. The line beside the balance is real too — a month of daily closes, and a percentage measured against the last one rather than invented, which is why it says today rather than claiming a 24-hour window nothing here could measure. An asset's own page draws that month properly: a smoothed curve over a gradient, and dragging across it answers what your balance was worth on any day in it. The invented tokens keep their fixture prices, because those are the only prices they can have; their lines are now scaled to their own move, so a stablecoin that did not move draws flat.",
+      },
+      {
+        id: "splits",
+        title: "Splits you can actually raise",
+        summary:
+          "Divide an amount, chase it, pay your share of somebody else's.",
+        body: "Splits was a list of four invented bills with a Mark paid button that forgot itself on reload. You can raise one now — what it is for, a total, handles from your contacts, evenly or a figure each — and it is written down, so what has settled is still true tomorrow. A reminder opens the conversation with the line already written and leaves the sending to you, starting the conversation if there is not one yet. And a split has two ends: one somebody else raised shows up under You owe, with your own share and a button that pays it. The share is marked when the money leaves, not when the sheet opens.",
+        steps: [
+          "Payments, then Splits, then New split.",
+          "The total is what you are owed back — your own share is not part of it.",
+          "Shares are independent: one failing can be retried without touching the rest.",
+        ],
+      },
+      {
+        id: "settings-persist",
+        title: "Settings that remember",
+        summary: "What you change survives a reload.",
+        body: "A preference that forgets itself on every launch is not a preference. Everything Settings can change is written down, versioned so a future rename is a discarded blob rather than a crash, and coalesced so a slider does not write sixty times a second.",
+      },
+      {
+        id: "legal",
+        title: "Terms and privacy, in the app",
+        summary: "Two tabs, written against what this client actually does.",
+        body: "Keys held on your device with no recovery path, per-workspace app permissions, handles that resolve across ecosystems, payments that cannot be reversed, and Nexus Sync being off until you turn it on. The software licence is a separate document about a separate question, and these point at it rather than paraphrasing it.",
+        steps: ["Help and resources, bottom right, then Legal summary."],
+      },
+      {
+        id: "vault-doors",
+        title: "A vault that shuts on its own",
+        summary: "Keys, recovery phrases and private files behind a door.",
+        body: "Nothing is escrowed and nothing leaves the device; the only thing that opens it is a passphrase you hold. The door seals itself the moment you leave the app rather than waiting to be told.",
+      },
+    ],
+  },
+  {
     version: "2026.0.5",
     date: "2026-08-05",
     headline: "Secrets that do not stay in the transcript.",

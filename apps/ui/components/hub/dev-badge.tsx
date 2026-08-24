@@ -77,14 +77,12 @@ export function DevBadge({
     <p
       className={`text-muted-foreground flex items-center gap-1 text-xs font-medium ${className}`}
     >
-      {named ? (
+      {/* Nothing at all for a third party. The empty ring was meant to say
+          "unverified", and instead read as a check that had failed to load —
+          the absence of a mark already says everything the ring did. */}
+      {named && (
         <VerifiedCheck
           tone={VOUCHED.includes(developer) ? "vouched" : "known"}
-        />
-      ) : (
-        <span
-          className="border-muted-foreground/40 size-3.5 shrink-0 rounded-full border"
-          aria-hidden="true"
         />
       )}
       {DEV_LABEL[developer]}

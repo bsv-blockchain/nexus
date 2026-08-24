@@ -50,6 +50,19 @@ export const ALWAYS_APPS: HubAppSlug[] = [
  */
 export const SHARED_SINGLES: HubAppSlug[] = ["bsv-radar"];
 
+/**
+ * The catalogue those shared singles are served from.
+ *
+ * Paired with `SHARED_SINGLES` rather than written into each preset's `repos`,
+ * for the same reason the app is: which source carries BSV Radar is a fact
+ * about BSV Radar, not about Thinker. Any preset brings the app, so any preset
+ * has to bring the source too, or the rail ends up holding a listing the store
+ * has stopped showing.
+ *
+ * Not reversible, unlike a preset's own `repos` — see `ownReposFor`.
+ */
+export const SHARED_REPOS: string[] = ["repo-tlon"];
+
 export interface Preset {
   id: PresetId;
   /** shown on the tile and as the headline when focused */
@@ -195,13 +208,25 @@ export function appsFor(chosen: PresetId[]): HubAppSlug[] {
   return out;
 }
 
-/** Repo ids a set of presets switches on, deduped. */
-export function reposFor(chosen: PresetId[]): string[] {
+/** Repo ids a preset declares for itself, deduped. */
+export function ownReposFor(chosen: PresetId[]): string[] {
   const out = new Set<string>();
   for (const preset of presets) {
     if (!chosen.includes(preset.id)) continue;
     for (const repo of preset.repos ?? []) out.add(repo);
   }
+  return [...out];
+}
+
+/**
+ * Every repo id a set of presets needs switched on, deduped.
+ *
+ * The declared ones plus the shared catalogue, which any preset needs because
+ * every preset brings the app it serves.
+ */
+export function reposFor(chosen: PresetId[]): string[] {
+  const out = new Set<string>(ownReposFor(chosen));
+  if (chosen.length > 0) for (const repo of SHARED_REPOS) out.add(repo);
   return [...out];
 }
 

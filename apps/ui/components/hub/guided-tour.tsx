@@ -24,6 +24,7 @@
  */
 
 import { useHub } from "@/components/hub/hub-provider";
+import { TourArtwork } from "@/components/hub/tour-art";
 import { content } from "@/lib/data";
 import {
   endCopy,
@@ -452,7 +453,11 @@ function StepCard({
         style={{ ...style, ...(isDesktop ? { width: CARD_W } : {}) }}
         className="bg-surface-raised ring-border fixed z-[120] overflow-hidden rounded-2xl shadow-2xl ring-1"
       >
-        <Placeholder className="h-32 w-full" />
+        {card.art ? (
+          <TourArtwork art={card.art} />
+        ) : (
+          <Placeholder className="h-32 w-full" />
+        )}
         <div className="p-5">
           <h2 className="text-base font-semibold">{words.title}</h2>
           <Body

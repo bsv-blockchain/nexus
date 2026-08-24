@@ -2,6 +2,7 @@
 
 import { ChevronRight, type LucideIcon } from "lucide-react";
 import { createPortal } from "react-dom";
+import { useHostOverlay } from "@/lib/wallet-data";
 import { useEffect, type ReactNode } from "react";
 
 /** The widest menu this renders; used to keep one on screen near an edge. */
@@ -53,6 +54,21 @@ export function PopoverMenu({
    */
   width?: number;
 }): ReactNode {
+  /*
+   * Hold the shell's page layer down while this is up.
+   *
+   * A browsed page is a native view in both shells — a WebContentsView on the
+   * desktop, a native web view on mobile — and a native view is a sibling of
+   * this document that always paints ABOVE it. No z-index reaches over one, so
+   * without this the surface renders perfectly and is then completely hidden
+   * behind whatever tab happens to be open.
+   *
+   * Held by the primitive rather than by each caller, because "remember to call
+   * useHostOverlay" is a rule that gets forgotten exactly once and then fails
+   * silently. A no-op in a plain browser, which has no page layer to hide.
+   */
+  useHostOverlay(open);
+
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -89,7 +105,7 @@ export function PopoverMenu({
                 anchor.right - menuWidth,
                 window.innerWidth - menuWidth - 8
               )
-            : anchor.left,
+            : anchor.left
         ),
       }
     : null;
@@ -114,7 +130,7 @@ export function PopoverMenu({
            that would stop a narrow trigger's menu from matching it. */
         className={`${rect ? "fixed" : "absolute"} ${
           width ? "" : "min-w-56"
-        } z-50 rounded-2xl border border-border bg-surface-raised p-1.5 shadow-2xl ${className}`}
+        } border-border bg-surface-raised z-50 rounded-2xl border p-1.5 shadow-2xl ${className}`}
       >
         {children}
       </div>
@@ -144,7 +160,7 @@ export function MenuItem({
       type="button"
       role="menuitem"
       onClick={onClick}
-      className={`focus-ring flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-surface-hover ${
+      className={`focus-ring hover:bg-surface-hover flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm ${
         destructive ? "text-negative" : ""
       }`}
     >
@@ -156,13 +172,13 @@ export function MenuItem({
       )}
       <span className="flex-1 truncate">{label}</span>
       {shortcut && (
-        <span className="shrink-0 text-xs text-muted-foreground">
+        <span className="text-muted-foreground shrink-0 text-xs">
           {shortcut}
         </span>
       )}
       {hasSubmenu && (
         <ChevronRight
-          className="size-3.5 shrink-0 text-muted-foreground"
+          className="text-muted-foreground size-3.5 shrink-0"
           aria-hidden="true"
         />
       )}
@@ -171,5 +187,5 @@ export function MenuItem({
 }
 
 export function MenuSeparator(): ReactNode {
-  return <div className="mx-2 my-1 h-px bg-border" aria-hidden="true" />;
+  return <div className="bg-border mx-2 my-1 h-px" aria-hidden="true" />;
 }

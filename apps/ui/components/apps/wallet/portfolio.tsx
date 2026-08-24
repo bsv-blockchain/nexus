@@ -2,11 +2,13 @@
 
 import { TokenMark, formatUnits } from "@/components/apps/wallet/token-mark";
 import { content } from "@/lib/data";
+import { useBsvHistory } from "@/lib/exchange-rate";
 import {
+  change24hOf,
   changeTone,
   percent,
-  sparkPath,
-  sparkline,
+  sparkD,
+  sparkSeries,
   usd,
   type Holding,
 } from "@/lib/wallet";
@@ -14,18 +16,35 @@ import { usePortfolio } from "@/lib/wallet-live";
 import { ArrowDownLeft, ArrowUpRight, Repeat } from "lucide-react";
 import type { ReactNode } from "react";
 
-/** Compact sparkline. Purely decorative, so it carries no accessible name. */
+/**
+ * The row sparkline. Purely decorative, so it carries no accessible name.
+ *
+ * Wide and shallow rather than square: this is a trend line beside a balance,
+ * and a month of closes reads as a direction across the width. The old box was
+ * near enough square that a drawing swinging edge to edge looked like a
+ * seismograph — which it was, since the series it drew was a sine wave.
+ *
+ * Deliberately not interactive and deliberately not animated. The chart you can
+ * actually read lives on the asset's own page; five of these drawing themselves
+ * every time the list paints is a page that fidgets.
+ *
+ * Subscribed rather than merely read, so the line redraws from the wobble to
+ * the real closes the moment the explorer answers.
+ *
+ * @see components/apps/wallet/price-chart.tsx
+ */
 export function Spark({
   holding,
-  width = 64,
-  height = 22,
+  width = 88,
+  height = 18,
 }: {
   holding: Holding;
   width?: number;
   height?: number;
 }): ReactNode {
-  const values = sparkline(holding.token);
-  const up = holding.token.change24h >= 0;
+  useBsvHistory();
+  const values = sparkSeries(holding.token);
+  const up = change24hOf(holding.token) >= 0;
   return (
     <svg
       width={width}
@@ -34,8 +53,8 @@ export function Spark({
       aria-hidden="true"
       className="shrink-0 overflow-visible"
     >
-      <polyline
-        points={sparkPath(values, width, height)}
+      <path
+        d={sparkD(values, width, height)}
         fill="none"
         strokeWidth="1.5"
         strokeLinecap="round"
@@ -78,6 +97,7 @@ export function Portfolio({
   onSend,
   onReceive,
   onExchange,
+  wallet,
 }: {
   onOpenToken: (tokenId: string) => void;
   /** Absent means the shell has no rail behind the button — it hides rather
@@ -85,6 +105,8 @@ export function Portfolio({
   onSend?: () => void;
   onReceive?: () => void;
   onExchange?: () => void;
+  /** The wallet picker, which the card heads rather than the page. */
+  wallet?: ReactNode;
 }): ReactNode {
   const copy = content.wallet;
   const { rows, total, change, loading, error, mode } = usePortfolio();
@@ -100,33 +122,51 @@ export function Portfolio({
 
   return (
     <div className="mx-auto w-full max-w-2xl">
-      <section className="rounded-2xl bg-surface p-5 sm:p-6">
-        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          {copy.totalValue}
-        </p>
-        <p className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-          {loading ? "—" : usd(total)}
-        </p>
-        {/* An em dash above says the total is unknown; this says why. Without it a
+      <section className="bg-surface rounded-2xl p-5 sm:p-6">
+        {/*
+          The wallet's name, level with the figure it belongs to.
+
+          It used to sit above the card, where it read as a page heading — but
+          this number is one wallet's, not the app's, and the two belong in the
+          same frame. Right of the total rather than over it, so the eye still
+          lands on the money first.
+        */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+              {copy.totalValue}
+            </p>
+            <p className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+              {loading ? "—" : usd(total)}
+            </p>
+            {/* An em dash above says the total is unknown; this says why. Without it a
             funded wallet with no rate looks like a broken wallet. */}
-        {!loading && total === null && rows.length > 0 ? (
-          <p className="mt-1 text-sm text-muted-foreground">{copy.noRate}</p>
-        ) : null}
-        {/* A real wallet cannot answer "how much did this move today", and printing
+            {!loading && total === null && rows.length > 0 ? (
+              <p className="text-muted-foreground mt-1 text-sm">
+                {copy.noRate}
+              </p>
+            ) : null}
+            {/* A real wallet cannot answer "how much did this move today", and printing
             0.00% would be an answer rather than an absence of one. */}
-        {change !== null ? (
-          <p className={`mt-1 text-sm font-semibold ${changeTone(change)}`}>
-            {percent(change)}{" "}
-            <span className="font-normal text-muted-foreground">
-              {copy.change24h}
-            </span>
-          </p>
-        ) : null}
-        {error ? (
-          <p role="alert" className="mt-1 text-sm font-medium text-negative">
-            {error}
-          </p>
-        ) : null}
+            {change !== null ? (
+              <p className={`mt-1 text-sm font-semibold ${changeTone(change)}`}>
+                {percent(change)}{" "}
+                <span className="text-muted-foreground font-normal">
+                  {copy.change24h}
+                </span>
+              </p>
+            ) : null}
+            {error ? (
+              <p
+                role="alert"
+                className="text-negative mt-1 text-sm font-medium"
+              >
+                {error}
+              </p>
+            ) : null}
+          </div>
+          {wallet}
+        </div>
 
         {actions.length > 0 && (
           <div className={`mt-5 grid gap-2 ${ACTION_COLUMNS[actions.length]}`}>
@@ -135,7 +175,7 @@ export function Portfolio({
                 key={label}
                 type="button"
                 onClick={onClick}
-                className="focus-ring flex flex-col items-center gap-1.5 rounded-xl bg-surface-raised px-3 py-3 text-xs font-semibold ring-1 ring-border/60 transition-colors hover:bg-surface-hover"
+                className="focus-ring bg-surface-raised ring-border/60 hover:bg-surface-hover flex flex-col items-center gap-1.5 rounded-xl px-3 py-3 text-xs font-semibold ring-1 transition-colors"
               >
                 {/*
                   Bigger, and mixed toward the foreground rather than sitting at
@@ -165,13 +205,13 @@ export function Portfolio({
 
       <section className="mt-6">
         <h2 className="px-1 text-sm font-semibold">{copy.assets}</h2>
-        <ul className="mt-2 divide-y divide-border overflow-hidden rounded-2xl bg-surface">
+        <ul className="divide-border bg-surface mt-2 divide-y overflow-hidden rounded-2xl">
           {rows.map((holding) => (
             <li key={holding.token.id}>
               <button
                 type="button"
                 onClick={() => onOpenToken(holding.token.id)}
-                className="focus-ring flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-hover"
+                className="focus-ring hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-3 text-left transition-colors"
               >
                 <TokenMark token={holding.token} size={36} />
                 <span className="min-w-0 flex-1">
@@ -180,12 +220,12 @@ export function Portfolio({
                       {holding.token.name}
                     </span>
                     {holding.token.base && (
-                      <span className="shrink-0 rounded-full bg-accent/15 px-1.5 py-px text-[10px] font-bold text-accent">
+                      <span className="bg-accent/15 text-accent shrink-0 rounded-full px-1.5 py-px text-[10px] font-bold">
                         {copy.baseCurrency}
                       </span>
                     )}
                   </span>
-                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                  <span className="text-muted-foreground mt-0.5 block truncate text-xs">
                     {formatUnits(holding.units, holding.token.decimals)}{" "}
                     {holding.token.symbol}
                   </span>
@@ -197,9 +237,9 @@ export function Portfolio({
                   </span>
                   {showTrend && (
                     <span
-                      className={`block text-xs font-medium ${changeTone(holding.token.change24h)}`}
+                      className={`block text-xs font-medium ${changeTone(change24hOf(holding.token))}`}
                     >
-                      {percent(holding.token.change24h)}
+                      {percent(change24hOf(holding.token))}
                     </span>
                   )}
                 </span>

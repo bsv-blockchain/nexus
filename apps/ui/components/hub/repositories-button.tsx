@@ -1,26 +1,17 @@
 "use client";
 
 import { useIsDesktop } from "@/lib/use-is-desktop";
-import {
-  setRepositories,
-  useRepositories,
-} from "@/lib/repositories-store";
-import {
-  content,
-  suggestedRepositories,
-  type AppRepository,
-} from "@/lib/data";
+import { setRepositories, useRepositories } from "@/lib/repositories-store";
+import { content, suggestedRepositories, type AppRepository } from "@/lib/data";
 import { Check, ListChecks, Plus, ShieldAlert, Trash2, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import {
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { useHostOverlay } from "@/lib/wallet-data";
 
 // A dotted hostname (e.g. apps.example.com) or bare localhost. The URL
 // constructor alone is too lax — it happily accepts "https://!!!".
-const HOSTNAME = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
+const HOSTNAME =
+  /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
 
 function normalizeUrl(value: string): string | null {
   const trimmed = value.trim();
@@ -174,7 +165,7 @@ function RepositoriesSheet({
   const isDesktop = useIsDesktop();
   const repos = useRepositories();
   const setRepos = (
-    update: (current: AppRepository[]) => AppRepository[],
+    update: (current: AppRepository[]) => AppRepository[]
   ): void => setRepositories(update(repos));
   const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -193,15 +184,15 @@ function RepositoriesSheet({
 
   const existingUrls = useMemo(
     () => new Set(repos.map((r) => r.url.replace(/\/$/, ""))),
-    [repos],
+    [repos]
   );
   const suggestions = suggestedRepositories.filter(
-    (s) => !existingUrls.has(s.url.replace(/\/$/, "")),
+    (s) => !existingUrls.has(s.url.replace(/\/$/, ""))
   );
 
   const toggle = (id: string): void =>
     setRepos((current) =>
-      current.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)),
+      current.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r))
     );
   const remove = (id: string): void =>
     setRepos((current) => current.filter((r) => r.id !== id));
@@ -287,7 +278,7 @@ function RepositoriesSheet({
       >
         {!isDesktop && (
           <div className="flex justify-center pt-3" aria-hidden="true">
-            <span className="h-1 w-9 rounded-full bg-muted-foreground/30" />
+            <span className="bg-muted-foreground/30 h-1 w-9 rounded-full" />
           </div>
         )}
 
@@ -316,7 +307,7 @@ function RepositoriesSheet({
               type="button"
               aria-label={"Close"}
               onClick={onClose}
-              className="focus-ring rounded-md p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+              className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground rounded-md p-1"
             >
               <X className="size-4" aria-hidden="true" />
             </button>
@@ -327,7 +318,7 @@ function RepositoriesSheet({
           {commonSource ? (
             <div className="group flex items-center gap-2.5 rounded-xl px-2 py-2">
               <span
-                className="flex size-5 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground ring-1 ring-accent"
+                className="bg-accent text-accent-foreground ring-accent flex size-5 shrink-0 items-center justify-center rounded-md ring-1"
                 aria-hidden="true"
               >
                 <Check className="size-3.5" />
@@ -337,122 +328,122 @@ function RepositoriesSheet({
                   <span className="truncate text-sm font-medium">
                     {copy.commonSource}
                   </span>
-                  <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  <span className="bg-muted text-muted-foreground shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium">
                     {copy.commonSourceTag}
                   </span>
                 </span>
-                <span className="block truncate text-[11px] text-muted-foreground">
+                <span className="text-muted-foreground block truncate text-[11px]">
                   {copy.commonSourceDesc}
                 </span>
               </div>
             </div>
           ) : (
             <>
-          {repos.map((repo) => (
-            <div
-              key={repo.id}
-              className="group relative flex items-center gap-2.5 rounded-xl px-2 py-2 hover:bg-surface-hover"
-            >
-              <button
-                type="button"
-                role="switch"
-                aria-checked={repo.enabled}
-                aria-label={`${repo.enabled ? copy.disable : copy.enable}: ${repo.name}`}
-                onClick={() => toggle(repo.id)}
-                className={`focus-ring flex size-5 shrink-0 items-center justify-center rounded-md ring-1 transition-colors ${
-                  repo.enabled
-                    ? "bg-accent text-accent-foreground ring-accent"
-                    : "bg-transparent ring-border"
-                }`}
-              >
-                {repo.enabled && (
-                  <Check className="size-3.5" aria-hidden="true" />
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => toggle(repo.id)}
-                className="focus-ring min-w-0 flex-1 text-left"
-              >
-                <span className="flex items-center gap-1.5">
-                  <span className="truncate text-sm font-medium">
-                    {repo.name}
-                  </span>
-                  {repo.official && (
-                    <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                      {copy.official}
+              {repos.map((repo) => (
+                <div
+                  key={repo.id}
+                  className="group hover:bg-surface-hover relative flex items-center gap-2.5 rounded-xl px-2 py-2"
+                >
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={repo.enabled}
+                    aria-label={`${repo.enabled ? copy.disable : copy.enable}: ${repo.name}`}
+                    onClick={() => toggle(repo.id)}
+                    className={`focus-ring flex size-5 shrink-0 items-center justify-center rounded-md ring-1 transition-colors ${
+                      repo.enabled
+                        ? "bg-accent text-accent-foreground ring-accent"
+                        : "ring-border bg-transparent"
+                    }`}
+                  >
+                    {repo.enabled && (
+                      <Check className="size-3.5" aria-hidden="true" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggle(repo.id)}
+                    className="focus-ring min-w-0 flex-1 text-left"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className="truncate text-sm font-medium">
+                        {repo.name}
+                      </span>
+                      {repo.official && (
+                        <span className="bg-muted text-muted-foreground shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+                          {copy.official}
+                        </span>
+                      )}
                     </span>
-                  )}
-                </span>
-                <span className="flex items-baseline gap-2">
-                  <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-                    {hostLabel(repo.url)}
-                  </span>
-                  {/* On the address line and right-aligned, not beside the
+                    <span className="flex items-baseline gap-2">
+                      <span className="text-muted-foreground min-w-0 flex-1 truncate text-[11px]">
+                        {hostLabel(repo.url)}
+                      </span>
+                      {/* On the address line and right-aligned, not beside the
                       name. "Official" is a claim about who runs a source; this
                       says what you get from it — worth reading, but not first. */}
-                  {repo.note && (
-                    <span
-                      className={`shrink-0 text-[10px] font-medium text-muted-foreground ${
-                        repo.official
-                          ? ""
-                          : "transition-opacity group-hover:opacity-0"
-                      }`}
-                    >
-                      {repo.note}
+                      {repo.note && (
+                        <span
+                          className={`text-muted-foreground shrink-0 text-[10px] font-medium ${
+                            repo.official
+                              ? ""
+                              : "transition-opacity group-hover:opacity-0"
+                          }`}
+                        >
+                          {repo.note}
+                        </span>
+                      )}
                     </span>
-                  )}
-                </span>
-              </button>
-              {!repo.official && (
-                <button
-                  type="button"
-                  aria-label={`${copy.remove}: ${repo.name}`}
-                  onClick={() => remove(repo.id)}
-                  /* Out of the flow, so the note beside it can reach the right
+                  </button>
+                  {!repo.official && (
+                    <button
+                      type="button"
+                      aria-label={`${copy.remove}: ${repo.name}`}
+                      onClick={() => remove(repo.id)}
+                      /* Out of the flow, so the note beside it can reach the right
                      edge. It fades in exactly where the note fades out — one
                      slot, two things, and no row that jumps on hover. */
-                  className="focus-ring absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-surface-hover hover:text-negative group-hover:opacity-100 focus-visible:opacity-100"
-                >
-                  <Trash2 className="size-4" aria-hidden="true" />
-                </button>
-              )}
-            </div>
-          ))}
+                      className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-negative absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                    >
+                      <Trash2 className="size-4" aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
+              ))}
 
-          {suggestions.length > 0 && (
-            <div className="mt-2 px-2">
-              <p className="pb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                {copy.suggested}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {suggestions.map((s) => (
-                  <button
-                    key={s.url}
-                    type="button"
-                    onClick={() => requestAdd(s.name, s.url)}
-                    className="focus-ring flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
-                  >
-                    <Plus className="size-3" aria-hidden="true" />
-                    {s.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+              {suggestions.length > 0 && (
+                <div className="mt-2 px-2">
+                  <p className="text-muted-foreground pb-1.5 text-[11px] font-semibold tracking-wide uppercase">
+                    {copy.suggested}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {suggestions.map((s) => (
+                      <button
+                        key={s.url}
+                        type="button"
+                        onClick={() => requestAdd(s.name, s.url)}
+                        className="focus-ring bg-muted text-muted-foreground hover:bg-surface-hover hover:text-foreground flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors"
+                      >
+                        <Plus className="size-3" aria-hidden="true" />
+                        {s.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
 
         {!commonSource && (
-        <form
-          className="border-border relative border-t p-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            requestAdd(picked?.url === url ? picked.name : "", url);
-          }}
-        >
-          {/*
+          <form
+            className="border-border relative border-t p-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              requestAdd(picked?.url === url ? picked.name : "", url);
+            }}
+          >
+            {/*
             Something to try, offered where the typing happens.
 
             An empty URL field assumes the reader already knows a registry
@@ -461,91 +452,96 @@ function RepositoriesSheet({
             rather than adding it, which keeps the confirmation as the single
             place a repository is actually agreed to.
           */}
-          <AnimatePresence>
-            {picking && suggestions.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 4 }}
-                transition={{ duration: 0.14 }}
-                className="border-border bg-surface-raised absolute inset-x-3 bottom-full z-10 mb-2 overflow-hidden rounded-xl border shadow-2xl"
-              >
-                <p className="text-muted-foreground border-border/60 border-b px-3 py-1.5 text-[10px] font-semibold tracking-wide uppercase">
-                  {copy.pickSuggested}
-                </p>
-                <ul>
-                  {suggestions.map((s) => (
-                    <li key={s.url}>
-                      <button
-                        type="button"
-                        /* The field must keep focus, or the blur below closes
+            <AnimatePresence>
+              {picking && suggestions.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 4 }}
+                  transition={{ duration: 0.14 }}
+                  className="border-border bg-surface-raised absolute inset-x-3 bottom-full z-10 mb-2 overflow-hidden rounded-xl border shadow-2xl"
+                >
+                  <p className="text-muted-foreground border-border/60 border-b px-3 py-1.5 text-[10px] font-semibold tracking-wide uppercase">
+                    {copy.pickSuggested}
+                  </p>
+                  <ul>
+                    {suggestions.map((s) => (
+                      <li key={s.url}>
+                        <button
+                          type="button"
+                          /* The field must keep focus, or the blur below closes
                            this list before the click lands on it. */
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => {
-                          setUrl(s.url);
-                          setPicked({ name: s.name, url: s.url });
-                          setError(null);
-                          setPicking(false);
-                        }}
-                        className="focus-ring hover:bg-surface-hover block w-full px-3 py-1.5 text-left"
-                      >
-                        <span className="block truncate text-xs font-medium">
-                          {s.name}
-                        </span>
-                        <span className="text-muted-foreground block truncate font-mono text-[10px]">
-                          {hostLabel(s.url)}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-muted-foreground border-border/60 border-t px-3 py-1.5 text-[10px] text-pretty">
-                  {copy.pickHint}
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            setUrl(s.url);
+                            setPicked({ name: s.name, url: s.url });
+                            setError(null);
+                            setPicking(false);
+                          }}
+                          className="focus-ring hover:bg-surface-hover block w-full px-3 py-1.5 text-left"
+                        >
+                          <span className="block truncate text-xs font-medium">
+                            {s.name}
+                          </span>
+                          <span className="text-muted-foreground block truncate font-mono text-[10px]">
+                            {hostLabel(s.url)}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-muted-foreground border-border/60 border-t px-3 py-1.5 text-[10px] text-pretty">
+                    {copy.pickHint}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-          <div
-            className="flex items-center gap-2"
-            /* Closes when focus leaves the field *and* the list, so tabbing
+            <div
+              className="flex items-center gap-2"
+              /* Closes when focus leaves the field *and* the list, so tabbing
                through the suggestions does not dismiss them. */
-            onBlur={(event) => {
-              if (!event.currentTarget.contains(event.relatedTarget as Node)) {
-                setPicking(false);
-              }
-            }}
-          >
-            <input
-              value={url}
-              onChange={(event) => {
-                setUrl(event.target.value);
-                if (picked && picked.url !== event.target.value) setPicked(null);
-                if (error) setError(null);
-              }}
-              onFocus={() => setPicking(true)}
-              onClick={() => setPicking(true)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape" && picking) {
-                  event.stopPropagation();
+              onBlur={(event) => {
+                if (
+                  !event.currentTarget.contains(event.relatedTarget as Node)
+                ) {
                   setPicking(false);
                 }
               }}
-              inputMode="url"
-              placeholder={copy.urlPlaceholder}
-              aria-label={copy.urlPlaceholder}
-              aria-invalid={error !== null}
-              className="border-border bg-surface focus:border-ring min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm outline-none"
-            />
-            <button
-              type="submit"
-              className="focus-ring bg-accent text-accent-foreground shrink-0 rounded-lg px-3 py-2 text-sm font-semibold hover:opacity-90"
             >
-              {copy.add}
-            </button>
-          </div>
-          {error && <p className="text-negative mt-1.5 text-[11px]">{error}</p>}
-        </form>
+              <input
+                value={url}
+                onChange={(event) => {
+                  setUrl(event.target.value);
+                  if (picked && picked.url !== event.target.value)
+                    setPicked(null);
+                  if (error) setError(null);
+                }}
+                onFocus={() => setPicking(true)}
+                onClick={() => setPicking(true)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape" && picking) {
+                    event.stopPropagation();
+                    setPicking(false);
+                  }
+                }}
+                inputMode="url"
+                placeholder={copy.urlPlaceholder}
+                aria-label={copy.urlPlaceholder}
+                aria-invalid={error !== null}
+                className="border-border bg-surface focus:border-ring min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm outline-none"
+              />
+              <button
+                type="submit"
+                className="focus-ring bg-accent text-accent-foreground shrink-0 rounded-lg px-3 py-2 text-sm font-semibold hover:opacity-90"
+              >
+                {copy.add}
+              </button>
+            </div>
+            {error && (
+              <p className="text-negative mt-1.5 text-[11px]">{error}</p>
+            )}
+          </form>
         )}
       </motion.div>
 
@@ -575,6 +571,10 @@ export function RepositoriesButton({
 }): ReactNode {
   const copy = content.repositories;
   const [open, setOpen] = useState(false);
+  /* Holds the shell's page layer down while this is up: a browsed page is a
+     native view that paints above this document, so no z-index reaches over
+     it. See lib/wallet-data. */
+  useHostOverlay(open);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
 
   return (
@@ -595,7 +595,7 @@ export function RepositoriesButton({
         }}
         className={
           className ||
-          "focus-ring rounded-md p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+          "focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground rounded-md p-1.5"
         }
       >
         {children ?? <ListChecks className="size-4" aria-hidden="true" />}

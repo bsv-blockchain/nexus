@@ -21,6 +21,7 @@ import { setPolicy, useVault, type LockPolicy } from "@/lib/vault-store";
 import { Check, ShieldCheck, Timer } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState, type ReactNode } from "react";
+import { useHostOverlay } from "@/lib/wallet-data";
 
 const copy = content.vault.lock;
 
@@ -164,6 +165,10 @@ function PolicySheet({
 
 export function VaultLockButton(): ReactNode {
   const [open, setOpen] = useState(false);
+  /* Holds the shell's page layer down while this is up: a browsed page is a
+     native view that paints above this document, so no z-index reaches over
+     it. See lib/wallet-data. */
+  useHostOverlay(open);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
 
   return (

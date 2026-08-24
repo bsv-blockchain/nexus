@@ -25,6 +25,8 @@ export const storageKeys = {
   developerMode: "nexus.developer-mode",
   /** which first-run presets this install was set up with */
   presets: "nexus.presets",
+  /** splits raised here, and the share statuses set on any of them */
+  splits: "nexus.splits",
   /** true once the Guided Tour has been finished or skipped */
   tourTaken: "nexus.tour-taken",
   /** true once the help circle has been hovered, which stops it pulsing */

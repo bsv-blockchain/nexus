@@ -82,6 +82,24 @@ export const paymentLinks: PaymentLink[] = [
 
 export const splitBills: SplitBill[] = [
   {
+    /* One somebody else raised. `raisedBy` is what makes it a bill rather than
+       a ledger: the shares here are what everyone owes THEM, and one of them is
+       yours. */
+    id: "sb-studio",
+    description: "Studio time, four ways",
+    tokenId: "bsv",
+    totalUnits: 0.048,
+    createdAt: "2026-08-19T16:20:00.000Z",
+    raisedBy: "rhea-mensah",
+    yourShareUnits: 0.012,
+    yourShareStatus: "pending",
+    shares: [
+      { personId: "tomas-lindqvist", units: 0.012, status: "paid" },
+      { personId: "amara-okonkwo", units: 0.012, status: "paid" },
+      { personId: "sanne-verhoeven", units: 0.012, status: "pending" },
+    ],
+  },
+  {
     id: "sb-coordination",
     description: "Week's coordination costs",
     tokenId: "bsv",

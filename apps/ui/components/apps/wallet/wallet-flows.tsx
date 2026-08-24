@@ -34,21 +34,28 @@ export function SendSheet({
   open,
   tokenId,
   presetPersonId,
+  presetUnits,
   onClose,
   onSend,
 }: {
   open: boolean;
   tokenId: string;
   presetPersonId?: string | null;
+  /** opens on this amount, for a caller that already knows it — a split share */
+  presetUnits?: number | null;
   onClose: () => void;
-  onSend: (args: { token: Token; units: number; person: MessagePerson }) => void;
+  onSend: (args: {
+    token: Token;
+    units: number;
+    person: MessagePerson;
+  }) => void;
 }): ReactNode {
   const copy = content.wallet;
   const [asset, setAsset] = useState(tokenId);
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(presetUnits ? String(presetUnits) : "");
   const [query, setQuery] = useState("");
   const [personId, setPersonId] = useState<string | null>(
-    presetPersonId ?? null,
+    presetPersonId ?? null
   );
 
   const token = getToken(asset);
@@ -68,10 +75,16 @@ export function SendSheet({
       (person) =>
         !needle ||
         person.name.toLowerCase().includes(needle) ||
-        handleOf(person).toLowerCase().includes(needle),
+        handleOf(person).toLowerCase().includes(needle)
     )
     .slice(0, 6);
-  const chosen = personId ? people.find((p) => p.id === personId) : null;
+  /* Looked up across every contact rather than in `people`, which is the search
+     results capped at six. A recipient the caller preset — a split's payee —
+     need not be in that window, and finding nothing there rendered the search
+     box while the send button was already enabled. */
+  const chosen = personId
+    ? getWalletContacts().find((p) => p.id === personId)
+    : null;
 
   return (
     <Sheet
@@ -86,7 +99,7 @@ export function SendSheet({
             const person = getWalletContacts().find((p) => p.id === personId);
             if (token && person) onSend({ token, units, person });
           }}
-          className="focus-ring w-full rounded-full bg-accent px-4 py-2.5 text-sm font-bold text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+          className="focus-ring bg-accent text-accent-foreground w-full rounded-full px-4 py-2.5 text-sm font-bold transition-opacity hover:opacity-90 disabled:opacity-40"
         >
           {copy.reviewSend}
         </button>
@@ -100,11 +113,11 @@ export function SendSheet({
         <div>
           <label
             htmlFor="send-amount"
-            className="mb-1.5 block text-[11px] font-bold tracking-wide text-muted-foreground uppercase"
+            className="text-muted-foreground mb-1.5 block text-[11px] font-bold tracking-wide uppercase"
           >
             {copy.amount}
           </label>
-          <div className="flex items-center gap-2 rounded-xl border border-border px-3">
+          <div className="border-border flex items-center gap-2 rounded-xl border px-3">
             <input
               id="send-amount"
               type="text"
@@ -123,7 +136,7 @@ export function SendSheet({
               </span>
             )}
           </div>
-          <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+          <div className="text-muted-foreground mt-1 flex items-center justify-between text-xs">
             <span>
               {token && units > 0 ? usd(units * token.usdPerUnit) : usd(0)}
             </span>
@@ -131,7 +144,7 @@ export function SendSheet({
               <button
                 type="button"
                 onClick={() => setAmount(String(holding.units))}
-                className="focus-ring rounded font-semibold hover:text-foreground"
+                className="focus-ring hover:text-foreground rounded font-semibold"
               >
                 {copy.max} {formatUnits(holding.units, token.decimals)}
               </button>
@@ -140,11 +153,11 @@ export function SendSheet({
         </div>
 
         <div>
-          <p className="mb-1.5 text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
+          <p className="text-muted-foreground mb-1.5 text-[11px] font-bold tracking-wide uppercase">
             {copy.to}
           </p>
           {chosen ? (
-            <div className="flex items-center gap-2.5 rounded-xl border border-accent bg-accent/10 p-3">
+            <div className="border-accent bg-accent/10 flex items-center gap-2.5 rounded-xl border p-3">
               <MemberAvatar person={chosen} size={32} />
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-1.5">
@@ -156,22 +169,22 @@ export function SendSheet({
                 <Handle
                   person={chosen}
                   size={11}
-                  className="max-w-full truncate text-xs text-muted-foreground"
+                  className="text-muted-foreground max-w-full truncate text-xs"
                 />
               </span>
               <button
                 type="button"
                 onClick={() => setPersonId(null)}
-                className="focus-ring shrink-0 rounded-full px-2 py-1 text-xs font-semibold text-muted-foreground hover:bg-surface-hover"
+                className="focus-ring text-muted-foreground hover:bg-surface-hover shrink-0 rounded-full px-2 py-1 text-xs font-semibold"
               >
                 {copy.change}
               </button>
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-2 rounded-xl border border-border px-3">
+              <div className="border-border flex items-center gap-2 rounded-xl border px-3">
                 <Search
-                  className="size-4 shrink-0 text-muted-foreground"
+                  className="text-muted-foreground size-4 shrink-0"
                   aria-hidden="true"
                 />
                 <input
@@ -179,7 +192,7 @@ export function SendSheet({
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder={copy.toPlaceholder}
                   aria-label={copy.to}
-                  className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                  className="placeholder:text-muted-foreground h-11 min-w-0 flex-1 bg-transparent text-sm outline-none"
                 />
               </div>
               <ul className="mt-2 space-y-0.5">
@@ -188,7 +201,7 @@ export function SendSheet({
                     <button
                       type="button"
                       onClick={() => setPersonId(person.id)}
-                      className="focus-ring flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-surface-hover"
+                      className="focus-ring hover:bg-surface-hover flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left"
                     >
                       <MemberAvatar person={person} size={28} />
                       <span className="min-w-0 flex-1">
@@ -201,7 +214,7 @@ export function SendSheet({
                         <Handle
                           person={person}
                           size={10}
-                          className="max-w-full truncate text-[11px] text-muted-foreground"
+                          className="text-muted-foreground max-w-full truncate text-[11px]"
                         />
                       </span>
                     </button>
@@ -243,13 +256,14 @@ export function ReceiveSheet({
         {/* Stand-in for a QR: a deterministic block grid, not a real code. */}
         <div className="flex justify-center py-2">
           <div
-            className="grid size-40 grid-cols-11 gap-px rounded-xl bg-surface p-2"
+            className="bg-surface grid size-40 grid-cols-11 gap-px rounded-xl p-2"
             role="img"
             aria-label={copy.qrLabel}
           >
             {Array.from({ length: 121 }, (_, i) => {
               const on =
-                (i * 7 + (i % 11) * 3 + account.address.charCodeAt(i % 20)) % 3 <
+                (i * 7 + (i % 11) * 3 + account.address.charCodeAt(i % 20)) %
+                  3 <
                 1;
               return (
                 <span
@@ -262,10 +276,10 @@ export function ReceiveSheet({
         </div>
 
         <div>
-          <p className="mb-1.5 text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
+          <p className="text-muted-foreground mb-1.5 text-[11px] font-bold tracking-wide uppercase">
             {copy.yourHandle}
           </p>
-          <div className="flex items-center gap-2 rounded-xl border border-border px-3 py-2.5">
+          <div className="border-border flex items-center gap-2 rounded-xl border px-3 py-2.5">
             <code className="min-w-0 flex-1 truncate font-mono text-sm">
               {myHandle}
             </code>
@@ -276,12 +290,12 @@ export function ReceiveSheet({
                 toast.success(copy.copied);
               }}
               aria-label={copy.copyHandle}
-              className="focus-ring shrink-0 rounded p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+              className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground shrink-0 rounded p-1"
             >
               <Copy className="size-4" aria-hidden="true" />
             </button>
           </div>
-          <p className="mt-1.5 text-xs text-pretty text-muted-foreground">
+          <p className="text-muted-foreground mt-1.5 text-xs text-pretty">
             {token?.base ? copy.receiveHintBsv : copy.receiveHintToken}
           </p>
         </div>
@@ -337,7 +351,7 @@ export function ExchangeSheet({
           onClick={() => {
             if (from && to) onExchange({ from, to, fromUnits, toUnits });
           }}
-          className="focus-ring w-full rounded-full bg-accent px-4 py-2.5 text-sm font-bold text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+          className="focus-ring bg-accent text-accent-foreground w-full rounded-full px-4 py-2.5 text-sm font-bold transition-opacity hover:opacity-90 disabled:opacity-40"
         >
           {copy.confirmExchange}
         </button>
@@ -348,7 +362,7 @@ export function ExchangeSheet({
 
         <TokenPicker selected={fromId} onSelect={setFromId} label={copy.from} />
         <div>
-          <div className="flex items-center gap-2 rounded-xl border border-border px-3">
+          <div className="border-border flex items-center gap-2 rounded-xl border px-3">
             <input
               type="text"
               inputMode="decimal"
@@ -371,7 +385,7 @@ export function ExchangeSheet({
 
         <div className="flex justify-center">
           <span
-            className="flex size-8 items-center justify-center rounded-full bg-surface text-muted-foreground"
+            className="bg-surface text-muted-foreground flex size-8 items-center justify-center rounded-full"
             aria-hidden="true"
           >
             <ArrowDown className="size-4" />
@@ -379,7 +393,7 @@ export function ExchangeSheet({
         </div>
 
         <TokenPicker selected={toId} onSelect={setToId} label={copy.to} />
-        <div className="rounded-xl bg-surface p-3">
+        <div className="bg-surface rounded-xl p-3">
           <p className="flex items-baseline gap-2 text-lg font-bold">
             {to ? formatUnits(toUnits, to.decimals) : "0"}
             {to && (
@@ -392,7 +406,7 @@ export function ExchangeSheet({
         </div>
 
         {from && to && (
-          <dl className="space-y-1.5 border-t border-border pt-3 text-xs">
+          <dl className="border-border space-y-1.5 border-t pt-3 text-xs">
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">{copy.rate}</dt>
               <dd>
@@ -406,7 +420,7 @@ export function ExchangeSheet({
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">{copy.midMarket}</dt>
               <dd className="flex items-center gap-1">
-                <Check className="size-3 text-positive" aria-hidden="true" />
+                <Check className="text-positive size-3" aria-hidden="true" />
                 {copy.noSpread}
               </dd>
             </div>

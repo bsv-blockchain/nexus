@@ -1,8 +1,14 @@
 "use client";
 
 import { CertificateDialog } from "@/components/hub/certificate-dialog";
-import { MenuItem, MenuSeparator, PopoverMenu } from "@/components/hub/popover-menu";
+import {
+  MenuItem,
+  MenuSeparator,
+  PopoverMenu,
+} from "@/components/hub/popover-menu";
+import { useHub } from "@/components/hub/hub-provider";
 import { content } from "@/lib/data";
+import { isPinnableUrl, shortNameFor } from "@/lib/rail/origin";
 import {
   Camera,
   Cookie,
@@ -15,11 +21,12 @@ import {
   ScanLine,
   Settings,
   Share,
+  SquarePlus,
   Sun,
   Trash2,
-  Wand2,
 } from "lucide-react";
 import { useTheme } from "next-themes";
+import { toast } from "sonner";
 import { useState, type ReactNode } from "react";
 
 /** URL-bar settings popover from the design: quick actions, extensions, settings. */
@@ -41,11 +48,48 @@ export function BrowserSettingsMenu({
   const [developerMode, setDeveloperMode] = useState(false);
   const [certOpen, setCertOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const quickActions = [
-    { icon: Share, label: "Share" },
-    { icon: Wand2, label: "Boost" },
-    { icon: Camera, label: "Capture" },
-    { icon: ScanLine, label: "Reader" },
+  const { activeTab, pinSite, pinnedSites } = useHub();
+
+  /*
+   * The page in this tab, put on the rail as an app.
+   *
+   * The slot this replaced was "Boost", which was a wand that did nothing. This
+   * is the one thing somebody standing on a web app actually wants from a
+   * browser that has a rail: keep it. A pinned site IS how a web listing is
+   * connected — the same thing the App Store does when you connect one — so
+   * this is not a second kind of tile, just the other door onto it.
+   *
+   * The name comes from the page title cut back to the site's own name, and the
+   * mark from the largest icon that origin serves; see lib/rail/origin.
+   */
+  const addToRail = (): void => {
+    if (!activeTab) return;
+    if (!isPinnableUrl(activeTab.url)) {
+      toast.error(copy.addToRailRefused);
+      return;
+    }
+    const name = shortNameFor(activeTab.title, activeTab.url);
+    const already = pinnedSites.some((site) => site.url === activeTab.url);
+    const site = pinSite(activeTab.url, name);
+    onClose();
+    if (!site) {
+      toast.error(copy.addToRailRefused);
+      return;
+    }
+    toast.success(already ? copy.addToRailAlready : copy.addToRailDone, {
+      description: name,
+    });
+  };
+
+  const quickActions: {
+    icon: typeof Share;
+    label: string;
+    onClick: () => void;
+  }[] = [
+    { icon: Share, label: "Share", onClick: onClose },
+    { icon: SquarePlus, label: copy.addToRail, onClick: addToRail },
+    { icon: Camera, label: "Capture", onClick: onClose },
+    { icon: ScanLine, label: "Reader", onClick: onClose },
   ];
 
   return (
@@ -62,8 +106,9 @@ export function BrowserSettingsMenu({
             key={action.label}
             type="button"
             aria-label={action.label}
-            onClick={onClose}
-            className="focus-ring flex h-11 flex-1 items-center justify-center rounded-xl bg-muted hover:bg-surface-hover"
+            title={action.label}
+            onClick={action.onClick}
+            className="focus-ring bg-muted hover:bg-surface-hover flex h-11 flex-1 items-center justify-center rounded-xl"
           >
             <action.icon className="size-4.5" aria-hidden="true" />
           </button>
@@ -75,12 +120,12 @@ export function BrowserSettingsMenu({
       </h3>
       <div className="flex gap-2">
         <span
-          className="relative flex size-11 items-center justify-center rounded-xl bg-muted text-sm font-bold text-negative"
+          className="bg-muted text-negative relative flex size-11 items-center justify-center rounded-xl text-sm font-bold"
           aria-label="uBlock Origin — 2 items blocked"
         >
           uB
           <span
-            className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-negative text-[10px] font-bold text-white"
+            className="bg-negative absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full text-[10px] font-bold text-white"
             aria-hidden="true"
           >
             2
@@ -90,7 +135,7 @@ export function BrowserSettingsMenu({
           type="button"
           aria-label="Add extension"
           onClick={onClose}
-          className="focus-ring flex size-11 items-center justify-center rounded-xl bg-muted hover:bg-surface-hover"
+          className="focus-ring bg-muted hover:bg-surface-hover flex size-11 items-center justify-center rounded-xl"
         >
           <Plus className="size-4.5" aria-hidden="true" />
         </button>
@@ -104,26 +149,24 @@ export function BrowserSettingsMenu({
           type="button"
           onClick={() => setTheme(isDark ? "light" : "dark")}
           aria-pressed={isDark}
-          className="focus-ring flex w-full items-center gap-2.5 rounded-lg px-1 py-1.5 text-left hover:bg-surface-hover"
+          className="focus-ring hover:bg-surface-hover flex w-full items-center gap-2.5 rounded-lg px-1 py-1.5 text-left"
         >
-          <span className="flex size-8 items-center justify-center rounded-full bg-muted">
+          <span className="bg-muted flex size-8 items-center justify-center rounded-full">
             {isDark ? (
               <Moon
-                className="size-4 text-muted-foreground"
+                className="text-muted-foreground size-4"
                 aria-hidden="true"
               />
             ) : (
               <Sun
-                className="size-4 text-muted-foreground"
+                className="text-muted-foreground size-4"
                 aria-hidden="true"
               />
             )}
           </span>
           <span className="min-w-0">
-            <span className="block text-sm font-medium">
-              {copy.appearance}
-            </span>
-            <span className="block text-xs text-muted-foreground">
+            <span className="block text-sm font-medium">{copy.appearance}</span>
+            <span className="text-muted-foreground block text-xs">
               {isDark ? copy.appearanceDark : copy.appearanceLight}
             </span>
           </span>
@@ -132,30 +175,33 @@ export function BrowserSettingsMenu({
           type="button"
           onClick={() => setDeveloperMode((on) => !on)}
           aria-pressed={developerMode}
-          className="focus-ring flex w-full items-center gap-2.5 rounded-lg px-1 py-1.5 text-left hover:bg-surface-hover"
+          className="focus-ring hover:bg-surface-hover flex w-full items-center gap-2.5 rounded-lg px-1 py-1.5 text-left"
         >
-          <span className="flex size-8 items-center justify-center rounded-full bg-muted">
-            <Hammer className="size-4 text-muted-foreground" aria-hidden="true" />
+          <span className="bg-muted flex size-8 items-center justify-center rounded-full">
+            <Hammer
+              className="text-muted-foreground size-4"
+              aria-hidden="true"
+            />
           </span>
           <span className="min-w-0">
             <span className="block text-sm font-medium">
               {copy.developerMode}
             </span>
-            <span className="block text-xs text-muted-foreground">
+            <span className="text-muted-foreground block text-xs">
               {developerMode ? copy.on : copy.off}
             </span>
           </span>
         </button>
       </div>
 
-      <div className="mt-2 flex items-center justify-between border-t border-border pt-2.5">
+      <div className="border-border mt-2 flex items-center justify-between border-t pt-2.5">
         <button
           type="button"
           onClick={() => setCertOpen(true)}
           aria-haspopup="dialog"
-          className="focus-ring flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-sm font-medium hover:bg-surface-hover"
+          className="focus-ring bg-muted hover:bg-surface-hover flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium"
         >
-          <Lock className="size-3.5 text-positive" aria-hidden="true" />
+          <Lock className="text-positive size-3.5" aria-hidden="true" />
           {copy.secure}
         </button>
         <div className="relative">
@@ -164,7 +210,7 @@ export function BrowserSettingsMenu({
             aria-label="More"
             aria-expanded={moreOpen}
             onClick={() => setMoreOpen((open) => !open)}
-            className="focus-ring flex size-8 items-center justify-center rounded-full bg-muted hover:bg-surface-hover"
+            className="focus-ring bg-muted hover:bg-surface-hover flex size-8 items-center justify-center rounded-full"
           >
             <MoreHorizontal className="size-4" aria-hidden="true" />
           </button>

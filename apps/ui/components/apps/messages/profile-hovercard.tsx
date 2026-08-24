@@ -1,17 +1,21 @@
 "use client";
 
-import { FloatingPanel, useDismissOnOutside } from "@/components/apps/messages/floating-panel";
+import {
+  FloatingPanel,
+  useDismissOnOutside,
+} from "@/components/apps/messages/floating-panel";
 import { Handle } from "@/components/apps/messages/ecosystem-tag";
 import { EcosystemHovercard } from "@/components/apps/messages/ecosystem-hovercard";
 import { Tooltip } from "@/components/hub/tooltip";
 import { MemberAvatar } from "@/components/apps/messages/member-avatar";
 import { PresenceDot } from "@/components/apps/messages/presence-dot";
+import { content, getEcosystem, type MessagePerson } from "@/lib/data";
 import {
-  content,
-  getEcosystem,
-  type MessagePerson,
-} from "@/lib/data";
-import { PRESENCE_LABEL, handleOf, namedHandleOf, presenceFor } from "@/lib/messages";
+  PRESENCE_LABEL,
+  handleOf,
+  namedHandleOf,
+  presenceFor,
+} from "@/lib/messages";
 import { toggleFollow, useTimeline } from "@/lib/timeline-store";
 import {
   CircleArrowDown,
@@ -69,7 +73,9 @@ export function ProfileActionsProvider({
   children: ReactNode;
 }): ReactNode {
   return (
-    <ActionsContext.Provider value={actions}>{children}</ActionsContext.Provider>
+    <ActionsContext.Provider value={actions}>
+      {children}
+    </ActionsContext.Provider>
   );
 }
 
@@ -221,7 +227,7 @@ export function ProfileActionsRow({
               action.onClick();
               if (!action.stay) onAfter?.();
             }}
-            className="focus-ring grid size-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
+            className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground grid size-8 place-items-center rounded-lg transition-colors"
           >
             {action.icon}
           </button>
@@ -257,7 +263,7 @@ function Card({
   const presence = presenceFor(person.id);
 
   return (
-    <div className="w-72 max-w-[min(18rem,calc(100vw-1.5rem))] rounded-2xl border border-border bg-surface-raised text-foreground shadow-2xl">
+    <div className="border-border bg-surface-raised text-foreground w-72 max-w-[min(18rem,calc(100vw-1.5rem))] rounded-2xl border shadow-2xl">
       <div className="p-4">
         <div className="flex items-start gap-3">
           <span className="relative shrink-0">
@@ -288,18 +294,18 @@ function Card({
                 <Handle
                   person={person}
                   size={11}
-                  className="mt-0.5 max-w-full truncate text-[11px] text-muted-foreground"
+                  className="text-muted-foreground mt-0.5 max-w-full truncate text-[11px]"
                 />
               </EcosystemHovercard>
             ) : (
               <Handle
                 person={person}
                 size={11}
-                className="mt-0.5 max-w-full truncate text-[11px] text-muted-foreground"
+                className="text-muted-foreground mt-0.5 max-w-full truncate text-[11px]"
               />
             )}
             {named && (
-              <p className="truncate font-mono text-[11px] text-muted-foreground">
+              <p className="text-muted-foreground truncate font-mono text-[11px]">
                 {named}
               </p>
             )}
@@ -308,19 +314,19 @@ function Card({
 
         {/* The opening paragraph only. A hovercard is a glance; the rest is
             what the profile is for. */}
-        <p className="mt-3 text-xs leading-relaxed text-pretty text-foreground/80">
+        <p className="text-foreground/80 mt-3 text-xs leading-relaxed text-pretty">
           {person.bio.split("\n\n")[0]}
         </p>
-        <p className="mt-2 text-[11px] text-foreground/70">
+        <p className="text-foreground/70 mt-2 text-[11px]">
           {person.role}
           {person.organization ? ` · ${person.organization}` : ""}
         </p>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">
+        <p className="text-muted-foreground mt-0.5 text-[11px]">
           {PRESENCE_LABEL[presence]}
         </p>
       </div>
 
-      <div className="rounded-b-2xl border-t border-border bg-surface/60 px-2 py-2">
+      <div className="border-border bg-surface/60 rounded-b-2xl border-t px-2 py-2">
         <ProfileActionsRow person={person} onAfter={onClose} />
       </div>
     </div>
@@ -335,12 +341,23 @@ export function ProfileHovercard({
   person,
   children,
   className = "",
+  wrapperClassName = "",
   align = "start",
   label,
 }: {
   person: MessagePerson;
   children: ReactNode;
   className?: string;
+  /**
+   * For the positioning wrapper rather than the button.
+   *
+   * The wrapper has to be the anchor the panel measures against, so it sits
+   * between the caller's row and the trigger. That makes it — not the button —
+   * the flex item, and a caller that wants the trigger to fill a row has to be
+   * able to say so here. Without it, `flex-1` on `className` lands inside a
+   * shrink-to-fit span and does nothing.
+   */
+  wrapperClassName?: string;
   align?: "start" | "end";
   label?: string;
 }): ReactNode {
@@ -357,7 +374,7 @@ export function ProfileHovercard({
   useDismissOnOutside(open, ref, setOpen);
 
   return (
-    <span ref={ref} className="relative inline-flex">
+    <span ref={ref} className={`relative inline-flex ${wrapperClassName}`}>
       <button
         type="button"
         onClick={() => (open ? setOpen(false) : show())}

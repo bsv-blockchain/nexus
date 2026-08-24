@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState, type ReactNode } from "react";
+import { useHostOverlay } from "@/lib/wallet-data";
 
 const copy = content.timeline.activityBar;
 
@@ -46,6 +47,10 @@ export function ActivityBar(): ReactNode {
   const { activityRange, activityApps } = useTimeline();
   const [open, setOpen] = useState<null | "range" | "apps">(null);
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
+  /* Holds the shell's page layer down while this is up: a browsed page is a
+     native view that paints above this document, so no z-index reaches over
+     it. See lib/wallet-data. */
+  useHostOverlay(open !== null);
 
   const show = (kind: "range" | "apps", rect: DOMRect): void => {
     setAnchor(rect);

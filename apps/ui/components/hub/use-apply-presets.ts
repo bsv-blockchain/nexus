@@ -21,6 +21,7 @@ import { useHub } from "@/components/hub/hub-provider";
 import {
   appsFor,
   developerModeFor,
+  ownReposFor,
   presets,
   railPlanFor,
   reposFor,
@@ -230,7 +231,12 @@ export function useTogglePreset(): (id: PresetId, on: boolean) => void {
        * makes the switch look like it did not work.
        */
       const wanted = reposFor(next);
-      const touched = reposFor([id]);
+      /* Only what this preset declared for itself may be switched back off.
+         The shared catalogue is in `reposFor` as well, and it ships enabled and
+         serves listings that have nothing to do with presets — taking it away
+         because somebody turned Gamer off would be a switch reaching further
+         than its own card. */
+      const touched = ownReposFor([id]);
       setRepositories(
         getRepositoriesSnapshot().map((repo: AppRepository) =>
           wanted.includes(repo.id)

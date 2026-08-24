@@ -82,6 +82,14 @@ export interface TourCard {
   mobileSide?: "top" | "bottom";
   /** the illustration; empty renders the placeholder field */
   image: string;
+  /**
+   * A drawn visual instead of the placeholder, for the cards where the thing
+   * being explained has a shape worth showing.
+   *
+   * A name rather than a component, so this module stays data — see
+   * components/hub/tour-art.tsx, which is what knows how to draw one.
+   */
+  art?: "vault-doors";
   title: string;
   /**
    * The card's words.
@@ -157,7 +165,7 @@ export const tourCards: TourCard[] = [
     mobileSide: "top",
     image: "",
     title: "Getting paid, and paying",
-    body: "Send *sats* to a handle, or a *payment link* anybody can open. Every payment lands in *Activity* with what it was for, and the things you buy stay yours: *collectibles* you keep and *consumables* you spend. Set a ceiling once and anything under it stops asking.",
+    body: "Send *sats* to a handle, or a *payment link* anybody can open. Every payment lands in *Activity* with what it was for, and the things you buy stay yours: *collectibles* you keep and *consumables* you spend.",
   },
   {
     id: "vault",
@@ -169,8 +177,9 @@ export const tourCards: TourCard[] = [
     side: "right",
     mobileSide: "top",
     image: "",
-    title: "The things you cannot lose",
-    body: "*Keys*, recovery phrases and documents go behind a door that *shuts on its own* when you leave the app.",
+    art: "vault-doors",
+    title: "Sealed, and only you can open it",
+    body: "Your *keys*, recovery phrases and private files sit behind a lock that *shuts itself* the moment you leave. Nothing is escrowed and nothing leaves this device: the only thing that opens it is a passphrase you hold.",
   },
 
   /* ---- one per preset ---------------------------------------------------- */

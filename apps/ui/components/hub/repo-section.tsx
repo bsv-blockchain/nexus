@@ -263,8 +263,12 @@ export function RepoSection({
                   isLatest ? "" : "text-warning border-warning/40 bg-warning/10"
                 }`}
               >
-                v{current}
-                {isLatest && <span>{copy.repoLatest}</span>}
+                {/* Shut, it answers "am I current?" — and "latest" answers
+                    that, where "v2026.08 latest" made a reader check a number
+                    against a word that already told them. Pinned to an older
+                    catalogue it shows which one, because then the number IS
+                    the answer. The menu lists every version either way. */}
+                {isLatest ? <span>{copy.repoLatest}</span> : <>v{current}</>}
                 <ChevronDown className="size-3" aria-hidden="true" />
               </button>
               <PopoverMenu

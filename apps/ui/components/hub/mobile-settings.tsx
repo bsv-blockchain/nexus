@@ -17,16 +17,14 @@ import { LicencePane } from "@/components/hub/licence-pane";
 import { LegalPane } from "@/components/hub/legal-pane";
 import { ReleaseDetail, ReleaseList } from "@/components/hub/release-notes";
 import { RepositoriesButton } from "@/components/hub/repositories-button";
-import {
-  ClearDataPane,
-  LanguagesPane,
-} from "@/components/hub/settings-panes";
+import { ClearDataPane, LanguagesPane } from "@/components/hub/settings-panes";
 import { SiteSettingsPane } from "@/components/hub/site-settings-pane";
 import { content, getDownloads, licence } from "@/lib/data";
 import { ChevronLeft, ChevronRight, Download, ListChecks } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useReducedMotion } from "@/lib/motion";
 import { useState, type ReactNode } from "react";
+import { useHostOverlay } from "@/lib/wallet-data";
 
 const copy = content.mobileBrowser.settings;
 const spring = { type: "spring" as const, damping: 34, stiffness: 360 };
@@ -142,10 +140,18 @@ const PANE_KINDS = new Set([
  * The stack is two deep at most: root → category → pane. Deeper than that and
  * the back button stops being a place people can predict.
  */
-export function MobileSettings({ onClose }: { onClose: () => void }): ReactNode {
+export function MobileSettings({
+  onClose,
+}: {
+  onClose: () => void;
+}): ReactNode {
   const { detailPane, closeDetailPane, openDetailPane } = useHub();
   const [category, setCategory] = useState<SettingsCategory | null>(null);
   const still = useReducedMotion();
+  /* Holds the shell's page layer down while this is up: a browsed page is a
+     native view that paints above this document, so no z-index reaches over
+     it. See lib/wallet-data. */
+  useHostOverlay(true);
 
   /* Derived from hub state rather than copied into local state: the panels
      write there, and a second copy would be a second thing to keep in step. */
@@ -168,7 +174,10 @@ export function MobileSettings({ onClose }: { onClose: () => void }): ReactNode 
   const slide = still
     ? {}
     : {
-        initial: { x: depth === 0 ? 0 : "100%", opacity: depth === 0 ? 1 : 0.6 },
+        initial: {
+          x: depth === 0 ? 0 : "100%",
+          opacity: depth === 0 ? 1 : 0.6,
+        },
         animate: { x: 0, opacity: 1 },
         exit: { x: "100%", opacity: 0.6 },
         transition: spring,

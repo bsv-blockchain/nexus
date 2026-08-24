@@ -8,6 +8,7 @@ import {
   addWallet,
   isUnlocked,
   labelOf,
+  profilesUsing,
   setActiveWallet,
   unlockWallet,
   useWallets,
@@ -23,6 +24,12 @@ import {
   Sparkles,
 } from "lucide-react";
 import { resolveDataMode } from "@/lib/data-mode";
+import {
+  getUsdPerBsv,
+  usdForSatoshis,
+  useUsdPerBsv,
+} from "@/lib/exchange-rate";
+import { activeHandleFor } from "@/lib/settings-store";
 import { toast } from "sonner";
 import { useState, type ReactNode } from "react";
 
@@ -82,13 +89,39 @@ export function WalletMark({
   );
 }
 
-function fiat(wallet: WalletAccount): string {
-  const value = (wallet.balanceSatoshis / 100_000_000) * wallet.fiatRate;
-  return value.toLocaleString("en-GB", {
-    style: "currency",
-    currency: wallet.fiatCurrency,
-    maximumFractionDigits: 2,
-  });
+function fiat(wallet: WalletAccount, usdPerBsv: number): string {
+  return usdForSatoshis(wallet.balanceSatoshis, usdPerBsv).toLocaleString(
+    "en-GB",
+    {
+      style: "currency",
+      currency: wallet.fiatCurrency,
+      maximumFractionDigits: 2,
+    }
+  );
+}
+
+/**
+ * The handle a wallet answers to.
+ *
+ * A wallet does not hold a handle; a workspace does, and a workspace spends
+ * from one wallet — so the name attached to money leaving this wallet is the
+ * handle of the workspace using it. Set in Identity, read here.
+ *
+ * The workspace you are in wins when it is one of them, because that is whose
+ * money is on screen. Otherwise the first workspace using it, which is at least
+ * true. A wallet no workspace has selected shows nothing rather than borrowing
+ * somebody else's name.
+ */
+function handleFor(
+  wallet: WalletAccount,
+  activeSpaceId: string,
+  spaceIds: string[]
+): string | null {
+  const using = profilesUsing(wallet.id, spaceIds);
+  const space = using.includes(activeSpaceId) ? activeSpaceId : using[0];
+  if (!space) return null;
+  const handle = activeHandleFor(space);
+  return handle ? `@${handle}` : null;
 }
 
 /**
@@ -106,25 +139,40 @@ export function WalletTrigger({
   onOpen: () => void;
   className?: string;
 }): ReactNode {
-  const { activeSpaceId } = useHub();
+  const { activeSpaceId, spaces } = useHub();
   useWallets();
   const wallet = activeWalletFor(activeSpaceId);
   if (!wallet || !switchable()) return null;
+  const handle = handleFor(
+    wallet,
+    activeSpaceId,
+    spaces.map((space) => space.id)
+  );
   return (
     <button
       type="button"
       onClick={onOpen}
       aria-haspopup="dialog"
-      className={`focus-ring border-border bg-surface hover:bg-surface-hover flex items-center gap-2.5 rounded-full border py-1 pr-3 pl-1 text-left ${className}`}
+      /* Bigger than it was, because it carries two lines now rather than one:
+         the wallet's name, and the handle its money goes out under. It sits
+         level with the portfolio total, which is the largest figure on the
+         screen, and a small control beside a large number reads as an
+         afterthought rather than as the thing that chooses whose number it is. */
+      className={`focus-ring border-border bg-surface hover:bg-surface-hover flex items-center gap-3 rounded-xl border py-2 pr-3.5 pl-2 text-left ${className}`}
     >
-      <WalletMark wallet={wallet} size={28} />
+      <WalletMark wallet={wallet} size={40} />
       <span className="min-w-0">
-        <span className="block truncate text-sm font-bold">
+        <span className="block truncate text-base font-bold">
           {labelOf(wallet)}
         </span>
+        {handle && (
+          <span className="text-muted-foreground block truncate text-xs">
+            {handle}
+          </span>
+        )}
       </span>
       <ChevronDown
-        className="text-muted-foreground size-4 shrink-0"
+        className="text-muted-foreground size-4.5 shrink-0"
         aria-hidden="true"
       />
     </button>
@@ -277,7 +325,10 @@ function AddWallet({ onDone }: { onDone: () => void }): ReactNode {
         type="button"
         disabled={!ready}
         onClick={() => {
-          const id = `acct-${label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+          const id = `acct-${label
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")}`;
           const colors =
             PALETTE[Math.abs(id.length * 7) % PALETTE.length] ?? PALETTE[0]!;
           addWallet(
@@ -289,10 +340,10 @@ function AddWallet({ onDone }: { onDone: () => void }): ReactNode {
               colors,
               balanceSatoshis: 0,
               fiatCurrency: "USD",
-              fiatRate: 52.4,
+              fiatRate: getUsdPerBsv(),
             },
             activeSpaceId,
-            Date.now(),
+            Date.now()
           );
           toast.success(label.trim(), { description: copy.added });
           onDone();
@@ -319,8 +370,10 @@ export function WalletSwitcher({
   open: boolean;
   onClose: () => void;
 }): ReactNode {
-  const { activeSpaceId } = useHub();
+  const { activeSpaceId, spaces } = useHub();
   useWallets();
+  const usdPerBsv = useUsdPerBsv();
+  const spaceIds = spaces.map((space) => space.id);
   const [adding, setAdding] = useState(false);
   const [unlocking, setUnlocking] = useState<string | null>(null);
   const wallets = walletsByRecent();
@@ -351,6 +404,7 @@ export function WalletSwitcher({
             {wallets.map((wallet) => {
               const sealed = wallet.locked === true && !isUnlocked(wallet.id);
               const current = wallet.id === active?.id;
+              const handle = handleFor(wallet, activeSpaceId, spaceIds);
               return (
                 <li key={wallet.id} className="px-4 py-3">
                   <div className="flex items-center gap-3">
@@ -368,9 +422,13 @@ export function WalletSwitcher({
                         )}
                       </span>
                       {/* A sealed wallet does not show a balance it cannot
-                          have read. */}
-                      <span className="text-muted-foreground block truncate text-[11px] tabular-nums">
-                        {sealed ? copy.sealed : fiat(wallet)}
+                          have read. The handle beside it is the name money
+                          leaves this wallet under — see `handleFor`. */}
+                      <span className="text-muted-foreground block truncate text-[11px]">
+                        <span className="tabular-nums">
+                          {sealed ? copy.sealed : fiat(wallet, usdPerBsv)}
+                        </span>
+                        {handle && ` · ${handle}`}
                       </span>
                     </span>
                     {current ? (
@@ -384,7 +442,7 @@ export function WalletSwitcher({
                         onClick={() => {
                           if (sealed) {
                             setUnlocking(
-                              unlocking === wallet.id ? null : wallet.id,
+                              unlocking === wallet.id ? null : wallet.id
                             );
                             return;
                           }

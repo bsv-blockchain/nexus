@@ -12,6 +12,7 @@
  * part of it. Global verbs keep their specified behaviour for fiat and satoshi
  * amounts; tokens ride the same syntax position.
  */
+import { FALLBACK_USD_PER_BSV } from "@/lib/exchange-rate";
 import type { Token } from "./types";
 
 export const tokens: Token[] = [
@@ -24,10 +25,17 @@ export const tokens: Token[] = [
     color: "#EAB300",
     decimals: 8,
     base: true,
-    protocol: "native",
-    blurb:
-      "The base currency. Amounts without a token are BSV, and satoshis are its smallest unit.",
-    usdPerUnit: 72.5,
+    protocol: "BSV Blockchain",
+    protocolUrl: "https://bsvblockchain.org",
+    issuer: "Satoshi",
+    issuerUrl:
+      "https://hub.bsvblockchain.org/higher-learning/bsv-academy/bitcoin-whitepaper-series",
+    blurb: "Peer to Peer Electronic Cash",
+    /* Ignored. BSV is the one asset in this table with a real price, so it is
+       read from the market instead — see `usdPerUnitOf` in lib/wallet.ts and
+       lib/exchange-rate.ts. Left here because `Token` requires it and because
+       a zero would be a claim. */
+    usdPerUnit: FALLBACK_USD_PER_BSV,
     change24h: 1.2,
   },
   {
@@ -81,7 +89,11 @@ export const tokens: Token[] = [
     symbol: "NEX",
     name: "Nexus Credits",
     ecosystem: "nexus",
-    icon: null,
+    /* The wordmark rather than the ecosystem's app tile, which is a square
+       picture with its own background and showed its corners inside a round
+       mark. This one is a glyph on nothing, so it gets a plate. */
+    icon: "/icons/Nexus-logo-white.svg",
+    plate: "#000000",
     color: "#4353ff",
     decimals: 2,
     protocol: "BSV-21",

@@ -1,6 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
+import { useHostOverlay } from "@/lib/wallet-data";
 import { useEffect, type ReactNode } from "react";
 
 /** Centered modal card on a dark overlay. Backdrop click and Escape close it. */
@@ -19,6 +20,21 @@ export function Dialog({
   showClose?: boolean;
   className?: string;
 }): ReactNode {
+  /*
+   * Hold the shell's page layer down while this is up.
+   *
+   * A browsed page is a native view in both shells — a WebContentsView on the
+   * desktop, a native web view on mobile — and a native view is a sibling of
+   * this document that always paints ABOVE it. No z-index reaches over one, so
+   * without this the surface renders perfectly and is then completely hidden
+   * behind whatever tab happens to be open.
+   *
+   * Held by the primitive rather than by each caller, because "remember to call
+   * useHostOverlay" is a rule that gets forgotten exactly once and then fails
+   * silently. A no-op in a plain browser, which has no page layer to hide.
+   */
+  useHostOverlay(open);
+
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -39,7 +55,7 @@ export function Dialog({
       onClick={onClose}
     >
       <div
-        className={`relative w-full max-w-md overflow-hidden rounded-2xl border border-border bg-surface-raised shadow-2xl ${className}`}
+        className={`border-border bg-surface-raised relative w-full max-w-md overflow-hidden rounded-2xl border shadow-2xl ${className}`}
         onClick={(event) => event.stopPropagation()}
       >
         {showClose && (
@@ -47,7 +63,7 @@ export function Dialog({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="focus-ring absolute top-3 right-3 z-10 rounded-md p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+            className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground absolute top-3 right-3 z-10 rounded-md p-1.5"
           >
             <X className="size-4" aria-hidden="true" />
           </button>

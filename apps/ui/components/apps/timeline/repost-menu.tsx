@@ -19,6 +19,7 @@ import { PenLine, Repeat2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
 import type { ReactNode } from "react";
+import { useHostOverlay } from "@/lib/wallet-data";
 
 const copy = content.timeline.repostMenu;
 
@@ -60,6 +61,11 @@ function Sheet({
   anchor: DOMRect;
   onClose: () => void;
 }): ReactNode {
+  /* Holds the shell's page layer down while this is up: a browsed page is a
+     native view that paints above this document, so no z-index reaches over
+     it. See lib/wallet-data. */
+  useHostOverlay(true);
+
   const isDesktop = useIsDesktop();
   const { reposted } = useTimeline();
   const on = reposted.includes(postId);

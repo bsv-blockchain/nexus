@@ -124,7 +124,17 @@ export const content = {
     },
     balanceLabel: "Total balance",
     totalValue: "Portfolio value",
-    change24h: "past 24 hours",
+    /* Not "past 24 hours": bitcoin's move is measured against the last
+       daily close, which is the finest thing the explorer answers with.
+       See getBsvChange in lib/exchange-rate. */
+    change24h: "today",
+    /* The month chart on a token's own page. `label` names what the scrub is
+       choosing between; `reading` is what a screen reader is told at each
+       stop, which is the same sentence the header shows visually. */
+    chart: {
+      label: "Historical value of your balance",
+      reading: "{date}, {value} for {units} {symbol} at {rate} per {symbol}",
+    },
     noRate: "Exchange rate unavailable",
     assets: "Assets",
     baseCurrency: "Base",
@@ -279,12 +289,14 @@ export const content = {
     unfavourited: "removed from favourites",
     splits: {
       title: "Splits",
-      hint: "An amount divided across handles. Shares are independent, so one failing does not undo the others.",
+      hint: "What you are owed, and what you owe. Each share is its own payment.",
       ways: "ways",
       of: "of",
       settledCount: "settled",
       settled: "Fully settled",
       stillOwed: "still owed to you",
+      /** the same figure on a split somebody else raised, where it is not yours */
+      stillOutstanding: "still outstanding",
       markPaid: "Mark paid",
       remind: "Send a reminder",
       retry: "Retry this share",
@@ -292,9 +304,47 @@ export const content = {
       settledUp: "settled up",
       independentNote:
         "Each share is its own payment. A failed one can be retried without touching the rest.",
+      /* Raising one. The form is a side pane, like a new payment link. */
+      newSplit: "New split",
+      newTitle: "Split an amount",
+      newHint:
+        "Divide it across handles. Each share is its own payment, so one failing does not undo the others.",
+      descriptionLabel: "What it is for",
+      descriptionPlaceholder: "Studio time, four ways",
+      amountLabel: "Total",
+      /* Says which total, because the two readings differ by a share. What is
+         recorded is what the others owe; whatever you are covering yourself is
+         not part of it, the same way the seeded splits are written. */
+      amountHint: "What you are owed back. Your own share is not part of it.",
+      peopleLabel: "Split with",
+      peopleHint: "Search your contacts.",
+      /** the field around the even/custom choice, which the options then name */
+      sharesLabel: "Shares",
+      evenly: "Split evenly",
+      custom: "Set each share",
+      remainder: "Left to allocate",
+      over: "That is more than the total.",
+      raise: "Raise the split",
+      raised: "Split raised",
+      needPeople: "Add at least one person.",
+      needAmount: "Enter a total above zero.",
+      /* Two sides of the same object. */
+      owedToYou: "Owed to you",
+      youOwe: "You owe",
+      raisedByLabel: "Raised by",
+      yourShare: "Your share",
+      payShare: "Pay your share",
+      yourSharePaid: "You have paid your share",
+      remove: "Delete this split",
+      removed: "Split deleted",
+      /* What a reminder actually does — it opens the thread with the line
+         written, rather than sending on somebody's behalf. */
+      reminderDraft: "about {what}: your share is {amount}.",
+      empty: "No splits yet.",
+      emptyHint: "Divide an amount across handles and track who has settled.",
     },
     contactsHint:
-      "The same people you message. A verified handle is one whose certificate checks out and whose key at least one peer vouches for.",
+      "Everyone you message, ready to pay. A check means the handle is verified, so the money reaches the person it names.",
     verified: "Verified",
     verifiedHint:
       "This handle's certificate is valid and peers have attested to its key, so you are paying the person the handle names.",
@@ -1431,6 +1481,11 @@ export const content = {
     /* Named for what they are. "Collections" was a word this app used nowhere
        else; these five are the first run's presets, and the three below them
        are the repositories the store already calls sources. */
+    /* The cross a rail tile grows when it is held down. "Remove" rather than
+       "Disconnect" on the label because the tile is what you are pointing at;
+       what it does is disconnect, which the toast then says. */
+    railRemove: "Remove from rail:",
+    railRemoved: "Removed from the rail",
     presetsTitle: "Nexus Presets",
     sourcesTitle: "App repositories",
     /* Shown on a folded section, so closing one saves room without losing the
@@ -1633,6 +1688,13 @@ export const content = {
     noResults: "No matching tabs.",
   },
   browserSettings: {
+    /* The quick action that replaced "Boost", which was a wand that did
+       nothing. Pinning is what connects a web listing, so this says "rail"
+       rather than "bookmark" — the rail is where it lands. */
+    addToRail: "Add to rail",
+    addToRailDone: "Added to the rail",
+    addToRailAlready: "Already on the rail",
+    addToRailRefused: "This page cannot be added to the rail",
     extensions: "Extensions",
     settings: "Settings",
     appearance: "Appearance",
@@ -2264,7 +2326,11 @@ export const content = {
     /* The preset picker, which is the last thing the first run asks. */
     presets: {
       eyebrow: "One more thing",
-      title: "What are you here for?",
+      /* The answers are nouns — Thinker, Maker, Developer, Gamer — so the
+         question asks for one. "What are you here for?" asks for a purpose,
+         and "to read things" is not on the cards. "Which of these" also reads
+         correctly whether somebody picks one of them or all four. */
+      title: "Which of these are you?",
       body: "Pick as many as you like. You can change any of it later.",
       skip: "Set up without a preset",
       continueOne: "Set up with 1 preset",
@@ -2278,22 +2344,29 @@ export const content = {
     steps: {
       welcome: {
         title: "Welcome to Nexus",
-        body: "The web, your money and your name, finally in one place.",
+        /* The same three things as before — the web, money, a name — said as
+           what they are to a person rather than as a list of parts. "One name
+           they know you by" is the claim the old "in one place" was making, and
+           it names who the you is talking to. */
+        body: "Everywhere you go, everyone you pay, and one name they know you by.",
       },
       browse: {
         title: "The web, with a wallet in it",
         body: "Pages load as they always did. The ones that speak Bitcoin can now ask.",
       },
       pay: {
-        title: "Pay a name, not an address",
+        title: "You're a name, not a number",
         /* What you can move and how, rather than what you are spared. "No chain
            to choose" answers an objection somebody arriving has not raised yet,
            and spends the only sentence this card gets on the machinery. */
         body: "Send and receive BSV, tokens and collectibles, or share a link anyone can pay.",
       },
       workspaces: {
-        title: "One device, several lives",
-        body: "Work and personal keep their own tabs, wallet and name.",
+        title: "Several devices, several lives",
+        /* Two claims in one line: the workspaces are separate, and they are the
+           same wherever you open them. Naming the devices rather than saying
+           "everywhere" — a phone and a laptop are what somebody pictures. */
+        body: "Phone or laptop, each workspace keeps its own tabs, wallet and name.",
       },
     },
     handle: {

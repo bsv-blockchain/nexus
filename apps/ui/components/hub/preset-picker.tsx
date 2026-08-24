@@ -38,7 +38,15 @@ const copy = content.firstRun.presets;
 const CARD_H = 0.42; // focused card height ÷ stage height
 const CARD_AR = 406 / 720; // the clips are portrait; the card is their shape
 const GAP = 0.06; // gap ÷ card width
-const STRIP_TOP = 0.4; // the strip's shared top edge, down the stage
+/*
+ * The strip's shared top edge, down the stage.
+ *
+ * Higher than it reads: the button at the foot is the one thing on this screen
+ * that ends it, and at 0.4 the strip came down close enough to it that the two
+ * looked like one block. Everything above moves up so the way on has air around
+ * it.
+ */
+const STRIP_TOP = 0.34;
 
 /** Wheel distance that commits to a step, and the lockout after one. */
 const WHEEL_THRESHOLD = 60;
@@ -54,17 +62,40 @@ const clamp = (n: number, min: number, max: number): number =>
  * play inline and hands back a fullscreen player, which is the opposite of a
  * background. `preload="auto"` because all four are on screen at once and a
  * card that starts black while it buffers reads as broken.
+ *
+ * Exported because the first run's welcome card wants the same rules for the
+ * same reason, and two copies of them drift.
  */
-function Clip({
+export function Clip({
   src,
   className = "",
+  rate = 1,
+  poster,
 }: {
   src: string;
   className?: string;
+  /** playback speed; below 1 for a background that should not compete */
+  rate?: number;
+  poster?: string;
 }): ReactNode {
+  const ref = useRef<HTMLVideoElement>(null);
+  /*
+   * Set on the element, because there is no attribute for it.
+   *
+   * Also re-applied on `loadedmetadata`: swapping `src` resets the rate to 1,
+   * and the strip swaps this clip's source every time the focus moves, so
+   * setting it once on mount held for the first preset and no other.
+   */
+  useEffect(() => {
+    const el = ref.current;
+    if (el) el.playbackRate = rate;
+  }, [rate, src]);
+
   return (
     <video
+      ref={ref}
       src={src}
+      {...(poster ? { poster } : {})}
       autoPlay
       loop
       muted
@@ -72,6 +103,9 @@ function Clip({
       preload="auto"
       aria-hidden="true"
       tabIndex={-1}
+      onLoadedMetadata={(event) => {
+        event.currentTarget.playbackRate = rate;
+      }}
       className={`h-full w-full object-cover ${className}`}
     />
   );
@@ -129,6 +163,32 @@ function Strip({
   const go = useCallback(
     (next: number) => setIndex(clamp(next, 0, last)),
     [last]
+  );
+
+  /*
+   * Setting one moves on to the next one still unanswered.
+   *
+   * The strip does not advance on its own, because these are ticks rather than
+   * a sequence — but leaving it parked on a card that has just been answered
+   * makes choosing four presets four taps and four drags. Wrapping round and
+   * stopping at the current card means the last tick leaves the strip where it
+   * is instead of jumping to something already chosen.
+   */
+  const setAndAdvance = useCallback(
+    (id: PresetId) => {
+      onToggle(id);
+      const already = chosen.includes(id);
+      if (already) return;
+      for (let step = 1; step <= last; step += 1) {
+        const at = (index + step) % presets.length;
+        const next = presets[at];
+        if (next && !chosen.includes(next.id) && next.id !== id) {
+          setIndex(at);
+          return;
+        }
+      }
+    },
+    [onToggle, chosen, index, last]
   );
 
   useEffect(() => {
@@ -216,7 +276,7 @@ function Strip({
         };
         if (event.key === " " || event.key === "Enter") {
           event.preventDefault();
-          onToggle(active.id);
+          setAndAdvance(active.id);
           return;
         }
         if (!(event.key in keys)) return;
@@ -240,7 +300,9 @@ function Strip({
               softened edges vignette in from the sides. 24px rather than 40 —
               far enough that the clip is a wash the tiles sit on, near enough
               that you can still tell what it is. */}
-          <Clip src={active.video} className="scale-140 blur-xl" />
+          {/* Half speed. It is a wash behind a question, and at full rate the
+              movement in it kept pulling the eye off the cards it is behind. */}
+          <Clip src={active.video} rate={0.5} className="scale-140 blur-xl" />
           {/* Keeps the clip's luminance, takes the accent's hue. */}
           <div
             className="absolute inset-0"
@@ -303,7 +365,7 @@ function Strip({
                 type="button"
                 aria-pressed={picked}
                 aria-label={`${preset.title} — ${preset.tagline}`}
-                onClick={() => (focused ? onToggle(preset.id) : go(i))}
+                onClick={() => (focused ? setAndAdvance(preset.id) : go(i))}
                 className="relative shrink-0 overflow-hidden rounded-2xl bg-white/5"
                 style={{ width: cardW }}
                 animate={{ height: focused ? fullH : halfH }}
@@ -345,7 +407,7 @@ function Strip({
       </div>
 
       {/* What the focused preset is for, and the way on. */}
-      <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-4 px-10 pb-8">
+      <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-7 px-10 pb-10">
         <AnimatePresence mode="wait" initial={false}>
           <motion.p
             key={active.id}
@@ -404,7 +466,11 @@ function Stack({
               type="button"
               aria-pressed={picked}
               onClick={() => onToggle(preset.id)}
-              className={`focus-ring relative block h-36 w-full overflow-hidden rounded-2xl text-left ring-2 transition-shadow ${
+              /* Taller than the desktop strip's proportions would suggest: on a
+                 phone these are the whole screen rather than four cards in a
+                 row, and a 144px band left the clip behind each one reading as
+                 a texture instead of a place. */
+              className={`focus-ring relative block h-44 w-full overflow-hidden rounded-2xl text-left ring-2 transition-shadow ${
                 picked ? "ring-accent" : "ring-transparent"
               }`}
             >
@@ -465,7 +531,10 @@ function Continue({
     <button
       type="button"
       onClick={onDone}
-      className="focus-ring bg-accent text-accent-foreground w-full max-w-sm rounded-full px-6 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
+      /* `mx-auto` because the phone's footer is a plain block: the desktop
+         strip centres this with `items-center`, and without it the button sat
+         against the left edge on any screen wider than `max-w-sm`. */
+      className="focus-ring bg-accent text-accent-foreground mx-auto block w-full max-w-sm rounded-full px-6 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
     >
       {count === 0
         ? copy.skip

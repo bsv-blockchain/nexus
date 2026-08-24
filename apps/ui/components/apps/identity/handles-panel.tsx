@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useHostOverlay } from "@/lib/wallet-data";
 
 const copy = contentRoot.identity.handles;
 
@@ -156,7 +157,7 @@ function LinkedAccounts(): ReactNode {
       setLinked(account.id, new Date().toISOString());
       setBusy(null);
       toast.success(
-        copy.linkedToast.replace("{service}", provider(account.provider).label),
+        copy.linkedToast.replace("{service}", provider(account.provider).label)
       );
     }, 1400);
   };
@@ -173,7 +174,10 @@ function LinkedAccounts(): ReactNode {
                 : account.attestedAt;
             const working = busy === account.id;
             return (
-              <li key={account.id} className="flex items-center gap-3 px-4 py-3">
+              <li
+                key={account.id}
+                className="flex items-center gap-3 px-4 py-3"
+              >
                 <span
                   className="grid size-9 shrink-0 place-items-center rounded-xl text-sm font-bold text-white"
                   style={{ backgroundColor: meta.colour }}
@@ -182,7 +186,9 @@ function LinkedAccounts(): ReactNode {
                   {meta.mark}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium">{meta.label}</span>
+                  <span className="block text-sm font-medium">
+                    {meta.label}
+                  </span>
                   <span className="text-muted-foreground block truncate text-[11px]">
                     {attestedAt
                       ? account.handle || meta.domain
@@ -223,7 +229,7 @@ function LinkedAccounts(): ReactNode {
           aria-modal="true"
           aria-label={copy.consentTitle.replace(
             "{service}",
-            provider(asking).label,
+            provider(asking).label
           )}
           className="fixed inset-0 z-70 flex items-center justify-center bg-black/60 p-4"
           onClick={() => setAsking(null)}
@@ -297,12 +303,16 @@ function ShareCard(): ReactNode {
   const input = useRef<HTMLInputElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sheet, setSheet] = useState(false);
+  /* Holds the shell's page layer down while this is up: a browsed page is a
+     native view that paints above this document, so no z-index reaches over
+     it. See lib/wallet-data. */
+  useHostOverlay(sheet);
   const link = `https://nexus.build/@${handle}`;
 
   const attested = linkedAccounts.filter((account) =>
     account.id in settings.linked
       ? settings.linked[account.id]
-      : account.attestedAt,
+      : account.attestedAt
   );
 
   const pick = (file: File): void => {
@@ -311,7 +321,7 @@ function ShareCard(): ReactNode {
       setError(
         copy.avatarTooBig
           .replace("{size}", String(Math.round(file.size / 1024)))
-          .replace("{max}", String(MAX_KB)),
+          .replace("{max}", String(MAX_KB))
       );
       return;
     }
@@ -424,7 +434,9 @@ function ShareCard(): ReactNode {
             )}
           </div>
           {error && (
-            <p className="text-negative mt-2 text-[11px] text-pretty">{error}</p>
+            <p className="text-negative mt-2 text-[11px] text-pretty">
+              {error}
+            </p>
           )}
         </div>
       </div>

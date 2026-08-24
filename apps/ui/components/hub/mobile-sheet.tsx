@@ -21,6 +21,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { useHostOverlay } from "@/lib/wallet-data";
 
 type SheetView =
   | { kind: "root" }
@@ -61,6 +62,10 @@ function RootRow({
 /** Full-screen mobile navigation sheet with drilldown menus. */
 export function MobileSheet(): ReactNode {
   const { mobileSheetOpen } = useHub();
+  /* Holds the shell's page layer down while this is up: a browsed page is a
+     native view that paints above this document, so no z-index reaches over
+     it. See lib/wallet-data. */
+  useHostOverlay(mobileSheetOpen);
   // Unmounting on close resets the drilldown to the root menu for next open.
   if (!mobileSheetOpen) return null;
   return <MobileSheetContent />;

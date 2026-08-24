@@ -91,11 +91,11 @@ const BOLT_COUNT = 11;
  * and the light the wheel picks up, which is where `--accent` does the work of
  * belonging to this product.
  */
-const STEEL_DEEP = "#14171a";
-const STEEL_DARK = "#23282d";
-const STEEL_MID = "#3b4148";
-const STEEL_LIGHT = "#666f79";
-const STEEL_EDGE = "#8a939d";
+export const STEEL_DEEP = "#14171a";
+export const STEEL_DARK = "#23282d";
+export const STEEL_MID = "#3b4148";
+export const STEEL_LIGHT = "#666f79";
+export const STEEL_EDGE = "#8a939d";
 
 const METHODS: { id: UnlockMethod; icon: typeof QrCode }[] = [
   { id: "password", icon: KeyRound },

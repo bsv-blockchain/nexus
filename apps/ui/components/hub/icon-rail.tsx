@@ -13,6 +13,7 @@ import {
   content,
   getChatThreads,
   getHubApps,
+  getEssentialAppSlugs,
   getMailMessages,
   getUnreadCount,
   type HubApp,
@@ -30,8 +31,10 @@ import {
   Layers,
   LayoutGrid,
   type LucideIcon,
+  X,
 } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /**
  * A drag carries the dragged slot's `refKey`, under a MIME type of our own so
@@ -246,6 +249,8 @@ export function IconRail(): ReactNode {
     ungroupRef,
     reorderRailRef,
     openShare,
+    uninstallApp,
+    unpinSite,
   } = useHub();
 
   // A system tab is "active" when its view/panel is showing.
@@ -347,7 +352,51 @@ export function IconRail(): ReactNode {
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [tip, setTip] = useState<Tip | null>(null);
   const [settings, setSettings] = useState<GroupSettings | null>(null);
+  /* Which tile is offering to be removed, by ref key. One at a time: two open
+     crosses in a column of icons is two things to dismiss. */
+  const [removing, setRemoving] = useState<string | null>(null);
   const pressTimer = useRef<number | null>(null);
+
+  /*
+   * Dismissed by the next press anywhere else.
+   *
+   * On the document rather than on a backdrop element, because a backdrop over
+   * the whole app to catch one click would swallow the click that was going
+   * somewhere. Capture phase, so the cross is gone before whatever was pressed
+   * gets to act on it.
+   */
+  useEffect(() => {
+    if (!removing) return;
+    const dismiss = (event: PointerEvent): void => {
+      const target = event.target;
+      if (target instanceof Element && target.closest("[data-remove-badge]")) {
+        return;
+      }
+      setRemoving(null);
+    };
+    document.addEventListener("pointerdown", dismiss, true);
+    return () => document.removeEventListener("pointerdown", dismiss, true);
+  }, [removing]);
+
+  /**
+   * Taking a tile off the rail.
+   *
+   * Removing is disconnecting, not hiding: an app goes out of this workspace
+   * the same way the App Store's Disconnect takes it out, and a web listing is
+   * connected by having its URL pinned, so unpinning is the same act for one of
+   * those. Two shapes, one meaning — a rail that could hide a connected app
+   * would be a second inventory of what this workspace has.
+   */
+  const removeRef = (ref: RailRef): void => {
+    setRemoving(null);
+    if (ref.kind === "app") uninstallApp(ref.slug as AppSlug, activeSpaceId);
+    else unpinSite(ref.id);
+  };
+
+  /** Essential apps refuse to be uninstalled, so they are not offered it. */
+  const essentialSlugs = new Set<string>(getEssentialAppSlugs());
+  const removable = (ref: RailRef): boolean =>
+    ref.kind !== "app" || !essentialSlugs.has(ref.slug);
 
   const resolve = (ref: RailRef): Resolved | null =>
     resolveRef(ref, pinnedSites);
@@ -434,6 +483,12 @@ export function IconRail(): ReactNode {
     setSettings({ id: entry.id, name: entry.name, color: entry.color });
     setTip(null);
   };
+  const startRemovePress = (key: string) => (): void => {
+    pressTimer.current = window.setTimeout(() => {
+      setRemoving(key);
+      hideTip();
+    }, LONG_PRESS_MS);
+  };
   const startPress = (entry: RailEntry) => (): void => {
     pressTimer.current = window.setTimeout(
       () => openGroupSettings(entry),
@@ -486,8 +541,13 @@ export function IconRail(): ReactNode {
         <div className="bg-border my-2 h-px w-12 shrink-0" aria-hidden="true" />
       )}
 
-      {/* Apps and pinned sites — scroll underneath the pinned tabs. */}
-      <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-y-auto px-2 py-1">
+      {/* Apps and pinned sites — scroll underneath the pinned tabs.
+
+          `scrollbar-none` is alignment, not taste: an `overflow-y-auto` column
+          reserves a gutter on its right, so its centred tiles sat 5px left of
+          the pinned ones above, which have no gutter to make room for. A
+          scrollbar in a 96px column of icons was not doing any work anyway. */}
+      <div className="scrollbar-none flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-y-auto px-2 py-1">
         {railEntries.map((entry) => {
           const showUnread = entryUnread(entry);
           if (entry.type === "single") {
@@ -516,6 +576,23 @@ export function IconRail(): ReactNode {
                   showTip(event, resolved.name, resolved.desc)
                 }
                 onMouseLeave={hideTip}
+                /* Held down rather than right-clicked, because the rail is the
+                   one part of this app a thumb reaches on a tablet. The context
+                   menu does the same thing for a mouse. */
+                onPointerDown={
+                  removable(ref) ? startRemovePress(refKey(ref)) : undefined
+                }
+                onPointerUp={cancelPress}
+                onPointerLeave={cancelPress}
+                onContextMenu={
+                  removable(ref)
+                    ? (event) => {
+                        event.preventDefault();
+                        setRemoving(refKey(ref));
+                        hideTip();
+                      }
+                    : undefined
+                }
               >
                 {showUnread && (
                   <span
@@ -574,6 +651,34 @@ export function IconRail(): ReactNode {
                     aria-hidden="true"
                   />
                 )}
+                {/* The cross, once the tile has been held. `data-remove-badge`
+                    is how the document-level dismiss knows to leave this one
+                    press alone — see the effect above. */}
+                <AnimatePresence>
+                  {removing === refKey(ref) && (
+                    <motion.button
+                      type="button"
+                      data-remove-badge=""
+                      initial={{ scale: 0.4, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.4, opacity: 0 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 520,
+                        damping: 24,
+                      }}
+                      onClick={() => removeRef(ref)}
+                      aria-label={`${content.appStore.railRemove} ${resolved.name}`}
+                      className="focus-ring border-surface bg-negative absolute top-1 right-2 z-20 grid size-5 place-items-center rounded-full border-2 text-white shadow-lg"
+                    >
+                      <X
+                        className="size-3"
+                        strokeWidth={3}
+                        aria-hidden="true"
+                      />
+                    </motion.button>
+                  )}
+                </AnimatePresence>
               </div>
             );
           }
