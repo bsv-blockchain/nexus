@@ -160,6 +160,18 @@ export interface SettingsState {
    * @see components/hub/use-apply-presets.ts — what the first run seeds it with
    */
   homescreen: "timeline" | "focus";
+  /**
+   * What a stranger attaches, in US cents.
+   *
+   * Held in cents rather than satoshis because it is a PRICE — the thing being
+   * asked for is "about a penny", and a penny is a fixed number of cents and a
+   * moving number of satoshis. Storing the sats would freeze today's exchange
+   * rate into a policy that outlives it, so the conversion happens at the point
+   * of display against the live rate.
+   *
+   * Only in force while `reach` is `toll`; see PrivacyPanel.
+   */
+  strangerFeeCents: number;
 
   /* ---- Autofill ------------------------------------------------------- */
   autofillAddresses: boolean;
@@ -311,6 +323,10 @@ const INITIAL: SettingsState = {
   /* The feed, for anybody who never answers the question. The first run
      overwrites this from the presets before it is ever read. */
   homescreen: "timeline",
+  /* A cent. Small enough that nobody with something to say is stopped by it,
+     and large enough that sending a hundred thousand of them costs real money,
+     which is the entire mechanism. */
+  strangerFeeCents: 1,
 
   autofillAddresses: true,
   autofillCards: false,

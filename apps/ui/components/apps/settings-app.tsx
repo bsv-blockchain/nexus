@@ -94,6 +94,7 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
+import { useUsdPerBsv } from "@/lib/exchange-rate";
 import { toast } from "sonner";
 import {
   useEffect,
@@ -332,6 +333,68 @@ const soon = (): void => {
  * that only exists as a command is a policy nobody who has not read the grammar
  * will ever find.
  */
+/**
+ * A price in cents, and what that is in satoshis right now.
+ *
+ * Both, together, because neither is the whole answer: a cent is what somebody
+ * decides to charge and satoshis are what actually moves, and showing only the
+ * second turns a policy into a number that quietly means something different
+ * every week. The rate comes from WhatsOnChain — the same feed the wallet
+ * prices with, so two screens in this app never disagree about what a coin is
+ * worth — and the line says so, because a conversion whose source is invisible
+ * is a conversion nobody can check.
+ *
+ * Greyed rather than hidden when strangers are not being charged. The setting
+ * above is what turns it on, and a section that vanishes when you pick the
+ * wrong option teaches nobody that the two are connected.
+ */
+function StrangerFee({ active }: { active: boolean }): ReactNode {
+  const copy = content.settings.privacy;
+  const settings = useSettings();
+  /* Subscribing is what starts the fetch — see lib/exchange-rate. Without it
+     this renders the fallback rate and never corrects. */
+  const usdPerBsv = useUsdPerBsv();
+  const cents = settings.strangerFeeCents;
+  const sats = Math.round((cents / 100 / usdPerBsv) * 100_000_000);
+
+  return (
+    <div className={`p-2.5 ${active ? "" : "opacity-55"}`}>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {[1, 5, 10, 25].map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            onClick={() => setSetting("strangerFeeCents", preset)}
+            aria-pressed={cents === preset}
+            className={`focus-ring rounded-full border px-3 py-1 text-xs font-semibold tabular-nums transition-colors ${
+              cents === preset
+                ? "border-accent bg-accent/15 text-foreground"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {preset === 100 ? "$1" : `${preset}\u00a2`}
+          </button>
+        ))}
+        <span className="text-muted-foreground ml-1 text-xs tabular-nums">
+          &asymp; {sats.toLocaleString("en-US")} sats
+        </span>
+      </div>
+      <p className="text-muted-foreground mt-2 text-[11px] text-pretty">
+        {copy.feeRate.replace(
+          "{rate}",
+          usdPerBsv.toLocaleString("en-US", {
+            style: "currency",
+            currency: "USD",
+            maximumFractionDigits: 2,
+          }),
+        )}
+        {" \u00b7 "}
+        {active ? copy.feeApplies : copy.feeIdle}
+      </p>
+    </div>
+  );
+}
+
 export function PrivacyPanel(): ReactNode {
   const copy = content.settings.privacy;
   const settings = useSettings();
@@ -395,6 +458,13 @@ export function PrivacyPanel(): ReactNode {
             { id: "toll", label: copy.reachToll, hint: copy.reachTollHint },
           ]}
         />
+      </Group>
+
+      {/* Above the per-message toll, because it is the number that toll is a
+          departure FROM: this is what everybody pays, and the group below is
+          who pays something else. */}
+      <Group title={copy.feeTitle} hint={copy.feeHint}>
+        <StrangerFee active={effects.reach === "toll"} />
       </Group>
 
       <Group title={copy.tollTitle} hint={copy.tollHint}>

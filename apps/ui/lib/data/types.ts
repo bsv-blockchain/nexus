@@ -1300,6 +1300,15 @@ export interface VaultItem {
 export interface Connection {
   id: string;
   name: string;
+  /**
+   * The shelf it sits on, from the store's own set.
+   *
+   * The same `StoreCategory` the App Store filters by rather than a second
+   * vocabulary: a site you connected and an app you installed are the same kind
+   * of thing seen from two screens, and two lists of categories would disagree
+   * within a week of either being edited.
+   */
+  category: StoreCategory;
   origin: string;
   favicon: string;
   faviconColor: string;

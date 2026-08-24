@@ -1984,6 +1984,16 @@ export const content = {
       reachToll: "Strangers pay a toll",
       reachTollHint: "Open to anyone willing to attach the amount below.",
       reachSaved: "Reachable by",
+      feeTitle: "What a stranger pays",
+      feeHint:
+        "Set in cents and sent in satoshis, converted at the rate when the message is sent — so the price stays a price rather than drifting with the market.",
+      /* The rate is stated, not just used. A number converted by something the
+         reader cannot see is a number they have to take on trust. */
+      feeRate: "at {rate} / BSV, from WhatsOnChain",
+      feeRateStale: "at {rate} / BSV, last known",
+      feeApplies: "In force because strangers pay a toll to reach you.",
+      feeIdle:
+        "Not in force: anyone can reach you for nothing under the setting above.",
       tollTitle: "Message toll",
       tollHint:
         "What a stranger attaches to each message. You keep it whether or not you reply. Same setting as /trolltoll.",

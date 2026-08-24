@@ -8,12 +8,18 @@ import { WALLET_SECTIONS } from "@/components/apps/wallet-app";
 import { WalletColumnHeader } from "@/components/apps/wallet/wallet-column";
 import { Tooltip } from "@/components/hub/tooltip";
 import { Favicon } from "@/components/hub/favicon";
+import {
+  toggleRepoCollapsed,
+  useCollapsedRepos,
+} from "@/lib/collapsed-repos";
+import type { Connection } from "@/lib/data/types";
 import { AppHelpBar } from "@/components/hub/app-help-bar";
 import { useHub, type AppSlug } from "@/components/hub/hub-provider";
 import {
   content,
   getAppOnboarding,
   getConnections,
+  storeCategories,
   getCourses,
   getHubApp,
   getIdentityCertificates,
@@ -33,6 +39,7 @@ import {
   AtSign,
   BadgeCheck,
   Boxes,
+  ChevronDown,
   File,
   FileCheck,
   FileLock2,
@@ -791,6 +798,7 @@ function AppContextFooter({ slug }: { slug: AppSlug }): ReactNode {
 function ConnectSidebar(): ReactNode {
   const { connectSelected, setConnectSelected } = useHub();
   const settings = useSettings();
+  const collapsed = useCollapsedRepos();
   /*
    * Revoked sites leave this list rather than sitting in it greyed out.
    *
@@ -804,67 +812,122 @@ function ConnectSidebar(): ReactNode {
   );
   const activeId = connectSelected ?? connections[0]?.id ?? null;
   const copy = content.connect;
+
+  /*
+   * Grouped onto the store's own shelves.
+   *
+   * A flat list answers "what have I connected" and nothing else. Past a dozen
+   * the question becomes "what have I given the block explorers", which is a
+   * question about kinds — and the kinds already exist, on the App Store's
+   * filter, so this borrows them rather than inventing a second vocabulary that
+   * would drift from the first within a week of either being edited.
+   *
+   * Only shelves with something on them, in the store's own order. An empty
+   * heading is a claim that you might have connected a wallet, which is not
+   * information.
+   */
+  const shelves = storeCategories
+    .map((category) => ({
+      category,
+      rows: connections.filter((conn) => conn.category === category.id),
+    }))
+    .filter((shelf) => shelf.rows.length > 0);
+
+  const disconnect = (conn: Connection): void => {
+    toggleConnection(conn.id);
+    /* Selection would otherwise point at a row that is no longer here, leaving
+       the pane beside it showing a site this list denies. */
+    if (conn.id === activeId) {
+      const next = connections.find((entry) => entry.id !== conn.id);
+      setConnectSelected(next?.id ?? null);
+    }
+    toast.success(conn.name, {
+      description: copy.disconnected,
+      action: {
+        label: content.hub.undo,
+        onClick: () => toggleConnection(conn.id),
+      },
+    });
+  };
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
-      {connections.map((conn) => {
-        const active = conn.id === activeId;
-        const disconnect = (): void => {
-          toggleConnection(conn.id);
-          /* Selection would otherwise point at a row that is no longer here,
-             leaving the pane beside it showing a site this list denies. */
-          if (active) {
-            const next = connections.find((entry) => entry.id !== conn.id);
-            setConnectSelected(next?.id ?? null);
-          }
-          toast.success(conn.name, {
-            description: copy.disconnected,
-            action: {
-              label: content.hub.undo,
-              onClick: () => toggleConnection(conn.id),
-            },
-          });
-        };
+    <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+      {shelves.map(({ category, rows }) => {
+        /* Namespaced into the store the App Store's sections already use, so
+           the two accordions behave identically — same persistence, same
+           "collapsed is what is remembered" rule — and a category here cannot
+           collide with a repository id there. */
+        const key = `conn:${category.id}`;
+        const shut = collapsed.has(key);
         return (
-          /* A row, not a button: the X is its own control, and a button inside a
-             button is neither valid nor clickable. */
-          <div
-            key={conn.id}
-            className={`group relative flex items-center rounded-lg ${
-              active ? "bg-accent/10" : "hover:bg-surface-hover"
-            }`}
-          >
+          <section key={category.id}>
             <button
               type="button"
-              onClick={() => setConnectSelected(conn.id)}
-              aria-current={active ? "true" : undefined}
-              className="focus-ring flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-2 text-left"
+              onClick={() => toggleRepoCollapsed(key)}
+              aria-expanded={!shut}
+              className="focus-ring text-muted-foreground hover:text-foreground flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-[10px] font-bold tracking-wide uppercase"
             >
-              <Favicon
-                url={conn.origin}
-                letter={conn.favicon}
-                color={conn.faviconColor}
-                size={22}
-                rounded="rounded-lg"
+              <ChevronDown
+                className={`size-3 shrink-0 transition-transform ${
+                  shut ? "-rotate-90" : ""
+                }`}
+                aria-hidden="true"
               />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate pr-6 text-sm font-medium">
-                  {conn.name}
-                </span>
-                <span className="block truncate pr-6 text-xs text-muted-foreground">
-                  {conn.origin.replace(/^https?:\/\//, "")}
-                </span>
+              <span className="min-w-0 flex-1 truncate text-left">
+                {category.label}
               </span>
+              <span className="tabular-nums">{rows.length}</span>
             </button>
-            <button
-              type="button"
-              onClick={disconnect}
-              aria-label={`${copy.disconnect} ${conn.name}`}
-              title={copy.disconnect}
-              className="focus-ring absolute right-1.5 rounded p-1 text-muted-foreground opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-surface-hover hover:text-negative"
-            >
-              <X className="size-3.5" aria-hidden="true" />
-            </button>
-          </div>
+            {!shut && (
+              <div className="mt-0.5 flex flex-col gap-0.5">
+                {rows.map((conn) => {
+                  const active = conn.id === activeId;
+                  return (
+                    /* A row, not a button: the X is its own control, and a
+                       button inside a button is neither valid nor clickable. */
+                    <div
+                      key={conn.id}
+                      className={`group relative flex items-center rounded-lg ${
+                        active ? "bg-accent/10" : "hover:bg-surface-hover"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setConnectSelected(conn.id)}
+                        aria-current={active ? "true" : undefined}
+                        className="focus-ring flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-2 text-left"
+                      >
+                        <Favicon
+                          url={conn.origin}
+                          letter={conn.favicon}
+                          color={conn.faviconColor}
+                          size={22}
+                          rounded="rounded-lg"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate pr-6 text-sm font-medium">
+                            {conn.name}
+                          </span>
+                          <span className="text-muted-foreground block truncate pr-6 text-xs">
+                            {conn.origin.replace(/^https?:\/\//, "")}
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => disconnect(conn)}
+                        aria-label={`${copy.disconnect} ${conn.name}`}
+                        title={copy.disconnect}
+                        className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-negative absolute right-1.5 rounded p-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
+                      >
+                        <X className="size-3.5" aria-hidden="true" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         );
       })}
     </div>
