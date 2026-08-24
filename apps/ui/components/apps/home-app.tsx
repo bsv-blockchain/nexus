@@ -344,18 +344,32 @@ function Card({
   title,
   children,
   action,
+  grow = false,
 }: {
   title: string;
   children: ReactNode;
   action?: ReactNode;
+  /**
+   * Take whatever height the column has left.
+   *
+   * For the one card whose content has no natural size. The others are as tall
+   * as what is in them — three tasks is three rows — but a note is as long as
+   * you want it to be, and a fixed five rows is either a scrollbar over two
+   * sentences or a band of empty surface under one.
+   */
+  grow?: boolean;
 }): ReactNode {
   return (
-    <section className="bg-surface rounded-2xl p-4">
+    <section
+      className={`bg-surface rounded-2xl p-4 ${
+        grow ? "flex min-h-40 flex-1 flex-col" : ""
+      }`}
+    >
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">{title}</h2>
         {action}
       </div>
-      <div className="mt-3">{children}</div>
+      <div className={`mt-3 ${grow ? "min-h-0 flex-1" : ""}`}>{children}</div>
     </section>
   );
 }
@@ -440,14 +454,16 @@ function Tasks(): ReactNode {
 function Note(): ReactNode {
   const { note } = useHome();
   return (
-    <Card title={copy.note}>
+    <Card title={copy.note} grow>
       <textarea
         value={note}
         onChange={(event) => setNote(event.target.value)}
         placeholder={copy.notePlaceholder}
         aria-label={copy.note}
-        rows={5}
-        className="placeholder:text-muted-foreground w-full resize-none bg-transparent text-[13px] leading-relaxed outline-none"
+        /* `h-full` rather than a row count, so the field is the card and the
+           card is the space left. `min-h-40` on the card keeps it usable on a
+           short window, where the column scrolls instead. */
+        className="placeholder:text-muted-foreground h-full w-full resize-none bg-transparent text-[13px] leading-relaxed outline-none"
       />
     </Card>
   );
@@ -579,7 +595,7 @@ export function HomeApp(): ReactNode {
         opened from the left column has to appear somewhere, and a third column
         beside these two would leave the photograph a strip.
       */}
-      <aside className="hidden w-80 shrink-0 flex-col gap-2 overflow-y-auto lg:flex">
+      <aside className="hidden min-h-0 w-80 shrink-0 flex-col gap-2 overflow-y-auto lg:flex">
         {detailPane ? (
           <DetailPane />
         ) : (
