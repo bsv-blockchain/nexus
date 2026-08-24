@@ -2293,6 +2293,10 @@ export const content = {
     updateNow: "Update now",
     home: "Home",
     newWorkspace: "New workspace",
+    /* On the tab you are already on, which is the one place a tooltip has
+       something to add: the others say which workspace they are by name and by
+       colour, and this one has to explain why it looks different. */
+    youAreIn: "You are in {name}",
     minimize: "Minimise",
     maximize: "Maximise",
     restore: "Restore",

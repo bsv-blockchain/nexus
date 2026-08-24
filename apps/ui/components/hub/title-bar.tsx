@@ -160,21 +160,39 @@ export function TitleBar(): ReactNode {
       <div className="scrollbar-none flex min-w-0 items-stretch overflow-x-auto">
         {spaces.map((space) => {
           const active = space.id === activeSpaceId;
+          const tab = (
+            <Control
+              onClick={() => setActiveSpaceId(space.id)}
+              aria-current={active ? "page" : undefined}
+              className={`relative flex h-full max-w-48 min-w-0 items-center gap-2 px-3 text-xs font-medium transition-colors ${
+                active
+                  ? "bg-surface-raised text-foreground"
+                  : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+              }`}
+            >
+              <SpaceIcon value={space.emoji} size={14} />
+              <span className="truncate">{space.name}</span>
+              <ThemeUnderline spaceId={space.id} active={active} />
+            </Control>
+          );
           return (
             <div key={space.id} className="flex items-stretch">
-              <Control
-                onClick={() => setActiveSpaceId(space.id)}
-                aria-current={active ? "page" : undefined}
-                className={`relative flex max-w-48 min-w-0 items-center gap-2 px-3 text-xs font-medium transition-colors ${
-                  active
-                    ? "bg-surface-raised text-foreground"
-                    : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
-                }`}
-              >
-                <SpaceIcon value={space.emoji} size={14} />
-                <span className="truncate">{space.name}</span>
-                <ThemeUnderline spaceId={space.id} active={active} />
-              </Control>
+              {/* Only the one you are on. A name that is cut off at 48px is a
+                  name worth spelling out, but on the others the tab is a place
+                  to go and a tooltip would be repeating the label it covers —
+                  here it answers the different question the raised surface
+                  raises, which is why this tab is not like the rest. */}
+              {active ? (
+                <Tooltip
+                  label={copy.youAreIn.replace("{name}", space.name)}
+                  side="bottom"
+                  className="min-w-0"
+                >
+                  {tab}
+                </Tooltip>
+              ) : (
+                tab
+              )}
               <Divider />
             </div>
           );
