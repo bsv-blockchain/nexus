@@ -2314,6 +2314,17 @@ export const content = {
        something to add: the others say which workspace they are by name and by
        colour, and this one has to explain why it looks different. */
     youAreIn: "You are in {name}",
+    /* On the tabs you are not in. "Move to" rather than "Switch to": a
+       workspace is somewhere you are, which is what the tooltip on the active
+       one says, and going to another one is going somewhere. */
+    moveTo: "Move to {name}",
+    /* The three facts that decide whether you want to be there — who you are,
+       what you spend from, and how much is set up. Stated because the strip has
+       room for a name and nothing else. */
+    tabApps: "{n} connected apps",
+    tabOneApp: "1 connected app",
+    tabNoHandle: "No handle",
+    tabNoWallet: "No wallet",
     minimize: "Minimise",
     maximize: "Maximise",
     restore: "Restore",

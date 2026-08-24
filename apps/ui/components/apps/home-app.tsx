@@ -27,6 +27,7 @@
 
 import { useWalletAccountId } from "@/components/apps/wallet/use-wallet-account";
 import { DetailPane } from "@/components/hub/detail-pane";
+import { NexusSyncPitch } from "@/components/hub/nexus-sync-pitch";
 import { useHub } from "@/components/hub/hub-provider";
 import { content, getChatThreads, getUnreadCount } from "@/lib/data";
 import { usd } from "@/lib/wallet";
@@ -73,6 +74,7 @@ import {
 import { useEffect, useState, type ReactNode } from "react";
 
 const copy = content.home;
+const syncCopy = content.timeline.rail.sync;
 
 /** The photograph, and the reason it is this one — see the note at the top. */
 const BACKDROP = "/images/ricardo-gomez-angel-58uZCE8zrdk-unsplash.jpg";
@@ -585,6 +587,11 @@ export function HomeApp(): ReactNode {
             <Tasks />
             <Timer />
             <Note />
+            {/* Last, because it is the only card here that is asking for
+                something rather than holding something of yours. */}
+            <Card title={syncCopy.title}>
+              <NexusSyncPitch />
+            </Card>
           </>
         )}
       </aside>

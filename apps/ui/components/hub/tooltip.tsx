@@ -45,7 +45,16 @@ export function Tooltip({
   side = "top",
   className = "",
 }: {
-  label: string;
+  /**
+   * A word, or a small block of them.
+   *
+   * A node rather than a string because a workspace tab has four facts to state
+   * and they belong on four lines. `whitespace-nowrap` is dropped when it is
+   * not a plain string, since a block that cannot wrap is a block that runs off
+   * the screen — a single-line label still gets it, which is what keeps every
+   * other tooltip in the app the shape it was.
+   */
+  label: ReactNode;
   children: ReactNode;
   side?: "top" | "bottom";
   className?: string;
@@ -127,7 +136,9 @@ export function Tooltip({
                 ? "translate(-50%, -100%)"
                 : "translate(-50%, 0)",
             }}
-            className="bg-foreground text-background pointer-events-none fixed z-100 rounded-md px-2 py-1 text-[11px] font-medium whitespace-nowrap shadow-lg"
+            className={`bg-foreground text-background pointer-events-none fixed z-100 rounded-md px-2 py-1 text-[11px] font-medium shadow-lg ${
+              typeof label === "string" ? "whitespace-nowrap" : "max-w-56"
+            }`}
           >
             {label}
             <span

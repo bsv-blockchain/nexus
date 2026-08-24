@@ -24,7 +24,8 @@
 import { useHub } from "@/components/hub/hub-provider";
 import { useCustomTheme } from "@/components/hub/theme-provider";
 import { homeView } from "@/lib/home-view";
-import { useSettings } from "@/lib/settings-store";
+import { activeHandleFor, useSettings } from "@/lib/settings-store";
+import { activeWalletFor, labelOf, useWallets } from "@/lib/wallets-store";
 import { SpaceIcon } from "@/components/hub/space-icon";
 import { Tooltip } from "@/components/hub/tooltip";
 import { content } from "@/lib/data";
@@ -108,9 +109,12 @@ export function TitleBar(): ReactNode {
     setMainView,
     openProfilesManager,
     isInstalled,
+    installedFor,
   } = useHub();
   const update = useUpdateState();
   const settings = useSettings();
+  /* Subscribed so a wallet switched in another view repaints the strip. */
+  useWallets();
   /* Home is a question, not a destination — see lib/home-view. */
   const home = homeView(
     settings.homescreen,
@@ -169,6 +173,12 @@ export function TitleBar(): ReactNode {
       <div className="scrollbar-none flex min-w-0 items-stretch overflow-x-auto">
         {spaces.map((space) => {
           const active = space.id === activeSpaceId;
+          /* What is over there, for a tab you are not on. Read per workspace
+             rather than for the active one — that was the bug this shape of
+             code caused everywhere else in the app. */
+          const handle = activeHandleFor(space.id);
+          const wallet = activeWalletFor(space.id);
+          const apps = installedFor(space.id).length;
           const tab = (
             <Control
               onClick={() => setActiveSpaceId(space.id)}
@@ -200,7 +210,30 @@ export function TitleBar(): ReactNode {
                   {tab}
                 </Tooltip>
               ) : (
-                tab
+                <Tooltip
+                  label={
+                    <span className="block space-y-0.5">
+                      <span className="block font-semibold">
+                        {copy.moveTo.replace("{name}", space.name)}
+                      </span>
+                      <span className="block opacity-80">
+                        {handle ? `@${handle}` : copy.tabNoHandle}
+                      </span>
+                      <span className="block opacity-80">
+                        {wallet ? labelOf(wallet) : copy.tabNoWallet}
+                      </span>
+                      <span className="block opacity-80">
+                        {apps === 1
+                          ? copy.tabOneApp
+                          : copy.tabApps.replace("{n}", String(apps))}
+                      </span>
+                    </span>
+                  }
+                  side="bottom"
+                  className="min-w-0"
+                >
+                  {tab}
+                </Tooltip>
               )}
               <Divider />
             </div>

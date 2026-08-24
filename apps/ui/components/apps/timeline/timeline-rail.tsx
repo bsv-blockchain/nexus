@@ -14,10 +14,10 @@
 import { MemberAvatar } from "@/components/apps/messages/member-avatar";
 import { ProfileHovercard } from "@/components/apps/messages/profile-hovercard";
 import { Handle } from "@/components/apps/messages/ecosystem-tag";
+import { NexusSyncPitch } from "@/components/hub/nexus-sync-pitch";
 import { content, getMessagePerson } from "@/lib/data";
 import {
   liveRooms,
-  nexusSyncFeatures,
   whoToFollow,
   type LiveRoom,
   type Suggestion,
@@ -26,7 +26,6 @@ import { countLabel } from "@/lib/timeline";
 import {
   expandSection,
   openSearch,
-  openSync,
   toggleFollow,
   useTimeline,
   type TimelineExpansion,
@@ -235,28 +234,10 @@ export function TimelineRail(): ReactNode {
           It had picked up `--accent`, which made it the only panel title in the
           rail shouting — and the one it was shouting over was the live one. */}
       <Panel title={copy.sync.title} icon={CloudSync}>
-        <div className="px-4 pb-4">
-          <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-            {copy.sync.blurb}
-          </p>
-          <ul className="mt-2.5 space-y-1.5">
-            {nexusSyncFeatures.map((feature) => (
-              <li key={feature} className="flex items-start gap-2 text-xs">
-                <Check
-                  className="text-accent mt-0.5 size-3.5 shrink-0"
-                  aria-hidden="true"
-                />
-                <span className="text-muted-foreground">{feature}</span>
-              </li>
-            ))}
-          </ul>
-          <button
-            type="button"
-            onClick={openSync}
-            className="focus-ring bg-accent text-accent-foreground mt-3 w-full rounded-full px-4 py-1.5 text-sm font-semibold transition-opacity hover:opacity-90"
-          >
-            {copy.sync.cta}
-          </button>
+        {/* The argument itself is shared with Focus's column, which shows the
+            same case in its own card — see components/hub/nexus-sync-pitch. */}
+        <div className="px-4 pt-1 pb-4">
+          <NexusSyncPitch />
         </div>
       </Panel>
       <Panel title={copy.onAir.title} icon={Radio}>
