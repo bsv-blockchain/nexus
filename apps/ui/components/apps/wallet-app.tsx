@@ -114,7 +114,12 @@ export function WalletApp(): ReactNode {
      and Activity both read this, and reading the first row meant switching
      wallet changed the switcher and nothing else on the screen. */
   const selectedId = useWalletAccountId();
-  const account = (selectedId ? getWallet(selectedId) : undefined) ?? getWalletAccount();
+  /* `account` is only ever read for its shape — a name and an address to draw.
+     Anything that FILTERS uses `selectedId`, which is empty when the workspace
+     has no wallet and so matches nothing; falling back here and then filtering
+     on `account.id` would have shown Everyday's history under a workspace that
+     has never connected a wallet. */
+  const account = getWallet(selectedId) ?? getWalletAccount();
   const { walletTransactions: fromCommands } = useCommandEffects();
   const copy = content.wallet;
 
@@ -165,11 +170,11 @@ export function WalletApp(): ReactNode {
 
   // Demo: locally-recorded payments in front of the fixture history. Live: the
   // wallet's own ledger, and nothing invented alongside it.
-  const activity = useActivity(getWalletTransactions(account.id));
+  const activity = useActivity(getWalletTransactions(selectedId));
   const transactions =
     activity.mode === "demo"
       ? [
-          ...fromCommands.filter((tx) => tx.accountId === account.id),
+          ...fromCommands.filter((tx) => tx.accountId === selectedId),
           ...activity.transactions,
         ]
       : activity.transactions;

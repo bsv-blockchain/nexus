@@ -399,13 +399,27 @@ export function getTokenBySymbol(symbol: string): Token | undefined {
   const needle = symbol.trim().toLowerCase();
   return tokens.find((t) => t.symbol.toLowerCase() === needle);
 }
-/** What one wallet holds, or the union of all of them when none is named. */
+/**
+ * What one wallet holds, or every wallet's holding of each token summed.
+ *
+ * Summed, not concatenated. Four wallets each holding BSV is four rows in the
+ * table and one asset in the hand, so the unscoped answer has to add them up —
+ * a list with the same token in it four times is not a holding, it is the
+ * table, and every reader of it would have to do this itself. React noticed
+ * first, because four rows keyed by token id are four children with one key.
+ */
 export function getTokenBalances(
   accountId?: string,
 ): { token: Token; units: number }[] {
-  return tokenBalances
-    .filter((row) => accountId === undefined || row.accountId === accountId)
-    .map(({ tokenId, units }) => {
+  const rows = tokenBalances.filter(
+    (row) => accountId === undefined || row.accountId === accountId,
+  );
+  const summed = new Map<string, number>();
+  for (const row of rows) {
+    summed.set(row.tokenId, (summed.get(row.tokenId) ?? 0) + row.units);
+  }
+  return [...summed]
+    .map(([tokenId, units]) => {
       const token = getToken(tokenId);
       return token ? { token, units } : null;
     })

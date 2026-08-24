@@ -17,9 +17,18 @@
 import { useHub } from "@/components/hub/hub-provider";
 import { activeWalletFor, useWallets } from "@/lib/wallets-store";
 
-/** The selected wallet's id, or undefined where the workspace has none. */
-export function useWalletAccountId(): string | undefined {
+/**
+ * The selected wallet's id, or `""` where the workspace has none.
+ *
+ * An empty string rather than `undefined` on purpose. Every section passes this
+ * straight to a `get…(accountId)` accessor, and those read a missing argument as
+ * "no wallet named, so give me everything" — which is right for a share card and
+ * exactly wrong here: a workspace that has not connected a wallet was being
+ * shown the sum of all four. `""` is a real id that nothing equals, so each
+ * section falls to its own empty state, which is the truthful answer.
+ */
+export function useWalletAccountId(): string {
   const { activeSpaceId } = useHub();
   useWallets();
-  return activeWalletFor(activeSpaceId)?.id;
+  return activeWalletFor(activeSpaceId)?.id ?? "";
 }
