@@ -31,6 +31,7 @@ import { useHostOverlay } from "@/lib/wallet-data";
 import { ChevronRight, Search } from "lucide-react";
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -125,7 +126,17 @@ function SearchBar({
      without this the bar opens behind whatever site is loaded. */
   useHostOverlay(true);
 
-  useEffect(() => {
+  /*
+   * Focused before the browser paints, not after.
+   *
+   * `useEffect` runs a frame late, which on a phone is a screen that appears
+   * and then summons a keyboard over itself — the list jumps once, having
+   * already been read. A layout effect is the earliest React will hand this
+   * back. (A real iOS build needs the focus inside the tap handler itself;
+   * Safari ignores programmatic focus outside a gesture, and no amount of
+   * effect ordering gets around that.)
+   */
+  useLayoutEffect(() => {
     field.current?.focus();
   }, []);
 
@@ -171,6 +182,109 @@ function SearchBar({
     onClose();
   }
 
+  const list = (
+    <div
+      role="listbox"
+      aria-label={copy.search}
+      className={
+        isDesktop
+          ? "max-h-80 overflow-y-auto p-1.5"
+          : "min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5"
+      }
+    >
+      {results.length === 0 ? (
+        <p className="text-muted-foreground px-3 py-6 text-center text-xs">
+          {copy.searchEmpty}
+        </p>
+      ) : (
+        results.map((result, position) => (
+          <ResultRow
+            key={
+              result.kind === "category"
+                ? `c:${result.id}`
+                : `s:${result.section.category}:${result.section.title}`
+            }
+            result={result}
+            active={position === clamped}
+            onPick={() => pick(result)}
+          />
+        ))
+      )}
+    </div>
+  );
+
+  const field_ = (
+    <input
+      ref={field}
+      type="search"
+      value={query}
+      onChange={(event) => {
+        setQuery(event.target.value);
+        setIndex(0);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") onClose();
+        if (event.key === "Enter") pick(results[clamped]);
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          setIndex((value) => Math.min(value + 1, results.length - 1));
+        }
+        if (event.key === "ArrowUp") {
+          event.preventDefault();
+          setIndex((value) => Math.max(value - 1, 0));
+        }
+      }}
+      placeholder={copy.searchPlaceholder}
+      aria-label={copy.search}
+      /* A search field, said in the ways a phone keyboard reads: no
+         autocorrect mangling "usdsv", no capital on the first letter, and Go
+         on the return key rather than a newline nothing would do anything
+         with. */
+      enterKeyHint="go"
+      autoCorrect="off"
+      autoCapitalize="none"
+      spellCheck={false}
+      className={`min-w-0 flex-1 bg-transparent outline-none [&::-webkit-search-cancel-button]:hidden ${
+        isDesktop ? "text-sm" : "text-base"
+      }`}
+    />
+  );
+
+  /*
+   * The whole screen on a phone, a card on a desktop.
+   *
+   * Half a phone is about to be keyboard. A centred sheet with a backdrop then
+   * has its results squeezed into the strip between the field and the keys,
+   * and the rounded corners and dimmed edges are decoration around a gap
+   * nothing can use. Full bleed instead, laid out in `dvh` so the list keeps
+   * whatever height the keyboard leaves it, with the results scrolling inside.
+   *
+   * And a Cancel, because with no backdrop there is nothing to tap outside of
+   * and no Escape key to press. A full-screen thing with no way back is a trap
+   * on the one device that cannot reach for a keyboard.
+   */
+  if (!isDesktop) {
+    return (
+      <div className="bg-background fixed inset-0 z-[70] flex h-dvh flex-col">
+        <div className="border-border flex items-center gap-2.5 border-b px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
+          <Search
+            className="text-muted-foreground size-4 shrink-0"
+            aria-hidden="true"
+          />
+          {field_}
+          <button
+            type="button"
+            onClick={onClose}
+            className="focus-ring text-accent shrink-0 rounded-md px-1 text-[15px] font-semibold"
+          >
+            {content.settings.sync.searchCancel}
+          </button>
+        </div>
+        {list}
+      </div>
+    );
+  }
+
   return (
     <div
       className="fixed inset-0 z-[70] flex items-start justify-center bg-black/40 px-4 pt-[12vh]"
@@ -185,52 +299,10 @@ function SearchBar({
             className="text-muted-foreground size-4 shrink-0"
             aria-hidden="true"
           />
-          <input
-            ref={field}
-            type="text"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setIndex(0);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") onClose();
-              if (event.key === "Enter") pick(results[clamped]);
-              if (event.key === "ArrowDown") {
-                event.preventDefault();
-                setIndex((value) => Math.min(value + 1, results.length - 1));
-              }
-              if (event.key === "ArrowUp") {
-                event.preventDefault();
-                setIndex((value) => Math.max(value - 1, 0));
-              }
-            }}
-            placeholder={copy.searchPlaceholder}
-            aria-label={copy.search}
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-          />
+          {field_}
         </div>
 
-        <div role="listbox" aria-label={copy.search} className="max-h-80 overflow-y-auto p-1.5">
-          {results.length === 0 ? (
-            <p className="text-muted-foreground px-3 py-6 text-center text-xs">
-              {copy.searchEmpty}
-            </p>
-          ) : (
-            results.map((result, position) => (
-              <ResultRow
-                key={
-                  result.kind === "category"
-                    ? `c:${result.id}`
-                    : `s:${result.section.category}:${result.section.title}`
-                }
-                result={result}
-                active={position === clamped}
-                onPick={() => pick(result)}
-              />
-            ))
-          )}
-        </div>
+        {list}
 
         <p className="border-border text-muted-foreground border-t px-4 py-2 text-[11px]">
           {copy.searchHint}

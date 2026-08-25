@@ -1981,6 +1981,9 @@ export const content = {
        * linking as the action at the top of it. Telegram's shape, because it
        * is the one people have already learned.
        */
+      /* The way out of a full-screen search on a phone, where there is no
+         backdrop to tap past and no Escape key to reach for. */
+      searchCancel: "Cancel",
       devicesTitle: "Devices",
       devicesHint: "Where you are signed in, and what you can sign out.",
       linkDevice: "Link desktop device",
