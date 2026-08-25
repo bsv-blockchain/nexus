@@ -2,10 +2,81 @@ import { getEcosystem, getToken, type Token } from "@/lib/data";
 import { FLAGS } from "@/components/apps/wallet/flags";
 import type { ReactNode } from "react";
 
+/** The mark of each chain a token can sit on. */
+const CHAIN_ICONS: Record<string, string> = {
+  bsv: "/tokens/bsv.svg",
+  sol: "/chains/sol.svg",
+  eth: "/chains/eth.svg",
+  doge: "/chains/doge.svg",
+};
+
+/**
+ * Below this the badge is noise rather than information.
+ *
+ * A chain badge is two fifths of the mark, so on the 14px marks that sit inline
+ * beside an amount it would be a five-pixel smudge — unreadable, and enough to
+ * make the mark itself look damaged. The list rows that are actually about
+ * choosing between assets draw at 36 and get one.
+ */
+const BADGE_FROM = 24;
+
+/**
+ * Which chain to badge a token with, or null for the ones that are the chain.
+ *
+ * USDsv is dollars *on* BSV and USDC is dollars *on* Solana, and which chain is
+ * the difference between them — so both are badged. Bitcoin is not badged with
+ * bitcoin, and neither is SOL with Solana: a coin that is its own chain has
+ * nothing to disambiguate, and stamping it anyway is a label reading "this is
+ * itself".
+ */
+function chainBadgeFor(token: Token): string | null {
+  const chain = token.chain ?? "bsv";
+  const isTheChain = token.chain ? token.id === token.chain : Boolean(token.base);
+  if (isTheChain) return null;
+  return CHAIN_ICONS[chain] ?? null;
+}
+
+/**
+ * The chain badge, sitting over the mark's bottom-right rather than inside it.
+ *
+ * Superimposed on purpose. ChangeNOW ships USDC-on-Solana as one square image
+ * with the Solana mark in its corner, and a round clip took a bite out of it —
+ * the badge read as a rendering fault rather than as a fact about the coin.
+ * Drawn here instead, over the edge, with a ring of the surrounding surface so
+ * it reads as a separate chip resting on top.
+ */
+function ChainBadge({ icon, size }: { icon: string; size: number }): ReactNode {
+  const badge = Math.round(size * 0.42);
+  return (
+    <span
+      aria-hidden="true"
+      className="bg-background absolute overflow-hidden rounded-full"
+      style={{
+        width: badge,
+        height: badge,
+        right: -Math.round(badge * 0.12),
+        bottom: -Math.round(badge * 0.12),
+        padding: 1,
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={icon}
+        alt=""
+        className="rounded-full"
+        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+      />
+    </span>
+  );
+}
+
 /**
  * A token's mark. Its own icon where it has one, otherwise the issuing
  * ecosystem's — so a NUTRI amount carries the same Mycelia glyph a Mycelia
  * handle does, and provenance is legible without a legend.
+ *
+ * Whatever the mark turns out to be, the chain it lives on is badged over its
+ * corner where there is room — see `chainBadgeFor`.
  */
 export function TokenMark({
   token,
@@ -15,6 +86,31 @@ export function TokenMark({
   token: Token;
   size?: number;
   className?: string;
+}): ReactNode {
+  const badge = size >= BADGE_FROM ? chainBadgeFor(token) : null;
+  const mark = <Mark token={token} size={size} className={className} />;
+  if (!badge) return mark;
+  return (
+    /* The wrapper is the mark's own size and does not clip, so the badge can
+       hang over the edge without widening the row it sits in. */
+    <span
+      className="relative inline-grid shrink-0 place-items-center"
+      style={{ width: size, height: size }}
+    >
+      {mark}
+      <ChainBadge icon={badge} size={size} />
+    </span>
+  );
+}
+
+function Mark({
+  token,
+  size,
+  className,
+}: {
+  token: Token;
+  size: number;
+  className: string;
 }): ReactNode {
   // A pegged stablecoin is recognised by its flag before its ticker, so the
   // flag wins over the generic mark where there is one — the Vela convention.

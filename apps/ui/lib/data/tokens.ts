@@ -148,7 +148,10 @@ export const foreignTokens: Token[] = [
     symbol: "USDC",
     name: "USD Coin (SOL)",
     ecosystem: null,
-    icon: "https://content-api.changenow.io/uploads/usdcsol_9415198300.svg",
+    /* The plain mark, not ChangeNOW's, whose artwork bakes a Solana badge into
+       the bottom-right corner — a round clip then bit a piece out of it. The
+       chain is TokenMark's job now, drawn over the edge instead of inside it. */
+    icon: "/tokens/usdc.svg",
     color: "#2775CA",
     decimals: 6,
     chain: "sol",

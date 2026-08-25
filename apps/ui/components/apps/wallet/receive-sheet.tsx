@@ -227,11 +227,8 @@ export function ReceiveSheet({
                 copy.receiveHintToken
               )
             ) : (
-              <span className="text-negative flex items-start gap-1.5">
-                <TriangleAlert
-                  className="mt-px size-3.5 shrink-0"
-                  aria-hidden="true"
-                />
+              <span className="text-negative flex items-center gap-1.5">
+                <TriangleAlert className="size-3.5 shrink-0" aria-hidden="true" />
                 <span>
                   {coin.symbol} on {coin.networkLabel} only. The same ticker on
                   another network goes to an address nobody holds the key to.
