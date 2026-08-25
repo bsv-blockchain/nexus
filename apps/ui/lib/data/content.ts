@@ -1964,9 +1964,19 @@ export const content = {
       step1: "Open Nexus on your phone",
       step2: "Go to Settings › General › Link desktop device",
       step3: "Point your phone at this screen to confirm",
-      /* The way past the QR for somebody who already has the app open and
-         would rather type a code than hold a phone up to a screen. */
-      hasApp: "I have already downloaded Nexus mobile",
+      /*
+       * The way out for the person the steps do not work for.
+       *
+       * It used to read "I have already downloaded Nexus mobile", which is the
+       * one group of people the three steps above already serve — they have the
+       * app, they can scan. The gap is the other way round: somebody reading
+       * "open Nexus on your phone" who has no Nexus on their phone. So this is
+       * where to go and get one.
+       */
+      hasApp: "I have not yet downloaded Nexus Mobile",
+      /* The mobile client, on the web, so there is something to open before
+         there is anything to install. */
+      getAppUrl: "web.nexus.free",
       /*
        * The phone's half is not a code, it is a register.
        *

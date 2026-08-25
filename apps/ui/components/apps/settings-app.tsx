@@ -677,6 +677,7 @@ export function PrivacyPanel(): ReactNode {
 function SyncPanel(): ReactNode {
   const copy = content.settings.sync;
   const isDesktop = useIsDesktop();
+  const { activeSpaceId, openLinkInBrowser } = useHub();
   if (!isDesktop) return <DevicesPanel />;
   return (
     <section className="border-border bg-surface-raised mb-6 rounded-xl border p-6">
@@ -716,9 +717,14 @@ function SyncPanel(): ReactNode {
           ))}
         </ol>
 
+        {/* Opens in a tab rather than toasting "soon": there is a real place
+            to send somebody who has no phone client yet, and it is the client
+            itself. */}
         <button
           type="button"
-          onClick={soon}
+          onClick={() =>
+            openLinkInBrowser(activeSpaceId, `https://${copy.getAppUrl}`)
+          }
           className="focus-ring text-accent rounded-md px-2 py-1 text-sm font-semibold hover:underline"
         >
           {copy.hasApp}
