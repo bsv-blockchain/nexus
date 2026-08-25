@@ -89,6 +89,7 @@ import {
   Monitor,
   PanelLeftClose,
   ReceiptText,
+  ScanLine,
   Rows3,
   ShieldAlert,
   ShieldCheck,
@@ -654,17 +655,23 @@ export function PrivacyPanel(): ReactNode {
 }
 
 /**
- * Pairing a phone, as a code you point a camera at.
+ * Pairing a phone, from whichever end you are holding.
  *
  * A QR rather than an account form, because there is no account to sign into:
  * pairing here is two devices agreeing to share one identity's keys, and the
  * only secret involved should never be typed into a second screen. The code is
  * decorative in a prototype — same trick the wallet's receive panel uses — but
  * the shape is the real one, so the steps beside it are the actual steps.
+ *
+ * Which is exactly why the phone gets a different half. A code is shown by one
+ * device and read by another; a phone showing one is asking a laptop to hold
+ * itself up to a phone. So on a narrow screen this is a button that opens the
+ * camera, and the steps point at the desktop instead.
  */
-
 function SyncPanel(): ReactNode {
   const copy = content.settings.sync;
+  const isDesktop = useIsDesktop();
+  if (!isDesktop) return <PhoneSyncPanel />;
   return (
     <section className="border-border bg-surface-raised mb-6 rounded-xl border p-6">
       <div className="flex flex-col items-center gap-4">
@@ -709,6 +716,66 @@ function SyncPanel(): ReactNode {
           className="focus-ring text-accent rounded-md px-2 py-1 text-sm font-semibold hover:underline"
         >
           {copy.hasApp}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The other end of the pairing: this phone reading the desktop's code.
+ *
+ * Same card, same three steps, one control instead of a picture — because the
+ * useful thing a phone can do here is open its camera, and the useful thing a
+ * desktop can do is hold still while it is photographed.
+ */
+function PhoneSyncPanel(): ReactNode {
+  const copy = content.settings.sync;
+  return (
+    <section className="border-border bg-surface-raised mb-6 rounded-xl border p-5">
+      <div className="flex flex-col items-center gap-4">
+        <span
+          className="bg-accent/12 text-accent grid size-14 place-items-center rounded-2xl"
+          aria-hidden="true"
+        >
+          <ScanLine className="size-7" />
+        </span>
+
+        <h3 className="text-center text-base font-bold text-pretty">
+          {copy.phoneTitle}
+        </h3>
+
+        <ol className="w-full max-w-xs space-y-2.5">
+          {[copy.phoneStep1, copy.phoneStep2, copy.phoneStep3].map(
+            (step, index) => (
+              <li key={step} className="flex items-start gap-2.5">
+                <span
+                  className="bg-accent text-accent-foreground mt-px grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-bold"
+                  aria-hidden="true"
+                >
+                  {index + 1}
+                </span>
+                <span className="text-sm text-pretty">{step}</span>
+              </li>
+            ),
+          )}
+        </ol>
+
+        <button
+          type="button"
+          onClick={soon}
+          className="focus-ring bg-accent text-accent-foreground w-full max-w-xs rounded-full px-4 py-2.5 text-sm font-bold transition-opacity hover:opacity-90"
+        >
+          {copy.phoneAction}
+        </button>
+        {/* For somebody whose camera is covered, or who is pairing two devices
+            that are not in the same room. */}
+        <button
+          type="button"
+          onClick={soon}
+          className="focus-ring text-accent rounded-md px-2 py-1 text-sm font-semibold hover:underline"
+        >
+          {copy.phoneHasCode}
         </button>
       </div>
     </section>

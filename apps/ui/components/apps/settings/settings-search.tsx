@@ -104,7 +104,15 @@ function ResultRow({
   );
 }
 
-function SearchBar({ onClose }: { onClose: () => void }): ReactNode {
+function SearchBar({
+  onClose,
+  onNavigate,
+  categories,
+}: {
+  onClose: () => void;
+  onNavigate?: (category: SettingsCategory) => void;
+  categories: typeof SETTINGS_CATEGORIES;
+}): ReactNode {
   const copy = content.settings.payments;
   const { setSettingsCategory } = useHub();
   const [query, setQuery] = useState("");
@@ -120,13 +128,13 @@ function SearchBar({ onClose }: { onClose: () => void }): ReactNode {
   }, []);
 
   const results = useMemo<Result[]>(() => {
-    const { categories, sections } = searchSettings(query, [
-      ...SETTINGS_CATEGORIES,
+    const { categories: found, sections } = searchSettings(query, [
+      ...categories,
     ]);
     /* Categories first: a query that names one almost always means "take me
        there", and its sections are then one screen away anyway. */
     return [
-      ...categories.map(
+      ...found.map(
         (entry): Result => ({
           kind: "category",
           id: entry.id,
@@ -136,18 +144,26 @@ function SearchBar({ onClose }: { onClose: () => void }): ReactNode {
       ),
       ...sections.map((section): Result => ({ kind: "section", section })),
     ];
-  }, [query]);
+  }, [query, categories]);
 
   const clamped = Math.min(index, Math.max(0, results.length - 1));
 
+  /*
+   * Two ways to arrive, because there are two settings screens.
+   *
+   * The desktop page reads the category from hub state and swaps its panel.
+   * The phone sheet keeps a category of its own and pushes a screen, since a
+   * drill-down has a back button and hub state has no notion of depth. Both
+   * are told, so a result works the same either way and neither screen needs a
+   * search of its own.
+   */
   function pick(result: Result | undefined): void {
     if (!result) return;
-    if (result.kind === "category") {
-      setSettingsCategory(result.id);
-    } else {
-      setSettingsCategory(result.section.category);
-      goTo(result.section);
-    }
+    const category =
+      result.kind === "category" ? result.id : result.section.category;
+    setSettingsCategory(category);
+    onNavigate?.(category);
+    if (result.kind === "section") goTo(result.section);
     onClose();
   }
 
@@ -231,7 +247,17 @@ function SearchBar({ onClose }: { onClose: () => void }): ReactNode {
  * Bound only while this is mounted, which is only while Settings is open, so
  * ⌘F goes on meaning find-in-page everywhere else.
  */
-export function SettingsSearch(): ReactNode {
+export function SettingsSearch({
+  onNavigate,
+  categories = SETTINGS_CATEGORIES,
+  className,
+}: {
+  /** the phone sheet's way of pushing its own screen; see `pick` */
+  onNavigate?: (category: SettingsCategory) => void;
+  /** narrowed on a phone, which drops Shortcuts */
+  categories?: typeof SETTINGS_CATEGORIES;
+  className?: string;
+} = {}): ReactNode {
   const [open, setOpen] = useState(false);
   const copy = content.settings.payments;
 
@@ -251,15 +277,26 @@ export function SettingsSearch(): ReactNode {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="focus-ring border-border bg-surface hover:bg-surface-hover text-muted-foreground mb-1.5 flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left"
+        className={
+          className ??
+          "focus-ring border-border bg-surface hover:bg-surface-hover text-muted-foreground mb-1.5 flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left"
+        }
       >
         <Search className="size-3.5 shrink-0" aria-hidden="true" />
         <span className="min-w-0 flex-1 truncate text-xs">{copy.search}</span>
-        <kbd className="bg-muted shrink-0 rounded px-1 py-0.5 font-mono text-[10px]">
+        {/* Only where there is a keyboard to press it on. A phone showing a
+            chord badge is advertising a shortcut it cannot accept. */}
+        <kbd className="bg-muted hidden shrink-0 rounded px-1 py-0.5 font-mono text-[10px] md:block">
           ⌘F
         </kbd>
       </button>
-      {open && <SearchBar onClose={() => setOpen(false)} />}
+      {open && (
+        <SearchBar
+          onClose={() => setOpen(false)}
+          {...(onNavigate ? { onNavigate } : {})}
+          categories={categories}
+        />
+      )}
     </>
   );
 }

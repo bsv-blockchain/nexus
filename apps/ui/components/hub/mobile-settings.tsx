@@ -5,9 +5,13 @@ import {
   AppearancePanel,
   BrowsingPanel,
   GeneralPanel,
+  PaymentsPanel,
   PrivacyPanel,
   SETTINGS_CATEGORIES,
 } from "@/components/apps/settings-app";
+import { ProfilesPanel } from "@/components/apps/settings/profiles-panel";
+import { SecurityPanel } from "@/components/apps/settings/security-panel";
+import { WalletSettingsPanel } from "@/components/apps/settings-wallet";
 import { AutofillPanel } from "@/components/apps/settings/autofill-panel";
 import { PermissionsPanel } from "@/components/apps/settings/permissions-panel";
 import { ShortcutsPanel } from "@/components/apps/settings/shortcuts-panel";
@@ -17,6 +21,7 @@ import { LicencePane } from "@/components/hub/licence-pane";
 import { LegalPane } from "@/components/hub/legal-pane";
 import { ReleaseDetail, ReleaseList } from "@/components/hub/release-notes";
 import { RepositoriesButton } from "@/components/hub/repositories-button";
+import { SettingsSearch } from "@/components/apps/settings/settings-search";
 import { ClearDataPane, LanguagesPane } from "@/components/hub/settings-panes";
 import { SiteSettingsPane } from "@/components/hub/site-settings-pane";
 import { content, getDownloads, licence } from "@/lib/data";
@@ -42,8 +47,14 @@ function CategoryPanel({ id }: { id: SettingsCategory }): ReactNode {
   switch (id) {
     case "general":
       return <GeneralPanel />;
+    case "profiles":
+      return <ProfilesPanel />;
+    case "security":
+      return <SecurityPanel />;
     case "privacy":
       return <PrivacyPanel />;
+    case "payments":
+      return <PaymentsPanel />;
     case "permissions":
       return <PermissionsPanel />;
     case "autofill":
@@ -54,10 +65,10 @@ function CategoryPanel({ id }: { id: SettingsCategory }): ReactNode {
       return <ShortcutsPanel />;
     case "appearance":
       return <AppearancePanel />;
+    case "wallet":
+      return <WalletSettingsPanel />;
     case "about":
       return <AboutPanel />;
-    default:
-      return null;
   }
 }
 
@@ -247,6 +258,22 @@ export function MobileSettings({
 }
 
 /**
+ * Categories worth opening on a phone.
+ *
+ * Shortcuts goes: it is twenty-two chord bindings and a control for recording
+ * a new one, and a phone has no ⌘ to hold down. It is not hidden because it is
+ * long — Preferences is longer — but because every row in it describes an
+ * action this device cannot perform.
+ *
+ * Nothing else is dropped. A settings category that exists on one device and
+ * not the other is a thing people have to learn, so the bar for removing one is
+ * that it be inert here rather than merely less useful.
+ */
+const PHONE_CATEGORIES = SETTINGS_CATEGORIES.filter(
+  (entry) => entry.id !== "shortcuts",
+);
+
+/**
  * The list you land on.
  *
  * Two tiles for the things people open settings to look at rather than
@@ -265,6 +292,21 @@ function Root({
   const downloads = getDownloads().length;
   return (
     <div className="space-y-6 pt-1">
+      {/*
+        The same search, told where to push.
+
+        A phone needs it more than a desktop does, not less: the drill-down
+        that makes eleven categories fit is the same drill-down that hides
+        every setting one tap deeper. `onNavigate` is how a result opens the
+        category here rather than only in hub state, which this sheet does not
+        read for its depth.
+      */}
+      <SettingsSearch
+        onNavigate={onOpen}
+        categories={PHONE_CATEGORIES}
+        className="focus-ring border-border bg-surface-raised text-muted-foreground flex w-full items-center gap-2 rounded-2xl border px-4 py-3 text-left"
+      />
+
       <div className="grid grid-cols-2 gap-3">
         <button
           type="button"
@@ -287,7 +329,7 @@ function Root({
       </div>
 
       <div className="border-border divide-border/60 bg-surface-raised divide-y overflow-hidden rounded-2xl border">
-        {SETTINGS_CATEGORIES.map((entry) => (
+        {PHONE_CATEGORIES.map((entry) => (
           <button
             key={entry.id}
             type="button"

@@ -1967,6 +1967,20 @@ export const content = {
       /* The way past the QR for somebody who already has the app open and
          would rather type a code than hold a phone up to a screen. */
       hasApp: "I have already downloaded Nexus mobile",
+      /*
+       * The same pairing, told from the phone's end.
+       *
+       * A QR is a thing one device shows and another reads, so which end you
+       * are on decides which half you get. The desktop displays the code; the
+       * phone is the camera. Showing the phone a code to be scanned asks a
+       * laptop to hold itself up to a phone, which is not a thing laptops do.
+       */
+      phoneTitle: "Sync with Nexus Desktop",
+      phoneAction: "Scan the code on your desktop",
+      phoneStep1: "Open Nexus on your desktop",
+      phoneStep2: "Go to Settings › General",
+      phoneStep3: "Point this phone at the code on that screen",
+      phoneHasCode: "Type a pairing code instead",
     },
     general: {
       title: "General",
