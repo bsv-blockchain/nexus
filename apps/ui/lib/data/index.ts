@@ -19,6 +19,7 @@ import {
   nexusBot,
 } from "./messages";
 import { ecosystems } from "./ecosystems";
+import { linkedDevices } from "./devices";
 import { foreignTokens, tokenBalances, tokens } from "./tokens";
 import { attributeColors, collectibles } from "./collectibles";
 import { paymentLinks, splitBills } from "./wallet-extras";
@@ -42,6 +43,7 @@ import { chainTransactions } from "./transactions";
 import { walletAccounts, walletTransactions } from "./wallet";
 import { DEMO_SURFACES, shippedApps } from "../surfaces";
 import type {
+  LinkedDevice,
   AppCollection,
   BrowserTab,
   ChainTransaction,
@@ -427,6 +429,18 @@ export function getLocalEcosystem(): Ecosystem {
   const local = ecosystems.find((eco) => eco.local);
   if (!local) throw new Error("No local ecosystem in lib/data/ecosystems.ts");
   return local;
+}
+
+/* devices */
+/**
+ * Where this identity is signed in, the current device first.
+ *
+ * Not gated on the empty content mode: a wallet with no money is still signed
+ * in somewhere, and a device list that empties when the fixtures do would be
+ * claiming you had been logged out.
+ */
+export function getLinkedDevices(): LinkedDevice[] {
+  return [...linkedDevices].sort((a, b) => Number(b.current) - Number(a.current));
 }
 
 /* tokens */

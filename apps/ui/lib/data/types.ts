@@ -400,6 +400,30 @@ export interface DownloadItem {
 }
 
 /** table: wallet_accounts */
+/**
+ * A place this identity is signed in.
+ *
+ * @see lib/data/devices.ts
+ */
+export interface LinkedDevice {
+  id: string;
+  /** what the person would call it — the model, or the name they gave it */
+  label: string;
+  /** which build is running there, which is what tells two Macs apart */
+  platform: string;
+  /** roughly where, because "somewhere I have never been" is the whole alarm */
+  place: string;
+  /**
+   * Minutes since it was last used, or null for the device you are holding.
+   *
+   * Minutes rather than a stamp, for the reason `agoLabel` gives in
+   * lib/timeline: a static export has no "now", so a fixture dated last
+   * Tuesday reads as three months stale by the time somebody opens the build.
+   */
+  lastActiveMinutes: number | null;
+  current: boolean;
+}
+
 export interface WalletAccount {
   id: string;
   label: string;

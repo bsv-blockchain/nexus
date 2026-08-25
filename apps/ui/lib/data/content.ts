@@ -1962,25 +1962,42 @@ export const content = {
       title: "Sync Nexus by QR code",
       codeLabel: "Pairing code",
       step1: "Open Nexus on your phone",
-      step2: "Go to Settings › Devices › Add device",
+      step2: "Go to Settings › General › Link desktop device",
       step3: "Point your phone at this screen to confirm",
       /* The way past the QR for somebody who already has the app open and
          would rather type a code than hold a phone up to a screen. */
       hasApp: "I have already downloaded Nexus mobile",
       /*
-       * The same pairing, told from the phone's end.
+       * The phone's half is not a code, it is a register.
        *
-       * A QR is a thing one device shows and another reads, so which end you
-       * are on decides which half you get. The desktop displays the code; the
-       * phone is the camera. Showing the phone a code to be scanned asks a
-       * laptop to hold itself up to a phone, which is not a thing laptops do.
+       * Which device shows the code and which one reads it is decided by which
+       * you are holding — the desktop displays, the phone is the camera. But
+       * "point your camera at a thing" is a step, not a screen, and a phone
+       * whose settings only offer that step has nowhere to answer the question
+       * people actually open this to ask: what is signed in as me, and how do
+       * I stop one of them.
+       *
+       * So the phone gets what every messenger's phone gets: the list, with
+       * linking as the action at the top of it. Telegram's shape, because it
+       * is the one people have already learned.
        */
-      phoneTitle: "Sync with Nexus Desktop",
-      phoneAction: "Scan the code on your desktop",
-      phoneStep1: "Open Nexus on your desktop",
-      phoneStep2: "Go to Settings › General",
-      phoneStep3: "Point this phone at the code on that screen",
-      phoneHasCode: "Type a pairing code instead",
+      devicesTitle: "Devices",
+      devicesHint: "Where you are signed in, and what you can sign out.",
+      linkDevice: "Link desktop device",
+      linkDeviceHint: "Scan the code shown on Nexus for desktop or web.",
+      /* Not "This device": General already has a group by that name, holding
+         the app icon and the keyboard. Two identical headings on one screen is
+         a screen that has to be read twice, and they would also share an
+         anchor, so search could only ever find the first of them. */
+      thisDevice: "Signed in here",
+      otherDevices: "Active sessions",
+      online: "online now",
+      lastActive: "last active",
+      endSession: "Sign out",
+      endSessionDone: "Signed out",
+      endOthers: "Sign out of all other devices",
+      endOthersDone: "Signed out everywhere else",
+      noOthers: "Nothing else is signed in.",
     },
     general: {
       title: "General",

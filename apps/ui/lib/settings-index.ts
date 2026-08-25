@@ -26,6 +26,14 @@ export interface SettingsSection {
   title: string;
   hint?: string;
   /**
+   * Only rendered on a phone, so only searchable there.
+   *
+   * The device list is the phone's half of pairing — the desktop shows a code
+   * instead — and a result that opens a category and then has nothing to scroll
+   * to is a search claiming it found something it did not.
+   */
+  phoneOnly?: boolean;
+  /**
    * Words somebody would type that the heading does not contain.
    *
    * Sections are indexed by their title and hint, which covers most of them —
@@ -50,6 +58,18 @@ const mobile = content.mobileBrowser.settings;
  */
 const BY_CATEGORY: Partial<Record<SettingsCategory, SettingsSection[]>> = {
   general: [
+    {
+      category: "general",
+      title: settings.sync.thisDevice,
+      phoneOnly: true,
+      keywords: ["device", "sync", "linked", "session", "sign out"],
+    },
+    {
+      category: "general",
+      title: settings.sync.otherDevices,
+      phoneOnly: true,
+      keywords: ["device", "session", "sign out", "log out", "linked"],
+    },
     { category: "general", title: mobile.startupTitle },
     { category: "general", title: settings.general.searchTitle },
     { category: "general", title: settings.general.linksTitle },
@@ -234,6 +254,30 @@ export const SETTINGS_SECTIONS: SettingsSection[] = Object.values(
   BY_CATEGORY,
 ).flat();
 
+/*
+ * Two sections with the same heading are one section as far as this file is
+ * concerned.
+ *
+ * The anchor is derived from the words, so a repeated heading means both
+ * results scroll to whichever renders first — and the second is unreachable
+ * without anybody noticing, because it looks findable in the list. It happened
+ * the first time within a day: the device card's "This device" landed in the
+ * same category as General's own "This device", and search offered the same row
+ * twice. Development only, like the missing-section warning it sits beside.
+ */
+if (process.env.NODE_ENV !== "production") {
+  const seen = new Set<string>();
+  for (const section of SETTINGS_SECTIONS) {
+    const key = sectionSlug(section.title);
+    if (seen.has(key)) {
+      console.warn(
+        `Two Settings sections are titled "${section.title}". They share an anchor, so search can only ever reach the first.`,
+      );
+    }
+    seen.add(key);
+  }
+}
+
 /**
  * A heading's anchor id.
  *
@@ -257,6 +301,8 @@ export function sectionIsIndexed(title: string): boolean {
 export function searchSettings(
   query: string,
   categories: { id: SettingsCategory; label: string; hint: string }[],
+  /** false on a phone, which is the only place the device sections render */
+  isDesktop = true,
 ): { categories: typeof categories; sections: SettingsSection[] } {
   const needle = query.trim().toLowerCase();
   if (!needle) return { categories, sections: [] };
@@ -275,6 +321,7 @@ export function searchSettings(
   const matchedSections = SETTINGS_SECTIONS.filter(
     (section) =>
       live.has(section.category) &&
+      !(section.phoneOnly && isDesktop) &&
       (section.title.toLowerCase().includes(needle) ||
         section.hint?.toLowerCase().includes(needle) ||
         section.keywords?.some((word) => word.includes(needle)) ||

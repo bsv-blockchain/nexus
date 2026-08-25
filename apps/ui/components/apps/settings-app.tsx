@@ -21,11 +21,13 @@ import {
   content,
   currentRelease,
   getDownloads,
+  getLinkedDevices,
   getLanguage,
   getSearchEngine,
   licence,
   releases,
   searchEngines,
+  type LinkedDevice,
 } from "@/lib/data";
 import { Sheet } from "@/components/apps/messages/sheet";
 import {
@@ -88,8 +90,11 @@ import {
   Link2Off,
   Monitor,
   PanelLeftClose,
+  Laptop,
+  LogOut,
   ReceiptText,
   ScanLine,
+  Smartphone,
   Rows3,
   ShieldAlert,
   ShieldCheck,
@@ -99,6 +104,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useUsdPerBsv } from "@/lib/exchange-rate";
+import { agoLabel } from "@/lib/timeline";
 import { toast } from "sonner";
 import {
   useEffect,
@@ -671,7 +677,7 @@ export function PrivacyPanel(): ReactNode {
 function SyncPanel(): ReactNode {
   const copy = content.settings.sync;
   const isDesktop = useIsDesktop();
-  if (!isDesktop) return <PhoneSyncPanel />;
+  if (!isDesktop) return <DevicesPanel />;
   return (
     <section className="border-border bg-surface-raised mb-6 rounded-xl border p-6">
       <div className="flex flex-col items-center gap-4">
@@ -723,62 +729,128 @@ function SyncPanel(): ReactNode {
 }
 
 /**
- * The other end of the pairing: this phone reading the desktop's code.
+ * The phone's half of pairing: the register, not the code.
  *
- * Same card, same three steps, one control instead of a picture — because the
- * useful thing a phone can do here is open its camera, and the useful thing a
- * desktop can do is hold still while it is photographed.
+ * Reworked from a card that offered "Scan the code on your desktop", which is
+ * an instruction rather than a screen — it told somebody to go and do a thing
+ * and gave them nowhere to come back to. The question a person opens this to
+ * ask is not "how do I scan" but "what is signed in as me, and how do I stop
+ * one of them", and that has an answer with a shape every messenger already
+ * uses. This is Telegram's: linking at the top, this device below it, then
+ * everything else with a way to end each one.
+ *
+ * The desktop keeps the QR, because a code is displayed by one device and read
+ * by the other and the desktop is the one with a screen to hold still.
  */
-function PhoneSyncPanel(): ReactNode {
+function DevicesPanel(): ReactNode {
   const copy = content.settings.sync;
+  const devices = getLinkedDevices();
+  const here = devices.find((device) => device.current);
+  const others = devices.filter((device) => !device.current);
+
   return (
-    <section className="border-border bg-surface-raised mb-6 rounded-xl border p-5">
-      <div className="flex flex-col items-center gap-4">
+    <section className="mb-6 space-y-3">
+      {/* The action first, and as a whole row rather than a link at the foot
+          of a list: linking a device is what somebody came here to do, and it
+          is the one thing on this screen that adds rather than removes. */}
+      <button
+        type="button"
+        onClick={soon}
+        className="focus-ring border-border bg-surface-raised hover:bg-surface-hover flex w-full items-center gap-3 rounded-xl border p-3 text-left"
+      >
         <span
-          className="bg-accent/12 text-accent grid size-14 place-items-center rounded-2xl"
+          className="bg-accent/12 text-accent grid size-10 shrink-0 place-items-center rounded-xl"
           aria-hidden="true"
         >
-          <ScanLine className="size-7" />
+          <ScanLine className="size-5" />
         </span>
+        <span className="min-w-0 flex-1">
+          <span className="text-accent block text-sm font-bold">
+            {copy.linkDevice}
+          </span>
+          <span className="text-muted-foreground mt-0.5 block text-[11px] text-pretty">
+            {copy.linkDeviceHint}
+          </span>
+        </span>
+      </button>
 
-        <h3 className="text-center text-base font-bold text-pretty">
-          {copy.phoneTitle}
-        </h3>
+      {here && (
+        <Group title={copy.thisDevice}>
+          <DeviceRow device={here} />
+        </Group>
+      )}
 
-        <ol className="w-full max-w-xs space-y-2.5">
-          {[copy.phoneStep1, copy.phoneStep2, copy.phoneStep3].map(
-            (step, index) => (
-              <li key={step} className="flex items-start gap-2.5">
-                <span
-                  className="bg-accent text-accent-foreground mt-px grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-bold"
-                  aria-hidden="true"
-                >
-                  {index + 1}
-                </span>
-                <span className="text-sm text-pretty">{step}</span>
-              </li>
-            ),
-          )}
-        </ol>
-
-        <button
-          type="button"
-          onClick={soon}
-          className="focus-ring bg-accent text-accent-foreground w-full max-w-xs rounded-full px-4 py-2.5 text-sm font-bold transition-opacity hover:opacity-90"
-        >
-          {copy.phoneAction}
-        </button>
-        {/* For somebody whose camera is covered, or who is pairing two devices
-            that are not in the same room. */}
-        <button
-          type="button"
-          onClick={soon}
-          className="focus-ring text-accent rounded-md px-2 py-1 text-sm font-semibold hover:underline"
-        >
-          {copy.phoneHasCode}
-        </button>
-      </div>
+      <Group title={copy.otherDevices}>
+        {others.length === 0 ? (
+          <p className="text-muted-foreground px-3 py-2.5 text-xs">
+            {copy.noOthers}
+          </p>
+        ) : (
+          <>
+            {others.map((device) => (
+              <DeviceRow key={device.id} device={device} />
+            ))}
+            {/* Last, and worded as "all other" every time it is mentioned.
+                This is the button somebody presses when they think they have
+                been compromised, and the one thing they must not fear is that
+                it signs out the device they are pressing it on. */}
+            <button
+              type="button"
+              onClick={() => toast.success(copy.endOthersDone)}
+              className="focus-ring text-negative hover:bg-surface-hover w-full px-3 py-2.5 text-left text-sm font-medium"
+            >
+              {copy.endOthers}
+            </button>
+          </>
+        )}
+      </Group>
     </section>
+  );
+}
+
+/** One signed-in place: what it is, where it is, and when it last spoke. */
+function DeviceRow({ device }: { device: LinkedDevice }): ReactNode {
+  const copy = content.settings.sync;
+  return (
+    <div className="flex items-center gap-3 px-3 py-2.5">
+      <span
+        className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-lg"
+        aria-hidden="true"
+      >
+        {device.platform.toLowerCase().includes("ios") ? (
+          <Smartphone className="size-4" />
+        ) : (
+          <Laptop className="size-4" />
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium">
+          {device.label}
+        </span>
+        <span className="text-muted-foreground mt-0.5 block truncate text-[11px]">
+          {device.platform} · {device.place}
+        </span>
+      </span>
+      {device.lastActiveMinutes === null ? (
+        <span className="text-positive shrink-0 text-[11px] font-medium">
+          {copy.online}
+        </span>
+      ) : (
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="text-muted-foreground text-[11px]">
+            {agoLabel(device.lastActiveMinutes)}
+          </span>
+          <button
+            type="button"
+            onClick={() => toast.success(`${copy.endSessionDone} ${device.label}`)}
+            aria-label={`${copy.endSession} ${device.label}`}
+            className="focus-ring text-muted-foreground hover:text-negative rounded-md p-1"
+          >
+            <LogOut className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -26,6 +26,7 @@ import {
   sectionSlug,
   type SettingsSection,
 } from "@/lib/settings-index";
+import { useIsDesktop } from "@/lib/use-is-desktop";
 import { useHostOverlay } from "@/lib/wallet-data";
 import { ChevronRight, Search } from "lucide-react";
 import {
@@ -117,6 +118,7 @@ function SearchBar({
   const { setSettingsCategory } = useHub();
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
+  const isDesktop = useIsDesktop();
   const field = useRef<HTMLInputElement | null>(null);
 
   /* The browsed page is a native view above this document in both shells, so
@@ -128,9 +130,11 @@ function SearchBar({
   }, []);
 
   const results = useMemo<Result[]>(() => {
-    const { categories: found, sections } = searchSettings(query, [
-      ...categories,
-    ]);
+    const { categories: found, sections } = searchSettings(
+      query,
+      [...categories],
+      isDesktop,
+    );
     /* Categories first: a query that names one almost always means "take me
        there", and its sections are then one screen away anyway. */
     return [
@@ -144,7 +148,7 @@ function SearchBar({
       ),
       ...sections.map((section): Result => ({ kind: "section", section })),
     ];
-  }, [query, categories]);
+  }, [query, categories, isDesktop]);
 
   const clamped = Math.min(index, Math.max(0, results.length - 1));
 
