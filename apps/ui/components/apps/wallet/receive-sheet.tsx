@@ -125,13 +125,17 @@ function SwapIntoBsv({
   onChange: (next: boolean) => void;
 }): ReactNode {
   const priced = bsv ? quote(coin, bsv, 1) : null;
+  /* The box is centred against the pair of lines rather than aligned to the
+     first. It belongs to the whole control — the label and the rate under it
+     are one statement — and sitting it on the top line made it look like it
+     governed the title and not the price. */
   return (
-    <label className="border-border hover:bg-surface-hover flex cursor-pointer items-start gap-3 rounded-xl border p-3">
+    <label className="border-border hover:bg-surface-hover flex cursor-pointer items-center gap-3 rounded-xl border p-3">
       <input
         type="checkbox"
         checked={on}
         onChange={(event) => onChange(event.target.checked)}
-        className="accent-accent mt-0.5 size-4 shrink-0"
+        className="accent-accent size-4 shrink-0"
       />
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-bold">Swap into BSV</span>
