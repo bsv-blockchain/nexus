@@ -1,6 +1,7 @@
 "use client";
 
 import { AppMenu } from "@/components/hub/app-menu";
+import { ReceiveSheet } from "@/components/apps/wallet/receive-sheet";
 import { SwapSheet } from "@/components/apps/wallet/swap-flow";
 import { useWalletAccountId } from "@/components/apps/wallet/use-wallet-account";
 import { getWallet } from "@/lib/wallets-store";
@@ -10,7 +11,6 @@ import {
   WalletTrigger,
 } from "@/components/apps/wallet/wallet-switcher";
 import {
-  ReceiveSheet,
   SendSheet,
 } from "@/components/apps/wallet/wallet-flows";
 import { Collectibles } from "@/components/apps/wallet/collectibles";

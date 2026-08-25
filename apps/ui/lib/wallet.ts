@@ -25,7 +25,26 @@ export interface Holding {
 }
 
 /**
- * Held assets, most valuable first, with BSV always pinned to the top.
+ * Where an asset sits in the list, before value is considered.
+ *
+ * Bitcoin, then the stablecoins issued on it, then everything else. The middle
+ * rank is the point: a dollar or euro balance on BSV is the money you spend,
+ * and sorting it purely by value drops it below whichever speculative holding
+ * happened to run up that week. Two of the three most-used figures in the
+ * wallet would then be somewhere down the page.
+ *
+ * BSV-native only, on `peg` and the absence of a `chain` — USDC on Solana is a
+ * stablecoin and is not one of these. It arrived by swap, it cannot be spent
+ * from here, and it belongs with the rest of what is merely held.
+ */
+function rank(token: Token): number {
+  if (token.base) return 0;
+  if (token.peg && !token.chain) return 1;
+  return 2;
+}
+
+/**
+ * Held assets: bitcoin, then BSV stablecoins, then the rest by value.
  *
  * Fixture-side only — a live wallet's single holding is assembled in
  * wallet-live.ts from the shell's balance. Every price here is a fixture price
@@ -40,8 +59,8 @@ export function holdings(accountId?: string): Holding[] {
       return { token, units, usd: rate === null ? null : units * rate };
     })
     .sort((a, b) => {
-      if (a.token.base !== b.token.base) return a.token.base ? -1 : 1;
-      return (b.usd ?? 0) - (a.usd ?? 0);
+      const byRank = rank(a.token) - rank(b.token);
+      return byRank === 0 ? (b.usd ?? 0) - (a.usd ?? 0) : byRank;
     });
 }
 

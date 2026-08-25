@@ -127,6 +127,15 @@ export function CoinPicker({
 }): ReactNode {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+
+  /* Cleared each time it opens. A search left over from the last visit means
+     the list opens filtered to a word nobody typed just now, which reads as a
+     wallet that has lost most of its assets. */
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
+    if (open) setQuery("");
+  }
   const box = useRef<HTMLDivElement | null>(null);
   const field = useRef<HTMLInputElement | null>(null);
   const current = coins.find((coin) => coin.id === selected) ?? coins[0];

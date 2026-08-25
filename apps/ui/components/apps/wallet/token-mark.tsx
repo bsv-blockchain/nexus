@@ -92,11 +92,21 @@ export function TokenMark({
   );
 }
 
-/** Trim trailing zeros without losing meaningful precision. */
+/**
+ * Trim trailing zeros without losing meaningful precision.
+ *
+ * Capped at eight places whatever the chain says. Ether carries eighteen, and
+ * honouring that turns a swap quote into `0.002656345993589744 ETH` — every
+ * digit true, and the number as a whole unreadable. Eight is where bitcoin
+ * stops, it is past the point anybody reads, and the digits below it are not a
+ * quantity a person is deciding anything with.
+ */
+const MAX_PLACES = 8;
+
 export function formatUnits(units: number, decimals: number): string {
   return units.toLocaleString("en-US", {
     minimumFractionDigits: 0,
-    maximumFractionDigits: decimals,
+    maximumFractionDigits: Math.min(decimals, MAX_PLACES),
   });
 }
 

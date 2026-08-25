@@ -15,6 +15,7 @@
  */
 
 import { useHub } from "@/components/hub/hub-provider";
+import type { WalletAccount } from "@/lib/data";
 import { activeWalletFor, useWallets } from "@/lib/wallets-store";
 
 /**
@@ -31,4 +32,18 @@ export function useWalletAccountId(): string {
   const { activeSpaceId } = useHub();
   useWallets();
   return activeWalletFor(activeSpaceId)?.id ?? "";
+}
+
+/**
+ * The selected wallet itself, where a caller needs more than its id.
+ *
+ * The receive and swap screens need its identifier, because that is what stands
+ * in for the seed the chain addresses are derived from — see lib/chain-address.
+ * Undefined where the workspace has no wallet, which those screens read as
+ * "nothing to show an address for".
+ */
+export function useWalletAccount(): WalletAccount | undefined {
+  const { activeSpaceId } = useHub();
+  useWallets();
+  return activeWalletFor(activeSpaceId);
 }

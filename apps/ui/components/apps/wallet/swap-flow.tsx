@@ -22,11 +22,13 @@
 import { formatUnits } from "@/components/apps/wallet/token-mark";
 import { CoinMark, CoinPicker } from "@/components/apps/wallet/coin-picker";
 import { Sheet } from "@/components/apps/messages/sheet";
-import { useWalletAccountId } from "@/components/apps/wallet/use-wallet-account";
+import { useWalletAccount } from "@/components/apps/wallet/use-wallet-account";
 import { content } from "@/lib/data";
 import { useMinute } from "@/lib/clock";
 import {
   depositAddress,
+  ownAddress,
+  SWAP_FEE,
   quote,
   routeFor,
   swapId,
@@ -43,6 +45,7 @@ import {
   ExternalLink,
   RefreshCcw,
   ShieldCheck,
+  Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useState, type ReactNode } from "react";
@@ -308,8 +311,9 @@ function Choose({
           </p>
         ) : (
           <p className="text-muted-foreground text-xs">
-            {PROVIDER.name} quotes this pair when your deposit lands. What you
-            see before then is an estimate.
+            {PROVIDER.name} quotes this pair when your deposit lands, with the{" "}
+            {(SWAP_FEE * 100).toFixed(2)}% Nexus fee in the rate. What you see
+            before then is an estimate.
           </p>
         )}
       </div>
@@ -323,6 +327,16 @@ function Choose({
                 1 {from.symbol} = {formatUnits(priced.rate, to.decimals)}{" "}
                 {to.symbol}
               </dd>
+            </div>
+          )}
+          {/* In the rate, not beside it — so the figure under You get is the
+              figure that arrives and there is no second number to reconcile
+              afterwards. Said out loud all the same: a fee folded into a rate
+              and never mentioned is a fee nobody agreed to. */}
+          {priced && priced.fee > 0 && (
+            <div className="flex justify-between gap-3">
+              <dt className="text-muted-foreground">Nexus fee</dt>
+              <dd>{(priced.fee * 100).toFixed(2)}%, included in the rate</dd>
             </div>
           )}
           <div className="flex justify-between gap-3">
@@ -349,6 +363,60 @@ function Choose({
 }
 
 /**
+ * An address that is already filled in, and can be changed anyway.
+ *
+ * Prefilled with this wallet's own key on that chain, and it says so, because
+ * a long string that appeared by itself in a field about where your money goes
+ * is exactly the thing somebody should not have to take on trust. Typing over
+ * it is allowed — paying out somewhere else is a real thing to want — and a
+ * "use mine" appears the moment it stops matching.
+ */
+function AddressField({
+  label,
+  value,
+  mine,
+  note,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  mine: string;
+  note: string;
+  onChange: (next: string) => void;
+}): ReactNode {
+  const isMine = value === mine;
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-muted-foreground flex items-baseline justify-between gap-2 text-[11px] font-bold tracking-wide uppercase">
+        {label}
+        {!isMine && mine && (
+          <button
+            type="button"
+            onClick={() => onChange(mine)}
+            className="focus-ring text-accent rounded px-1 normal-case"
+          >
+            Use mine
+          </button>
+        )}
+      </span>
+      <input
+        type="text"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        spellCheck={false}
+        className="focus-ring border-border bg-surface w-full rounded-xl border px-3 py-2.5 font-mono text-xs outline-none"
+      />
+      {isMine && (
+        <span className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
+          <Wallet className="size-3" aria-hidden="true" />
+          {note}
+        </span>
+      )}
+    </label>
+  );
+}
+
+/**
  * Step 2 — where it lands, and where it comes back to if it does not.
  *
  * The refund address is the field people skip, so it is a field rather than a
@@ -361,6 +429,7 @@ function Details({
   units,
   destination,
   refund,
+  mine,
   onDestination,
   onRefund,
   onBack,
@@ -370,6 +439,8 @@ function Details({
   units: number;
   destination: string;
   refund: string;
+  /** this wallet's own addresses on each side, for the "yours" note */
+  mine: { destination: string; refund: string };
   onDestination: (value: string) => void;
   onRefund: (value: string) => void;
   onBack: () => void;
@@ -385,33 +456,21 @@ function Details({
         <Leg label="You get" coin={to} units={priced?.units ?? null} />
       </div>
 
-      <label className="block space-y-1.5">
-        <span className="text-muted-foreground text-[11px] font-bold tracking-wide uppercase">
-          {to.symbol} destination · {to.networkLabel}
-        </span>
-        <input
-          type="text"
-          value={destination}
-          onChange={(event) => onDestination(event.target.value)}
-          placeholder={`Your ${to.symbol} address`}
-          spellCheck={false}
-          className="focus-ring border-border bg-surface w-full rounded-xl border px-3 py-2.5 font-mono text-xs outline-none"
-        />
-      </label>
+      <AddressField
+        label={`${to.symbol} destination · ${to.networkLabel}`}
+        value={destination}
+        mine={mine.destination}
+        onChange={onDestination}
+        note={`Your ${to.networkLabel} address in this wallet.`}
+      />
 
-      <label className="block space-y-1.5">
-        <span className="text-muted-foreground text-[11px] font-bold tracking-wide uppercase">
-          Refund address · {from.networkLabel}
-        </span>
-        <input
-          type="text"
-          value={refund}
-          onChange={(event) => onRefund(event.target.value)}
-          placeholder={`Where ${from.symbol} comes back to`}
-          spellCheck={false}
-          className="focus-ring border-border bg-surface w-full rounded-xl border px-3 py-2.5 font-mono text-xs outline-none"
-        />
-      </label>
+      <AddressField
+        label={`Refund address · ${from.networkLabel}`}
+        value={refund}
+        mine={mine.refund}
+        onChange={onRefund}
+        note={`Your ${from.networkLabel} address in this wallet.`}
+      />
 
       <div className="border-border space-y-2 border-t pt-3">
         <Note icon={<ShieldCheck className="size-3.5" />}>
@@ -419,8 +478,10 @@ function Details({
           coin, or the right coin on the wrong chain, cannot be recovered.
         </Note>
         <Note icon={<CircleAlert className="size-3.5" />}>
-          If the swap fails, {from.symbol} goes back to the refund address. Leave
-          it empty and there is nowhere to send it.
+          If the swap fails, {from.symbol} goes back to the refund address.
+          Change it and it is the new one that has to be able to receive
+          {" "}
+          {from.symbol}.
         </Note>
         <Note icon={<ExternalLink className="size-3.5" />}>
           Swapped by {PROVIDER.name}. Rates, limits and custody during the swap
@@ -616,11 +677,22 @@ export function SwapSheet({
   }) => void;
 }): ReactNode {
   const copy = content.wallet;
-  const coins = useSwapCoins(useWalletAccountId());
+  const account = useWalletAccount();
+  const coins = useSwapCoins(account?.id);
   const [fromId, setFromId] = useState("bsv");
   const [toId, setToId] = useState("eursv");
   const [amount, setAmount] = useState("");
   const [step, setStep] = useState<Step>(0);
+  /*
+   * Empty means "use mine".
+   *
+   * This wallet holds a key on every chain it supports, so it already knows
+   * where a swap into ether should land and where a failed one comes back to.
+   * Asking somebody to paste in an address the app can derive is asking them to
+   * retype their own wallet, and it is the step at which a swap goes to the
+   * wrong place. Still editable, because paying out to somewhere else is a real
+   * thing to want.
+   */
   const [destination, setDestination] = useState("");
   const [refund, setRefund] = useState("");
   const [createdAt, setCreatedAt] = useState(0);
@@ -649,6 +721,9 @@ export function SwapSheet({
   const units = Number(amount);
   const route = from && to ? routeFor(from, to) : "wallet";
   const id = from && to ? swapId(from, to, amount) : "";
+  const seed = account?.identifier ?? "";
+  const myDestination = to ? ownAddress(seed, to.network) : "";
+  const myRefund = from ? ownAddress(seed, from.network) : "";
 
   /*
    * You cannot spend what you do not hold — on the route this wallet settles.
@@ -694,7 +769,10 @@ export function SwapSheet({
     step === 0 || step === 1 ? (
       <button
         type="button"
-        disabled={!canAdvance || (step === 1 && !destination.trim())}
+        disabled={
+          !canAdvance ||
+          (step === 1 && !(destination || myDestination).trim())
+        }
         onClick={advance}
         className="focus-ring bg-accent text-accent-foreground w-full rounded-full px-4 py-2.5 text-sm font-bold transition-opacity hover:opacity-90 disabled:opacity-40"
       >
@@ -733,8 +811,9 @@ export function SwapSheet({
             from={from}
             to={to}
             units={units}
-            destination={destination}
-            refund={refund}
+            destination={destination || myDestination}
+            refund={refund || myRefund}
+            mine={{ destination: myDestination, refund: myRefund }}
             onDestination={setDestination}
             onRefund={setRefund}
             onBack={() => setStep(0)}
@@ -746,7 +825,7 @@ export function SwapSheet({
             from={from}
             to={to}
             units={units}
-            destination={destination}
+            destination={destination || myDestination}
             id={id}
             createdAt={createdAt}
             onSend={() => setStep(3)}

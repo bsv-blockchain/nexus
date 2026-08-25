@@ -431,6 +431,17 @@ export function getLocalEcosystem(): Ecosystem {
 
 /* tokens */
 /**
+ * The assets this wallet supports on chains that are not BSV.
+ *
+ * Exported rather than hidden behind a getter because it is a catalogue, not a
+ * holding — what the wallet can hold, whether or not it does. `getTokenBalances`
+ * is the one that answers what is actually there, and it is gated on the empty
+ * content mode; this is not, because a wallet with no money still supports
+ * ether.
+ */
+export { foreignTokens } from "./tokens";
+
+/**
  * The tokens this wallet can act on: issue, request, gate, split.
  *
  * BSV-native only. A coin that arrived by swap sits on somebody else's chain,

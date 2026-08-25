@@ -20,7 +20,8 @@
  * @see components/apps/wallet/swap-flow.tsx for the screens
  */
 
-import { getEcosystem, getToken, getTokens } from "@/lib/data";
+import { chainAddress } from "@/lib/chain-address";
+import { foreignTokens, getEcosystem, getTokens } from "@/lib/data";
 import type { Token } from "@/lib/data";
 import { networkLabel, useSwapAssets, type SwapAsset } from "@/lib/swap-assets";
 import { holdings, usdPerUnitOf } from "@/lib/wallet";
@@ -116,15 +117,19 @@ export function useSwapCoins(accountId?: string): SwapCoin[] {
     holdings(accountId).map(({ token, units }) => [token.id, units]),
   );
 
-  /* Every BSV-native token, held or not: you can swap into a token you have
-     never owned, which is rather the point of a swap. Held foreign coins too,
-     because they are the only way to swap back out. */
-  const ours: SwapCoin[] = [
-    ...getTokens(),
-    ...[...held.keys()]
-      .map((id) => getToken(id))
-      .filter((token): token is Token => Boolean(token?.chain)),
-  ].map((token) => fromToken(token, held.get(token.id) ?? 0));
+  /*
+   * Every asset this wallet supports, held or not.
+   *
+   * Not just what is in the balance table: a wallet you can only swap *out* of
+   * is not a wallet, and support for an asset is a property of the wallet
+   * rather than of your current holding. It is also what keeps a pair priced
+   * the same in every wallet — when ETH was only known if you held some, the
+   * same BSV→ETH swap showed a rate under Work and "quoted at deposit" under
+   * Everyday, which is the app disagreeing with itself about the market.
+   */
+  const ours: SwapCoin[] = [...getTokens(), ...foreignTokens].map((token) =>
+    fromToken(token, held.get(token.id) ?? 0),
+  );
 
   const mine = new Set(ours.map((coin) => `${coin.network}:${coin.symbol}`));
   const theirs = assets
@@ -150,22 +155,52 @@ export function routeFor(from: SwapCoin, to: SwapCoin): SwapRoute {
 }
 
 /**
- * What you get for what you put in.
+ * What Nexus takes, on the swaps it is doing work for.
  *
- * Two assets we can both price is real arithmetic and reads as a rate. Anything
- * involving a coin the fixtures cannot price returns null, and the screen says
- * the provider quotes at deposit — which is true of a real cross-chain swap
- * anyway, where the number shown before you send is an estimate and the number
- * you get is whatever the market did in between.
+ * Charged on anything that is not two BSV instruments trading against each
+ * other. Inside the BSV chain this wallet writes the transaction itself and
+ * there is nothing to mark up — a fee there would be a charge for reading our
+ * own ledger. Once a swap leaves the chain there is routing, a counterparty,
+ * and a quote somebody has to stand behind, and that is what this pays for.
+ */
+export const SWAP_FEE = 0.0218;
+
+export interface Quote {
+  /** the rate you actually get, fee already in it */
+  rate: number;
+  /** what lands, at that rate */
+  units: number;
+  /** the rate before the fee, for anyone who wants to see the difference */
+  mid: number;
+  /** the fee as a fraction, 0 on the in-wallet route */
+  fee: number;
+}
+
+/**
+ * What you get for what you put in, fee included.
+ *
+ * Built into the rate rather than added beside it, which is how every wallet
+ * that does this quotes it: the figure under "You get" is then the figure that
+ * arrives, and there is no second number to reconcile after the fact. The
+ * screens say the rate includes it, and `mid` is here for the ones that want to
+ * show what it would have been.
+ *
+ * Two assets we can both price is real arithmetic. Anything involving a coin
+ * the fixtures cannot price returns null, and the screen says the provider
+ * quotes at deposit — which is true of a real cross-chain swap anyway, where
+ * the number shown before you send is an estimate and the number you get is
+ * whatever the market did in between.
  */
 export function quote(
   from: SwapCoin,
   to: SwapCoin,
   units: number,
-): { rate: number; units: number } | null {
+): Quote | null {
   if (!from.usdPerUnit || !to.usdPerUnit) return null;
-  const rate = from.usdPerUnit / to.usdPerUnit;
-  return { rate, units: units * rate };
+  const mid = from.usdPerUnit / to.usdPerUnit;
+  const fee = routeFor(from, to) === "provider" ? SWAP_FEE : 0;
+  const rate = mid * (1 - fee);
+  return { rate, units: units * rate, mid, fee };
 }
 
 /**
@@ -187,33 +222,25 @@ export function swapId(from: SwapCoin, to: SwapCoin, amount: string): string {
 }
 
 /**
- * A plausible deposit address on the coin's own chain.
+ * The provider's one-off deposit address for a swap.
  *
- * Shaped per chain because the shape is the check — somebody about to send ETH
- * looks for `0x`, and an address that looked like a bitcoin one would be the
- * single most alarming thing on the screen.
+ * Theirs, not ours — this is where you send the coin so they can send back the
+ * other one, and it exists for this swap only. Seeded on the swap id so it is
+ * stable while the order is open and different for the next one.
  */
 export function depositAddress(coin: SwapCoin, id: string): string {
-  const body = `${id}${coin.symbol}`.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const filler = (length: number): string =>
-    body.repeat(Math.ceil(length / body.length)).slice(0, length);
-  switch (coin.network) {
-    case "eth":
-    case "bsc":
-    case "base":
-    case "arbitrum":
-    case "matic":
-    case "op":
-      return `0x${filler(40)}`;
-    case "sol":
-      return filler(44);
-    case "btc":
-      return `bc1q${filler(38)}`;
-    case "bsv":
-      return `1${filler(33)}`;
-    default:
-      return filler(34);
-  }
+  return chainAddress(`deposit:${id}`, coin.network);
+}
+
+/**
+ * This wallet's own address on a coin's chain.
+ *
+ * What a destination field should already contain: you are swapping into ether
+ * so it can land in your wallet, and making you paste in an address you own is
+ * making you retype something the app knows.
+ */
+export function ownAddress(accountIdentifier: string, network: string): string {
+  return chainAddress(accountIdentifier, network);
 }
 
 /** How long the provider holds the quote. Their number, not ours. */

@@ -8,18 +8,15 @@ import { TokenMark, formatUnits } from "@/components/apps/wallet/token-mark";
 import { VerifiedHandle } from "@/components/apps/wallet/wallet-views";
 import {
   content,
-  getCurrentMessageUser,
   getToken,
   getTokens,
-  getWalletAccount,
   getWalletContacts,
   type MessagePerson,
   type Token,
 } from "@/lib/data";
 import { handleOf } from "@/lib/messages";
 import { holdingOf, usd } from "@/lib/wallet";
-import { Copy, Search } from "lucide-react";
-import { toast } from "sonner";
+import { Search } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 /** Token picker row list, shared by send and exchange. */
@@ -223,81 +220,6 @@ export function SendSheet({
               </ul>
             </>
           )}
-        </div>
-      </div>
-    </Sheet>
-  );
-}
-
-/** Receive: an address and a shareable link, per asset. */
-export function ReceiveSheet({
-  open,
-  tokenId,
-  onClose,
-}: {
-  open: boolean;
-  tokenId: string;
-  onClose: () => void;
-}): ReactNode {
-  const copy = content.wallet;
-  const [asset, setAsset] = useState(tokenId);
-  const token = getToken(asset);
-  const account = getWalletAccount();
-  // Read from the signed-in identity rather than repeating the literal, so the
-  // handle shown here cannot drift from the one used in Messages.
-  const myHandle = handleOf(getCurrentMessageUser());
-
-  return (
-    <Sheet open={open} onClose={onClose} label={copy.receive}>
-      <div className="space-y-4 p-5">
-        <h2 className="text-lg font-bold">{copy.receive}</h2>
-        <TokenPicker selected={asset} onSelect={setAsset} label={copy.asset} />
-
-        {/* Stand-in for a QR: a deterministic block grid, not a real code. */}
-        <div className="flex justify-center py-2">
-          <div
-            className="bg-surface grid size-40 grid-cols-11 gap-px rounded-xl p-2"
-            role="img"
-            aria-label={copy.qrLabel}
-          >
-            {Array.from({ length: 121 }, (_, i) => {
-              const on =
-                (i * 7 + (i % 11) * 3 + account.address.charCodeAt(i % 20)) %
-                  3 <
-                1;
-              return (
-                <span
-                  key={i}
-                  className={on ? "bg-foreground" : "bg-transparent"}
-                />
-              );
-            })}
-          </div>
-        </div>
-
-        <div>
-          <p className="text-muted-foreground mb-1.5 text-[11px] font-bold tracking-wide uppercase">
-            {copy.yourHandle}
-          </p>
-          <div className="border-border flex items-center gap-2 rounded-xl border px-3 py-2.5">
-            <code className="min-w-0 flex-1 truncate font-mono text-sm">
-              {myHandle}
-            </code>
-            <button
-              type="button"
-              onClick={() => {
-                void navigator.clipboard?.writeText(myHandle);
-                toast.success(copy.copied);
-              }}
-              aria-label={copy.copyHandle}
-              className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground shrink-0 rounded p-1"
-            >
-              <Copy className="size-4" aria-hidden="true" />
-            </button>
-          </div>
-          <p className="text-muted-foreground mt-1.5 text-xs text-pretty">
-            {token?.base ? copy.receiveHintBsv : copy.receiveHintToken}
-          </p>
         </div>
       </div>
     </Sheet>
