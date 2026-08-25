@@ -318,7 +318,7 @@ export const proposals: Proposal[] = [
     id: "prop-split-view",
     title: "Add split view for browsing two tabs side by side",
     summary:
-      "Let a Space show two tabs at once in a resizable split, so you can read docs and build in Nexus at the same time.",
+      "Let a workspace show two tabs at once in a resizable split, so you can read docs and build in Nexus at the same time.",
     status: "open",
     votesFor: 1_842,
     votesAgainst: 214,
@@ -327,9 +327,9 @@ export const proposals: Proposal[] = [
   },
   {
     id: "prop-sync",
-    title: "End-to-end encrypted sync of Spaces across devices",
+    title: "End-to-end encrypted sync of workspaces across devices",
     summary:
-      "Sync your Spaces, tabs and favorites between desktop and mobile, encrypted with your identity key so only you can read them.",
+      "Sync your workspaces, tabs and favorites between desktop and mobile, encrypted with your identity key so only you can read them.",
     status: "open",
     votesFor: 2_461,
     votesAgainst: 138,
@@ -382,9 +382,9 @@ export const proposals: Proposal[] = [
   },
   {
     id: "prop-theme",
-    title: "Ship per-Space theme colors",
+    title: "Ship per-workspace theme colours",
     summary:
-      "Rebrand vote concluded. Spaces can now carry their own accent color, shipped in v1.0.",
+      "Rebrand vote concluded. Workspaces can now carry their own accent colour, shipped in v1.0.",
     status: "closed",
     votesFor: 2_105,
     votesAgainst: 240,

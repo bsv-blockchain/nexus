@@ -13,7 +13,10 @@ export const content = {
   },
   library: {
     spaces: {
-      title: "Spaces",
+      /* The key stays `spaces` — it is read in a dozen places and renaming it
+         buys nothing — but what a person sees is Workspaces, which is what
+         they are called everywhere else in the app. */
+      title: "Workspaces",
       newTab: "New Tab",
       clear: "Clear",
       /* Screen-reader names for the horizontal strip. The visible row is
@@ -1779,10 +1782,16 @@ export const content = {
     copied: "Copied!",
   },
   gettingStarted: {
-    headingLine1: "Let's settle in!",
-    headingLine2: "Here are the basics.",
-    learnShortcuts: "Learn Essential Shortcuts",
-    helpResources: "Help & Resources",
+    /*
+     * Two lines because the layout gives it two, and the second one has to earn
+     * its break. "Here are the basics" described the page rather than saying
+     * anything — this says what the four steps are actually for, which is the
+     * shortest useful thing a first screen can do.
+     */
+    headingLine1: "Welcome to Nexus.",
+    headingLine2: "Four things worth knowing.",
+    learnShortcuts: "Essential shortcuts",
+    helpResources: "Help & resources",
     helpUrl: "https://bsvassociation.org/education/blockchain-101/",
     steps: [
       /*
@@ -1795,32 +1804,46 @@ export const content = {
        */
       {
         icon: "LayoutGrid",
-        title: "Add apps to your Nexus",
-        body: "Open the Apps tab to connect a wallet, publisher or explorer. Connected apps live in your sidebar rail.",
+        title: "Put the apps you use on the rail",
+        body: "Open Apps to find a wallet, a publisher, an explorer. Anything you add gets an icon on the left, and the icon opens the site.",
       },
       {
+        /*
+         * Rewritten twice over. It said "Group your tabs and folders into
+         * Spaces" — folders are not a thing here, and tabs are the least of
+         * what a workspace holds. What actually changes when you switch one is
+         * the whole context: the rail, the wallet paying, the handle you are
+         * wearing, the colour of the window. That is the idea worth teaching
+         * on a first screen, and it is why the split is not just tidiness.
+         */
         icon: "Layers",
-        title: "Organize with Spaces",
-        body: "Group your tabs and folders into Spaces for work, life or a project, then switch between them in a click.",
+        title: "Keep separate lives separate",
+        body: "A workspace carries its own apps, wallet, handle and colour. Switch workspace and all four change together, so work and home never share a key or a history.",
       },
       {
         icon: "Globe",
-        title: "Browse the BSV web",
-        body: "Type a URL or search from the address bar. Your tabs, favorites and history stay tucked in the sidebar.",
+        title: "Browse with a wallet already in it",
+        body: "Type an address or a search. Sites that speak to the wallet ask before they take anything — a payment or a signature is a prompt you can refuse.",
       },
       {
         icon: "Wallet",
-        title: "Make your first payment",
-        body: "Open Payments from the rail to send BSV, check your balance and browse your full transaction history.",
+        title: "Send your first payment",
+        body: "Payments holds your balance, your history and your handle. Anyone can pay that handle, and nothing leaves without you saying so.",
       },
     ],
     shortcutsTitle: "Essential shortcuts",
     shortcutsPlaceholder: "Keyboard shortcuts",
+    /* Four, and every one of them is bound in this build — Settings has the
+       full table, and a welcome screen that taught a chord nothing answers to
+       would be the first thing it got wrong. */
     shortcuts: [
-      { keys: "⌘ T", label: "Search or open a new tab" },
-      { keys: "⌘ \\", label: "Toggle the sidebar" },
+      { keys: "⌘ T", label: "Search your tabs, or open a new one" },
+      { keys: "⌘ \\", label: "Show or hide the side panel" },
       { keys: "Esc", label: "Close menus and overlays" },
-      { keys: "Drag", label: "Drop a tab onto Favorites to pin it" },
+      /* Not a chord, and kept for that reason: the one thing on this list
+         somebody would never guess. Dropping a tab on Favorites is how you pin
+         a site, and nothing on screen says so. */
+      { keys: "Drag", label: "Drop a tab on Favorites to pin it" },
     ],
   },
   mobile: {

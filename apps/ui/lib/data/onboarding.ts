@@ -387,7 +387,7 @@ export const appOnboarding: AppOnboarding[] = [
     features: [
       {
         id: "spaces",
-        title: "Spaces keep contexts apart",
+        title: "Workspaces keep contexts apart",
         summary: "Each workspace has its own tabs, theme and identity.",
         body: "Work and personal browsing do not share a key, a history or a look. Switching workspace switches all three at once, so there is no state left behind to leak between them.",
       },
