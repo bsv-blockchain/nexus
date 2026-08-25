@@ -102,8 +102,24 @@ function Header({ slug }: { slug: AppSlug }): ReactNode {
     setMessagesUnreadOnly,
     openNewConversation,
     toggleRail,
+    spaces,
+    activeSpaceId,
   } = useHub();
   if (!app) return null;
+
+  /*
+   * The Vault says whose it is; the other apps do not need to.
+   *
+   * Every app in this column is scoped to the workspace, but for most of them
+   * that is obvious from what is in the list — these are your messages, these
+   * are the sites you connected. A vault is a closed door with a count beside
+   * it, and the one thing you want to know before opening it is which one it
+   * is. Naming it here is cheaper than opening it to find out.
+   */
+  const space =
+    slug === "vault"
+      ? spaces.find((entry) => entry.id === activeSpaceId)
+      : undefined;
   return (
     <div className="flex items-center gap-2 px-1.5 pt-0.5 pb-3">
       {/* Closing the pane belongs beside what the pane is called, rather than
@@ -123,6 +139,11 @@ function Header({ slug }: { slug: AppSlug }): ReactNode {
       {/* No app tile: the rail already shows which app is open, in the same
           mark, a few pixels to the left. Twice is not clearer. */}
       <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">
+        {space && (
+          <span className="text-muted-foreground font-normal">
+            {space.name}{" "}
+          </span>
+        )}
         <AppName app={app} />
       </h2>
       {slug === "messages" && (
@@ -273,9 +294,9 @@ const VAULT_KINDS: { id: string; label: string; icon: LucideIcon }[] = [
 ];
 
 function VaultSidebar(): ReactNode {
-  const { vaultKind, setVaultKind } = useHub();
+  const { vaultKind, setVaultKind, activeSpaceId } = useHub();
   const { phase } = useVault();
-  const items = getVaultItems();
+  const items = getVaultItems(activeSpaceId);
 
   /*
    * A shut vault has no contents to filter.

@@ -1346,6 +1346,15 @@ export interface MarketListing {
 /** table: vault_items — encrypted items in the vault app */
 export interface VaultItem {
   id: string;
+  /**
+   * The workspace whose vault this is in.
+   *
+   * A vault holds seeds, keys and papers, which are the most workspace-shaped
+   * things a person owns — the whole argument for separating work from home is
+   * that they do not share a key. The column header names the workspace, and
+   * that name has to be true of what is under it.
+   */
+  spaceId: string;
   label: string;
   kind: "seed-backup" | "key" | "credential" | "file";
   lastAccessedAt: string;

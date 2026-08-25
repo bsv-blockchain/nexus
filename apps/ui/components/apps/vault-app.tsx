@@ -38,9 +38,9 @@ function formatDate(iso: string): string {
 }
 
 export function VaultApp(): ReactNode {
-  const { vaultKind, activeApp } = useHub();
+  const { vaultKind, activeApp, activeSpaceId } = useHub();
   const { phase, policy } = useVault();
-  const items = getVaultItems().filter(
+  const items = getVaultItems(activeSpaceId).filter(
     (item) => vaultKind === "all" || item.kind === vaultKind,
   );
   const copy = content.vault;

@@ -278,9 +278,19 @@ export const marketListings: MarketListing[] = [
   },
 ];
 
+/*
+ * What each workspace keeps locked up.
+ *
+ * Split rather than shared: the personal one holds the seed, the identity key
+ * and the will; work holds the credential it was issued. Uneven on purpose —
+ * a personal vault accumulates a life and a work one accumulates a job, and
+ * two evenly stocked vaults would be a fixture pretending to be symmetrical
+ * about something that is not.
+ */
 export const vaultItems: VaultItem[] = [
   {
     id: "vault-seed",
+    spaceId: "space-my-hub",
     label: "Main wallet seed backup",
     kind: "seed-backup",
     lastAccessedAt: "2026-06-01T10:00:00.000Z",
@@ -289,6 +299,7 @@ export const vaultItems: VaultItem[] = [
   },
   {
     id: "vault-identity",
+    spaceId: "space-my-hub",
     label: "Identity key (encrypted)",
     kind: "key",
     lastAccessedAt: "2026-07-01T17:20:00.000Z",
@@ -297,6 +308,7 @@ export const vaultItems: VaultItem[] = [
   },
   {
     id: "vault-exchange",
+    spaceId: "space-work",
     label: "Exchange API credential",
     kind: "credential",
     lastAccessedAt: "2026-06-24T19:40:00.000Z",
@@ -305,6 +317,7 @@ export const vaultItems: VaultItem[] = [
   },
   {
     id: "vault-will",
+    spaceId: "space-my-hub",
     label: "estate-plan.pdf",
     kind: "file",
     lastAccessedAt: "2026-05-15T11:00:00.000Z",

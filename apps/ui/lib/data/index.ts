@@ -717,9 +717,19 @@ export function getMarketListings(): MarketListing[] {
 }
 
 /* vault */
-export function getVaultItems(): VaultItem[] {
+/**
+ * What one workspace keeps locked up, or everything when none is named.
+ *
+ * Scoped, because the column header names the workspace and a header that
+ * names one vault over another's contents is worse than no header at all. A
+ * workspace made after this fixture was written has an empty vault, which is
+ * the honest answer — nothing has been put in it yet.
+ */
+export function getVaultItems(spaceId?: string): VaultItem[] {
   if (isEmptyContent()) return [];
-  return [...vaultItems].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return vaultItems
+    .filter((item) => spaceId === undefined || item.spaceId === spaceId)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
 /* vote */
