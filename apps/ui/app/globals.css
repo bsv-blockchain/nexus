@@ -849,3 +849,33 @@ html[data-platform="win32"] {
     100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 0.5rem
   );
 }
+
+/*
+ * The section search just took you to.
+ *
+ * A page of six near-identical cards answers "here it is" badly on its own —
+ * scrolling to something is not the same as pointing at it. A ring that fades
+ * says which one without moving anything, and it is gone before it becomes
+ * decoration. Removed by the caller after 1.6s; see settings-search.tsx.
+ */
+@keyframes settings-found {
+  from {
+    box-shadow: 0 0 0 3px var(--color-accent);
+  }
+  to {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+
+.settings-found > div {
+  border-radius: var(--radius-xl);
+  animation: settings-found 1600ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Still marked, just not animated into place. */
+  .settings-found > div {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--color-accent);
+  }
+}

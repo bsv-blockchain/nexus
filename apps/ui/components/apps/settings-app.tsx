@@ -47,6 +47,7 @@ import { resetFirstRun } from "@/lib/first-run";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { startTour } from "@/lib/tour-store";
 import { AutofillPanel } from "@/components/apps/settings/autofill-panel";
+import { SettingsSearch } from "@/components/apps/settings/settings-search";
 import { UpdatePanel } from "@/components/apps/settings/update-panel";
 import { PermissionsPanel } from "@/components/apps/settings/permissions-panel";
 import { ProfilesPanel } from "@/components/apps/settings/profiles-panel";
@@ -72,6 +73,7 @@ import {
   type BrandMode,
 } from "@/lib/brand";
 import {
+  ArrowLeftRight,
   Check,
   ChevronRight,
   Columns3,
@@ -194,6 +196,16 @@ const ALL_SETTINGS_CATEGORIES: {
     icon: Monitor,
   },
   {
+    /* Under Preferences rather than beside Privacy, though it borrows from
+       both. Privacy is who can reach you; Permissions is what a site may do;
+       this is what happens to money either way, and it is the one somebody
+       comes looking for by name. */
+    id: "payments",
+    label: content.settings.payments.title,
+    hint: content.settings.payments.hint,
+    icon: ArrowLeftRight,
+  },
+  {
     id: "about",
     label: content.settings.about.title,
     hint: content.settings.about.hint,
@@ -223,6 +235,7 @@ const DEMO_CATEGORY_IDS: ReadonlySet<SettingsCategory> = new Set([
   "browsing",
   "shortcuts",
   "appearance",
+  "payments",
   "about",
 ]);
 const LIVE_CATEGORY_IDS: ReadonlySet<SettingsCategory> = new Set([
@@ -342,6 +355,12 @@ export function SettingsSidebar(): ReactNode {
         <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">
           {content.settings.title}
         </h2>
+      </div>
+      {/* Above the list rather than filtering it. Settings is eleven
+          categories deep and the one thing somebody hunting a setting does not
+          know is which of them it is under. */}
+      <div className="px-1.5">
+        <SettingsSearch />
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
         {SETTINGS_CATEGORIES.map((category) => {
@@ -1660,6 +1679,90 @@ function SettingsFooter(): ReactNode {
  * the hub uses, so the rail's gear lands somewhere that already feels like the
  * rest of the product.
  */
+/**
+ * Payments: what arrives, what leaves, and what happens without asking.
+ *
+ * Two halves, because money moves both ways and the decisions are unrelated.
+ * Receiving is about coins that turn up in something other than bitcoin.
+ * Spending is the pair that used to sit at the bottom of Permissions — which
+ * is the page about whether a site may spend at all, a different question from
+ * how much and whether you get asked. Permissions keeps the grant and points
+ * here.
+ */
+export function PaymentsPanel(): ReactNode {
+  const copy = content.settings.payments;
+  const settings = useSettings();
+  const { setSettingsCategory } = useHub();
+
+  return (
+    <>
+      <Group title={copy.receivingTitle} hint={copy.receivingHint}>
+        <Toggle
+          label={copy.autoSwap}
+          hint={copy.autoSwapHint}
+          value={settings.autoSwapToBsv}
+          onChange={(next) => setSetting("autoSwapToBsv", next)}
+        />
+        {/* Said here because a global switch reads as absolute. It sets the
+            box in Get paid; it does not weld it. */}
+        <p className="text-muted-foreground px-3 py-2.5 text-[11px] text-pretty">
+          {copy.autoSwapPerPayment}
+        </p>
+      </Group>
+
+      <Group title={copy.spendingTitle} hint={copy.spendingHint}>
+        {/* First, because it decides whether the cap under it is ever read
+            aloud: with this on, a paying action inside the cap happens without
+            a prompt. */}
+        <Toggle
+          label={copy.oneClick}
+          hint={copy.oneClickHint}
+          value={settings.oneClickPay}
+          onChange={(next) => setSetting("oneClickPay", next)}
+        />
+        <div className="px-3 py-2.5">
+          <p className="text-sm font-medium">{copy.spendCap}</p>
+          <p className="text-muted-foreground mt-0.5 text-[11px] text-pretty">
+            {copy.spendCapHint}
+          </p>
+          <div className="mt-2">
+            <SatsAmount
+              label={copy.spendCap}
+              value={settings.spendCapSats}
+              presets={SPEND_CAPS}
+              offLabel={copy.capAsk}
+              onPick={(next) => setSetting("spendCapSats", next)}
+            />
+          </div>
+        </div>
+        {/* The other half of the same decision, kept where it belongs. A cap
+            means nothing until a site is allowed to spend, so the way to that
+            answer is on the screen that states the cap. */}
+        <button
+          type="button"
+          onClick={() => setSettingsCategory("permissions")}
+          className="focus-ring hover:bg-surface-hover flex w-full items-center gap-3 px-3 py-2.5 text-left"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium">{copy.grantsLink}</span>
+            <span className="text-muted-foreground mt-0.5 block text-[11px]">
+              {copy.grantsHint}
+            </span>
+          </span>
+          <ChevronRight
+            className="text-muted-foreground size-4 shrink-0"
+            aria-hidden="true"
+          />
+        </button>
+      </Group>
+    </>
+  );
+}
+
+/* Shortcuts either side of what a small purchase costs; the field takes the
+   rest. Zero means every payment asks, which is why it reads as "Ask". */
+const SPEND_CAPS = [21_800, 218_000];
+
 export function SettingsApp(): ReactNode {
   const { settingsCategory: requestedCategory } = useHub();
   const settingsCategory = resolveCategory(requestedCategory);
@@ -1708,6 +1811,7 @@ export function SettingsApp(): ReactNode {
         {settingsCategory === "profiles" && <ProfilesPanel />}
         {settingsCategory === "security" && <SecurityPanel />}
         {settingsCategory === "privacy" && <PrivacyPanel />}
+        {settingsCategory === "payments" && <PaymentsPanel />}
         {settingsCategory === "permissions" && <PermissionsPanel />}
         {settingsCategory === "autofill" && <AutofillPanel />}
         {settingsCategory === "browsing" && <BrowsingPanel />}

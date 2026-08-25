@@ -103,6 +103,7 @@ export type SettingsCategory =
   | "profiles"
   | "security"
   | "privacy"
+  | "payments"
   | "permissions"
   | "autofill"
   | "browsing"

@@ -9,6 +9,7 @@
  */
 
 import { Pencil } from "lucide-react";
+import { sectionIsIndexed, sectionSlug } from "@/lib/settings-index";
 import type { ReactNode } from "react";
 
 export function Group({
@@ -23,9 +24,25 @@ export function Group({
   /** a `data-tour` handle, for the sections the Guided Tour points at */
   tour?: string;
 }): ReactNode {
+  /*
+   * A section search can find and land on.
+   *
+   * The id is the heading's own words, so there is no second identifier to keep
+   * in step — see lib/settings-index. The warning is the price of a static
+   * index: a group added without an entry there is a group nobody can search
+   * for, which is the kind of gap that is invisible until somebody gives up
+   * looking. Development only; a shipped build says nothing.
+   */
+  if (process.env.NODE_ENV !== "production" && !sectionIsIndexed(title)) {
+    console.warn(
+      `Settings section "${title}" is not in lib/settings-index.ts, so search cannot find it.`,
+    );
+  }
+
   return (
     <section
-      className="mt-6 first:mt-0"
+      id={sectionSlug(title)}
+      className="mt-6 scroll-mt-6 first:mt-0"
       {...(tour ? { "data-tour": tour } : {})}
     >
       <h3 className="text-sm font-bold">{title}</h3>

@@ -2065,6 +2065,40 @@ export const content = {
       revoke: "Withdraw access",
       restore: "Restore access",
     },
+    payments: {
+      title: "Payments",
+      hint: "What arrives, what leaves, and what happens without asking.",
+      receivingTitle: "Receiving",
+      receivingHint:
+        "What to do with money that turns up in something other than bitcoin.",
+      autoSwap: "Auto-swap into BSV when receiving payments",
+      autoSwapHint:
+        "Anything paid to you in another coin is converted as it lands. Cross-chain swaps carry a 2.18% fee in the rate; two BSV instruments do not.",
+      autoSwapStanding: "On by default from Settings → Payments.",
+      autoSwapPerPayment:
+        "Get paid still lets you keep a single payment in the coin it was sent in.",
+      spendingTitle: "Spending",
+      spendingHint:
+        "How much a page can spend on your behalf, and whether it has to ask first.",
+      /* Moved here from Permissions, where they sat under the per-site grid.
+         Which sites may spend is a permission; how much and whether you are
+         asked is a decision about your money, and it belongs with the money. */
+      oneClick: "One-click pay",
+      oneClickHint:
+        "Skip the confirm step for paying actions like likes and branches. The cap below still applies.",
+      spendCap: "Most a page may spend without asking again",
+      spendCapHint:
+        "Only applies once you have allowed a page to spend. Set it to nothing and every payment asks.",
+      capAsk: "Ask",
+      grantsLink: "Which sites may spend at all →",
+      grantsHint: "Set per site in Permissions.",
+      search: "Search settings",
+      searchPlaceholder: "Search settings",
+      searchEmpty: "Nothing in Settings matches that.",
+      searchCategories: "Categories",
+      searchSections: "Sections",
+      searchHint: "Type to find a category or a section inside one.",
+    },
     permissions: {
       title: "Permissions",
       hint: "What pages and apps are allowed to do.",
@@ -2076,12 +2110,14 @@ export const content = {
       capAsk: "Ask",
       capAllow: "Allow",
       capBlock: "Block",
-      oneClick: "One-click pay",
-      oneClickHint:
-        "Skip the confirm step for paying actions like likes and branches. The cap below still applies.",
-      spendCap: "Most a page may spend without asking again",
-      spendCapHint:
-        "Only applies once you have allowed a page to spend. Set it to nothing and every payment asks.",
+      /* The two controls that used to sit under this grid now live in Payments.
+         This page answers "may this site", and those answer "how much, and do
+         I get asked" — the same question the pay sheet asks, so they belong
+         together rather than at the bottom of a permissions list. */
+      spendingMoved: "How much, and whether you are asked",
+      spendingMovedHint:
+        "One-click pay and the spending cap are in Payments.",
+      spendingMovedLink: "Open Payments →",
       exceptionsTitle: "Sites you have answered for",
       exceptionsHint: "These override the defaults above.",
       exceptionsNone: "Nothing overridden.",

@@ -171,6 +171,17 @@ export interface SettingsState {
    *
    * Only in force while `reach` is `toll`; see PrivacyPanel.
    */
+  /**
+   * Convert anything paid to you into bitcoin as it lands.
+   *
+   * Off by default, because the honest default is that you keep what somebody
+   * chose to send you. On, it is the standing answer rather than the only one:
+   * Get paid shows the box already ticked and says this setting did it, and a
+   * single payment can still be kept in the coin it came in. A global that
+   * could not be overridden per payment would be a trip to Settings and back
+   * every time somebody wanted one exception.
+   */
+  autoSwapToBsv: boolean;
   strangerFeeCents: number;
   /**
    * Whether a metanet-enabled site gets your wallet without being asked.
@@ -339,6 +350,7 @@ const INITIAL: SettingsState = {
   /* A cent. Small enough that nobody with something to say is stopped by it,
      and large enough that sending a hundred thousand of them costs real money,
      which is the entire mechanism. */
+  autoSwapToBsv: false,
   strangerFeeCents: 1,
   // See the field above for why the default is the permissive one.
   autoConnectSites: "auto",

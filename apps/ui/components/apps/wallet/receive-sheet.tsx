@@ -23,6 +23,7 @@ import { useWalletAccount } from "@/components/apps/wallet/use-wallet-account";
 import { formatUnits } from "@/components/apps/wallet/token-mark";
 import { getCurrentMessageUser, content } from "@/lib/data";
 import { handleOf } from "@/lib/messages";
+import { useSettings } from "@/lib/settings-store";
 import { chainMemo, memoLabelFor } from "@/lib/chain-address";
 import {
   BSV_NETWORK,
@@ -117,11 +118,14 @@ function SwapIntoBsv({
   coin,
   bsv,
   on,
+  standing,
   onChange,
 }: {
   coin: SwapCoin;
   bsv: SwapCoin | undefined;
   on: boolean;
+  /** the Settings switch is on, so this box arrived ticked rather than chosen */
+  standing: boolean;
   onChange: (next: boolean) => void;
 }): ReactNode {
   const priced = bsv ? quote(coin, bsv, 1) : null;
@@ -151,6 +155,14 @@ function SwapIntoBsv({
             <>Converted at the rate when it lands.</>
           )}
         </span>
+        {/* Where the tick came from, when it was not this person who put it
+            there. A box that is already on and does not say why reads as a
+            default somebody chose for you and hid. */}
+        {standing && on && (
+          <span className="text-muted-foreground mt-0.5 block text-[11px]">
+            {content.settings.payments.autoSwapStanding}
+          </span>
+        )}
       </span>
     </label>
   );
@@ -166,10 +178,19 @@ export function ReceiveSheet({
   onClose: () => void;
 }): ReactNode {
   const copy = content.wallet;
+  const settings = useSettings();
   const account = useWalletAccount();
   const coins = useSwapCoins(account?.id);
   const [assetId, setAssetId] = useState(tokenId);
-  const [swapIn, setSwapIn] = useState(false);
+  /*
+   * Null means "whatever Settings says".
+   *
+   * Kept as three states rather than two so the box can follow the standing
+   * answer without forgetting that this person has overruled it for this
+   * payment. A plain boolean seeded from the setting would either ignore a
+   * later change to it or throw away the override, and both are wrong.
+   */
+  const [swapChoice, setSwapChoice] = useState<boolean | null>(null);
   const myHandle = handleOf(getCurrentMessageUser());
 
   /* Follows the asset the caller opened on — Get paid from a token's own page
@@ -178,7 +199,7 @@ export function ReceiveSheet({
   if (wasToken !== tokenId) {
     setWasToken(tokenId);
     setAssetId(tokenId);
-    setSwapIn(false);
+    setSwapChoice(null);
   }
 
   const coin = coins.find((entry) => entry.id === assetId) ?? coins[0];
@@ -207,9 +228,10 @@ export function ReceiveSheet({
           selected={coin.id}
           onSelect={(next) => {
             setAssetId(next);
-            /* Cleared on every change. A tick carried over from the last asset
-               is a conversion nobody asked for on a coin they just chose. */
-            setSwapIn(false);
+            /* Back to the standing answer on every change. An override
+               carried over from the last asset is a decision about a coin
+               somebody has just stopped looking at. */
+            setSwapChoice(null);
           }}
           label={copy.asset}
         />
@@ -252,8 +274,9 @@ export function ReceiveSheet({
           <SwapIntoBsv
             coin={coin}
             bsv={bsv}
-            on={swapIn}
-            onChange={setSwapIn}
+            on={swapChoice ?? settings.autoSwapToBsv}
+            standing={swapChoice === null && settings.autoSwapToBsv}
+            onChange={setSwapChoice}
           />
         )}
       </div>
