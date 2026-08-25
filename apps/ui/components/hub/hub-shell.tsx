@@ -2,6 +2,10 @@
 
 import { FirstRun } from "@/components/hub/first-run";
 import {
+  hydrateGrantedConnections,
+  useGrantedConnections,
+} from "@/lib/connections-store";
+import {
   getContentMode,
   getContentModeServerSnapshot,
   hydrateContentMode,
@@ -262,6 +266,11 @@ export function HubShell(): ReactNode {
     getContentModeServerSnapshot,
   );
   useEffect(hydrateContentMode, []);
+  /* Same reason, same shape: granted connections are read during render and the
+     server has no storage to read them from. */
+  const granted = useGrantedConnections();
+  void granted;
+  useEffect(hydrateGrantedConnections, []);
 
   return (
     <HubProvider>

@@ -1,6 +1,7 @@
 "use client";
 
 import { toggleConnection, useSettings } from "@/lib/settings-store";
+import { useGrantedConnections } from "@/lib/connections-store";
 import { Favicon } from "@/components/hub/favicon";
 import { useHub } from "@/components/hub/hub-provider";
 import { content, getConnections } from "@/lib/data";
@@ -18,7 +19,8 @@ function formatDate(iso: string): string {
 
 export function ConnectApp(): ReactNode {
   const { connectSelected } = useHub();
-  const connections = getConnections();
+  /* Seeded and granted alike; see the note in ConnectSidebar. */
+  const connections = [...getConnections(), ...useGrantedConnections()];
   const copy = content.connect;
   const settings = useSettings();
   /*

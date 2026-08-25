@@ -15,12 +15,13 @@
  * thing about what any of these mean.
  */
 
-import { Group, Row, Toggle } from "@/components/apps/settings/blocks";
+import { Choice, Group, Row, Toggle } from "@/components/apps/settings/blocks";
 import { JumpingDots } from "@/components/hub/jumping-dots";
 import { QrBlock } from "@/components/hub/qr-block";
 import { AppTile } from "@/components/hub/app-icon";
 import { useHub } from "@/components/hub/hub-provider";
 import { content, getHubApp } from "@/lib/data";
+import { setSetting, useSettings } from "@/lib/settings-store";
 import {
   ALL_APPS,
   addKey,
@@ -55,6 +56,10 @@ export function SecurityPanel(): ReactNode {
       <KeysGroup />
       <OtpGroup />
       <PhonesGroup />
+      {/* Above the lock, because it is the broader question: this decides what
+          a site is given without being asked, and the group below decides which
+          apps skip the asking on the way in. */}
+      <AutoConnectGroup />
       <ExemptGroup />
     </>
   );
@@ -389,6 +394,40 @@ function PhonesGroup(): ReactNode {
           />
         )}
       </AnimatePresence>
+    </Group>
+  );
+}
+
+/* -------------------------------------------------------- auto connect ---- */
+
+/**
+ * Whether a metanet site is handed the wallet, or has to ask.
+ *
+ * Two answers rather than a switch, because "off" would be the wrong word for
+ * the manual side: nothing is being turned off, the asking is being turned on.
+ * Named rows say what each one does; a toggle would leave the reader to work
+ * out what its unlabelled half means.
+ */
+function AutoConnectGroup(): ReactNode {
+  const settings = useSettings();
+  return (
+    <Group title={copy.autoConnectTitle} hint={copy.autoConnectHint}>
+      <Choice<"auto" | "manual">
+        value={settings.autoConnectSites}
+        onPick={(next) => setSetting("autoConnectSites", next)}
+        options={[
+          {
+            id: "auto",
+            label: copy.autoConnectAuto,
+            hint: copy.autoConnectAutoHint,
+          },
+          {
+            id: "manual",
+            label: copy.autoConnectManual,
+            hint: copy.autoConnectManualHint,
+          },
+        ]}
+      />
     </Group>
   );
 }

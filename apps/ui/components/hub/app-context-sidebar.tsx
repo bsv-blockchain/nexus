@@ -8,6 +8,7 @@ import { WALLET_SECTIONS } from "@/components/apps/wallet-app";
 import { WalletColumnHeader } from "@/components/apps/wallet/wallet-column";
 import { Tooltip } from "@/components/hub/tooltip";
 import { Favicon } from "@/components/hub/favicon";
+import { useGrantedConnections } from "@/lib/connections-store";
 import {
   toggleRepoCollapsed,
   useCollapsedRepos,
@@ -807,7 +808,10 @@ function ConnectSidebar(): ReactNode {
    * carries an Undo for the moment right after. This list answers "who can reach
    * my wallet", and a row that cannot is a different question.
    */
-  const connections = getConnections().filter(
+  /* The seeded three plus anything this session has granted — a site opened
+     while auto-connect was on, or an app put on the rail. One list, because
+     from here they are the same fact: something that can reach the wallet. */
+  const connections = [...getConnections(), ...useGrantedConnections()].filter(
     (conn) => !settings.revokedConnections.includes(conn.id),
   );
   const activeId = connectSelected ?? connections[0]?.id ?? null;

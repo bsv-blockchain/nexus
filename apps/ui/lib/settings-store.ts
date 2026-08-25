@@ -172,6 +172,19 @@ export interface SettingsState {
    * Only in force while `reach` is `toll`; see PrivacyPanel.
    */
   strangerFeeCents: number;
+  /**
+   * Whether a metanet-enabled site gets your wallet without being asked.
+   *
+   * Auto by default. A site that speaks BRC-100 is asking for the identity
+   * handshake, and answering it by hand every time is a dialog people learn to
+   * dismiss rather than read — which is worse than no dialog, because it trains
+   * the reflex that the spending prompts then have to fight.
+   *
+   * It grants identity only. Spending is asked for every time whatever this
+   * says, because a preference switch must not be able to hand out money
+   * quietly. See lib/connections-store.
+   */
+  autoConnectSites: "auto" | "manual";
 
   /* ---- Autofill ------------------------------------------------------- */
   autofillAddresses: boolean;
@@ -327,6 +340,8 @@ const INITIAL: SettingsState = {
      and large enough that sending a hundred thousand of them costs real money,
      which is the entire mechanism. */
   strangerFeeCents: 1,
+  // See the field above for why the default is the permissive one.
+  autoConnectSites: "auto",
 
   autofillAddresses: true,
   autofillCards: false,

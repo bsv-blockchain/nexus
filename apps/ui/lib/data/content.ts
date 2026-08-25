@@ -2658,6 +2658,15 @@ export const content = {
 
   /** Security: what you can prove yourself with, and where you are asked to */
   security: {
+    autoConnectTitle: "Auto connect to metanet enabled sites",
+    autoConnectHint:
+      "A site that speaks BRC-100 is asking to know who you are. This decides whether it is answered for you.",
+    autoConnectAuto: "Connect automatically",
+    autoConnectAutoHint:
+      "The wallet this workspace uses is offered as soon as a metanet site opens. Identity only \u2014 spending is always asked for.",
+    autoConnectManual: "Ask me each time",
+    autoConnectManualHint:
+      "Nothing is connected until you say so, on every site and in every workspace.",
     title: "Security",
     hint: "Passphrase, keys and where you are asked.",
     passphrase: {

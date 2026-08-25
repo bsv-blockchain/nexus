@@ -1,9 +1,13 @@
 "use client";
 
 import { Inspector } from "@/components/hub/inspector";
+import { grantConnection, originOf } from "@/lib/connections-store";
+import { useSettings } from "@/lib/settings-store";
+import { sameUrl } from "@/lib/tabs";
+import { activeWalletFor, useWallets } from "@/lib/wallets-store";
 import { useHub } from "@/components/hub/hub-provider";
 import { OriginChip } from "@/components/hub/origin-chip";
-import { getMockPage, type BrowserTab, type MockPage } from "@/lib/data";
+import { getHubApps, getMockPage, type BrowserTab, type MockPage } from "@/lib/data";
 import { forgetShellTab, noteShellTab } from "@/lib/wallet-reach";
 import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -196,6 +200,53 @@ function NativeSiteFrame({
 }
 
 /**
+ * Hand the workspace's wallet to a metanet site, if that is the standing answer.
+ *
+ * Here rather than in Browse, because this component is what every site goes
+ * through — the ones you type into the address bar and the ones sitting on the
+ * rail as apps. One hook covers both, and a second copy in the rail's open path
+ * would be a second copy to keep in step.
+ *
+ * WHAT COUNTS AS METANET-ENABLED. A real client learns this from the handshake:
+ * the page loads the substrate and asks for an identity. Nothing in this
+ * prototype's fixtures can be asked, so the stand-in is the catalogue — a site
+ * that the App Store lists as an app is one somebody has already established
+ * speaks BRC-100. That is a narrower rule than the real one and never a wider
+ * one, which is the right direction for a rule about granting access.
+ *
+ * The grant is per workspace, because the wallet is. Opening the same site in
+ * Work and in Personal connects two different wallets, which is the entire
+ * reason a workspace has one of its own.
+ */
+function useAutoConnect(url: string, title: string): void {
+  const { activeSpaceId } = useHub();
+  const settings = useSettings();
+  useWallets();
+  const walletId = activeWalletFor(activeSpaceId)?.id;
+  const auto = settings.autoConnectSites === "auto";
+
+  useEffect(() => {
+    if (!auto || !walletId) return;
+    const origin = originOf(url);
+    /* Matched on the whole URL rather than the origin: a listing is a page, and
+       two apps can share a host. `sameUrl` is what SiteTile already uses to
+       recognise a pinned listing, so the two agree about what counts. */
+    const listed = getHubApps().find(
+      (app) => app.web && sameUrl(app.web.url, url),
+    );
+    if (!listed) return;
+    grantConnection({
+      origin,
+      name: listed.name || title,
+      category: listed.categories[0] ?? "other",
+      walletId,
+      spaceId: activeSpaceId,
+      now: new Date().toISOString(),
+    });
+  }, [auto, walletId, url, title, activeSpaceId]);
+}
+
+/**
  * Shell detection has to happen in an effect, not at render: the server render has
  * no window, and reading it during the first client render would desync hydration.
  */
@@ -219,6 +270,7 @@ export function SiteFrame({
   title: string;
 }): ReactNode {
   const [loaded, setLoaded] = useState(false);
+  useAutoConnect(url, title);
 
   return (
     <div className="relative h-full w-full bg-canvas">
