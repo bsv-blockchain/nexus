@@ -216,10 +216,32 @@ function PreviewWindow(): ReactNode {
           aria-hidden="true"
         />
         <div className="mt-2 h-4 w-1/2 rounded bg-black/5" aria-hidden="true" />
+        {/*
+          The mark, on the one surface in this mockup with room for it.
+
+          Masked rather than dropped in as an image: the file is a fixed
+          #F4F2F0, which is off-white against a gradient that is not, so used as
+          a mask the colour is ours to set — the same trick first-run uses to
+          make one asset work on a light theme and a dark one.
+        */}
         <div
-          className="mt-4 h-40 rounded-xl bg-linear-to-br from-[#4353ff] via-[#7c86ff] to-[#22d3ee]"
+          className="mt-4 flex h-40 items-center rounded-xl bg-linear-to-br from-[#4353ff] via-[#7c86ff] to-[#22d3ee] px-6"
           aria-hidden="true"
-        />
+        >
+          <span
+            className="size-14 bg-white"
+            style={{
+              maskImage: "url(/icons/Nexus-logo-white.svg)",
+              maskRepeat: "no-repeat",
+              maskPosition: "center",
+              maskSize: "contain",
+              WebkitMaskImage: "url(/icons/Nexus-logo-white.svg)",
+              WebkitMaskRepeat: "no-repeat",
+              WebkitMaskPosition: "center",
+              WebkitMaskSize: "contain",
+            }}
+          />
+        </div>
         <div className="mt-4 space-y-2" aria-hidden="true">
           <div className="h-3 w-full rounded bg-black/5" />
           <div className="h-3 w-5/6 rounded bg-black/5" />
