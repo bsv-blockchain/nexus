@@ -1,6 +1,7 @@
 "use client";
 
 import { AppMenu } from "@/components/hub/app-menu";
+import { SwapSheet } from "@/components/apps/wallet/swap-flow";
 import { useWalletAccountId } from "@/components/apps/wallet/use-wallet-account";
 import { getWallet } from "@/lib/wallets-store";
 import { Portfolio } from "@/components/apps/wallet/portfolio";
@@ -9,7 +10,6 @@ import {
   WalletTrigger,
 } from "@/components/apps/wallet/wallet-switcher";
 import {
-  ExchangeSheet,
   ReceiveSheet,
   SendSheet,
 } from "@/components/apps/wallet/wallet-flows";
@@ -437,7 +437,7 @@ export function WalletApp(): ReactNode {
               onClose={closeIntent}
             />
 
-            <ExchangeSheet
+            <SwapSheet
               open={walletIntent?.kind === "exchange"}
               onClose={closeIntent}
               onExchange={({ from, to, fromUnits, toUnits }) => {

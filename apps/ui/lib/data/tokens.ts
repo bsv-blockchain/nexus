@@ -120,21 +120,98 @@ export const tokens: Token[] = [
  * chain arrives as more rows here against a token that declares it, rather than
  * as a second table; the accountId is what keeps that honest.
  */
+/*
+ * Coins held on other chains, arrived by swap.
+ *
+ * Four of them, because the swap is the only way they can be here and a wallet
+ * that shows six chains it never used would be describing a different product.
+ * Prices are fixtures like every other non-BSV price in this table — see
+ * `usdPerUnitOf`, which prices only bitcoin from the market.
+ */
+export const foreignTokens: Token[] = [
+  {
+    id: "sol",
+    symbol: "SOL",
+    name: "Solana",
+    ecosystem: null,
+    icon: "https://content-api.changenow.io/uploads/sol_3b3f795997.svg",
+    color: "#14F195",
+    decimals: 9,
+    chain: "sol",
+    protocol: "Solana",
+    blurb: "Held on Solana, swapped in through a provider.",
+    usdPerUnit: 148.2,
+    change24h: 2.4,
+  },
+  {
+    id: "usdc-sol",
+    symbol: "USDC",
+    name: "USD Coin (SOL)",
+    ecosystem: null,
+    icon: "https://content-api.changenow.io/uploads/usdcsol_9415198300.svg",
+    color: "#2775CA",
+    decimals: 6,
+    chain: "sol",
+    peg: { currency: "USD", note: "Fully reserved, redeemable one for one." },
+    flag: "US",
+    protocol: "SPL",
+    blurb: "Dollars on Solana.",
+    usdPerUnit: 1,
+    change24h: 0,
+  },
+  {
+    id: "eth",
+    symbol: "ETH",
+    name: "Ethereum",
+    ecosystem: null,
+    icon: "https://content-api.changenow.io/uploads/eth_f4ebb54ec0.svg",
+    color: "#627EEA",
+    decimals: 18,
+    chain: "eth",
+    protocol: "Ethereum",
+    blurb: "Held on Ethereum, swapped in through a provider.",
+    usdPerUnit: 3120,
+    change24h: -0.6,
+  },
+  {
+    id: "doge",
+    symbol: "DOGE",
+    name: "Dogecoin",
+    ecosystem: null,
+    icon: "https://content-api.changenow.io/uploads/doge_a0321dc732.svg",
+    color: "#C2A633",
+    decimals: 8,
+    chain: "doge",
+    protocol: "Dogecoin",
+    blurb: "Held on Dogecoin, swapped in through a provider.",
+    usdPerUnit: 0.21,
+    change24h: 3.1,
+  },
+];
+
 export const tokenBalances: {
   accountId: string;
   tokenId: string;
   units: number;
 }[] = [
-  /* Everyday — 5.88 BSV is about $100 at the fallback rate. */
+  /* Everyday — 5.88 BSV is about $100 at the fallback rate, plus what two
+     swaps brought back. Only two wallets hold anything foreign: a coin is here
+     because a swap put it here, and four wallets each holding a different chain
+     would be a fiction about how much this thing gets used. */
   { accountId: "acct-main", tokenId: "bsv", units: 5.8824 },
+  { accountId: "acct-main", tokenId: "sol", units: 1.42 },
+  { accountId: "acct-main", tokenId: "usdc-sol", units: 64 },
   { accountId: "acct-main", tokenId: "usdsv", units: 42 },
   { accountId: "acct-main", tokenId: "nex", units: 310 },
 
   /* Cold storage — one asset, a lot of it, and nothing that moves. */
   { accountId: "acct-cold", tokenId: "bsv", units: 120 },
 
-  /* Work — a float in BSV, and the money it invoices in. */
+  /* Work — a float in BSV, the money it invoices in, and two chains a client
+     paid on. */
   { accountId: "acct-work", tokenId: "bsv", units: 1.485 },
+  { accountId: "acct-work", tokenId: "eth", units: 0.19 },
+  { accountId: "acct-work", tokenId: "doge", units: 2450 },
   { accountId: "acct-work", tokenId: "usdsv", units: 320 },
   { accountId: "acct-work", tokenId: "eursv", units: 240 },
 

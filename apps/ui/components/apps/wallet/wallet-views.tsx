@@ -283,24 +283,38 @@ export function TokenDetail({
           )}
         </dl>
 
-        <div className="mt-5 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => onSend(tokenId)}
-            className="focus-ring bg-accent text-accent-foreground flex items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-bold transition-opacity hover:opacity-90"
-          >
-            <ArrowUpRight className="size-4" aria-hidden="true" />
-            {copy.send}
-          </button>
-          <button
-            type="button"
-            onClick={() => onReceive(tokenId)}
-            className="focus-ring border-border hover:bg-surface-hover flex items-center justify-center gap-1.5 rounded-full border px-4 py-2.5 text-sm font-semibold"
-          >
-            <ArrowDownLeft className="size-4" aria-hidden="true" />
-            {copy.receive}
-          </button>
-        </div>
+        {/*
+          Pay and Get paid, but only for what this wallet can actually move.
+          A coin that arrived by swap sits on Ethereum or Solana, and paying a
+          BSV handle in it is not a transaction anybody can write — the honest
+          set of actions on ether held here is one, and it is the swap back.
+        */}
+        {token.chain ? (
+          <p className="text-muted-foreground border-border mt-5 rounded-xl border border-dashed p-3 text-xs">
+            Held on {token.protocol ?? token.name}. Swap it back through
+            Exchange to spend it — a BSV handle cannot be paid in{" "}
+            {token.symbol}.
+          </p>
+        ) : (
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => onSend(tokenId)}
+              className="focus-ring bg-accent text-accent-foreground flex items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-bold transition-opacity hover:opacity-90"
+            >
+              <ArrowUpRight className="size-4" aria-hidden="true" />
+              {copy.send}
+            </button>
+            <button
+              type="button"
+              onClick={() => onReceive(tokenId)}
+              className="focus-ring border-border hover:bg-surface-hover flex items-center justify-center gap-1.5 rounded-full border px-4 py-2.5 text-sm font-semibold"
+            >
+              <ArrowDownLeft className="size-4" aria-hidden="true" />
+              {copy.receive}
+            </button>
+          </div>
+        )}
       </section>
 
       <h3 className="mt-6 px-1 text-sm font-semibold">

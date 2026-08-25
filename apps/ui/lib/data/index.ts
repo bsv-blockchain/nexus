@@ -19,7 +19,7 @@ import {
   nexusBot,
 } from "./messages";
 import { ecosystems } from "./ecosystems";
-import { tokenBalances, tokens } from "./tokens";
+import { foreignTokens, tokenBalances, tokens } from "./tokens";
 import { attributeColors, collectibles } from "./collectibles";
 import { paymentLinks, splitBills } from "./wallet-extras";
 import { connections, outputBaskets } from "./developer";
@@ -430,11 +430,26 @@ export function getLocalEcosystem(): Ecosystem {
 }
 
 /* tokens */
+/**
+ * The tokens this wallet can act on: issue, request, gate, split.
+ *
+ * BSV-native only. A coin that arrived by swap sits on somebody else's chain,
+ * so it can be held and shown and swapped back, but it cannot be the currency
+ * of a payment link or a token gate — those are BSV transactions. Callers that
+ * want the whole hand, foreign coins included, want `getTokenBalances`.
+ */
 export function getTokens(): Token[] {
   return tokens;
 }
+/**
+ * Look up a token by id, wherever it lives.
+ *
+ * Both tables, because a balance row naming `doge` is a real holding and a
+ * lookup that returned nothing for it would drop the row on the floor — the
+ * quiet kind of bug where money simply is not there.
+ */
 export function getToken(id: string): Token | undefined {
-  return tokens.find((t) => t.id === id);
+  return tokens.find((t) => t.id === id) ?? foreignTokens.find((t) => t.id === id);
 }
 /** BSV — the base currency and the default for a bare amount. */
 export function getBaseToken(): Token {
@@ -472,6 +487,10 @@ export function getTokenBalances(
       const token = getToken(tokenId);
       return token ? { token, units } : null;
     })
+    /* Unordered on purpose. `holdings()` in lib/wallet.ts sorts by real value
+       with BSV pinned first, and it is the one that knows bitcoin's market
+       price — a second sort here would order the same list by the fallback
+       rate and disagree with the first as soon as the market moved. */
     .filter((row): row is { token: Token; units: number } => Boolean(row));
 }
 

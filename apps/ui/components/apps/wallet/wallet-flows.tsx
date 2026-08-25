@@ -18,7 +18,7 @@ import {
 } from "@/lib/data";
 import { handleOf } from "@/lib/messages";
 import { holdingOf, usd } from "@/lib/wallet";
-import { ArrowDown, Check, Copy, Search } from "lucide-react";
+import { Copy, Search } from "lucide-react";
 import { toast } from "sonner";
 import { useState, type ReactNode } from "react";
 
@@ -299,133 +299,6 @@ export function ReceiveSheet({
             {token?.base ? copy.receiveHintBsv : copy.receiveHintToken}
           </p>
         </div>
-      </div>
-    </Sheet>
-  );
-}
-
-/** Exchange: swap between held assets with an explicit fee breakdown. */
-export function ExchangeSheet({
-  open,
-  onClose,
-  onExchange,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onExchange: (args: {
-    from: Token;
-    to: Token;
-    fromUnits: number;
-    toUnits: number;
-  }) => void;
-}): ReactNode {
-  const copy = content.wallet;
-  const [fromId, setFromId] = useState("bsv");
-  const [toId, setToId] = useState("eursv");
-  const [amount, setAmount] = useState("");
-
-  const from = getToken(fromId);
-  const to = getToken(toId);
-  const holding = holdingOf(fromId);
-  const fromUnits = Number(amount);
-  // Mid-market: value in, value out, minus a flat sub-cent network fee.
-  const rate = from && to ? from.usdPerUnit / to.usdPerUnit : 0;
-  const toUnits = Number.isFinite(fromUnits) ? fromUnits * rate : 0;
-  const valid =
-    from &&
-    to &&
-    from.id !== to.id &&
-    fromUnits > 0 &&
-    holding &&
-    fromUnits <= holding.units;
-
-  return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      label={copy.exchange}
-      footer={
-        <button
-          type="button"
-          disabled={!valid}
-          onClick={() => {
-            if (from && to) onExchange({ from, to, fromUnits, toUnits });
-          }}
-          className="focus-ring bg-accent text-accent-foreground w-full rounded-full px-4 py-2.5 text-sm font-bold transition-opacity hover:opacity-90 disabled:opacity-40"
-        >
-          {copy.confirmExchange}
-        </button>
-      }
-    >
-      <div className="space-y-4 p-5">
-        <h2 className="text-lg font-bold">{copy.exchange}</h2>
-
-        <TokenPicker selected={fromId} onSelect={setFromId} label={copy.from} />
-        <div>
-          <div className="border-border flex items-center gap-2 rounded-xl border px-3">
-            <input
-              type="text"
-              inputMode="decimal"
-              value={amount}
-              onChange={(event) =>
-                setAmount(event.target.value.replace(/[^\d.]/g, ""))
-              }
-              placeholder="0"
-              aria-label={copy.amount}
-              className="h-12 min-w-0 flex-1 bg-transparent text-lg font-bold outline-none"
-            />
-            {from && (
-              <span className="flex shrink-0 items-center gap-1.5 text-sm font-bold">
-                <TokenMark token={from} size={16} />
-                {from.symbol}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex justify-center">
-          <span
-            className="bg-surface text-muted-foreground flex size-8 items-center justify-center rounded-full"
-            aria-hidden="true"
-          >
-            <ArrowDown className="size-4" />
-          </span>
-        </div>
-
-        <TokenPicker selected={toId} onSelect={setToId} label={copy.to} />
-        <div className="bg-surface rounded-xl p-3">
-          <p className="flex items-baseline gap-2 text-lg font-bold">
-            {to ? formatUnits(toUnits, to.decimals) : "0"}
-            {to && (
-              <span className="inline-flex items-center gap-1 text-sm">
-                <TokenMark token={to} size={14} />
-                {to.symbol}
-              </span>
-            )}
-          </p>
-        </div>
-
-        {from && to && (
-          <dl className="border-border space-y-1.5 border-t pt-3 text-xs">
-            <div className="flex justify-between gap-3">
-              <dt className="text-muted-foreground">{copy.rate}</dt>
-              <dd>
-                1 {from.symbol} = {formatUnits(rate, to.decimals)} {to.symbol}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-muted-foreground">{copy.networkFee}</dt>
-              <dd>1 sat</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-muted-foreground">{copy.midMarket}</dt>
-              <dd className="flex items-center gap-1">
-                <Check className="text-positive size-3" aria-hidden="true" />
-                {copy.noSpread}
-              </dd>
-            </div>
-          </dl>
-        )}
       </div>
     </Sheet>
   );

@@ -615,6 +615,18 @@ export interface Token {
   /** brand tint, for generated tiles and accents */
   color: string;
   decimals: number;
+  /**
+   * The chain it lives on, where that is not BSV.
+   *
+   * Absent means BSV, which is every token this wallet issues. Present means
+   * the coin arrived by a cross-chain swap and is held on somebody else's
+   * chain — which is worth stating on the row, because "0.4 ETH" in a BSV
+   * wallet is otherwise a claim nobody can place.
+   *
+   * The value is ChangeNOW's network code, so a holding and a swap route are
+   * talking about the same network. See lib/swap-assets.
+   */
+  chain?: string;
   /** the base currency — the default for a bare amount */
   base?: boolean;
   /** fiat peg, for stablecoins */

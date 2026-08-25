@@ -130,10 +130,15 @@ export function usdPerUnitOf(token: Token): number | null {
   /*
    * Bitcoin is priced from the market in demo mode too.
    *
-   * The other symbols here are invented and their fixture prices are the only
-   * ones they can have, but BSV is a real asset with a real price, and quoting
-   * a stale one under a balance somebody can check elsewhere is the one figure
-   * on this screen that can be caught out. See lib/exchange-rate.
+   * The tokens this wallet issues are invented and their fixture prices are the
+   * only ones they can have, but BSV is a real asset with a real price, and
+   * quoting a stale one under a balance somebody can check elsewhere is the one
+   * figure on this screen that can be caught out. See lib/exchange-rate.
+   *
+   * The coins that arrived by swap — ETH, SOL, DOGE and the like — are real
+   * assets carrying fixture prices, so they drift. Fine for a prototype and not
+   * fine for a wallet: pricing them properly means a second feed, since
+   * WhatsOnChain quotes bitcoin and nothing else.
    */
   if (token.id === "bsv") return getUsdPerBsv();
   return token.usdPerUnit;
