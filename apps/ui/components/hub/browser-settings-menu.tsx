@@ -7,6 +7,7 @@ import {
   PopoverMenu,
 } from "@/components/hub/popover-menu";
 import { useHub } from "@/components/hub/hub-provider";
+import { Tooltip } from "@/components/hub/tooltip";
 import { content } from "@/lib/data";
 import { isPinnableUrl, shortNameFor } from "@/lib/rail/origin";
 import {
@@ -48,7 +49,8 @@ export function BrowserSettingsMenu({
   const [developerMode, setDeveloperMode] = useState(false);
   const [certOpen, setCertOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const { activeTab, pinSite, pinnedSites, openPage } = useHub();
+  const { activeTab, pinSite, pinnedSites, createTab, setSettingsCategory, setMainView } =
+    useHub();
 
   /*
    * The page in this tab, put on the rail as an app.
@@ -135,7 +137,7 @@ export function BrowserSettingsMenu({
             type="button"
             onClick={() => {
               onClose();
-              openPage("extensions");
+              createTab("nexus://extensions");
             }}
             className="focus-ring text-muted-foreground hover:text-foreground rounded-md px-1.5 py-0.5 text-xs font-semibold opacity-0 transition-opacity group-hover/ext:opacity-100 focus-visible:opacity-100"
           >
@@ -155,17 +157,22 @@ export function BrowserSettingsMenu({
               2
             </span>
           </span>
-          <button
-            type="button"
-            aria-label="Add extension"
-            onClick={() => {
-              onClose();
-              openPage("extensions");
-            }}
-            className="focus-ring bg-muted hover:bg-surface-hover flex size-11 items-center justify-center rounded-xl"
-          >
-            <Plus className="size-4.5" aria-hidden="true" />
-          </button>
+          {/* Adding an extension means getting one, and there is nowhere to
+              get one but the store — so this opens the store rather than the
+              manager, which is where you go to deal with the ones you have. */}
+          <Tooltip label={content.extensions.addTooltip}>
+            <button
+              type="button"
+              aria-label={content.extensions.addTooltip}
+              onClick={() => {
+                onClose();
+                createTab(content.extensions.storeUrl);
+              }}
+              className="focus-ring bg-muted hover:bg-surface-hover flex size-11 items-center justify-center rounded-xl"
+            >
+              <Plus className="size-4.5" aria-hidden="true" />
+            </button>
+          </Tooltip>
         </div>
       </div>
 
@@ -266,7 +273,7 @@ export function BrowserSettingsMenu({
               label={copy.more.manageExtensions}
               onClick={() => {
                 onClose();
-                openPage("extensions");
+                createTab("nexus://extensions");
               }}
             />
             <MenuItem
@@ -274,14 +281,21 @@ export function BrowserSettingsMenu({
               label={copy.more.addExtension}
               onClick={() => {
                 onClose();
-                openPage("extensions");
+                createTab(content.extensions.storeUrl);
               }}
             />
             <MenuSeparator />
+            {/* Named a destination and went nowhere. Site settings live under
+                Browsing, so that is where this lands rather than the top of a
+                page with eleven categories on it. */}
             <MenuItem
               icon={Settings}
               label={copy.more.allSiteSettings}
-              onClick={onClose}
+              onClick={() => {
+                onClose();
+                setSettingsCategory("browsing");
+                setMainView("settings");
+              }}
             />
           </PopoverMenu>
         </div>

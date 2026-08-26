@@ -315,14 +315,14 @@ export interface Space {
 
 /** internal pages that render in the main view instead of a website */
 /**
- * A screen the browser shows instead of a page.
+ * A screen that replaces the browser canvas outright, tabs and all.
  *
- * Chrome has `chrome://` for these; this is the same idea with a smaller
- * vocabulary. They take the canvas the webview would have had, which is what
- * makes them feel like part of the browser rather than a site it happens to be
- * pointed at.
+ * Only Getting Started. Screens that belong IN a tab — the extensions manager,
+ * the search results page — are addressed instead, so they keep a title, an
+ * icon, a place in the strip and a Back button. See `INTERNAL_PAGES` in
+ * lib/tabs.
  */
-export type PageId = "getting-started" | "extensions";
+export type PageId = "getting-started";
 
 /** An extension this browser is carrying. @see lib/data/extensions.ts */
 export interface BrowserExtension {

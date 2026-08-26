@@ -1,6 +1,7 @@
 "use client";
 
 import { Inspector } from "@/components/hub/inspector";
+import { ExtensionsPage } from "@/components/apps/extensions-page";
 import { grantConnection, originOf } from "@/lib/connections-store";
 import { useSettings } from "@/lib/settings-store";
 import { sameUrl } from "@/lib/tabs";
@@ -351,6 +352,12 @@ function BrowserCanvas({
 }): ReactNode {
   if (tab.url.includes(INTERNAL_SEARCH_HOST)) {
     return <SearchPage url={tab.url} />;
+  }
+
+  /* Served by the browser, so it never reaches the native layer — same route
+     the search page takes. See INTERNAL_PAGES in lib/tabs. */
+  if (tab.url === "nexus://extensions") {
+    return <ExtensionsPage />;
   }
 
   // Inside a shell every real URL goes to the native layer — the mock/localOnly

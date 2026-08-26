@@ -17,10 +17,11 @@
 
 import { AddressBar } from "@/components/hub/browser-nav";
 import { Favicon } from "@/components/hub/favicon";
+import { internalPage } from "@/lib/tabs";
 import { HoverMarquee } from "@/components/hub/hover-marquee";
 import { useHub } from "@/components/hub/hub-provider";
 import { content } from "@/lib/data";
-import { ArrowLeft, ArrowRight, Plus, RotateCw, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Plus, Puzzle, RotateCw, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 export function TabStrip(): ReactNode {
@@ -146,11 +147,21 @@ export function TabStrip(): ReactNode {
                     onClick={() => openTab(tab.id)}
                     className="focus-ring flex w-40 min-w-0 items-center gap-2 rounded-t-lg py-1.5 pr-7 pl-2.5 text-left text-sm"
                   >
-                    <Favicon
-                      url={tab.url}
-                      letter={tab.favicon}
-                      color={tab.faviconColor}
-                    />
+                    {/* A page the browser serves itself has no origin to
+                        fetch an icon from, and its first letter is not a mark.
+                        Chromium draws a puzzle piece here; so do we. */}
+                    {internalPage(tab.url) ? (
+                      <Puzzle
+                        className="text-accent size-4 shrink-0"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <Favicon
+                        url={tab.url}
+                        letter={tab.favicon}
+                        color={tab.faviconColor}
+                      />
+                    )}
                     <HoverMarquee text={tab.title} className="min-w-0 flex-1" />
                   </button>
                   {/* On hover and on focus, not always: a close button on every tab

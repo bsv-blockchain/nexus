@@ -1795,6 +1795,8 @@ export const content = {
     on: "on",
     off: "off",
     manage: "Manage",
+    /* On the plus, which is otherwise a shape with no noun. */
+    addTooltip: "Get extensions",
     notSet: "Not set",
     editShortcut: "Set a shortcut",
     clearShortcut: "Clear the shortcut",

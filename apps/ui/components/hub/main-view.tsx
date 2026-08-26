@@ -27,7 +27,6 @@ import { TimelineApp } from "@/components/apps/timeline-app";
 import { HomeApp } from "@/components/apps/home-app";
 import { AppStore } from "@/components/hub/app-store";
 import { DetailPane } from "@/components/hub/detail-pane";
-import { ExtensionsPage } from "@/components/apps/extensions-page";
 import { GettingStartedPage } from "@/components/hub/getting-started-page";
 import { ProfilesManager } from "@/components/hub/profiles-manager";
 import { AppMenu, SplitPaneHeader } from "@/components/hub/app-menu";
@@ -470,13 +469,7 @@ export function MainView(): ReactNode {
         <div className="min-h-0 flex-1">
           <GettingStartedPage />
         </div>
-      ) : activePage === "extensions" ? (
-        /* Takes the webview's canvas, the same way Getting Started does — see
-           the note on `PageId`. An extension manager is part of the browser
-           rather than a site it is pointed at. */
-        <div className="flex min-h-0 flex-1">
-          <ExtensionsPage />
-        </div>
+
       ) : showHome ? (
         <HomeApp />
       ) : showTimeline ? (
