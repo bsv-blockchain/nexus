@@ -3,7 +3,13 @@
 import { Inspector } from "@/components/hub/inspector";
 import { TumbleBar } from "@/components/apps/browser/tumble-bar";
 import { internalPage } from "@/lib/tabs";
+import {
+  extensionForUrl,
+  extensionIsOn,
+  useInstalledExtensions,
+} from "@/lib/extensions-store";
 import { ExtensionsPage } from "@/components/apps/extensions-page";
+import { ExtensionDetailPage } from "@/components/apps/extension-detail-page";
 import { TumbleUponPage } from "@/components/apps/tumbleupon-page";
 import { grantConnection, originOf } from "@/lib/connections-store";
 import { useSettings } from "@/lib/settings-store";
@@ -12,7 +18,6 @@ import { activeWalletFor, useWallets } from "@/lib/wallets-store";
 import { useHub } from "@/components/hub/hub-provider";
 import { OriginChip } from "@/components/hub/origin-chip";
 import {
-  getExtensions,
   getHubApps,
   getMockPage,
   type BrowserTab,
@@ -373,6 +378,12 @@ function BrowserCanvas({
     return <TumbleUponPage />;
   }
 
+  /* Every other extension gets the page its own fixture can fill. */
+  const extension = extensionForUrl(tab.url);
+  if (extension) {
+    return <ExtensionDetailPage extension={extension} />;
+  }
+
   // Inside a shell every real URL goes to the native layer — the mock/localOnly
   // fallbacks exist only because the web build cannot embed un-frameable hosts.
   if (hasShell) {
@@ -409,12 +420,12 @@ export function BrowserApp(): ReactNode {
 function BrowserPage(): ReactNode {
   const { activeTab, activeRef, setActiveRef, unpinSite, navigateActiveTab } =
     useHub();
-  /* The toolbar follows the extension's own switch, so turning TumbleUpon off
-     in the manager is what takes the bar away — otherwise that switch would be
-     a control with nothing behind it. */
-  const tumbleOn = getExtensions().some(
-    (entry) => entry.id === "tumbleupon" && entry.enabled,
-  );
+  /* Subscribed, not read: the switch lives in a store, and without the hook a
+     toggle in the manager would change it and leave this bar exactly where it
+     was. That is what "a control with nothing behind it" looks like from the
+     other side. */
+  useInstalledExtensions();
+  const tumbleOn = extensionIsOn("tumbleupon");
   const hasShell = useHasShell();
 
   if (!activeTab) {

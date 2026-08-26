@@ -8,7 +8,12 @@ import {
 } from "@/components/hub/popover-menu";
 import { useHub } from "@/components/hub/hub-provider";
 import { Tooltip } from "@/components/hub/tooltip";
-import { content } from "@/lib/data";
+import { content, type BrowserExtension } from "@/lib/data";
+import {
+  extensionUrl,
+  removeExtension,
+  useInstalledExtensions,
+} from "@/lib/extensions-store";
 import { isPinnableUrl, shortNameFor } from "@/lib/rail/origin";
 import {
   Camera,
@@ -25,10 +30,110 @@ import {
   SquarePlus,
   Sun,
   Trash2,
+  X,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+
+/** How long a press has to be before it is a hold. Matches the rail's. */
+const LONG_PRESS_MS = 450;
+
+/**
+ * One extension, as a tile you can open or take off.
+ *
+ * The same two gestures the rail uses, because it is the same kind of object: a
+ * short press opens it, a hold offers the cross. Learning one row of icons and
+ * then finding the next one answers to different gestures is the sort of thing
+ * people blame themselves for.
+ *
+ * The badge is uBlock's block count, and only uBlock has one — it is the number
+ * that extension exists to produce. A badge on every tile would be a decoration
+ * pretending to be a count.
+ */
+function ExtensionTile({
+  extension,
+  removing,
+  onHold,
+  onOpen,
+  onRemove,
+}: {
+  extension: BrowserExtension;
+  removing: boolean;
+  onHold: () => void;
+  onOpen: () => void;
+  onRemove: () => void;
+}): ReactNode {
+  const timer = useRef<number | null>(null);
+  const held = useRef(false);
+
+  const start = (): void => {
+    held.current = false;
+    timer.current = window.setTimeout(() => {
+      held.current = true;
+      onHold();
+    }, LONG_PRESS_MS);
+  };
+  const cancel = (): void => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = null;
+  };
+
+  return (
+    <span className="relative shrink-0">
+      <Tooltip label={extension.name}>
+        <button
+          type="button"
+          onPointerDown={start}
+          onPointerUp={cancel}
+          onPointerLeave={cancel}
+          /* The same thing for a mouse. Holding a button down is what a thumb
+             does; a right-click is what a hand on a trackpad does, and the rail
+             offers both for exactly this reason. */
+          onContextMenu={(event) => {
+            event.preventDefault();
+            onHold();
+          }}
+          onClick={() => {
+            /* A hold has already done something; letting go should not then
+               also open the page it was offering to remove. */
+            if (held.current) return;
+            onOpen();
+          }}
+          aria-label={extension.name}
+          className={`focus-ring hover:bg-surface-hover flex size-11 items-center justify-center rounded-xl text-sm font-bold transition-opacity ${
+            extension.enabled ? "" : "opacity-40"
+          }`}
+          style={{
+            background: extension.mark.background,
+            color: extension.mark.color,
+          }}
+        >
+          {extension.mark.letters}
+        </button>
+      </Tooltip>
+      {extension.id === "ublock-origin" && extension.enabled && (
+        <span
+          className="bg-negative pointer-events-none absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full text-[10px] font-bold text-white"
+          aria-hidden="true"
+        >
+          2
+        </span>
+      )}
+      {removing && (
+        <button
+          type="button"
+          data-remove-badge=""
+          onClick={onRemove}
+          aria-label={`${content.extensions.uninstall} ${extension.name}`}
+          className="focus-ring border-surface bg-negative absolute -top-1 -right-1 z-20 grid size-5 place-items-center rounded-full border-2 text-white shadow-lg"
+        >
+          <X className="size-3" strokeWidth={3} aria-hidden="true" />
+        </button>
+      )}
+    </span>
+  );
+}
 
 /** URL-bar settings popover from the design: quick actions, extensions, settings. */
 export function BrowserSettingsMenu({
@@ -51,6 +156,22 @@ export function BrowserSettingsMenu({
   const [moreOpen, setMoreOpen] = useState(false);
   const { activeTab, pinSite, pinnedSites, createTab, setSettingsCategory, setMainView } =
     useHub();
+  const installed = useInstalledExtensions();
+  /* One cross at a time, dismissed by the next press elsewhere — the same rule
+     and the same `data-remove-badge` escape the rail uses. */
+  const [removing, setRemoving] = useState<string | null>(null);
+  useEffect(() => {
+    if (!removing) return;
+    const dismiss = (event: PointerEvent): void => {
+      const target = event.target;
+      if (target instanceof Element && target.closest("[data-remove-badge]")) {
+        return;
+      }
+      setRemoving(null);
+    };
+    document.addEventListener("pointerdown", dismiss, true);
+    return () => document.removeEventListener("pointerdown", dismiss, true);
+  }, [removing]);
 
   /*
    * The page in this tab, put on the rail as an app.
@@ -145,18 +266,31 @@ export function BrowserSettingsMenu({
           </button>
         </div>
         <div className="flex gap-2">
-          <span
-            className="bg-muted text-negative relative flex size-11 items-center justify-center rounded-xl text-sm font-bold"
-            aria-label="uBlock Origin — 2 items blocked"
-          >
-            uB
-            <span
-              className="bg-negative absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full text-[10px] font-bold text-white"
-              aria-hidden="true"
-            >
-              2
-            </span>
-          </span>
+          {/* From what is installed, in the order the catalogue lists them —
+              ours first. The hardcoded uB tile survived two rounds of this
+              menu and would have gone on claiming uBlock was here after
+              somebody removed it. */}
+          {installed.map((extension) => (
+            <ExtensionTile
+              key={extension.id}
+              extension={extension}
+              removing={removing === extension.id}
+              onHold={() => setRemoving(extension.id)}
+              onOpen={() => {
+                onClose();
+                createTab(extensionUrl(extension.id));
+              }}
+              onRemove={() => {
+                removeExtension(extension.id);
+                toast.success(
+                  content.extensions.removedToast.replace(
+                    "{name}",
+                    extension.name,
+                  ),
+                );
+              }}
+            />
+          ))}
           {/* Adding an extension means getting one, and there is nowhere to
               get one but the store — so this opens the store rather than the
               manager, which is where you go to deal with the ones you have. */}

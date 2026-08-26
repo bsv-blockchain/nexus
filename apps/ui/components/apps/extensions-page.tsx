@@ -16,7 +16,14 @@
  * @see lib/data/extensions.ts for what is in it, and why there is one
  */
 
-import { content, getExtensions, type BrowserExtension } from "@/lib/data";
+import { content, type BrowserExtension } from "@/lib/data";
+import {
+  extensionUrl,
+  removeExtension,
+  setExtensionEnabled,
+  useInstalledExtensions,
+} from "@/lib/extensions-store";
+import { toast } from "sonner";
 import { useHub } from "@/components/hub/hub-provider";
 import { Keyboard, Pencil, Puzzle, Search, X } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
@@ -192,20 +199,18 @@ function ShortcutRows({ extension }: { extension: BrowserExtension }): ReactNode
 export function ExtensionsPage(): ReactNode {
   const { openLinkInBrowser, activeSpaceId, createTab } = useHub();
 
-  /* Only ours has a page to open. A details screen for uBlock would be a screen
-     we would have to invent the contents of, which is the kind of fixture that
-     reads as a feature until somebody clicks it. */
+  /* Every extension has a page now — its own for TumbleUpon, and one built
+     from the fixture for the rest. See lib/extensions-store. */
   const onDetails = (id: string): void => {
-    if (id === "tumbleupon") createTab("nexus://tumbleupon");
+    createTab(extensionUrl(id));
   };
-  const extensions = getExtensions();
+  /* What is actually installed, not the catalogue: removing something here has
+     to remove it from here, and from the tiles in the address bar, and from
+     whether its toolbar is over the page. One store answers all three. */
+  const extensions = useInstalledExtensions();
   const [view, setView] = useState<View>("installed");
   const [query, setQuery] = useState("");
   const [developer, setDeveloper] = useState(false);
-  /* Off-state kept here rather than in the fixture: turning an extension off is
-     a thing you do to this session, and a fixture that remembered it would be
-     a fixture editing itself. */
-  const [off, setOff] = useState<string[]>([]);
 
   const found = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -308,16 +313,17 @@ export function ExtensionsPage(): ReactNode {
                     <ExtensionCard
                       key={extension.id}
                       extension={extension}
-                      on={!off.includes(extension.id)}
+                      on={extension.enabled}
                       onToggle={(next) =>
-                        setOff((current) =>
-                          next
-                            ? current.filter((id) => id !== extension.id)
-                            : [...current, extension.id],
-                        )
+                        setExtensionEnabled(extension.id, next)
                       }
                       onDetails={() => onDetails(extension.id)}
-                      onRemove={() => setQuery("")}
+                      onRemove={() => {
+                        removeExtension(extension.id);
+                        toast.success(
+                          copy.removedToast.replace("{name}", extension.name),
+                        );
+                      }}
                     />
                   ))}
                 </div>

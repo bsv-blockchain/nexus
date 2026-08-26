@@ -2,6 +2,7 @@
  * Client-side helpers for creating browser tabs from user input.
  * Pure functions — no React, no storage.
  */
+import { browserExtensions } from "@/lib/data/extensions";
 import { getMockPage, type BrowserTab } from "@/lib/data";
 
 const FAVICON_COLORS = [
@@ -26,9 +27,19 @@ const FAVICON_COLORS = [
  */
 export const INTERNAL_SCHEME = "nexus://";
 
+const EXTENSION_PAGES: Record<string, { title: string }> = Object.fromEntries(
+  browserExtensions.map((entry) => [
+    `nexus://${entry.id.replace(/-/g, "")}`,
+    { title: entry.name },
+  ]),
+);
+
 export const INTERNAL_PAGES: Record<string, { title: string }> = {
   "nexus://extensions": { title: "Extensions" },
-  "nexus://tumbleupon": { title: "TumbleUpon" },
+  /* One page per extension, keyed off its id — see `extensionUrl` in
+     lib/extensions-store, which builds the same address from the same rule. A
+     hand-written list here would be a second place to add a row to. */
+  ...EXTENSION_PAGES,
 };
 
 /** The internal page this URL names, or null for an ordinary address. */

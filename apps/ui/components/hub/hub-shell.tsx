@@ -3,6 +3,10 @@
 import { FirstRun } from "@/components/hub/first-run";
 import { hydrateTumble, useTumble } from "@/lib/tumbleupon-store";
 import {
+  hydrateExtensions,
+  useInstalledExtensions,
+} from "@/lib/extensions-store";
+import {
   hydrateGrantedConnections,
   useGrantedConnections,
 } from "@/lib/connections-store";
@@ -271,6 +275,8 @@ export function HubShell(): ReactNode {
      has no storage to read them from. */
   useTumble();
   useEffect(hydrateTumble, []);
+  useInstalledExtensions();
+  useEffect(hydrateExtensions, []);
   /* Same reason, same shape: granted connections are read during render and the
      server has no storage to read them from. */
   const granted = useGrantedConnections();
