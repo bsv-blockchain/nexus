@@ -1791,6 +1791,12 @@ export const content = {
     unliked: "Taken out of your likes",
     dislike: "Not for me",
     notThisApp: "Not this app",
+    /* Paired with the line above, in the same shape, because they are the same
+       decision at two grains. The category is named underneath rather than in
+       the label: an app can sit on two shelves, and "Not this category" on its
+       own would not say which. */
+    notThisCategory: "Not this category",
+    offCatalogue: "This page is not in the catalogue, so there is nothing here to mute.",
     nothingFrom: "Nothing from {name}",
     blockedApp: "{app} will not come round again",
     blockedCategory: "{name} is out of the rotation",
@@ -1828,6 +1834,14 @@ export const content = {
     detailsTitle: "TumbleUpon",
     people: "People",
     peopleHint: "Handles you tumble with. They can send you a site, and you can send them one.",
+    addPerson: "Add a handle",
+    addPersonPlaceholder: "Search handles to add…",
+    added: "Added",
+    removePerson: "Remove",
+    removed: "Removed",
+    nobodyMatches: "No handle matches that.",
+    expand: "Show",
+    collapse: "Hide",
     likes: "Likes",
     likesHint: "What you said yes to.",
     likesEmpty: "Nothing yet. Press the thumb on something worth keeping.",

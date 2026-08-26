@@ -36,6 +36,17 @@ export interface TumbleState {
   readInbox: string[];
   /** what you have sent, so the details page can show it */
   sent: { toPersonId: string; appSlug: string; message: string }[];
+  /**
+   * Handles added to and dropped from the fixture's list.
+   *
+   * Two lists rather than one replacing it, so the seeded connections stay the
+   * seeded connections: dropping somebody records the drop, and adding them
+   * back takes it away again. A single overriding array would have to be
+   * written out in full on the first change, and would then never notice a
+   * fixture that grew.
+   */
+  addedPeople: string[];
+  droppedPeople: string[];
 }
 
 const EMPTY: TumbleState = {
@@ -46,6 +57,8 @@ const EMPTY: TumbleState = {
   query: "",
   readInbox: [],
   sent: [],
+  addedPeople: [],
+  droppedPeople: [],
 };
 
 let state: TumbleState = EMPTY;
@@ -160,6 +173,33 @@ export function removeCategory(category: StoreCategory): void {
 export function markInboxRead(id: string): void {
   if (state.readInbox.includes(id)) return;
   set({ readInbox: [...state.readInbox, id] });
+}
+
+/** Handles you tumble with: the seeded ones, less drops, plus additions. */
+export function connectionHandles(seeded: string[]): string[] {
+  const dropped = new Set(state.droppedPeople);
+  return [
+    ...seeded.filter((handle) => !dropped.has(handle)),
+    ...state.addedPeople.filter((handle) => !seeded.includes(handle)),
+  ];
+}
+
+export function addPerson(handle: string): void {
+  set({
+    addedPeople: state.addedPeople.includes(handle)
+      ? state.addedPeople
+      : [...state.addedPeople, handle],
+    droppedPeople: state.droppedPeople.filter((entry) => entry !== handle),
+  });
+}
+
+export function dropPerson(handle: string): void {
+  set({
+    addedPeople: state.addedPeople.filter((entry) => entry !== handle),
+    droppedPeople: state.droppedPeople.includes(handle)
+      ? state.droppedPeople
+      : [...state.droppedPeople, handle],
+  });
 }
 
 export function recordSent(entry: {

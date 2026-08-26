@@ -703,10 +703,21 @@ export function TumbleBar({
                     }}
                     className="focus-ring hover:bg-surface-hover w-full rounded-lg px-2.5 py-2 text-left text-xs"
                   >
-                    {copy.nothingFrom.replace("{name}", label)}
+                    <span className="block">{copy.notThisCategory}</span>
+                    <span className="text-muted-foreground block text-[10px]">
+                      {label}
+                    </span>
                   </button>
                 );
               })}
+              {/* Neither button can do anything from a page the catalogue has
+                  never heard of, and a menu of two greyed rows says less than
+                  one sentence explaining why. */}
+              {!here && (
+                <p className="text-muted-foreground px-2.5 py-2 text-[11px] leading-relaxed text-pretty">
+                  {copy.offCatalogue}
+                </p>
+              )}
             </div>
           )}
         </div>

@@ -436,9 +436,21 @@ export function getLocalEcosystem(): Ecosystem {
 }
 
 /* tumbleupon */
-/** The people you tumble with, as the app knows them. @see lib/data/tumbleupon */
-export function getTumbleConnections(): MessagePerson[] {
-  return tumbleConnections
+/** The seeded handles, before anything you have added or dropped. */
+export function tumbleConnectionHandles(): string[] {
+  return tumbleConnections;
+}
+
+/**
+ * People, from a list of handles.
+ *
+ * Takes the list rather than reading the fixture, because the live one is the
+ * fixture plus what the store remembers — see `connectionHandles` in
+ * lib/tumbleupon-store. Two callers with two answers about who you tumble with
+ * is the bug this signature prevents.
+ */
+export function getTumbleConnections(handles: string[]): MessagePerson[] {
+  return handles
     .map((id) => messagePeople.find((person) => person.handle === id))
     .filter((person): person is MessagePerson => Boolean(person));
 }
