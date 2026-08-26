@@ -255,6 +255,19 @@ export interface HubApp {
   description: string;
   /** two or three word subtitle for tiles and tooltips */
   tagline: string;
+  /**
+   * This app's slug on BSV Radar, where it has an entry.
+   *
+   * Stored rather than derived: the slugs are per-entry and inconsistent —
+   * `1satmarket` next to `bsv-browser` — so a rule that turned a name into one
+   * would be right about half the time and confidently wrong about the rest.
+   * Absent means not listed, which is the more common answer.
+   *
+   * Kept here rather than fetched. BSV Radar's API serves no CORS header, so a
+   * browser cannot ask it; this is the copy, and it goes stale the way any copy
+   * does — see the note in lib/data/hub-apps.
+   */
+  bsvRadar?: string;
   /** publishing organisation category */
   developer: AppDeveloper;
   /** 0–100 popularity score used for store sorting */

@@ -780,6 +780,50 @@ export function TumbleBar({
           <Users className="size-3.5" aria-hidden="true" />
           {copy.connections}
         </BarButton>
+
+        {/*
+          Whether anybody has written this one up.
+
+          Full strength means BSV Radar has an entry and the icon opens it;
+          half means it does not, and the icon says so rather than doing
+          nothing quietly. Dimmed rather than hidden, because "no review exists"
+          is a fact about a page worth knowing — an icon that vanished would
+          leave you unsure whether you had looked.
+        */}
+        <Tooltip
+          label={
+            here?.bsvRadar
+              ? copy.radarListed.replace("{app}", here.name)
+              : copy.radarUnlisted
+          }
+        >
+          <button
+            type="button"
+            disabled={!here?.bsvRadar}
+            onClick={() => {
+              if (here?.bsvRadar) {
+                createTab(`https://bsvradar.com/apps/${here.bsvRadar}`);
+              }
+            }}
+            aria-label={
+              here?.bsvRadar
+                ? copy.radarListed.replace("{app}", here.name)
+                : copy.radarUnlisted
+            }
+            className={`focus-ring flex size-7 shrink-0 items-center justify-center rounded-full transition-opacity ${
+              here?.bsvRadar
+                ? "hover:bg-surface-hover"
+                : "cursor-default opacity-50"
+            }`}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/app-icons/bsv-radar.png"
+              alt=""
+              className="size-4 rounded"
+            />
+          </button>
+        </Tooltip>
       </div>
 
       {inboxOpen && <InboxRow onClose={() => setInboxOpen(false)} />}

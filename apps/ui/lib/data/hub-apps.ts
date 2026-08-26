@@ -452,6 +452,7 @@ export const hubApps: HubApp[] = [
     description:
       "A shared canvas where each pixel costs a satoshi and anyone can paint over yours.",
     tagline: "One pixel at a time",
+    bsvRadar: "pixelwar",
     developer: "third-party",
     popularity: 41,
     iconSrc: "/app-icons/pixel-war.png",
@@ -527,6 +528,7 @@ export const hubApps: HubApp[] = [
     description:
       "Music published on-chain, where a play pays the artist directly instead of a quarterly statement.",
     tagline: "Music that pays out",
+    bsvRadar: "soundbase",
     developer: "third-party",
     popularity: 52,
     iconSrc: "",
@@ -550,6 +552,7 @@ export const hubApps: HubApp[] = [
     description:
       "The exchange for 1Sat Ordinals and BSV-20 tokens, with listings, bids and transfers settled on-chain.",
     tagline: "Trade ordinals & tokens",
+    bsvRadar: "1satmarket",
     developer: "open-protocol-labs",
     popularity: 68,
     iconSrc: "",
@@ -598,6 +601,7 @@ export const hubApps: HubApp[] = [
     description:
       "Pay-per-click promotion where advertisers settle with the people who actually shared the link.",
     tagline: "Promotion, paid per click",
+    bsvRadar: "tonicpow",
     developer: "third-party",
     popularity: 45,
     iconSrc: "/app-icons/tonicpow.svg",
@@ -772,6 +776,7 @@ export const hubApps: HubApp[] = [
     description:
       "Discover, compare, and access all applications built on the Bitcoin SV blockchain.",
     tagline: "Every app on the chain",
+    bsvRadar: "bsvradar",
     developer: "third-party",
     popularity: 57,
     iconSrc: "/app-icons/bsv-radar.png",

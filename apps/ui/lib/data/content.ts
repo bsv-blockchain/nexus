@@ -1811,6 +1811,8 @@ export const content = {
     cancel: "Cancel",
     sentTo: "Sent to",
     connections: "Connections",
+    radarListed: "See {app} on BSV Radar",
+    radarUnlisted: "Not listed on BSV Radar",
     inboxTooltip: "What people have sent you",
     inboxEmpty: "Nothing waiting. Somebody has to find something first.",
     closeInbox: "Close the inbox",
