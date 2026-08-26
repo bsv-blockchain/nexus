@@ -31,7 +31,6 @@ import {
   type MessagePerson,
   type StoreCategory,
 } from "@/lib/data";
-import { reserveTop, useReservedTop } from "@/lib/browser-reserve";
 import { agoLabel } from "@/lib/timeline";
 import {
   addCategory,
@@ -60,22 +59,34 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 const copy = content.tumbleupon;
 
-/*
- * How tall each menu is allowed to be, and how much room it claims.
- *
- * One number per menu, used for the CSS cap and for the gap it reserves above
- * the page — see lib/browser-reserve. Two numbers would drift, and the way you
- * would find out is a menu with its last row behind a website.
- */
-const FILTER_MENU_H = 224;
-const DISLIKE_MENU_H = 132;
+/** Breathing room between a menu's top edge and the top of the window. */
+const TOP_MARGIN = 12;
 
-/** Hold room above the page for as long as `open` is true. */
-function useTopGap(key: string, open: boolean, height: number): void {
-  useEffect(() => {
-    if (!open) return;
-    return reserveTop(key, height);
-  }, [key, open, height]);
+/**
+ * Menus open upward, and only as far as the window lets them.
+ *
+ * Downward is where a dropdown belongs and is the one direction that cannot
+ * work here: below this toolbar is the page, and a browsed page is a native
+ * view painting above the whole document — a menu over it is a menu behind it.
+ * The first attempt pushed the page down to make room, which worked and meant
+ * the site jumped every time a filter took focus.
+ *
+ * Upward there is nothing but chrome — the address bar, the tabs, the title bar
+ * — all ordinary DOM a menu can simply cover. What it must not do is run off
+ * the top of the window, so its height is capped at the distance from its own
+ * bottom edge to the top.
+ *
+ * Written straight onto the node in a ref callback rather than measured into
+ * state, which is the pattern Tooltip already uses for the same kind of
+ * correction: the measurement and the fix are both writes to the element that
+ * just mounted, so there is no round-trip and no second render. Anchored on
+ * `bottom` rather than height, so the cap is the same however long the list
+ * inside gets.
+ */
+function capToWindowTop(node: HTMLElement | null): void {
+  if (!node) return;
+  const bottom = node.getBoundingClientRect().bottom;
+  node.style.maxHeight = `${Math.max(0, Math.round(bottom - TOP_MARGIN))}px`;
 }
 
 /* ------------------------------------------------------------------ pieces */
@@ -155,7 +166,6 @@ function FilterField({
 }): ReactNode {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement | null>(null);
-  useTopGap("tumble-filter", open, FILTER_MENU_H);
 
   useEffect(() => {
     if (!open) return;
@@ -229,8 +239,8 @@ function FilterField({
 
       {open && suggestions.length > 0 && (
         <div
-          className="border-border bg-surface-raised absolute top-full right-0 left-0 z-30 mt-1 overflow-y-auto rounded-xl border p-1 shadow-2xl"
-          style={{ maxHeight: FILTER_MENU_H }}
+          ref={capToWindowTop}
+          className="border-border bg-surface-raised absolute right-0 bottom-full left-0 z-30 mb-1 overflow-y-auto rounded-xl border p-1 shadow-2xl"
         >
           <p className="text-muted-foreground px-2.5 pt-1.5 pb-1 text-[10px] font-bold tracking-wide uppercase">
             {copy.filterCategories}
@@ -243,15 +253,14 @@ function FilterField({
                 addCategory(category.id);
                 setQuery("");
               }}
-              className="focus-ring hover:bg-surface-hover flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left"
+              className="focus-ring hover:bg-surface-hover flex w-full items-center gap-2 rounded-lg px-2.5 py-1 text-left"
             >
-              <span className="min-w-0 flex-1">
-                <span className="block text-xs font-semibold">
-                  {category.label}
-                </span>
-                <span className="text-muted-foreground block truncate text-[10px]">
-                  {category.description}
-                </span>
+              {/* One line each. Upward, this menu gets whatever is between the
+                  toolbar and the top of the window — about 120px — and a
+                  two-line row spends half of that on a description that says
+                  what "Collectibles" already says. Four rows beat two. */}
+              <span className="min-w-0 flex-1 truncate text-xs font-semibold">
+                {category.label}
               </span>
             </button>
           ))}
@@ -304,7 +313,10 @@ function SharePopover({
   }
 
   return (
-    <div className="border-border bg-surface-raised absolute top-full right-0 z-40 mt-1.5 w-80 rounded-xl border p-3 shadow-2xl">
+    <div
+      ref={capToWindowTop}
+      className="border-border bg-surface-raised absolute right-0 bottom-full z-40 mb-1.5 w-80 overflow-y-auto rounded-xl border p-3 shadow-2xl"
+    >
       <p className="text-sm font-bold">{copy.shareTitle}</p>
       <p className="text-muted-foreground mt-0.5 text-[11px] text-pretty">
         {app ? app.name : copy.sharePageFallback}
@@ -506,11 +518,6 @@ export function TumbleBar({
   const [inboxOpen, setInboxOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [dislikeOpen, setDislikeOpen] = useState(false);
-  useTopGap("tumble-dislike", dislikeOpen, DISLIKE_MENU_H);
-  /* The share popover is a panel rather than a menu, so it claims its own
-     height — same rule, bigger number. */
-  useTopGap("tumble-share", shareOpen, 340);
-  const gap = useReservedTop();
   const here = appForUrl(url);
   const inbox = getTumbleInbox();
   const unread = inbox.filter(
@@ -642,8 +649,8 @@ export function TumbleBar({
           </button>
           {dislikeOpen && (
             <div
-              className="border-border bg-surface-raised absolute top-full left-0 z-40 mt-1 w-56 overflow-y-auto rounded-xl border p-1 shadow-2xl"
-              style={{ maxHeight: DISLIKE_MENU_H }}
+              ref={capToWindowTop}
+              className="border-border bg-surface-raised absolute bottom-full left-0 z-40 mb-1 w-56 overflow-y-auto rounded-xl border p-1 shadow-2xl"
             >
               <button
                 type="button"
@@ -745,23 +752,6 @@ export function TumbleBar({
 
       {inboxOpen && <InboxRow onClose={() => setInboxOpen(false)} />}
 
-      {/*
-        Room for whichever menu is open, held open in the document itself.
-
-        A browsed page is a native view painting above everything here, so a
-        dropdown over it is a dropdown behind it — no z-index reaches a sibling
-        the compositor puts on top. Hiding the page (`useHostOverlay`) is the
-        existing answer and the wrong one for a menu: taking the site away to
-        show a filter for the site answers the question by removing it.
-
-        So the menus draw into a gap instead. This spacer shrinks the pane
-        below, the pane's ResizeObserver re-pushes its rect, and the page moves
-        down by exactly the height of the thing you opened. Both are on screen,
-        which is the point.
-      */}
-      {gap > 0 && (
-        <div style={{ height: gap }} aria-hidden="true" className="shrink-0" />
-      )}
     </div>
   );
 }
