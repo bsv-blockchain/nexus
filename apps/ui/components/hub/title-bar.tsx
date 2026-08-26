@@ -126,6 +126,10 @@ export function TitleBar(): ReactNode {
 
   return (
     <header
+      /* Named so a popover elsewhere can measure where the chrome stops. The
+         browser's toolbar menus open upward and must not run under this strip;
+         see `capBelowTitleBar` in tumble-bar. */
+      data-nexus-title-bar=""
       /* `drag` on the strip, `no-drag` on each control. Doing it the other way
          round — dragging only on the gaps — leaves a window you can only move
          by finding a few pixels of nothing. */

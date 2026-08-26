@@ -59,8 +59,23 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 const copy = content.tumbleupon;
 
-/** Breathing room between a menu's top edge and the top of the window. */
-const TOP_MARGIN = 12;
+/** Breathing room between a menu's top edge and whatever is above it. */
+const TOP_MARGIN = 8;
+
+/**
+ * Where the chrome stops and a menu may begin.
+ *
+ * The workspaces strip is the one thing above these menus that is not part of
+ * the browser: it holds the window controls and the tabs you switch identity
+ * with, and a filter list sliding under it looks like a rendering fault rather
+ * than a long list. Measured rather than assumed, because its height is a CSS
+ * variable somebody can change. Falls back to the window top, which is the
+ * right answer on a build with no title bar at all.
+ */
+function ceilingY(): number {
+  const bar = document.querySelector("[data-nexus-title-bar]");
+  return bar ? bar.getBoundingClientRect().bottom : 0;
+}
 
 /**
  * Menus open upward, and only as far as the window lets them.
@@ -83,10 +98,10 @@ const TOP_MARGIN = 12;
  * `bottom` rather than height, so the cap is the same however long the list
  * inside gets.
  */
-function capToWindowTop(node: HTMLElement | null): void {
+function capBelowTitleBar(node: HTMLElement | null): void {
   if (!node) return;
   const bottom = node.getBoundingClientRect().bottom;
-  node.style.maxHeight = `${Math.max(0, Math.round(bottom - TOP_MARGIN))}px`;
+  node.style.maxHeight = `${Math.max(0, Math.round(bottom - ceilingY() - TOP_MARGIN))}px`;
 }
 
 /* ------------------------------------------------------------------ pieces */
@@ -239,31 +254,37 @@ function FilterField({
 
       {open && suggestions.length > 0 && (
         <div
-          ref={capToWindowTop}
+          ref={capBelowTitleBar}
           className="border-border bg-surface-raised absolute right-0 bottom-full left-0 z-30 mb-1 overflow-y-auto rounded-xl border p-1 shadow-2xl"
         >
-          <p className="text-muted-foreground px-2.5 pt-1.5 pb-1 text-[10px] font-bold tracking-wide uppercase">
+          <p className="text-muted-foreground px-1.5 pt-1 pb-1.5 text-[10px] font-bold tracking-wide uppercase">
             {copy.filterCategories}
           </p>
-          {suggestions.map((category) => (
-            <button
-              key={category.id}
-              type="button"
-              onClick={() => {
-                addCategory(category.id);
-                setQuery("");
-              }}
-              className="focus-ring hover:bg-surface-hover flex w-full items-center gap-2 rounded-lg px-2.5 py-1 text-left"
-            >
-              {/* One line each. Upward, this menu gets whatever is between the
-                  toolbar and the top of the window — about 120px — and a
-                  two-line row spends half of that on a description that says
-                  what "Collectibles" already says. Four rows beat two. */}
-              <span className="min-w-0 flex-1 truncate text-xs font-semibold">
+          {/*
+            Chips that wrap, not a row each.
+
+            Opening upward leaves this menu about a hundred pixels, and twelve
+            categories one to a line is a list you scroll through three at a
+            time. As chips the whole shelf is visible at once, which is what
+            makes it a picker rather than a queue — and they are the same shape
+            the chosen ones take in the field below, so choosing one is
+            visibly the same object moving.
+          */}
+          <div className="flex flex-wrap gap-1 px-1 pb-1">
+            {suggestions.map((category) => (
+              <button
+                key={category.id}
+                type="button"
+                onClick={() => {
+                  addCategory(category.id);
+                  setQuery("");
+                }}
+                className="focus-ring border-border hover:bg-surface-hover hover:border-accent rounded-full border px-2 py-1 text-[11px] font-semibold"
+              >
                 {category.label}
-              </span>
-            </button>
-          ))}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -314,7 +335,7 @@ function SharePopover({
 
   return (
     <div
-      ref={capToWindowTop}
+      ref={capBelowTitleBar}
       className="border-border bg-surface-raised absolute right-0 bottom-full z-40 mb-1.5 w-80 overflow-y-auto rounded-xl border p-3 shadow-2xl"
     >
       <p className="text-sm font-bold">{copy.shareTitle}</p>
@@ -649,7 +670,7 @@ export function TumbleBar({
           </button>
           {dislikeOpen && (
             <div
-              ref={capToWindowTop}
+              ref={capBelowTitleBar}
               className="border-border bg-surface-raised absolute bottom-full left-0 z-40 mb-1 w-56 overflow-y-auto rounded-xl border p-1 shadow-2xl"
             >
               <button
