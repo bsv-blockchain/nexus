@@ -77,3 +77,8 @@ export function setChosenPresets(chosen: PresetId[]): void {
 export function useChosenPresets(): PresetId[] {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
+
+/** The same answer outside a component, for stores that have to decide once. */
+export function getChosenPresets(): PresetId[] {
+  return getSnapshot();
+}

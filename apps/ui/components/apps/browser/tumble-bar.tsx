@@ -31,6 +31,7 @@ import {
   type MessagePerson,
   type StoreCategory,
 } from "@/lib/data";
+import { reserveTop, useReservedTop } from "@/lib/browser-reserve";
 import { agoLabel } from "@/lib/timeline";
 import {
   addCategory,
@@ -58,6 +59,24 @@ import { toast } from "sonner";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 const copy = content.tumbleupon;
+
+/*
+ * How tall each menu is allowed to be, and how much room it claims.
+ *
+ * One number per menu, used for the CSS cap and for the gap it reserves above
+ * the page — see lib/browser-reserve. Two numbers would drift, and the way you
+ * would find out is a menu with its last row behind a website.
+ */
+const FILTER_MENU_H = 224;
+const DISLIKE_MENU_H = 132;
+
+/** Hold room above the page for as long as `open` is true. */
+function useTopGap(key: string, open: boolean, height: number): void {
+  useEffect(() => {
+    if (!open) return;
+    return reserveTop(key, height);
+  }, [key, open, height]);
+}
 
 /* ------------------------------------------------------------------ pieces */
 
@@ -136,6 +155,7 @@ function FilterField({
 }): ReactNode {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement | null>(null);
+  useTopGap("tumble-filter", open, FILTER_MENU_H);
 
   useEffect(() => {
     if (!open) return;
@@ -208,7 +228,10 @@ function FilterField({
       </div>
 
       {open && suggestions.length > 0 && (
-        <div className="border-border bg-surface-raised absolute top-full right-0 left-0 z-30 mt-1 max-h-56 overflow-y-auto rounded-xl border p-1 shadow-2xl">
+        <div
+          className="border-border bg-surface-raised absolute top-full right-0 left-0 z-30 mt-1 overflow-y-auto rounded-xl border p-1 shadow-2xl"
+          style={{ maxHeight: FILTER_MENU_H }}
+        >
           <p className="text-muted-foreground px-2.5 pt-1.5 pb-1 text-[10px] font-bold tracking-wide uppercase">
             {copy.filterCategories}
           </p>
@@ -483,6 +506,11 @@ export function TumbleBar({
   const [inboxOpen, setInboxOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [dislikeOpen, setDislikeOpen] = useState(false);
+  useTopGap("tumble-dislike", dislikeOpen, DISLIKE_MENU_H);
+  /* The share popover is a panel rather than a menu, so it claims its own
+     height — same rule, bigger number. */
+  useTopGap("tumble-share", shareOpen, 340);
+  const gap = useReservedTop();
   const here = appForUrl(url);
   const inbox = getTumbleInbox();
   const unread = inbox.filter(
@@ -613,7 +641,10 @@ export function TumbleBar({
             <ChevronDown className="size-3" aria-hidden="true" />
           </button>
           {dislikeOpen && (
-            <div className="border-border bg-surface-raised absolute top-full left-0 z-40 mt-1 w-56 rounded-xl border p-1 shadow-2xl">
+            <div
+              className="border-border bg-surface-raised absolute top-full left-0 z-40 mt-1 w-56 overflow-y-auto rounded-xl border p-1 shadow-2xl"
+              style={{ maxHeight: DISLIKE_MENU_H }}
+            >
               <button
                 type="button"
                 onClick={() => {
@@ -713,6 +744,24 @@ export function TumbleBar({
       </div>
 
       {inboxOpen && <InboxRow onClose={() => setInboxOpen(false)} />}
+
+      {/*
+        Room for whichever menu is open, held open in the document itself.
+
+        A browsed page is a native view painting above everything here, so a
+        dropdown over it is a dropdown behind it — no z-index reaches a sibling
+        the compositor puts on top. Hiding the page (`useHostOverlay`) is the
+        existing answer and the wrong one for a menu: taking the site away to
+        show a filter for the site answers the question by removing it.
+
+        So the menus draw into a gap instead. This spacer shrinks the pane
+        below, the pane's ResizeObserver re-pushes its rect, and the page moves
+        down by exactly the height of the thing you opened. Both are on screen,
+        which is the point.
+      */}
+      {gap > 0 && (
+        <div style={{ height: gap }} aria-hidden="true" className="shrink-0" />
+      )}
     </div>
   );
 }

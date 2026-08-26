@@ -27,10 +27,18 @@ import {
   unblockCategory,
   useTumble,
 } from "@/lib/tumbleupon-store";
-import { Send, ShieldCheck, Undo2 } from "lucide-react";
+import {
+  extensionIsOn,
+  removeExtension,
+  setExtensionEnabled,
+  useInstalledExtensions,
+} from "@/lib/extensions-store";
+import { toast } from "sonner";
+import { ExternalLink, Send, ShieldCheck, Trash2, Undo2 } from "lucide-react";
 import type { ReactNode } from "react";
 
 const copy = content.tumbleupon;
+const extCopy = content.extensions;
 
 function Section({
   title,
@@ -57,7 +65,10 @@ function Section({
 export function TumbleUponPage(): ReactNode {
   const tumble = useTumble();
   const { openLinkInBrowser, activeSpaceId } = useHub();
+  const installed = useInstalledExtensions();
   const extension = getExtensions().find((entry) => entry.id === "tumbleupon");
+  const present = installed.some((entry) => entry.id === "tumbleupon");
+  const on = extensionIsOn("tumbleupon");
   const people = getTumbleConnections();
   const catalogue = getTumbleCatalogue();
   const liked = catalogue.filter((app) => tumble.liked.includes(app.slug));
@@ -86,8 +97,54 @@ export function TumbleUponPage(): ReactNode {
             <p className="text-muted-foreground mt-1 text-sm text-pretty">
               {copy.tagline}
             </p>
+            {extension && (
+              <p className="text-muted-foreground mt-1 text-xs">
+                {extCopy.version} {extension.version}
+              </p>
+            )}
           </div>
         </header>
+
+        {/* The same row every other extension's page carries. This one has more
+            to show underneath it, which is not a reason for it to be the one
+            page you cannot turn its extension off from. */}
+        {extension &&
+          (present ? (
+            <div className="mt-5 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setExtensionEnabled(extension.id, !on)}
+                className="focus-ring border-border hover:bg-surface-hover rounded-full border px-3.5 py-1.5 text-xs font-semibold"
+              >
+                {on ? extCopy.turnOff : extCopy.turnOn}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  removeExtension(extension.id);
+                  toast.success(
+                    extCopy.removedToast.replace("{name}", extension.name),
+                  );
+                }}
+                className="focus-ring border-border hover:bg-surface-hover flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold"
+              >
+                <Trash2 className="size-3.5" aria-hidden="true" />
+                {extCopy.remove}
+              </button>
+              <button
+                type="button"
+                onClick={() => openLinkInBrowser(activeSpaceId, extension.site)}
+                className="focus-ring text-muted-foreground hover:text-foreground flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-semibold"
+              >
+                <ExternalLink className="size-3.5" aria-hidden="true" />
+                {extCopy.homepage}
+              </button>
+            </div>
+          ) : (
+            <p className="border-border text-muted-foreground mt-5 rounded-xl border border-dashed p-4 text-sm">
+              {extCopy.removedNote}
+            </p>
+          ))}
 
         <Section title={copy.people} hint={copy.peopleHint}>
           <div className="grid gap-3 sm:grid-cols-2">

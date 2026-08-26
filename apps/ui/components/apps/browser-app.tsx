@@ -148,6 +148,11 @@ function NativeSiteFrame({
       }
       // Wide layouts give the browse pane a real content region: its rect is already
       // correct, and the floating bar does not exist there.
+      /* Straight from this element's rect. A menu in the toolbar that has to be
+         seen over the page does not adjust these numbers — it puts a spacer in
+         the document, which shrinks this box, which fires the ResizeObserver
+         below. One mechanism, and it works in the web build too. See
+         lib/browser-reserve. */
       void host.tabs.setBounds(id, {
         x: Math.round(r.left),
         y: Math.round(r.top),

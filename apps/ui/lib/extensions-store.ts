@@ -18,6 +18,7 @@
 
 import { useSyncExternalStore } from "react";
 import { getExtensions, type BrowserExtension } from "@/lib/data";
+import { getChosenPresets } from "@/lib/presets-store";
 
 const KEY = "nexus.extensions";
 
@@ -55,13 +56,40 @@ function emit(): void {
   for (const listener of listeners) listener();
 }
 
+/**
+ * Whether a first run leaves TumbleUpon installed.
+ *
+ * It is a discovery tool, and discovery needs somewhere to go. Somebody who
+ * picked no presets has an empty rail and nothing to be shown around; somebody
+ * who picked only Thinker asked for a quiet setup, and a toolbar that offers to
+ * fling them at a marketplace is the opposite of what they said. Every other
+ * setup gets it, because a rail with apps on it is a rail whose neighbours are
+ * worth meeting.
+ *
+ * Read once, when the store hydrates, rather than watched: this is a question
+ * about how the workspace was set up, not a rule that should keep re-applying
+ * and undo somebody removing it later.
+ */
+function wantedByDefault(): boolean {
+  const chosen = getChosenPresets();
+  if (chosen.length === 0) return false;
+  return !(chosen.length === 1 && chosen[0] === "thinker");
+}
+
 /** Applied after the first paint — same hydration rule as the content mode. */
 export function hydrateExtensions(): void {
   if (typeof window === "undefined") return;
   try {
     const raw = window.localStorage.getItem(KEY);
-    if (!raw) return;
-    state = { ...EMPTY, ...(JSON.parse(raw) as Partial<State>) };
+    if (raw) {
+      state = { ...EMPTY, ...(JSON.parse(raw) as Partial<State>) };
+    } else if (!wantedByDefault()) {
+      /* No stored answer yet, so this is the first look after a first run.
+         Removed rather than merely disabled: not offered is a cleaner thing to
+         be than offered and switched off, and the manager still lists it under
+         the store link if somebody goes looking. */
+      state = { ...EMPTY, removed: ["tumbleupon"] };
+    }
     rebuild();
     for (const listener of listeners) listener();
   } catch {
