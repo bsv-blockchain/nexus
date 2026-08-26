@@ -28,6 +28,7 @@ export const INTERNAL_SCHEME = "nexus://";
 
 export const INTERNAL_PAGES: Record<string, { title: string }> = {
   "nexus://extensions": { title: "Extensions" },
+  "nexus://tumbleupon": { title: "TumbleUpon" },
 };
 
 /** The internal page this URL names, or null for an ordinary address. */

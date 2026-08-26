@@ -21,6 +21,7 @@ import {
 import { ecosystems } from "./ecosystems";
 import { linkedDevices } from "./devices";
 import { browserExtensions } from "./extensions";
+import { tumbleConnections, tumbleInbox } from "./tumbleupon";
 import { foreignTokens, tokenBalances, tokens } from "./tokens";
 import { attributeColors, collectibles } from "./collectibles";
 import { paymentLinks, splitBills } from "./wallet-extras";
@@ -45,6 +46,7 @@ import { walletAccounts, walletTransactions } from "./wallet";
 import { DEMO_SURFACES, shippedApps } from "../surfaces";
 import type {
   BrowserExtension,
+  TumbleInboxItem,
   LinkedDevice,
   AppCollection,
   BrowserTab,
@@ -431,6 +433,31 @@ export function getLocalEcosystem(): Ecosystem {
   const local = ecosystems.find((eco) => eco.local);
   if (!local) throw new Error("No local ecosystem in lib/data/ecosystems.ts");
   return local;
+}
+
+/* tumbleupon */
+/** The people you tumble with, as the app knows them. @see lib/data/tumbleupon */
+export function getTumbleConnections(): MessagePerson[] {
+  return tumbleConnections
+    .map((id) => messagePeople.find((person) => person.handle === id))
+    .filter((person): person is MessagePerson => Boolean(person));
+}
+
+/** What is waiting in the TumbleUpon inbox, newest first. */
+export function getTumbleInbox(): TumbleInboxItem[] {
+  return [...tumbleInbox].sort((a, b) => a.minutesAgo - b.minutesAgo);
+}
+
+/**
+ * Everything Tumble! can land on.
+ *
+ * The store's catalogue minus the Essentials, which are the apps every setup
+ * already has — being sent to a wallet you are already signed into is not
+ * discovery. Web apps only: there is nothing to open for an app with no
+ * address.
+ */
+export function getTumbleCatalogue(): HubApp[] {
+  return getHubApps().filter((app) => !app.essential && app.web);
 }
 
 /* extensions */

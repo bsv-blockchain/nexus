@@ -19,6 +19,28 @@ import type { BrowserExtension } from "./types";
  */
 export const browserExtensions: BrowserExtension[] = [
   {
+    /*
+     * Ours, and the reason this manager has more than one row.
+     *
+     * StumbleUpon's idea — a button that takes you somewhere you did not know
+     * to look for — aimed at a web where the interesting thing is that a site
+     * can hold a wallet. The catalogue is the App Store minus the Essentials,
+     * so what it lands on is a real address somebody can open.
+     */
+    id: "tumbleupon",
+    name: "TumbleUpon",
+    blurb: "Discover the best of web3, one click at a time.",
+    version: "1.0.0",
+    mark: { letters: "Tu", background: "#4353ff", color: "#ffffff" },
+    enabled: true,
+    permissions: [
+      "Read the address of the page you are on",
+      "Open pages in the tab you are using",
+    ],
+    site: "https://tumbleupon.nexus.free",
+    commands: ["Tumble to a new site", "Like this site", "Open the inbox"],
+  },
+  {
     id: "ublock-origin",
     name: "uBlock Origin",
     blurb: "Finally, an efficient blocker. Easy on CPU and memory.",

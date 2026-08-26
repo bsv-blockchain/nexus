@@ -1,14 +1,23 @@
 "use client";
 
 import { Inspector } from "@/components/hub/inspector";
+import { TumbleBar } from "@/components/apps/browser/tumble-bar";
+import { internalPage } from "@/lib/tabs";
 import { ExtensionsPage } from "@/components/apps/extensions-page";
+import { TumbleUponPage } from "@/components/apps/tumbleupon-page";
 import { grantConnection, originOf } from "@/lib/connections-store";
 import { useSettings } from "@/lib/settings-store";
 import { sameUrl } from "@/lib/tabs";
 import { activeWalletFor, useWallets } from "@/lib/wallets-store";
 import { useHub } from "@/components/hub/hub-provider";
 import { OriginChip } from "@/components/hub/origin-chip";
-import { getHubApps, getMockPage, type BrowserTab, type MockPage } from "@/lib/data";
+import {
+  getExtensions,
+  getHubApps,
+  getMockPage,
+  type BrowserTab,
+  type MockPage,
+} from "@/lib/data";
 import { forgetShellTab, noteShellTab } from "@/lib/wallet-reach";
 import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -360,6 +369,10 @@ function BrowserCanvas({
     return <ExtensionsPage />;
   }
 
+  if (tab.url === "nexus://tumbleupon") {
+    return <TumbleUponPage />;
+  }
+
   // Inside a shell every real URL goes to the native layer — the mock/localOnly
   // fallbacks exist only because the web build cannot embed un-frameable hosts.
   if (hasShell) {
@@ -394,7 +407,14 @@ export function BrowserApp(): ReactNode {
 }
 
 function BrowserPage(): ReactNode {
-  const { activeTab, activeRef, setActiveRef, unpinSite } = useHub();
+  const { activeTab, activeRef, setActiveRef, unpinSite, navigateActiveTab } =
+    useHub();
+  /* The toolbar follows the extension's own switch, so turning TumbleUpon off
+     in the manager is what takes the bar away — otherwise that switch would be
+     a control with nothing behind it. */
+  const tumbleOn = getExtensions().some(
+    (entry) => entry.id === "tumbleupon" && entry.enabled,
+  );
   const hasShell = useHasShell();
 
   if (!activeTab) {
@@ -453,6 +473,19 @@ function BrowserPage(): ReactNode {
           url={activeTab.url}
           onOpenInBrowser={() => setActiveRef({ kind: "app", slug: "browser" })}
           onRemove={() => unpinSite(siteId)}
+        />
+      )}
+      {/*
+        The extension's toolbar, above the page it is about.
+
+        Only over real pages: the browser's own screens are not sites you can
+        like, share or tumble away from, and a discovery bar over the extensions
+        manager is a bar offering to send somebody a settings screen.
+      */}
+      {tumbleOn && !internalPage(activeTab.url) && (
+        <TumbleBar
+          url={activeTab.url}
+          onNavigate={(url) => navigateActiveTab(url)}
         />
       )}
       <div className="min-h-0 flex-1">

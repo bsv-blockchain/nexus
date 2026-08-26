@@ -1,6 +1,7 @@
 "use client";
 
 import { FirstRun } from "@/components/hub/first-run";
+import { hydrateTumble, useTumble } from "@/lib/tumbleupon-store";
 import {
   hydrateGrantedConnections,
   useGrantedConnections,
@@ -266,6 +267,10 @@ export function HubShell(): ReactNode {
     getContentModeServerSnapshot,
   );
   useEffect(hydrateContentMode, []);
+  /* Same reason again: TumbleUpon's likes are read during render and the server
+     has no storage to read them from. */
+  useTumble();
+  useEffect(hydrateTumble, []);
   /* Same reason, same shape: granted connections are read during render and the
      server has no storage to read them from. */
   const granted = useGrantedConnections();

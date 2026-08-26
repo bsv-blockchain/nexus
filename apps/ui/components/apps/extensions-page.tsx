@@ -190,7 +190,14 @@ function ShortcutRows({ extension }: { extension: BrowserExtension }): ReactNode
 }
 
 export function ExtensionsPage(): ReactNode {
-  const { openLinkInBrowser, activeSpaceId } = useHub();
+  const { openLinkInBrowser, activeSpaceId, createTab } = useHub();
+
+  /* Only ours has a page to open. A details screen for uBlock would be a screen
+     we would have to invent the contents of, which is the kind of fixture that
+     reads as a feature until somebody clicks it. */
+  const onDetails = (id: string): void => {
+    if (id === "tumbleupon") createTab("nexus://tumbleupon");
+  };
   const extensions = getExtensions();
   const [view, setView] = useState<View>("installed");
   const [query, setQuery] = useState("");
@@ -309,7 +316,7 @@ export function ExtensionsPage(): ReactNode {
                             : [...current, extension.id],
                         )
                       }
-                      onDetails={() => setQuery("")}
+                      onDetails={() => onDetails(extension.id)}
                       onRemove={() => setQuery("")}
                     />
                   ))}

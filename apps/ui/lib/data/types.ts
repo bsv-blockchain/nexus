@@ -324,6 +324,28 @@ export interface Space {
  */
 export type PageId = "getting-started";
 
+/**
+ * A site somebody sent you through TumbleUpon.
+ *
+ * @see lib/data/tumbleupon.ts
+ */
+export interface TumbleInboxItem {
+  id: string;
+  /** a `messagePeople` id — the same person Messages knows */
+  fromPersonId: string;
+  /** the app they sent, by its slug in the catalogue */
+  appSlug: string;
+  message: string;
+  /**
+   * Minutes since it arrived, not a stamp.
+   *
+   * Same reasoning as `agoLabel` in lib/timeline: a static export has no "now",
+   * and an inbox whose only message is three months old reads as abandoned.
+   */
+  minutesAgo: number;
+  read: boolean;
+}
+
 /** An extension this browser is carrying. @see lib/data/extensions.ts */
 export interface BrowserExtension {
   id: string;
