@@ -314,7 +314,37 @@ export interface Space {
 }
 
 /** internal pages that render in the main view instead of a website */
-export type PageId = "getting-started";
+/**
+ * A screen the browser shows instead of a page.
+ *
+ * Chrome has `chrome://` for these; this is the same idea with a smaller
+ * vocabulary. They take the canvas the webview would have had, which is what
+ * makes them feel like part of the browser rather than a site it happens to be
+ * pointed at.
+ */
+export type PageId = "getting-started" | "extensions";
+
+/** An extension this browser is carrying. @see lib/data/extensions.ts */
+export interface BrowserExtension {
+  id: string;
+  name: string;
+  blurb: string;
+  version: string;
+  /** its mark, drawn rather than fetched — see the note in the fixture */
+  mark: { letters: string; background: string; color: string };
+  enabled: boolean;
+  /** what it asked for at install, in the words the prompt used */
+  permissions: string[];
+  site: string;
+  /**
+   * The things it can be given a keyboard shortcut for.
+   *
+   * Its own commands in its own order, because the shortcuts screen lists them
+   * verbatim and a re-ordered or invented list would be a screen about an
+   * extension nobody ships.
+   */
+  commands: string[];
+}
 
 /** table: space_items — folders, their children, live folders and pins */
 export interface SpaceItem {

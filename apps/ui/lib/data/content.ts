@@ -1781,6 +1781,31 @@ export const content = {
     copy: "Copy link",
     copied: "Copied!",
   },
+  /* The extensions manager, on the canvas the page would have had. */
+  extensions: {
+    title: "Extensions",
+    search: "Search extensions",
+    searchPlaceholder: "Search extensions",
+    developerMode: "Developer mode",
+    installed: "My extensions",
+    shortcuts: "Keyboard shortcuts",
+    allExtensions: "All extensions",
+    details: "Details",
+    remove: "Remove",
+    on: "on",
+    off: "off",
+    manage: "Manage",
+    notSet: "Not set",
+    editShortcut: "Set a shortcut",
+    clearShortcut: "Clear the shortcut",
+    /* Where a chord applies. Chrome offers "In Chrome" or "Global"; this is
+       the same choice named for the browser it is in. */
+    inNexus: "In Nexus",
+    discover: "Discover more extensions and themes on the",
+    storeName: "Chrome Web Store",
+    storeUrl: "https://chromewebstore.google.com/",
+    noneMatch: "Nothing installed matches “{query}”.",
+  },
   gettingStarted: {
     /*
      * Two lines because the layout gives it two, and the second one has to earn

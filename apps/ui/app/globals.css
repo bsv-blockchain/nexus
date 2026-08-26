@@ -505,6 +505,25 @@ html.theme-animate {
  * onto `documentElement`, so these `var()` references resolve to whichever
  * custom theme is active — nothing extra to wire.
  */
+/*
+ * Toasts are not part of the window you can drag by.
+ *
+ * They arrive top-centre, which on desktop is directly over the title bar —
+ * and that bar is `-webkit-app-region: drag`, which macOS resolves before the
+ * click reaches the page. So the dismiss X looked and behaved like a button
+ * right up until you pressed it, at which point the window moved instead. The
+ * toaster portals to `<body>`, outside the tree where title-bar.tsx sets this,
+ * so it has to opt out for itself.
+ *
+ * On the whole toaster rather than the button: an action you cannot press is
+ * the loudest version of the bug, but dragging the window by a toast you were
+ * trying to read is the same mistake wearing a quieter coat.
+ */
+html [data-sonner-toaster],
+html [data-sonner-toaster] [data-sonner-toast] {
+  -webkit-app-region: no-drag;
+}
+
 html [data-sonner-toaster][data-sonner-theme] {
   /* Dismiss belongs in the top-right corner. */
   --toast-close-button-start: unset;

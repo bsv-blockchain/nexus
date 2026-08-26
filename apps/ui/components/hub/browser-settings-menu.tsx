@@ -48,7 +48,7 @@ export function BrowserSettingsMenu({
   const [developerMode, setDeveloperMode] = useState(false);
   const [certOpen, setCertOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const { activeTab, pinSite, pinnedSites } = useHub();
+  const { activeTab, pinSite, pinnedSites, openPage } = useHub();
 
   /*
    * The page in this tab, put on the rail as an app.
@@ -115,30 +115,58 @@ export function BrowserSettingsMenu({
         ))}
       </div>
 
-      <h3 className="px-1 pt-3 pb-1.5 text-sm font-semibold">
-        {copy.extensions}
-      </h3>
-      <div className="flex gap-2">
-        <span
-          className="bg-muted text-negative relative flex size-11 items-center justify-center rounded-xl text-sm font-bold"
-          aria-label="uBlock Origin — 2 items blocked"
-        >
-          uB
-          <span
-            className="bg-negative absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full text-[10px] font-bold text-white"
-            aria-hidden="true"
+      {/*
+        The heading and the tiles are one hover target.
+
+        `Manage` appears on the right of the heading rather than beside each
+        tile: there is one manager and it is about all of them, so a control per
+        extension would be the same destination offered N times. Grouping the
+        heading with the row it labels means the reveal happens wherever the
+        pointer is in this section — hovering a tile and finding nothing, then
+        having to travel up to the words, is the version of this that feels
+        broken.
+      */}
+      <div className="group/ext">
+        <div className="flex items-center gap-2 px-1 pt-3 pb-1.5">
+          <h3 className="flex-1 text-sm font-semibold">{copy.extensions}</h3>
+          {/* Focusable at all times, visible on hover — a control that only
+              exists under a pointer is a control a keyboard cannot reach. */}
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              openPage("extensions");
+            }}
+            className="focus-ring text-muted-foreground hover:text-foreground rounded-md px-1.5 py-0.5 text-xs font-semibold opacity-0 transition-opacity group-hover/ext:opacity-100 focus-visible:opacity-100"
           >
-            2
+            {content.extensions.manage}
+          </button>
+        </div>
+        <div className="flex gap-2">
+          <span
+            className="bg-muted text-negative relative flex size-11 items-center justify-center rounded-xl text-sm font-bold"
+            aria-label="uBlock Origin — 2 items blocked"
+          >
+            uB
+            <span
+              className="bg-negative absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full text-[10px] font-bold text-white"
+              aria-hidden="true"
+            >
+              2
+            </span>
           </span>
-        </span>
-        <button
-          type="button"
-          aria-label="Add extension"
-          onClick={onClose}
-          className="focus-ring bg-muted hover:bg-surface-hover flex size-11 items-center justify-center rounded-xl"
-        >
-          <Plus className="size-4.5" aria-hidden="true" />
-        </button>
+          <button
+            type="button"
+            aria-label="Add extension"
+            onClick={() => {
+              onClose();
+              openPage("extensions");
+            }}
+            className="focus-ring bg-muted hover:bg-surface-hover flex size-11 items-center justify-center rounded-xl"
+          >
+            <Plus className="size-4.5" aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       <h3 className="px-1 pt-3 pb-1.5 text-sm font-semibold">
@@ -231,15 +259,23 @@ export function BrowserSettingsMenu({
               onClick={onClose}
             />
             <MenuSeparator />
+            {/* Both of these named the extensions manager and then closed the
+                menu without opening anything. */}
             <MenuItem
               icon={Puzzle}
               label={copy.more.manageExtensions}
-              onClick={onClose}
+              onClick={() => {
+                onClose();
+                openPage("extensions");
+              }}
             />
             <MenuItem
               icon={Plus}
               label={copy.more.addExtension}
-              onClick={onClose}
+              onClick={() => {
+                onClose();
+                openPage("extensions");
+              }}
             />
             <MenuSeparator />
             <MenuItem
