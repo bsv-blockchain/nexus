@@ -33,6 +33,7 @@ import {
   Layers,
   LayoutGrid,
   type LucideIcon,
+  PanelLeftOpen,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -249,6 +250,7 @@ export function IconRail(): ReactNode {
     mainView,
     setMainView,
     railCollapsed,
+    toggleRail,
     openSettings,
     activeRef,
     openApp,
@@ -891,6 +893,8 @@ export function IconRail(): ReactNode {
         The buttons stay last because they are the things you press, and a
         control that moves depending on whether a label above it rendered is a
         control you have to look for.
+
+        Collapsed, a third joins them at the bottom — the way back. See below.
       */}
       <div className="flex w-full shrink-0 flex-col items-center gap-1 pt-3">
         <div
@@ -900,6 +904,30 @@ export function IconRail(): ReactNode {
               : "justify-between gap-1 px-2"
           }`}
         >
+          {/*
+            The way back, and only while there is somewhere to come back from.
+
+            Closing the panel lives beside the panel's own title, which is a
+            good home for it right up to the moment it works: the button that
+            closed the panel leaves with the panel, and the only thing left
+            that reopens it is a keyboard chord nobody was told about. So the
+            rail — the one column that never goes away — holds the other half.
+
+            First in the DOM because the collapsed footer is `flex-col-reverse`,
+            which puts it under the gear rather than over it. Expanded, the row
+            is the two buttons it has always been, since there is nothing to
+            expand.
+          */}
+          {railCollapsed && (
+            <button
+              type="button"
+              aria-label={content.hub.expandPanel}
+              onClick={toggleRail}
+              className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground rounded-md p-1.5"
+            >
+              <PanelLeftOpen className="size-4" aria-hidden="true" />
+            </button>
+          )}
           {/* Settings, not the panel toggle: closing the panel now lives beside
             the panel's own title, and the rail keeps the two things that are
             about the whole product rather than about one app. */}
