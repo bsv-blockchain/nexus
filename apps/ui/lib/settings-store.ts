@@ -201,6 +201,40 @@ export interface SettingsState {
    * screen states the satoshi equivalent beside it at the live rate.
    */
   autoSwapCapCents: number;
+  /**
+   * Whether a connected card may buy BSV mid-payment to cover a shortfall.
+   *
+   * The last link in a chain the two settings above start: one-click decides
+   * whether paying asks, auto-swap converts something else you hold, and this
+   * one runs when there is nothing left to convert. Off by default, because
+   * it is the only one of the three that reaches outside the wallet and moves
+   * somebody's actual bank money.
+   */
+  cardTopUp: boolean;
+  /**
+   * Linked phone ids where tap-to-pay is switched on.
+   *
+   * Per device rather than one global flag, because the answer genuinely
+   * differs per device: the phone you carry and the one in a drawer are not
+   * the same decision, and the platform underneath changes what the row can
+   * even offer.
+   */
+  walletPayDevices: string[];
+  /**
+   * How much Google Pay may approve before Nexus asks, in cents.
+   *
+   * Android only, and this is Nexus's own ceiling rather than Google's — worth
+   * being exact about, because the platform's threshold is going away. Google
+   * Wallet used to skip the device unlock under a regional limit (about £45 in
+   * the UK, CAD$100 in Canada) and is moving to requiring an unlock for every
+   * payment everywhere. So this number cannot promise that nothing happens; it
+   * only says whether Nexus adds a prompt of its own on top.
+   *
+   * iOS has no equivalent and is not given one. Apple authenticates every
+   * in-app payment with Face ID, Touch ID or the passcode, with no threshold
+   * and no way for an app to ask for one — see PKPaymentAuthorizationController.
+   */
+  walletPayCapCents: number;
   strangerFeeCents: number;
   /**
    * Whether a metanet-enabled site gets your wallet without being asked.
@@ -374,6 +408,14 @@ const INITIAL: SettingsState = {
   /* $2.18 — the house number, and the same figure the cross-chain fee is a
      percentage of. Small enough that a swap under it is not a decision. */
   autoSwapCapCents: 218,
+  cardTopUp: false,
+  /* The phone in your pocket, already set up. The Pixel is not, so the screen
+     shows both sides of the switch without anybody having to press it. */
+  walletPayDevices: ["dev-phone"],
+  /* $21.80 — the house number an order of magnitude up, which also lands where
+     the real contactless limits sit: £45 in the UK, CAD$100 in Canada. A
+     coffee goes through, a coat does not. */
+  walletPayCapCents: 2_180,
   strangerFeeCents: 1,
   // See the field above for why the default is the permissive one.
   autoConnectSites: "auto",

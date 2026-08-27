@@ -489,6 +489,37 @@ export interface LinkedDevice {
   current: boolean;
 }
 
+/** table: funding_cards */
+/**
+ * A bank card connected to the wallet, as the wallet is allowed to remember it.
+ *
+ * Four digits, a network and a month — the parts a person needs to tell two of
+ * their own cards apart, and nothing a thief could spend. There is deliberately
+ * no field for the number: the wallet never holds one. A connected card is a
+ * token held by the processor, and this row is the receipt for that.
+ *
+ * `capturedOn` is the device the details were typed or photographed on, which
+ * is the whole point of the pairing flow: the number is entered once, on
+ * whichever screen you trust, and the desktop only ever learns the last four.
+ *
+ * @see lib/data/cards.ts
+ * @see components/apps/settings/card-sheet.tsx
+ */
+export interface FundingCard {
+  id: string;
+  network: "Visa" | "Mastercard" | "American Express";
+  /** the only digits anybody keeps */
+  last4: string;
+  /** MM/YY, the way it is embossed */
+  expiry: string;
+  /** as printed, which is to say shouting */
+  holder: string;
+  /** a LinkedDevice id — where the number was entered */
+  capturedOn: string;
+  /** days rather than a date, for the reason `lastActiveMinutes` gives above */
+  addedDaysAgo: number;
+}
+
 export interface WalletAccount {
   id: string;
   label: string;

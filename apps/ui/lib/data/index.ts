@@ -20,6 +20,7 @@ import {
 } from "./messages";
 import { ecosystems } from "./ecosystems";
 import { linkedDevices } from "./devices";
+import { fundingCards } from "./cards";
 import { browserExtensions } from "./extensions";
 import { tumbleConnections, tumbleInbox } from "./tumbleupon";
 import { foreignTokens, tokenBalances, tokens } from "./tokens";
@@ -48,6 +49,7 @@ import type {
   BrowserExtension,
   TumbleInboxItem,
   LinkedDevice,
+  FundingCard,
   AppCollection,
   BrowserTab,
   ChainTransaction,
@@ -495,6 +497,19 @@ export function getExtensions(): BrowserExtension[] {
  */
 export function getLinkedDevices(): LinkedDevice[] {
   return [...linkedDevices].sort((a, b) => Number(b.current) - Number(a.current));
+}
+
+/* cards */
+/**
+ * The bank cards already connected to the wallet.
+ *
+ * Not gated on the empty content mode, for the same reason the device list is
+ * not: a wallet with no satoshis in it still has whatever you connected to fund
+ * it, and a card that disappeared when the fixtures emptied would be claiming
+ * your bank had dropped you.
+ */
+export function getFundingCards(): FundingCard[] {
+  return fundingCards;
 }
 
 /* tokens */

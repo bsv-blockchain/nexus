@@ -2253,6 +2253,86 @@ export const content = {
       autoSwapStanding: "On by default from Settings → Payments.",
       autoSwapPerPayment:
         "Get paid still lets you keep a single payment in the coin it was sent in.",
+      /* ---- Cards, between the two halves ------------------------------
+         A card is money coming in, so it sits under Receiving; it is money
+         coming in so that money can go out, so it sits above Spending. */
+      cardsTitle: "Cards",
+      cardsHint:
+        "A bank card the wallet can buy bitcoin with \u2014 to top itself up mid-payment, or because you asked it to.",
+      /* Said once, here, because Autofill has a switch with almost this name
+         and they are opposite things: that one types a number into somebody
+         else's checkout, this one funds the wallet you pay from. */
+      cardsNotAutofill:
+        "Not the same as Autofill\u2019s payment cards, which fills a number into someone else\u2019s checkout. This one only ever buys bitcoin.",
+      cardAdd: "Connect a card",
+      cardAddHint: "Enter it on your phone, or here.",
+      cardNone: "No card connected.",
+      cardAddedFrom: "Added from {device}, {ago} ago",
+      /* Separate rather than a clever suffix: `agoLabel` answers "now" for
+         anything under a minute, and "Added from your phone, now ago" is what
+         a template gets you for it. */
+      cardAddedFromNew: "Added from {device}, just now",
+      cardAddedHere: "Added on this device",
+      cardAddedFromUnknown: "Added on a device that is no longer linked",
+      cardExpires: "Expires {expiry}",
+      cardRemove: "Remove",
+      cardRemoved: "Card removed",
+      cardConnected: "Card connected",
+      cardBuy: "Buy bitcoin with this card",
+      cardBuyHint: "Opens the wallet, with the card already chosen.",
+      cardTopUp: "Top up with a card when a swap cannot cover it",
+      cardTopUpHint:
+        "The last resort, after converting something you already hold. Off, a payment you cannot cover is simply refused.",
+      cardTopUpNeedsCard: "Connect a card first.",
+
+      /* ---- The connect sheet ------------------------------------------- */
+      cardSheetTitle: "Connect a card",
+      cardSheetLead:
+        "The number is entered once, on whichever screen you trust. Nexus keeps the last four digits and nothing else.",
+      cardSheetPhone: "Use your phone",
+      cardSheetPhoneHint:
+        "Point Nexus on your phone at this code. It will offer to photograph the card or take it typed.",
+      cardSheetSteps: [
+        "Open Nexus on your phone",
+        "Settings \u203a Payments \u203a Connect a card",
+        "Point it at this code",
+      ],
+      cardSheetOr: "or",
+      cardSheetScan: "Photograph the card",
+      cardSheetScanHint: "The camera reads the number off the front.",
+      cardSheetType: "Type it in",
+      cardSheetTypeHere: "Type it here instead",
+      cardSheetScanning: "Hold the card inside the frame",
+      cardSheetScanned: "Read from the card. Check it before you continue.",
+      cardSheetNumber: "Card number",
+      cardSheetExpiry: "Expires",
+      cardSheetCvc: "Security code",
+      cardSheetHolder: "Name on the card",
+      cardSheetSubmit: "Connect",
+      cardSheetBack: "Back",
+      cardSheetNote:
+        "Nothing is sent anywhere. A card connected here lasts as long as this browser remembers it.",
+      cardSheetInvalid: "That does not look like a card number.",
+
+      /* ---- Tap to pay, one row per linked phone ------------------------- */
+      walletPayTitle: "Tap to pay",
+      walletPayHint:
+        "Paying from a phone you are holding, using the card already in it. One row per linked phone, because the platform decides what the row can offer.",
+      walletPayNone: "No phone linked yet. Pair one in General to pay by tap.",
+      applePay: "Apple Pay",
+      googlePay: "Google Pay",
+      /* Stated rather than implied. Somebody who has just set an amount on the
+         Android row will look for one here, and the honest answer is that iOS
+         does not have the concept \u2014 not that we forgot to build it. */
+      applePayAlways:
+        "Every payment is confirmed with Face ID, Touch ID or your passcode. Apple has no threshold to set and does not let an app add one.",
+      googlePayCap: "Approve up to this without asking",
+      googlePayCapHint:
+        "Nexus\u2019s own ceiling, not Google\u2019s. Above it, Nexus asks as well. Google Wallet is separately moving to requiring a device unlock for every payment, which happens whatever this says.",
+      walletPayCapAsk: "Always ask",
+      walletPayThisPhone: "the phone you are holding",
+      walletPayOff: "Off",
+
       spendingTitle: "Spending",
       autoSwapSpend: "Auto-swap into BSV when spending",
       autoSwapSpendHint:

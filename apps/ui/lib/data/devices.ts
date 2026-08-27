@@ -23,6 +23,22 @@ export const linkedDevices: LinkedDevice[] = [
     lastActiveMinutes: null,
     current: true,
   },
+  /*
+   * A second phone, and an Android one.
+   *
+   * Not padding. Payments draws one row per linked phone and the row differs by
+   * platform — Apple authenticates every payment and has no threshold to set,
+   * Google's has one — so a device list with a single iPhone in it can only
+   * ever show half of that screen. Two phones is also just what people have.
+   */
+  {
+    id: "dev-android",
+    label: "Pixel 9 Pro",
+    platform: "Nexus Android 2026.0.6",
+    place: "Zug, Switzerland",
+    lastActiveMinutes: 220,
+    current: false,
+  },
   {
     id: "dev-desktop",
     label: "MacBook Pro",

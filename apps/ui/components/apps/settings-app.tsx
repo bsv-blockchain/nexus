@@ -67,6 +67,8 @@ import {
 } from "@/lib/settings-store";
 import { InfoPopover } from "@/components/apps/roadmap/info-popover";
 import { PerSenderTolls } from "@/components/apps/settings/per-sender-tolls";
+import { CardSheet } from "@/components/apps/settings/card-sheet";
+import { removeCard, useCards } from "@/lib/cards-store";
 import {
   BRANDS,
   setBrandMode,
@@ -79,6 +81,7 @@ import {
   Check,
   ChevronRight,
   Columns3,
+  CreditCard,
   Globe,
   Moon,
   Heart,
@@ -95,6 +98,8 @@ import {
   ReceiptText,
   ScanLine,
   Smartphone,
+  SmartphoneNfc,
+  Plus,
   Rows3,
   ShieldAlert,
   ShieldCheck,
@@ -1899,6 +1904,293 @@ function SettingsFooter(): ReactNode {
  * how much and whether you get asked. Permissions keeps the grant and points
  * here.
  */
+/**
+ * Which phone platform a linked device is, or none.
+ *
+ * Read off the build string the device reports, which is the only thing this
+ * list carries that distinguishes an iPhone from a laptop. A Mac says "Nexus
+ * for macOS", which does not contain "ios" — but the check is written as a
+ * word boundary anyway, because that near-miss is exactly the kind of thing a
+ * future platform name walks straight into.
+ */
+function phoneOs(device: LinkedDevice): "ios" | "android" | null {
+  if (/\bios\b/i.test(device.platform)) return "ios";
+  if (/android/i.test(device.platform)) return "android";
+  return null;
+}
+
+/**
+ * Cards: money coming in, so that money can go out.
+ *
+ * Under Receiving because a card buys bitcoin, which is the same direction;
+ * above Spending because the reason to have one connected is the row below,
+ * where a payment you cannot cover gets covered.
+ *
+ * A card here is not the browser's stored card. Autofill has a switch called
+ * "Payment cards" and it does the opposite thing — types a number into
+ * somebody else's checkout. The two would look like duplicates on a search
+ * results list, so this one says out loud what it is not.
+ */
+function CardsGroup(): ReactNode {
+  const copy = content.settings.payments;
+  const settings = useSettings();
+  const cards = useCards();
+  const devices = getLinkedDevices();
+  const { openApp } = useHub();
+  const [adding, setAdding] = useState(false);
+
+  return (
+    <>
+      <Group title={copy.cardsTitle} hint={copy.cardsHint}>
+        {cards.length === 0 ? (
+          <p className="text-muted-foreground px-3 py-2.5 text-xs">
+            {copy.cardNone}
+          </p>
+        ) : (
+          cards.map((card) => {
+            const from = devices.find((device) => device.id === card.capturedOn);
+            /* Three cases, and the third is the one worth having copy for: a
+               card whose device has since been unlinked still exists, and
+               saying nothing about where it came from is worse than saying the
+               device is gone. */
+            const origin = !card.capturedOn
+              ? copy.cardAddedHere
+              : from
+                ? (card.addedDaysAgo > 0
+                    ? copy.cardAddedFrom.replace(
+                        "{ago}",
+                        agoLabel(card.addedDaysAgo * 24 * 60),
+                      )
+                    : copy.cardAddedFromNew
+                  ).replace("{device}", from.label)
+                : copy.cardAddedFromUnknown;
+            return (
+              <div key={card.id} className="flex items-center gap-3 px-3 py-2.5">
+                <span
+                  className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-lg"
+                  aria-hidden="true"
+                >
+                  <CreditCard className="size-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  {/* Middle dots rather than asterisks, and four of them: this
+                      is how the digits are masked on every statement and every
+                      checkout anybody has read. */}
+                  <span className="block text-sm font-medium">
+                    {card.network} &middot;&middot;&middot;&middot; {card.last4}
+                  </span>
+                  <span className="text-muted-foreground mt-0.5 block text-[11px]">
+                    {copy.cardExpires.replace("{expiry}", card.expiry)} &middot;{" "}
+                    {origin}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    removeCard(card.id);
+                    toast.success(copy.cardRemoved);
+                  }}
+                  className="focus-ring text-muted-foreground hover:text-negative shrink-0 rounded-md px-2 py-1 text-xs font-medium"
+                >
+                  {copy.cardRemove}
+                </button>
+              </div>
+            );
+          })
+        )}
+
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="focus-ring hover:bg-surface-hover flex w-full items-center gap-3 px-3 py-2.5 text-left"
+        >
+          <span
+            className="bg-accent/12 text-accent grid size-9 shrink-0 place-items-center rounded-lg"
+            aria-hidden="true"
+          >
+            <Plus className="size-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="text-accent block text-sm font-semibold">
+              {copy.cardAdd}
+            </span>
+            <span className="text-muted-foreground mt-0.5 block text-[11px]">
+              {copy.cardAddHint}
+            </span>
+          </span>
+        </button>
+
+        {/* The deliberate half of "both": the switch below is the card firing
+            on its own, and this is the card because you said so. Only offered
+            once there is a card, since it opens the wallet with one chosen. */}
+        {cards.length > 0 && (
+          <Row
+            label={copy.cardBuy}
+            hint={copy.cardBuyHint}
+            onClick={() => openApp("wallet")}
+          />
+        )}
+
+        <Toggle
+          label={copy.cardTopUp}
+          hint={cards.length === 0 ? copy.cardTopUpNeedsCard : copy.cardTopUpHint}
+          value={cards.length > 0 && settings.cardTopUp}
+          onChange={(next) => {
+            if (cards.length === 0) {
+              toast.error(copy.cardTopUpNeedsCard);
+              return;
+            }
+            setSetting("cardTopUp", next);
+          }}
+        />
+        <p className="text-muted-foreground px-3 py-2.5 text-[11px] text-pretty">
+          {copy.cardsNotAutofill}
+        </p>
+      </Group>
+
+      {adding && <CardSheet onClose={() => setAdding(false)} />}
+    </>
+  );
+}
+
+/**
+ * Tap to pay, one row per linked phone.
+ *
+ * Per phone rather than one switch, because the row is not the same row on
+ * both platforms and pretending otherwise would mean inventing a control one
+ * of them does not have:
+ *
+ *   iOS authenticates every in-app payment with Face ID, Touch ID or the
+ *   passcode. There is no threshold, and PassKit gives an app no way to ask
+ *   for one. So the iOS row is a switch and a sentence.
+ *
+ *   Android gets the amount. It is Nexus's own ceiling and the copy says so —
+ *   Google Wallet's regional skip-the-unlock limits (about £45 in the UK,
+ *   CAD$100 in Canada) are being retired in favour of an unlock on every
+ *   payment, so a number here cannot promise anything about Google's prompt.
+ *   It only governs whether Nexus adds one of its own.
+ *
+ * Which phones are listed comes from the same fixture the pairing panel reads,
+ * so unlinking a device in General removes its row here.
+ */
+function WalletPayGroup(): ReactNode {
+  const copy = content.settings.payments;
+  const settings = useSettings();
+  const phones = getLinkedDevices().filter((device) => phoneOs(device));
+
+  function toggle(id: string, on: boolean): void {
+    setSetting(
+      "walletPayDevices",
+      on
+        ? [...settings.walletPayDevices, id]
+        : settings.walletPayDevices.filter((entry) => entry !== id),
+    );
+  }
+
+  return (
+    <Group title={copy.walletPayTitle} hint={copy.walletPayHint}>
+      {phones.length === 0 ? (
+        <p className="text-muted-foreground px-3 py-2.5 text-xs">
+          {copy.walletPayNone}
+        </p>
+      ) : (
+        phones.map((device) => {
+          const os = phoneOs(device);
+          const on = settings.walletPayDevices.includes(device.id);
+          return (
+            <div key={device.id}>
+              <div className="flex items-start gap-3 px-3 py-2.5">
+                <span
+                  className={`mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg ${
+                    on
+                      ? "bg-accent/12 text-accent"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                  aria-hidden="true"
+                >
+                  <SmartphoneNfc className="size-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">
+                    {os === "ios" ? copy.applePay : copy.googlePay}
+                  </span>
+                  <span className="text-muted-foreground mt-0.5 block text-[11px]">
+                    {device.label}
+                    {device.current && ` \u00b7 ${copy.walletPayThisPhone}`}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={on}
+                  aria-label={`${
+                    os === "ios" ? copy.applePay : copy.googlePay
+                  } on ${device.label}`}
+                  onClick={() => toggle(device.id, !on)}
+                  className={`focus-ring relative mt-1.5 h-5 w-9 shrink-0 rounded-full transition-colors ${
+                    on ? "bg-accent" : "bg-muted-foreground/40"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 size-4 rounded-full bg-white transition-all ${
+                      on ? "left-4.5" : "left-0.5"
+                    }`}
+                    aria-hidden="true"
+                  />
+                </button>
+              </div>
+              {/* Only under the row it belongs to, and only while it is on: an
+                  explanation of a switch nobody has touched is noise, and the
+                  asymmetry between the two platforms only matters once one of
+                  them is actually in use. */}
+              {on && os === "ios" && (
+                <p className="text-muted-foreground px-3 pb-2.5 pl-15 text-[11px] text-pretty">
+                  {copy.applePayAlways}
+                </p>
+              )}
+              {on && os === "android" && <WalletPayCap />}
+            </div>
+          );
+        })
+      )}
+    </Group>
+  );
+}
+
+/** Android's half: the amount Nexus will let through without a word. */
+function WalletPayCap(): ReactNode {
+  const copy = content.settings.payments;
+  const settings = useSettings();
+  const cents = settings.walletPayCapCents;
+  return (
+    <div className="px-3 pb-3 pl-15">
+      <p className="text-sm font-medium">{copy.googlePayCap}</p>
+      <p className="text-muted-foreground mt-0.5 text-[11px] text-pretty">
+        {copy.googlePayCapHint}
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {WALLET_PAY_CAPS.map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            onClick={() => setSetting("walletPayCapCents", preset)}
+            aria-pressed={cents === preset}
+            className={`focus-ring rounded-full border px-3 py-1 text-xs font-semibold tabular-nums transition-colors ${
+              cents === preset
+                ? "border-accent bg-accent/15 text-foreground"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {preset === 0
+              ? copy.walletPayCapAsk
+              : `$${(preset / 100).toFixed(2)}`}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function PaymentsPanel(): ReactNode {
   const copy = content.settings.payments;
   const settings = useSettings();
@@ -1919,6 +2211,9 @@ export function PaymentsPanel(): ReactNode {
           {copy.autoSwapPerPayment}
         </p>
       </Group>
+
+      <CardsGroup />
+      <WalletPayGroup />
 
       <Group title={copy.spendingTitle} hint={copy.spendingHint}>
         {/* First, because it decides whether the cap under it is ever read
@@ -1990,6 +2285,11 @@ const SPEND_CAPS = [21_800, 218_000];
 /* In cents. $2.18 is the default and the middle option, with an order of
    magnitude either side and a zero that means every swap asks. */
 const AUTO_SWAP_CAPS = [0, 218, 2_180];
+
+/* In cents, and an order of magnitude above the swap cap: this one is a card
+   being charged rather than a coin being converted, and the real contactless
+   limits it stands in for are tens of currency units, not single ones. */
+const WALLET_PAY_CAPS = [0, 2_180, 21_800];
 
 export function SettingsApp(): ReactNode {
   const { settingsCategory: requestedCategory } = useHub();

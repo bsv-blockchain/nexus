@@ -159,6 +159,39 @@ const BY_CATEGORY: Partial<Record<SettingsCategory, SettingsSection[]>> = {
   payments: [
     {
       category: "payments",
+      title: settings.payments.cardsTitle,
+      hint: settings.payments.cardsHint,
+      keywords: [
+        "card",
+        "credit",
+        "debit",
+        "visa",
+        "mastercard",
+        "bank",
+        "top up",
+        "buy",
+        "fund",
+      ],
+    },
+    {
+      category: "payments",
+      title: settings.payments.walletPayTitle,
+      hint: settings.payments.walletPayHint,
+      /* The two names people will actually type. Neither appears in the
+         heading, which is the exact gap this list exists to close. */
+      keywords: [
+        "apple pay",
+        "google pay",
+        "nfc",
+        "contactless",
+        "face id",
+        "touch id",
+        "phone",
+        "tap",
+      ],
+    },
+    {
+      category: "payments",
       title: settings.payments.receivingTitle,
       hint: settings.payments.receivingHint,
       keywords: ["swap", "auto-swap", "convert", "exchange", "bsv", "bitcoin"],

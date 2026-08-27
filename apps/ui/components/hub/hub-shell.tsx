@@ -10,6 +10,7 @@ import {
   hydrateGrantedConnections,
   useGrantedConnections,
 } from "@/lib/connections-store";
+import { hydrateCards } from "@/lib/cards-store";
 import {
   getContentMode,
   getContentModeServerSnapshot,
@@ -277,6 +278,9 @@ export function HubShell(): ReactNode {
   useEffect(hydrateTumble, []);
   useInstalledExtensions();
   useEffect(hydrateExtensions, []);
+  /* No paired read: nothing renders cards during the server pass, so this only
+     has to catch up the store before Settings is ever opened. */
+  useEffect(hydrateCards, []);
   /* Same reason, same shape: granted connections are read during render and the
      server has no storage to read them from. */
   const granted = useGrantedConnections();
