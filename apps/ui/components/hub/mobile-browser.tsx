@@ -3,6 +3,8 @@
 import { AppTile, SiteTile } from "@/components/hub/app-icon";
 import { Favicon } from "@/components/hub/favicon";
 import { MobileSettings } from "@/components/hub/mobile-settings";
+import { MobileAppSheet } from "@/components/hub/mobile-app-sheet";
+import { hasContextSidebar } from "@/components/hub/app-context-sidebar";
 import { OriginChip } from "@/components/hub/origin-chip";
 import { SpaceIcon } from "@/components/hub/space-icon";
 import { homeView } from "@/lib/home-view";
@@ -186,6 +188,7 @@ function BottomBar({
   onSwitcher,
   onAddress,
   onDetails,
+  detailsLabel,
   timeline = false,
 }: {
   tabs: BrowserTab[];
@@ -205,6 +208,8 @@ function BottomBar({
    * there.
    */
   timeline?: boolean;
+  /** what the chevron is about, which is the page or the app it is over */
+  detailsLabel: string;
 }): ReactNode {
   return (
     <motion.div
@@ -266,7 +271,7 @@ function BottomBar({
         <button
           type="button"
           onClick={onDetails}
-          aria-label={content.mobileBrowser.urlDetails}
+          aria-label={detailsLabel}
           className="focus-ring bg-surface-raised/95 ring-border flex size-11 items-center justify-center rounded-full shadow-lg ring-1 backdrop-blur transition-transform active:scale-95"
         >
           <ChevronUp className="text-foreground size-5" aria-hidden="true" />
@@ -1591,6 +1596,10 @@ type Sheet =
   | "none"
   | "rail"
   | "details"
+  /* The open app's contextual column. The chevron opens this instead of the
+     page sheet whenever the canvas is an app rather than a page — see
+     mobile-app-sheet for why that is the same question. */
+  | "context"
   | "address"
   | "switcher"
   | "settings"
@@ -1613,6 +1622,7 @@ export function MobileBrowser({
     tabsBySpace,
     activeTabId,
     openTab,
+    activeApp,
     activeRef,
     activeTab,
     mainView,
@@ -1667,6 +1677,18 @@ export function MobileBrowser({
       />
     ) : null;
 
+  /*
+   * What the chevron asks about, which is whatever the canvas is showing.
+   *
+   * For a page that is the page's own options — the address, back and forward,
+   * copy the link, add it to the rail. For an app the same sheet was talking
+   * about a page that is not on screen, while the app's own list was
+   * unreachable below `md`. So the answer follows the canvas, and so does the
+   * label on the button.
+   */
+  const chevronOpens: Sheet =
+    !siteCanvas && hasContextSidebar(activeApp) ? "context" : "details";
+
   // Push the page back behind the matte while a bottom sheet is open.
   useEffect(() => {
     onDimChange(sheet === "details" || sheet === "address");
@@ -1712,7 +1734,24 @@ export function MobileBrowser({
                 setIncognito(false);
                 setSheet("address");
               }}
-              onDetails={() => setSheet("details")}
+              /*
+               * The chevron asks "what else is there about this".
+               *
+               * For a page that has always been the page's own options — the
+               * address, back and forward, copy the link, add it to the rail.
+               * For an app it was the same sheet talking about a page that is
+               * not on screen, while the app's own list was unreachable. So
+               * the answer follows the canvas.
+               */
+              onDetails={() => setSheet(chevronOpens)}
+              detailsLabel={
+                chevronOpens === "context"
+                  ? content.mobileBrowser.appOptions.replace(
+                      "{app}",
+                      (activeApp ? getHubApp(activeApp)?.name : "") ?? "",
+                    )
+                  : content.mobileBrowser.urlDetails
+              }
               timeline={onTimeline}
             />
           ))}
@@ -1720,6 +1759,9 @@ export function MobileBrowser({
 
       <AnimatePresence>
         {sheet === "rail" && <MobileRail key="rail" onClose={close} />}
+        {sheet === "context" && activeApp && (
+          <MobileAppSheet key="context" slug={activeApp} onClose={close} />
+        )}
         {sheet === "details" && (
           <UrlDetailsSheet
             key="details"

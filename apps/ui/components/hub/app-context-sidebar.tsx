@@ -95,7 +95,14 @@ export function hasContextSidebar(slug: AppSlug | null): boolean {
   return slug !== null && CONTEXTUAL.includes(slug);
 }
 
-function Header({ slug }: { slug: AppSlug }): ReactNode {
+function Header({
+  slug,
+  onClose,
+}: {
+  slug: AppSlug;
+  /** set on a phone, where this is a sheet and there is no panel to fold */
+  onClose?: (() => void) | undefined;
+}): ReactNode {
   const app = getHubApp(slug);
   const {
     messagesUnreadOnly,
@@ -126,14 +133,26 @@ function Header({ slug }: { slug: AppSlug }): ReactNode {
           in the rail's footer where it sat next to controls that have nothing
           to do with it. Re-opening is the rail's job, since this button goes
           with the panel it closes. */}
-      <Tooltip label={content.hub.collapsePanel}>
+      {/* On a phone this is a sheet rather than a column, so the leading
+          control shuts the sheet: there is no panel to fold away, and a
+          "close this panel" on something that is not one would be a button
+          claiming to do a thing the screen cannot do. */}
+      <Tooltip
+        label={onClose ? content.messages.media.close : content.hub.collapsePanel}
+      >
         <button
           type="button"
-          onClick={toggleRail}
-          aria-label={content.hub.collapsePanel}
+          onClick={onClose ?? toggleRail}
+          aria-label={
+            onClose ? content.messages.media.close : content.hub.collapsePanel
+          }
           className="focus-ring -ml-0.5 shrink-0 rounded-md p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
         >
-          <PanelLeftClose className="size-4" aria-hidden="true" />
+          {onClose ? (
+            <X className="size-4" aria-hidden="true" />
+          ) : (
+            <PanelLeftClose className="size-4" aria-hidden="true" />
+          )}
         </button>
       </Tooltip>
       {/* No app tile: the rail already shows which app is open, in the same
@@ -1146,7 +1165,24 @@ export function AppContextBody({ slug }: { slug: AppSlug }): ReactNode {
 }
 
 /** Full contextual sidebar column: header, scrolling body, docked CTAs. */
-export function AppContextSidebar({ slug }: { slug: AppSlug }): ReactNode {
+export function AppContextSidebar({
+  slug,
+  /**
+   * Set where this is the phone's sheet rather than the desktop's column.
+   *
+   * The whole panel it normally lives in is inside the shell's `hidden
+   * md:block`, so below that width every app's list — Mail's folders, the
+   * vault's sections, the roadmap's filters — simply was not there. Eleven of
+   * the fifteen apps with one had no phone equivalent at all. This is the same
+   * component in a bottom sheet rather than fifteen second implementations.
+   *
+   * @see components/hub/mobile-app-sheet.tsx
+   */
+  onClose,
+}: {
+  slug: AppSlug;
+  onClose?: (() => void) | undefined;
+}): ReactNode {
   /* Messages carries its own bar, with two controls this one has no business
      showing. Anything with nothing written about it gets no button rather than
      a button onto an empty pane. */
@@ -1155,7 +1191,7 @@ export function AppContextSidebar({ slug }: { slug: AppSlug }): ReactNode {
   if (!helped) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <Header slug={slug} />
+        <Header slug={slug} onClose={onClose} />
         <AppContextBody slug={slug} />
         <AppContextFooter slug={slug} />
       </div>
@@ -1176,7 +1212,7 @@ export function AppContextSidebar({ slug }: { slug: AppSlug }): ReactNode {
   const hasCta = slug === "wallet" || slug === "roadmap";
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <Header slug={slug} />
+      <Header slug={slug} onClose={onClose} />
       <div
         className={`relative flex min-h-0 flex-1 flex-col ${
           hasCta ? "[&>*:first-child]:pb-28" : "[&>*:first-child]:pb-12"

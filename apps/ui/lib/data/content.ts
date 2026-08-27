@@ -1967,6 +1967,10 @@ export const content = {
     openTabs: "Open tabs",
     newTab: "New tab",
     urlDetails: "Page options",
+    /* The same chevron, when the canvas is an app rather than a page.
+       Parallel wording on purpose: it is the same corner asking the same
+       question, and only the thing it is about has changed. */
+    appOptions: "{app} options",
     search: "Search…",
     incognito: "Incognito",
     incognitoTitle: "You're browsing Incognito",
