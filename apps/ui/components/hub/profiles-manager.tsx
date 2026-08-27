@@ -132,7 +132,11 @@ export function ProfilesManager(): ReactNode {
 
   return (
     <SpaceDragProvider>
-    <div className="flex h-full items-stretch gap-3 py-4 pr-2 pl-4">
+    {/* pb-24 below `md`: the browse bar is fixed over the bottom of a phone,
+        and a column that ends underneath it ends with its own footer buried —
+        which on this screen is Reorder, Theme and the options menu, three
+        controls that were on screen and could not be pressed. */}
+    <div className="flex h-full items-stretch gap-3 py-4 pr-2 pb-24 pl-4 md:pb-4">
       {columns.map((space) => (
         <ProfileColumn
           key={space.id}
