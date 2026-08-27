@@ -104,6 +104,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useUsdPerBsv } from "@/lib/exchange-rate";
+import { SATS_PER_BSV } from "@/lib/wallet";
 import { agoLabel } from "@/lib/timeline";
 import { toast } from "sonner";
 import {
@@ -447,7 +448,7 @@ function StrangerFee({ active }: { active: boolean }): ReactNode {
      this renders the fallback rate and never corrects. */
   const usdPerBsv = useUsdPerBsv();
   const cents = settings.strangerFeeCents;
-  const sats = Math.round((cents / 100 / usdPerBsv) * 100_000_000);
+  const sats = Math.round((cents / 100 / usdPerBsv) * SATS_PER_BSV);
 
   return (
     <div className={`p-2.5 ${active ? "" : "opacity-55"}`}>
@@ -482,6 +483,70 @@ function StrangerFee({ active }: { active: boolean }): ReactNode {
         )}
         {" \u00b7 "}
         {active ? copy.feeApplies : copy.feeIdle}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * How much may be swapped to cover a payment before it becomes a question.
+ *
+ * Cents with the satoshi equivalent beside them, the same pair `StrangerFee`
+ * shows and for the same reason: a cap is a decision about what a thing is
+ * worth, and satoshis are what actually moves. The rate comes from the same
+ * feed the wallet prices with, so two screens never disagree about a coin.
+ *
+ * Greyed rather than hidden when auto-swap is off. A control that vanishes
+ * with the switch above it teaches nobody that the two are connected.
+ */
+function AutoSwapCap({ active }: { active: boolean }): ReactNode {
+  const copy = content.settings.payments;
+  const settings = useSettings();
+  const usdPerBsv = useUsdPerBsv();
+  const cents = settings.autoSwapCapCents;
+  const sats = Math.round((cents / 100 / usdPerBsv) * SATS_PER_BSV);
+
+  return (
+    <div className={`px-3 py-2.5 ${active ? "" : "opacity-45"}`}>
+      <p className="text-sm font-medium">{copy.autoSwapCap}</p>
+      <p className="text-muted-foreground mt-0.5 text-[11px] text-pretty">
+        {copy.autoSwapCapHint}
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {AUTO_SWAP_CAPS.map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            onClick={() => setSetting("autoSwapCapCents", preset)}
+            aria-pressed={cents === preset}
+            className={`focus-ring rounded-full border px-3 py-1 text-xs font-semibold tabular-nums transition-colors ${
+              cents === preset
+                ? "border-accent bg-accent/15 text-foreground"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {preset === 0
+              ? copy.autoSwapCapAsk
+              : `$${(preset / 100).toFixed(2)}`}
+          </button>
+        ))}
+        {cents > 0 && (
+          <span className="text-muted-foreground ml-1 text-xs tabular-nums">
+            &asymp; {sats.toLocaleString("en-US")} sats
+          </span>
+        )}
+      </div>
+      <p className="text-muted-foreground mt-2 text-[11px] text-pretty">
+        {copy.autoSwapCapRate.replace(
+          "{rate}",
+          usdPerBsv.toLocaleString("en-US", {
+            style: "currency",
+            currency: "USD",
+            maximumFractionDigits: 2,
+          }),
+        )}
+        {" \u00b7 "}
+        {active ? copy.autoSwapCapActive : copy.autoSwapCapIdle}
       </p>
     </div>
   );
@@ -1865,6 +1930,20 @@ export function PaymentsPanel(): ReactNode {
           value={settings.oneClickPay}
           onChange={(next) => setSetting("oneClickPay", next)}
         />
+        {/* The swap sits between them: one-click decides whether a payment
+            asks, this decides whether COVERING that payment asks, and the cap
+            below is about the payment's own size. Three questions, narrowing. */}
+        <Toggle
+          label={copy.autoSwapSpend}
+          hint={copy.autoSwapSpendHint}
+          value={settings.autoSwapWhenSpending}
+          onChange={(next) => setSetting("autoSwapWhenSpending", next)}
+        />
+        <AutoSwapCap active={settings.autoSwapWhenSpending} />
+        <p className="text-muted-foreground px-3 py-2.5 text-[11px] text-pretty">
+          {copy.autoSwapWhich}
+        </p>
+
         <div className="px-3 py-2.5">
           <p className="text-sm font-medium">{copy.spendCap}</p>
           <p className="text-muted-foreground mt-0.5 text-[11px] text-pretty">
@@ -1907,6 +1986,10 @@ export function PaymentsPanel(): ReactNode {
 /* Shortcuts either side of what a small purchase costs; the field takes the
    rest. Zero means every payment asks, which is why it reads as "Ask". */
 const SPEND_CAPS = [21_800, 218_000];
+
+/* In cents. $2.18 is the default and the middle option, with an order of
+   magnitude either side and a zero that means every swap asks. */
+const AUTO_SWAP_CAPS = [0, 218, 2_180];
 
 export function SettingsApp(): ReactNode {
   const { settingsCategory: requestedCategory } = useHub();

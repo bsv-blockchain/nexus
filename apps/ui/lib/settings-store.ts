@@ -182,6 +182,25 @@ export interface SettingsState {
    * every time somebody wanted one exception.
    */
   autoSwapToBsv: boolean;
+  /**
+   * Cover a payment by converting what you hold, rather than refusing it.
+   *
+   * A web3-native site asks the wallet for BSV. Holding ether and being told
+   * no is the failure this removes: with it on, enough of something else is
+   * swapped to cover the charge and the payment goes through.
+   *
+   * Off by default, like its receiving twin. Both are about money moving in a
+   * form you did not pick, and the honest default for that is to ask.
+   */
+  autoSwapWhenSpending: boolean;
+  /**
+   * How much may be swapped that way before it becomes a question.
+   *
+   * In cents, because it is a decision about what a thing is worth rather than
+   * about a number of satoshis — the same reason `strangerFeeCents` is. The
+   * screen states the satoshi equivalent beside it at the live rate.
+   */
+  autoSwapCapCents: number;
   strangerFeeCents: number;
   /**
    * Whether a metanet-enabled site gets your wallet without being asked.
@@ -351,6 +370,10 @@ const INITIAL: SettingsState = {
      and large enough that sending a hundred thousand of them costs real money,
      which is the entire mechanism. */
   autoSwapToBsv: false,
+  autoSwapWhenSpending: false,
+  /* $2.18 — the house number, and the same figure the cross-chain fee is a
+     percentage of. Small enough that a swap under it is not a decision. */
+  autoSwapCapCents: 218,
   strangerFeeCents: 1,
   // See the field above for why the default is the permissive one.
   autoConnectSites: "auto",

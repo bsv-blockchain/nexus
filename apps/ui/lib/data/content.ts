@@ -2254,6 +2254,19 @@ export const content = {
       autoSwapPerPayment:
         "Get paid still lets you keep a single payment in the coin it was sent in.",
       spendingTitle: "Spending",
+      autoSwapSpend: "Auto-swap into BSV when spending",
+      autoSwapSpendHint:
+        "A web3-native site charges in BSV. If you are short, enough of something else is converted to cover it rather than the payment being refused.",
+      autoSwapCap: "Swap this much without asking",
+      autoSwapCapHint:
+        "Above this, a swap needs your approval even when the payment does not. Set it to nothing and every conversion asks.",
+      autoSwapCapAsk: "Always ask",
+      autoSwapCapRate: "At {rate} per BSV.",
+      autoSwapCapIdle: "Applies once auto-swap is on.",
+      autoSwapCapActive: "In use now.",
+      /* Which sites count. The same rule auto-connect uses, said the same way:
+         one definition of "web3-native" across the app, or two that drift. */
+      autoSwapWhich: "Web3-native means a site the App Store lists as an app, which is how this build recognises one.",
       spendingHint:
         "How much a page can spend on your behalf, and whether it has to ask first.",
       /* Moved here from Permissions, where they sat under the per-site grid.
