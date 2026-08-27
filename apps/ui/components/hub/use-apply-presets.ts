@@ -19,6 +19,7 @@
 
 import { useHub } from "@/components/hub/hub-provider";
 import { setSetting } from "@/lib/settings-store";
+import { homescreenFor } from "@/lib/home-view";
 import {
   appsFor,
   developerModeFor,
@@ -55,23 +56,11 @@ export function useApplyPresets(): (chosen: PresetId[]) => void {
     (chosen: PresetId[]) => {
       const wantedApps = appsFor(chosen);
 
-      /*
-       * Which screen this person should land on.
-       *
-       * Focus for somebody who picked nothing, and for a Thinker on their own:
-       * both answers describe a person who came here to get something done
-       * rather than to see what everyone is doing, and a feed is the wrong
-       * first thing to hand either of them. Every other answer — Maker,
-       * Developer, Gamer, or Thinker alongside one of them — is somebody with a
-       * reason to watch what is happening, so the Timeline wins.
-       *
-       * Seeded rather than locked: Preferences carries the same choice, and
-       * this is only what it starts as.
-       */
-      const solitaryThinker =
-        chosen.length === 0 ||
-        (chosen.length === 1 && chosen[0] === "thinker");
-      setSetting("homescreen", solitaryThinker ? "focus" : "timeline");
+      /* Which screen this person should land on. The rule is in lib/home-view
+         beside the one that reads it back, and is tested there. Seeded rather
+         than locked: Preferences carries the same choice, and whichever of the
+         two was answered most recently is the one that stands. */
+      setSetting("homescreen", homescreenFor(chosen));
 
       /*
        * Clear out first, so the profile is the answer and not the answer piled

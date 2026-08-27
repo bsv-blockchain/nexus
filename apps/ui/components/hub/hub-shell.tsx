@@ -11,6 +11,7 @@ import {
   useGrantedConnections,
 } from "@/lib/connections-store";
 import { hydrateCards } from "@/lib/cards-store";
+import { SyncUpgrade } from "@/components/hub/sync-upgrade";
 import {
   getContentMode,
   getContentModeServerSnapshot,
@@ -217,6 +218,10 @@ function Shell(): ReactNode {
       <ShareModal />
       <WalletGate />
       <AppPermissionSheet />
+      {/* Opened from two places that share an argument and nothing else — the
+          Timeline's rail and Focus's card — so it is mounted by neither. See
+          the note on the component. */}
+      <SyncUpgrade />
       {/* A control for whoever is running the demo, and it says so — "here is
           what we would ship first" is a conversation, not a feature. A shipped
           binary has one product state, so the chip has nothing to switch and the

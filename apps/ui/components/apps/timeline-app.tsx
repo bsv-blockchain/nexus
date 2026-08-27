@@ -31,7 +31,6 @@ import { profilePosts } from "@/lib/data/profiles";
 import { TimelineSearch } from "@/components/apps/timeline/timeline-search";
 import { PostAnalytics } from "@/components/apps/timeline/post-analytics";
 import { ReplyComposer } from "@/components/apps/timeline/reply-composer";
-import { SyncUpgrade } from "@/components/apps/timeline/sync-upgrade";
 import {
   TimelineExpanded,
   TimelineRail,
@@ -125,11 +124,6 @@ export function TimelineApp(): ReactNode {
           still exists below the desktop breakpoint, where the rail does not —
           search is the one thing on that column a narrow window still wants. */}
           <TimelineSearch />
-
-          {/* The upgrade sheet. Mounted here for the same reason search is: the
-          rail it is launched from does not exist on a narrow window, and the
-          sheet is the one thing on that column a phone still wants. */}
-          <SyncUpgrade />
 
           {/* The reply composer, mounted beside the other sheets rather than inside
           a row: it is opened from a post, but it belongs to the app, and a

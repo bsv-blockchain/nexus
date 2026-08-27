@@ -64,6 +64,19 @@ function usd(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
 
+/**
+ * Mounted once, by the shell.
+ *
+ * It lived inside the Timeline, which was right while the Timeline's rail was
+ * the only place the pitch appeared. Focus grew a card carrying the same
+ * argument — see components/hub/nexus-sync-pitch, which exists because the two
+ * columns share the words and not the shell around them — and its button did
+ * nothing at all: `openSync` set a flag with nobody rendering the sheet.
+ *
+ * So it sits beside the other things the whole app can open. Anywhere that
+ * offers Nexus Sync now opens the same sheet, and a third place offering it
+ * gets that for free rather than discovering this the same way Focus did.
+ */
 export function SyncUpgrade(): ReactNode {
   const { syncOpen } = useTimeline();
 
