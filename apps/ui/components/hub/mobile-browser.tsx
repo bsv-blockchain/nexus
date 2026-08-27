@@ -4,6 +4,8 @@ import { AppTile, SiteTile } from "@/components/hub/app-icon";
 import { Favicon } from "@/components/hub/favicon";
 import { MobileAppSheet } from "@/components/hub/mobile-app-sheet";
 import { hasContextSidebar } from "@/components/hub/app-context-sidebar";
+import { GroupSettingsDialog } from "@/components/hub/group-settings-dialog";
+import { getEssentialAppSlugs } from "@/lib/data";
 import { OriginChip } from "@/components/hub/origin-chip";
 import { SpaceIcon } from "@/components/hub/space-icon";
 import { homeView } from "@/lib/home-view";
@@ -13,6 +15,7 @@ import { useIsDesktop } from "@/lib/use-is-desktop";
 import { openSearch } from "@/lib/timeline-store";
 import {
   useHub,
+  type AppSlug,
   type RailEntry,
   type RailRef,
 } from "@/components/hub/hub-provider";
@@ -1104,41 +1107,96 @@ function TabSwitcher({
 }
 
 /** A single icon tile in the mobile rail (system tab or app). */
+/** As long as the desktop rail holds a tile before it offers to remove it. */
+const LONG_PRESS_MS = 500;
+
 function RailTile({
   icon,
   active,
   onClick,
+  onHold,
+  onRemove,
+  removing,
   label,
   children,
 }: {
   icon?: LucideIcon;
   active: boolean;
   onClick: () => void;
+  /** what a long press does, where a long press means anything */
+  onHold?: (() => void) | undefined;
+  /** the cross's action, once a hold has revealed one */
+  onRemove?: (() => void) | undefined;
+  removing?: boolean;
   label: string;
   children?: ReactNode;
 }): ReactNode {
   const Icon = icon;
+  const timer = useRef<number | null>(null);
+  const cancel = (): void => {
+    if (timer.current === null) return;
+    window.clearTimeout(timer.current);
+    timer.current = null;
+  };
+  /* Cleared on unmount as well as on release: the sheet closes on a tap, and a
+     timer that outlives the tile it belongs to fires into a dead component. */
+  useEffect(() => cancel, []);
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      aria-pressed={active}
-      className={`focus-ring flex size-14 shrink-0 items-center justify-center rounded-2xl transition-colors ${
-        active
-          ? "bg-surface-raised ring-border shadow-sm ring-1"
-          : "hover:bg-surface-hover"
-      }`}
-    >
-      {Icon ? (
-        <Icon
-          className={`size-6 ${active ? "text-foreground" : "text-muted-foreground"}`}
-          aria-hidden="true"
-        />
-      ) : (
-        children
-      )}
-    </button>
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={onClick}
+        onPointerDown={
+          onHold
+            ? () => {
+                cancel();
+                timer.current = window.setTimeout(onHold, LONG_PRESS_MS);
+              }
+            : undefined
+        }
+        onPointerUp={onHold ? cancel : undefined}
+        onPointerLeave={onHold ? cancel : undefined}
+        onPointerCancel={onHold ? cancel : undefined}
+        aria-label={label}
+        aria-pressed={active}
+        className={`focus-ring flex size-14 items-center justify-center rounded-2xl transition-colors ${
+          active
+            ? "bg-surface-raised ring-border shadow-sm ring-1"
+            : "hover:bg-surface-hover"
+        }`}
+      >
+        {Icon ? (
+          <Icon
+            className={`size-6 ${active ? "text-foreground" : "text-muted-foreground"}`}
+            aria-hidden="true"
+          />
+        ) : (
+          children
+        )}
+      </button>
+      {/* The same cross the desktop rail reveals after the same half second,
+          in the same corner. A phone has no right-click and no drag that this
+          column could tell apart from a scroll, so the hold is the whole of
+          its editing vocabulary — which is why it does the one act that
+          matters and leaves reordering to a mouse. */}
+      <AnimatePresence>
+        {removing && onRemove && (
+          <motion.button
+            type="button"
+            initial={{ scale: 0.4, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.4, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 520, damping: 24 }}
+            onClick={onRemove}
+            aria-label={`${content.appStore.railRemove} ${label}`}
+            className="focus-ring border-background bg-negative absolute top-0 right-0 z-20 grid size-5 place-items-center rounded-full border-2 text-white shadow-lg"
+          >
+            <X className="size-3" strokeWidth={3} aria-hidden="true" />
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -1164,8 +1222,34 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
     setMainView,
     openLinkInBrowser,
     isInstalled,
+    uninstallApp,
+    unpinSite,
   } = useHub();
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  /*
+   * Which tile is wearing a cross, and which group is being renamed.
+   *
+   * Both are what the desktop rail does with a long press — one act each, the
+   * one that fits what was held. A phone cannot drag a tile without the column
+   * mistaking it for a scroll, so reordering and folding into a folder stay a
+   * mouse's job; removing something you no longer want does not.
+   */
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [groupSettings, setGroupSettings] = useState<{
+    id: string;
+    name: string;
+    color?: string | undefined;
+  } | null>(null);
+
+  /* Essential apps refuse to be uninstalled, so they are not offered it. */
+  const essential = new Set<string>(getEssentialAppSlugs());
+  const removable = (ref: RailRef): boolean =>
+    ref.kind !== "app" || !essential.has(ref.slug);
+  const removeRef = (ref: RailRef): void => {
+    setRemoving(null);
+    if (ref.kind === "app") uninstallApp(ref.slug as AppSlug, activeSpaceId);
+    else unpinSite(ref.id);
+  };
   /*
    * Pinning Browse to the rail is one setting, and this is a rail.
    *
@@ -1290,9 +1374,23 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
           label={app.name}
           active={active}
           onClick={() => {
+            /* A tile wearing a cross is a tile being edited, so the tap that
+               would have opened it puts the cross away instead. Otherwise the
+               only way out of edit mode is to open something. */
+            if (removing !== null) {
+              setRemoving(null);
+              return;
+            }
             openApp(app.slug);
             onClose();
           }}
+          {...(removable(ref)
+            ? {
+                onHold: () => setRemoving(refKey(ref)),
+                onRemove: () => removeRef(ref),
+                removing: removing === refKey(ref),
+              }
+            : {})}
         >
           <AppTile app={app} size={38} className={active ? "" : "grayscale"} />
         </RailTile>
@@ -1306,7 +1404,14 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
         key={refKey(ref)}
         label={site.title}
         active={active}
+        onHold={() => setRemoving(refKey(ref))}
+        onRemove={() => removeRef(ref)}
+        removing={removing === refKey(ref)}
         onClick={() => {
+          if (removing !== null) {
+            setRemoving(null);
+            return;
+          }
           /* A site is a tab, so it opens through the browser's own path — same
              native tab layer and history as a URL typed into the address bar.
              The ref is an argument because openLinkInBrowser ends by setting the
@@ -1319,6 +1424,15 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
         <SiteTile site={site} size={38} className={active ? "" : "grayscale"} />
       </RailTile>
     );
+  };
+
+  /* Held rather than tapped, because a tap already does the other thing a
+     folder can do — open it. Same split the desktop rail makes. */
+  const groupTimer = useRef<number | null>(null);
+  const cancelGroupPress = (): void => {
+    if (groupTimer.current === null) return;
+    window.clearTimeout(groupTimer.current);
+    groupTimer.current = null;
   };
 
   /** The 2x2 peek inside a collapsed folder — tiles only, no slot chrome. */
@@ -1349,6 +1463,18 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
         <button
           type="button"
           onClick={() => setExpandedGroup(expanded ? null : entry.id)}
+          onPointerDown={() => {
+            groupTimer.current = window.setTimeout(() => {
+              setGroupSettings({
+                id: entry.id,
+                name: entry.name,
+                color: entry.color,
+              });
+            }, LONG_PRESS_MS);
+          }}
+          onPointerUp={cancelGroupPress}
+          onPointerLeave={cancelGroupPress}
+          onPointerCancel={cancelGroupPress}
           aria-label={entry.name}
           aria-expanded={expanded}
           className={`focus-ring flex size-14 shrink-0 items-center justify-center rounded-2xl transition-colors ${
@@ -1474,12 +1600,34 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
       <motion.button
         type="button"
         aria-label="Close app rail"
-        onClick={onClose}
+        onClick={() => {
+          /* A cross showing means the column is being edited, and tapping off
+             a tile is how every phone leaves that state. Only then does the
+             same tap close the rail. */
+          if (removing !== null) {
+            setRemoving(null);
+            return;
+          }
+          onClose();
+        }}
         className="flex-1 bg-black/20"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
       />
+
+      {/* Renaming and recolouring a folder, which is what the desktop rail
+          opens when one is held. The same dialog, so the two cannot drift. */}
+      {groupSettings && (
+        <GroupSettingsDialog
+          key={groupSettings.id}
+          open
+          onClose={() => setGroupSettings(null)}
+          groupId={groupSettings.id}
+          initialName={groupSettings.name}
+          initialColor={groupSettings.color}
+        />
+      )}
     </div>
   );
 }
