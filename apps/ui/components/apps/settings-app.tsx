@@ -1,8 +1,10 @@
 "use client";
 
 import { Favicon } from "@/components/hub/favicon";
+import { AppHelpBar } from "@/components/hub/app-help-bar";
 import { IdentitySigil } from "@/components/hub/identity-sigil";
 import { QrBlock } from "@/components/hub/qr-block";
+import { ShellVersion } from "@/components/hub/shell-version";
 import { useCustomTheme } from "@/components/hub/theme-provider";
 import { useHub, type SettingsCategory } from "@/components/hub/hub-provider";
 import {
@@ -19,11 +21,13 @@ import {
   content,
   currentRelease,
   getDownloads,
+  getLinkedDevices,
   getLanguage,
   getSearchEngine,
   licence,
   releases,
   searchEngines,
+  type LinkedDevice,
 } from "@/lib/data";
 import { Sheet } from "@/components/apps/messages/sheet";
 import {
@@ -36,9 +40,20 @@ import {
 } from "@/components/apps/settings/blocks";
 import { WalletSettingsPanel } from "@/components/apps/settings-wallet";
 import { DEMO_SURFACES } from "@/lib/surfaces";
+import {
+  DeveloperOnly,
+  setDeveloperMode,
+  useDeveloperMode,
+} from "@/lib/developer-mode";
+import { resetFirstRun } from "@/lib/first-run";
+import { useIsDesktop } from "@/lib/use-is-desktop";
+import { startTour } from "@/lib/tour-store";
 import { AutofillPanel } from "@/components/apps/settings/autofill-panel";
+import { SettingsSearch } from "@/components/apps/settings/settings-search";
 import { UpdatePanel } from "@/components/apps/settings/update-panel";
 import { PermissionsPanel } from "@/components/apps/settings/permissions-panel";
+import { ProfilesPanel } from "@/components/apps/settings/profiles-panel";
+import { SecurityPanel } from "@/components/apps/settings/security-panel";
 import { ShortcutsPanel } from "@/components/apps/settings/shortcuts-panel";
 import {
   setSetting,
@@ -48,9 +63,12 @@ import {
   type CookiePolicy,
   type OpenLinksIn,
   type StartupBehaviour,
+  type TabLayout,
 } from "@/lib/settings-store";
 import { InfoPopover } from "@/components/apps/roadmap/info-popover";
 import { PerSenderTolls } from "@/components/apps/settings/per-sender-tolls";
+import { CardSheet } from "@/components/apps/settings/card-sheet";
+import { removeCard, useCards } from "@/lib/cards-store";
 import {
   BRANDS,
   setBrandMode,
@@ -59,18 +77,30 @@ import {
   type BrandMode,
 } from "@/lib/brand";
 import {
+  ArrowLeftRight,
   Check,
   ChevronRight,
+  Columns3,
+  CreditCard,
   Globe,
   Moon,
   Heart,
   Info,
   KeyRound,
   Keyboard,
+  Lock,
+  UserRound,
   Link2Off,
   Monitor,
   PanelLeftClose,
+  Laptop,
+  LogOut,
   ReceiptText,
+  ScanLine,
+  Smartphone,
+  SmartphoneNfc,
+  Plus,
+  Rows3,
   ShieldAlert,
   ShieldCheck,
   Sliders,
@@ -78,6 +108,9 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
+import { useUsdPerBsv } from "@/lib/exchange-rate";
+import { SATS_PER_BSV } from "@/lib/wallet";
+import { agoLabel } from "@/lib/timeline";
 import { toast } from "sonner";
 import {
   useEffect,
@@ -124,6 +157,22 @@ const ALL_SETTINGS_CATEGORIES: {
     icon: Sliders,
   },
   {
+    /* Below General and above Security: this is who you are, and the two
+       under it are who can get in and what they may see. */
+    id: "profiles",
+    label: content.profilesPanel.title,
+    hint: content.profilesPanel.hint,
+    icon: UserRound,
+  },
+  {
+    /* Above Privacy on purpose: this decides who can get in at all, and
+       Privacy decides what they see once they have. */
+    id: "security",
+    label: content.security.title,
+    hint: content.security.hint,
+    icon: Lock,
+  },
+  {
     id: "privacy",
     label: content.settings.privacy.title,
     hint: content.settings.privacy.hint,
@@ -160,6 +209,16 @@ const ALL_SETTINGS_CATEGORIES: {
     icon: Monitor,
   },
   {
+    /* Under Preferences rather than beside Privacy, though it borrows from
+       both. Privacy is who can reach you; Permissions is what a site may do;
+       this is what happens to money either way, and it is the one somebody
+       comes looking for by name. */
+    id: "payments",
+    label: content.settings.payments.title,
+    hint: content.settings.payments.hint,
+    icon: ArrowLeftRight,
+  },
+  {
     id: "about",
     label: content.settings.about.title,
     hint: content.settings.about.hint,
@@ -178,12 +237,18 @@ const ALL_SETTINGS_CATEGORIES: {
  */
 const DEMO_CATEGORY_IDS: ReadonlySet<SettingsCategory> = new Set([
   "general",
+  "profiles",
+  /* Demo only, like the rest of this list: the flows behind it register keys
+     and phones that do not exist, which is exactly the kind of control a live
+     build must not offer. */
+  "security",
   "privacy",
   "permissions",
   "autofill",
   "browsing",
   "shortcuts",
   "appearance",
+  "payments",
   "about",
 ]);
 const LIVE_CATEGORY_IDS: ReadonlySet<SettingsCategory> = new Set([
@@ -217,6 +282,66 @@ function resolveCategory(requested: SettingsCategory): SettingsCategory {
  * destinations that change the canvas — so Settings is one more thing the rail
  * opens rather than a mode with its own rules.
  */
+/**
+ * What each Settings category is for, and the way into it.
+ *
+ * Built from `SETTINGS_CATEGORIES` rather than written out again in lib/data,
+ * which is where every other guide lives. Two reasons: the list is filtered per
+ * build — Wallet only exists in a live one — so a fixture copy would describe
+ * categories this install does not have; and a hand-written second list is a
+ * list that goes stale the first time somebody adds a category and forgets.
+ *
+ * Each row opens the thing it describes. A guide you have to read and then go
+ * and find the subject of is a guide that has made you do the work twice.
+ */
+function SettingsGuidePane(): ReactNode {
+  const { settingsCategory, setSettingsCategory } = useHub();
+  const current = resolveCategory(settingsCategory);
+  const copy = content.settings.guide;
+
+  return (
+    <div>
+      <div className="border-border/60 border-b p-4">
+        <p className="text-muted-foreground text-[11px] leading-relaxed text-pretty">
+          {copy.blurb}
+        </p>
+      </div>
+      <ul className="divide-border/60 divide-y">
+        {SETTINGS_CATEGORIES.map(({ id, label, hint, icon: Icon }) => {
+          const here = id === current;
+          return (
+            <li key={id} className="flex items-start gap-2.5 p-4">
+              <span className="bg-muted text-muted-foreground grid size-7 shrink-0 place-items-center rounded-lg">
+                <Icon className="size-3.5" aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">{label}</p>
+                <p className="text-muted-foreground mt-0.5 text-[11px] leading-relaxed text-pretty">
+                  {hint}
+                </p>
+                {/* The one you are already reading says so rather than
+                    offering to take you where you are. */}
+                <button
+                  type="button"
+                  disabled={here}
+                  onClick={() => setSettingsCategory(id)}
+                  className="focus-ring border-border hover:bg-surface-hover mt-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold disabled:pointer-events-none disabled:opacity-45"
+                >
+                  {here ? copy.here : copy.open.replace("{name}", label)}
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+export function SettingsGuide(): ReactNode {
+  return <SettingsGuidePane />;
+}
+
 export function SettingsSidebar(): ReactNode {
   const {
     settingsCategory: requestedCategory,
@@ -243,6 +368,12 @@ export function SettingsSidebar(): ReactNode {
         <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">
           {content.settings.title}
         </h2>
+      </div>
+      {/* Above the list rather than filtering it. Settings is eleven
+          categories deep and the one thing somebody hunting a setting does not
+          know is which of them it is under. */}
+      <div className="px-1.5">
+        <SettingsSearch />
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
         {SETTINGS_CATEGORIES.map((category) => {
@@ -277,6 +408,11 @@ export function SettingsSidebar(): ReactNode {
           );
         })}
       </div>
+      {/* The same bar every app's column ends with, so the way into a guide is
+          in one place across the shell rather than in one place per screen.
+          Nothing on the left of it: Settings has no second control to put
+          there, and an empty slot is not a reason to invent one. */}
+      <AppHelpBar slug="settings" pane={{ kind: "settings-guide", id: "" }} />
     </div>
   );
 }
@@ -295,6 +431,132 @@ const soon = (): void => {
  * that only exists as a command is a policy nobody who has not read the grammar
  * will ever find.
  */
+/**
+ * A price in cents, and what that is in satoshis right now.
+ *
+ * Both, together, because neither is the whole answer: a cent is what somebody
+ * decides to charge and satoshis are what actually moves, and showing only the
+ * second turns a policy into a number that quietly means something different
+ * every week. The rate comes from WhatsOnChain — the same feed the wallet
+ * prices with, so two screens in this app never disagree about what a coin is
+ * worth — and the line says so, because a conversion whose source is invisible
+ * is a conversion nobody can check.
+ *
+ * Greyed rather than hidden when strangers are not being charged. The setting
+ * above is what turns it on, and a section that vanishes when you pick the
+ * wrong option teaches nobody that the two are connected.
+ */
+function StrangerFee({ active }: { active: boolean }): ReactNode {
+  const copy = content.settings.privacy;
+  const settings = useSettings();
+  /* Subscribing is what starts the fetch — see lib/exchange-rate. Without it
+     this renders the fallback rate and never corrects. */
+  const usdPerBsv = useUsdPerBsv();
+  const cents = settings.strangerFeeCents;
+  const sats = Math.round((cents / 100 / usdPerBsv) * SATS_PER_BSV);
+
+  return (
+    <div className={`p-2.5 ${active ? "" : "opacity-55"}`}>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {[1, 5, 10, 25].map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            onClick={() => setSetting("strangerFeeCents", preset)}
+            aria-pressed={cents === preset}
+            className={`focus-ring rounded-full border px-3 py-1 text-xs font-semibold tabular-nums transition-colors ${
+              cents === preset
+                ? "border-accent bg-accent/15 text-foreground"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {preset === 100 ? "$1" : `${preset}\u00a2`}
+          </button>
+        ))}
+        <span className="text-muted-foreground ml-1 text-xs tabular-nums">
+          &asymp; {sats.toLocaleString("en-US")} sats
+        </span>
+      </div>
+      <p className="text-muted-foreground mt-2 text-[11px] text-pretty">
+        {copy.feeRate.replace(
+          "{rate}",
+          usdPerBsv.toLocaleString("en-US", {
+            style: "currency",
+            currency: "USD",
+            maximumFractionDigits: 2,
+          }),
+        )}
+        {" \u00b7 "}
+        {active ? copy.feeApplies : copy.feeIdle}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * How much may be swapped to cover a payment before it becomes a question.
+ *
+ * Cents with the satoshi equivalent beside them, the same pair `StrangerFee`
+ * shows and for the same reason: a cap is a decision about what a thing is
+ * worth, and satoshis are what actually moves. The rate comes from the same
+ * feed the wallet prices with, so two screens never disagree about a coin.
+ *
+ * Greyed rather than hidden when auto-swap is off. A control that vanishes
+ * with the switch above it teaches nobody that the two are connected.
+ */
+function AutoSwapCap({ active }: { active: boolean }): ReactNode {
+  const copy = content.settings.payments;
+  const settings = useSettings();
+  const usdPerBsv = useUsdPerBsv();
+  const cents = settings.autoSwapCapCents;
+  const sats = Math.round((cents / 100 / usdPerBsv) * SATS_PER_BSV);
+
+  return (
+    <div className={`px-3 py-2.5 ${active ? "" : "opacity-45"}`}>
+      <p className="text-sm font-medium">{copy.autoSwapCap}</p>
+      <p className="text-muted-foreground mt-0.5 text-[11px] text-pretty">
+        {copy.autoSwapCapHint}
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {AUTO_SWAP_CAPS.map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            onClick={() => setSetting("autoSwapCapCents", preset)}
+            aria-pressed={cents === preset}
+            className={`focus-ring rounded-full border px-3 py-1 text-xs font-semibold tabular-nums transition-colors ${
+              cents === preset
+                ? "border-accent bg-accent/15 text-foreground"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {preset === 0
+              ? copy.autoSwapCapAsk
+              : `$${(preset / 100).toFixed(2)}`}
+          </button>
+        ))}
+        {cents > 0 && (
+          <span className="text-muted-foreground ml-1 text-xs tabular-nums">
+            &asymp; {sats.toLocaleString("en-US")} sats
+          </span>
+        )}
+      </div>
+      <p className="text-muted-foreground mt-2 text-[11px] text-pretty">
+        {copy.autoSwapCapRate.replace(
+          "{rate}",
+          usdPerBsv.toLocaleString("en-US", {
+            style: "currency",
+            currency: "USD",
+            maximumFractionDigits: 2,
+          }),
+        )}
+        {" \u00b7 "}
+        {active ? copy.autoSwapCapActive : copy.autoSwapCapIdle}
+      </p>
+    </div>
+  );
+}
+
 export function PrivacyPanel(): ReactNode {
   const copy = content.settings.privacy;
   const settings = useSettings();
@@ -358,6 +620,13 @@ export function PrivacyPanel(): ReactNode {
             { id: "toll", label: copy.reachToll, hint: copy.reachTollHint },
           ]}
         />
+      </Group>
+
+      {/* Above the per-message toll, because it is the number that toll is a
+          departure FROM: this is what everybody pays, and the group below is
+          who pays something else. */}
+      <Group title={copy.feeTitle} hint={copy.feeHint}>
+        <StrangerFee active={effects.reach === "toll"} />
       </Group>
 
       <Group title={copy.tollTitle} hint={copy.tollHint}>
@@ -462,17 +731,24 @@ export function PrivacyPanel(): ReactNode {
 }
 
 /**
- * Pairing a phone, as a code you point a camera at.
+ * Pairing a phone, from whichever end you are holding.
  *
  * A QR rather than an account form, because there is no account to sign into:
  * pairing here is two devices agreeing to share one identity's keys, and the
  * only secret involved should never be typed into a second screen. The code is
  * decorative in a prototype — same trick the wallet's receive panel uses — but
  * the shape is the real one, so the steps beside it are the actual steps.
+ *
+ * Which is exactly why the phone gets a different half. A code is shown by one
+ * device and read by another; a phone showing one is asking a laptop to hold
+ * itself up to a phone. So on a narrow screen this is a button that opens the
+ * camera, and the steps point at the desktop instead.
  */
-
 function SyncPanel(): ReactNode {
   const copy = content.settings.sync;
+  const isDesktop = useIsDesktop();
+  const { activeSpaceId, openLinkInBrowser } = useHub();
+  if (!isDesktop) return <DevicesPanel />;
   return (
     <section className="border-border bg-surface-raised mb-6 rounded-xl border p-6">
       <div className="flex flex-col items-center gap-4">
@@ -484,7 +760,7 @@ function SyncPanel(): ReactNode {
             <span className="grid size-11 place-items-center rounded-xl bg-white ring-4 ring-white">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/icons/nexus.png"
+                src="/icons/Nexus-logo-solid-BG2.png"
                 alt=""
                 aria-hidden="true"
                 className="size-9 rounded-lg object-contain"
@@ -511,15 +787,146 @@ function SyncPanel(): ReactNode {
           ))}
         </ol>
 
+        {/* Opens in a tab rather than toasting "soon": there is a real place
+            to send somebody who has no phone client yet, and it is the client
+            itself. */}
         <button
           type="button"
-          onClick={soon}
+          onClick={() =>
+            openLinkInBrowser(activeSpaceId, `https://${copy.getAppUrl}`)
+          }
           className="focus-ring text-accent rounded-md px-2 py-1 text-sm font-semibold hover:underline"
         >
           {copy.hasApp}
         </button>
       </div>
     </section>
+  );
+}
+
+/**
+ * The phone's half of pairing: the register, not the code.
+ *
+ * Reworked from a card that offered "Scan the code on your desktop", which is
+ * an instruction rather than a screen — it told somebody to go and do a thing
+ * and gave them nowhere to come back to. The question a person opens this to
+ * ask is not "how do I scan" but "what is signed in as me, and how do I stop
+ * one of them", and that has an answer with a shape every messenger already
+ * uses. This is Telegram's: linking at the top, this device below it, then
+ * everything else with a way to end each one.
+ *
+ * The desktop keeps the QR, because a code is displayed by one device and read
+ * by the other and the desktop is the one with a screen to hold still.
+ */
+function DevicesPanel(): ReactNode {
+  const copy = content.settings.sync;
+  const devices = getLinkedDevices();
+  const here = devices.find((device) => device.current);
+  const others = devices.filter((device) => !device.current);
+
+  return (
+    <section className="mb-6 space-y-3">
+      {/* The action first, and as a whole row rather than a link at the foot
+          of a list: linking a device is what somebody came here to do, and it
+          is the one thing on this screen that adds rather than removes. */}
+      <button
+        type="button"
+        onClick={soon}
+        className="focus-ring border-border bg-surface-raised hover:bg-surface-hover flex w-full items-center gap-3 rounded-xl border p-3 text-left"
+      >
+        <span
+          className="bg-accent/12 text-accent grid size-10 shrink-0 place-items-center rounded-xl"
+          aria-hidden="true"
+        >
+          <ScanLine className="size-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="text-accent block text-sm font-bold">
+            {copy.linkDevice}
+          </span>
+          <span className="text-muted-foreground mt-0.5 block text-[11px] text-pretty">
+            {copy.linkDeviceHint}
+          </span>
+        </span>
+      </button>
+
+      {here && (
+        <Group title={copy.thisDevice}>
+          <DeviceRow device={here} />
+        </Group>
+      )}
+
+      <Group title={copy.otherDevices}>
+        {others.length === 0 ? (
+          <p className="text-muted-foreground px-3 py-2.5 text-xs">
+            {copy.noOthers}
+          </p>
+        ) : (
+          <>
+            {others.map((device) => (
+              <DeviceRow key={device.id} device={device} />
+            ))}
+            {/* Last, and worded as "all other" every time it is mentioned.
+                This is the button somebody presses when they think they have
+                been compromised, and the one thing they must not fear is that
+                it signs out the device they are pressing it on. */}
+            <button
+              type="button"
+              onClick={() => toast.success(copy.endOthersDone)}
+              className="focus-ring text-negative hover:bg-surface-hover w-full px-3 py-2.5 text-left text-sm font-medium"
+            >
+              {copy.endOthers}
+            </button>
+          </>
+        )}
+      </Group>
+    </section>
+  );
+}
+
+/** One signed-in place: what it is, where it is, and when it last spoke. */
+function DeviceRow({ device }: { device: LinkedDevice }): ReactNode {
+  const copy = content.settings.sync;
+  return (
+    <div className="flex items-center gap-3 px-3 py-2.5">
+      <span
+        className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-lg"
+        aria-hidden="true"
+      >
+        {device.platform.toLowerCase().includes("ios") ? (
+          <Smartphone className="size-4" />
+        ) : (
+          <Laptop className="size-4" />
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium">
+          {device.label}
+        </span>
+        <span className="text-muted-foreground mt-0.5 block truncate text-[11px]">
+          {device.platform} · {device.place}
+        </span>
+      </span>
+      {device.lastActiveMinutes === null ? (
+        <span className="text-positive shrink-0 text-[11px] font-medium">
+          {copy.online}
+        </span>
+      ) : (
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="text-muted-foreground text-[11px]">
+            {agoLabel(device.lastActiveMinutes)}
+          </span>
+          <button
+            type="button"
+            onClick={() => toast.success(`${copy.endSessionDone} ${device.label}`)}
+            aria-label={`${copy.endSession} ${device.label}`}
+            className="focus-ring text-muted-foreground hover:text-negative rounded-md p-1"
+          >
+            <LogOut className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -713,6 +1120,16 @@ export function BrowsingPanel(): ReactNode {
   const { openDetailPane } = useHub();
   return (
     <>
+      {/* Above Sites and Tabs because it decides whether Browse is a thing you
+          have at all before either of them describes how it behaves. */}
+      <Group title={copy.browseTitle}>
+        <Toggle
+          label={copy.browseAsButtonLabel}
+          hint={copy.browseAsButtonHint}
+          value={settings.browseAsButton}
+          onChange={(next) => setSetting("browseAsButton", next)}
+        />
+      </Group>
       <Group title={copy.sitesTitle}>
         <Row
           label={mobile.globalSiteSettings}
@@ -721,6 +1138,27 @@ export function BrowsingPanel(): ReactNode {
         />
       </Group>
       <Group title={copy.tabsTitle}>
+        {/* Above archiving, because it decides WHERE the tabs being archived
+            are drawn — answering "which list are we talking about" before the
+            question about that list. */}
+        <Choice<TabLayout>
+          value={settings.tabLayout}
+          options={[
+            {
+              id: "horizontal",
+              label: copy.tabLayoutHorizontal,
+              hint: copy.tabLayoutHorizontalHint,
+              icon: <Rows3 className="size-4" aria-hidden="true" />,
+            },
+            {
+              id: "vertical",
+              label: copy.tabLayoutVertical,
+              hint: copy.tabLayoutVerticalHint,
+              icon: <Columns3 className="size-4" aria-hidden="true" />,
+            },
+          ]}
+          onPick={(next) => setSetting("tabLayout", next)}
+        />
         <Steps
           label={mobile.archiveInactive}
           value={settings.archiveAfter}
@@ -777,36 +1215,6 @@ export function BrowsingPanel(): ReactNode {
           hint={copy.translateHint}
           value={settings.translateOffer}
           onChange={(next) => setSetting("translateOffer", next)}
-        />
-      </Group>
-
-      {/* Off by default, and grouped as its own thing rather than mixed in with
-          tabs and files: every switch in here widens what a page is allowed to
-          see, which is a different kind of decision from where downloads go. */}
-      <Group title={copy.devTitle} hint={copy.devHint}>
-        <Toggle
-          label={copy.devToolsLabel}
-          hint={copy.devToolsHint}
-          value={settings.devTools}
-          badge={copy.devToolsShortcut}
-          onChange={(next) => {
-            setSetting("devTools", next);
-            toast.success(next ? copy.devToolsOn : copy.devToolsOff, {
-              ...(next ? { description: copy.devWarn } : {}),
-            });
-          }}
-        />
-        <Toggle
-          label={copy.devOverlayLabel}
-          hint={copy.devOverlayHint}
-          value={settings.overlayInspector}
-          onChange={(next) => setSetting("overlayInspector", next)}
-        />
-        <Toggle
-          label={copy.devUnsafeLabel}
-          hint={copy.devUnsafeHint}
-          value={settings.unsignedRepos}
-          onChange={(next) => setSetting("unsignedRepos", next)}
         />
       </Group>
     </>
@@ -888,16 +1296,278 @@ function ModePicker(): ReactNode {
   );
 }
 
+/**
+ * The switches the master carries with it.
+ *
+ * Listed once so adding a fourth tool is one edit rather than three: the group
+ * renders them, this turns them on and off with the mode.
+ */
+const DEV_TOOLS = ["devTools", "overlayInspector", "unsignedRepos"] as const;
+
 export function AppearancePanel(): ReactNode {
   const copy = content.settings.appearance;
-  const { spaces, setSpaceThemeColor } = useHub();
+  /* The three moved switches kept their own copy where it was — they are the
+     same switches, and rewriting their descriptions to sit under a new heading
+     would have made them look like new features. */
+  const browsing = content.settings.browsing;
+  const settings = useSettings();
+  const developer = useDeveloperMode();
+  const [confirmReplay, setConfirmReplay] = useState(false);
+  const {
+    spaces,
+    setSpaceThemeColor,
+    isInstalled,
+    installApp,
+    uninstallApp,
+    mainView,
+    setMainView,
+  } = useHub();
   const brandMode = useBrandMode();
+  /* The rail only exists above the `md` breakpoint — below it the tab bar along
+     the bottom is the navigation — so a switch about what the rail holds has
+     nothing to say on a phone. Hidden rather than disabled: a control that
+     cannot do anything here is not a control, it is a claim. */
+  const isDesktop = useIsDesktop();
   const custom = spaces.filter(
     (space) => space.themeColor && space.themeColor !== DEFAULT_ACCENT
   );
 
   return (
     <>
+      {/* First, because it is the only thing on this page that changes what the
+          window looks like rather than what it is coloured. */}
+      {/* Above the rail, because it answers the bigger question: what you see
+          when the window opens, rather than what is down the side of it. */}
+      <Group title={copy.homeTitle} hint={copy.homeHint}>
+        <Choice
+          value={settings.homescreen}
+          onPick={(next) => {
+            setSetting("homescreen", next);
+            /*
+             * Asking for the Timeline is asking for there to BE one.
+             *
+             * The two switches in this group can contradict each other: promote
+             * the Timeline to an app, disconnect it, then choose it here, and
+             * the answer was silently ignored — `homeView` has nothing to show,
+             * so it keeps handing back Focus. Picking it as your homescreen is
+             * unambiguous, so it reconnects rather than arguing.
+             */
+            if (next === "timeline" && !isInstalled("timeline")) {
+              installApp("timeline");
+            }
+            /*
+             * And go there, if you are looking at the other one.
+             *
+             * The setting decides what Home MEANS, and `?view=home` and
+             * `?view=timeline` each name one of them outright — so answering
+             * the question while standing on the losing screen changed
+             * everything except what was in front of you. Only when the canvas
+             * is already a homescreen: picking a homescreen from Settings is
+             * not a request to leave Settings.
+             */
+            if (mainView === "home" || mainView === "timeline") {
+              setMainView(next === "focus" ? "home" : "timeline");
+            }
+          }}
+          options={[
+            {
+              id: "timeline" as const,
+              label: copy.homeTimeline,
+              hint: copy.homeTimelineHint,
+            },
+            {
+              id: "focus" as const,
+              label: copy.homeFocus,
+              hint: copy.homeFocusHint,
+            },
+          ]}
+        />
+      </Group>
+
+      {isDesktop && (
+        <Group title={copy.railTitle} hint={copy.railHint}>
+          <Toggle
+            label={copy.railWorkspacesLabel}
+            hint={copy.railWorkspacesHint}
+            value={settings.workspacesInRail}
+            onChange={(next) => setSetting("workspacesInRail", next)}
+          />
+          {/* Beside it because it is the same question — what the rail holds —
+              and because both answers change what the window opens on. */}
+          <Toggle
+            label={copy.timelineLabel}
+            hint={copy.timelineHint}
+            value={settings.timelineAsApp}
+            onChange={(next) => {
+              setSetting("timelineAsApp", next);
+              /* Connected on the way in, so the tile it promises is there when
+                 the switch finishes moving. Turning it off leaves the listing
+                 disconnected rather than deleting it, which is what every other
+                 app does and what makes turning it back on cheap. */
+              if (next) installApp("timeline");
+              else uninstallApp("timeline");
+            }}
+          />
+        </Group>
+      )}
+
+      {/* Above the theme, because it is the thing somebody came here to find
+          again — a welcome you cannot get back to is a demo you can only give
+          once. Demo-gated to match the screen it replays: with fixtures
+          compiled out there is no first run to trigger, and a row that does
+          nothing is worse than no row. */}
+      {DEMO_SURFACES && (
+        <Group
+          title={content.settings.onboarding.title}
+          hint={content.settings.onboarding.hint}
+        >
+          {/* Asks first. Replaying the welcome rebuilds this workspace's rail
+              from whatever presets get picked the second time, which is not
+              something to discover after the screen has already taken over. */}
+          <Row
+            label={content.settings.onboarding.firstRunLabel}
+            hint={content.settings.onboarding.firstRunHint}
+            value={content.settings.onboarding.replay}
+            onClick={() => setConfirmReplay(true)}
+          />
+          <Sheet
+            open={confirmReplay}
+            onClose={() => setConfirmReplay(false)}
+            label={content.settings.onboarding.confirmTitle}
+            footer={
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmReplay(false)}
+                  className="focus-ring ring-border hover:bg-surface-hover flex-1 rounded-full px-4 py-2.5 text-sm font-semibold ring-1"
+                >
+                  {content.settings.onboarding.confirmCancel}
+                </button>
+                <button
+                  type="button"
+                  /* No toast: the welcome takes the whole screen the moment
+                     this is pressed, so a message about it would be covered by
+                     the thing it describes. */
+                  onClick={() => {
+                    setConfirmReplay(false);
+                    resetFirstRun();
+                  }}
+                  className="focus-ring bg-accent text-accent-foreground flex-1 rounded-full px-4 py-2.5 text-sm font-semibold"
+                >
+                  {content.settings.onboarding.confirmGo}
+                </button>
+              </div>
+            }
+          >
+            <p className="text-muted-foreground px-6 py-5 text-center text-sm leading-relaxed text-balance">
+              {content.settings.onboarding.confirmBody}
+            </p>
+          </Sheet>
+          {/* Named now and empty on purpose: the flow after the first run is
+              next, and a section that appears later looks like a setting that
+              moved. */}
+          {/* Runs the tour again for whatever presets this install was set up
+              with — the run is assembled from the saved answer, so it is the
+              same tour, not a generic one. */}
+          <Row
+            label={content.settings.onboarding.flowLabel}
+            hint={content.settings.onboarding.flowHint}
+            value={content.settings.onboarding.replayTour}
+            onClick={startTour}
+          />
+        </Group>
+      )}
+
+      {/*
+        Above the theme, because it changes what the rest of Settings — and
+        every other app — has in it. A switch that reveals other switches has to
+        come before the things it reveals, or the page appears to grow upwards.
+
+        The three it holds came from Browsing. They were grouped there because
+        the first one docks a panel under a web page, but the other two were
+        never about browsing at all, and a developer hunting for them had to
+        guess which app owned them. One place, one switch to find it by.
+      */}
+      <Group
+        title={copy.devTitle}
+        hint={copy.devHint}
+        tour="settings-developer-tools"
+      >
+        <Toggle
+          label={copy.devModeLabel}
+          hint={copy.devModeHint}
+          value={developer}
+          onChange={(next) => {
+            setDeveloperMode(next);
+            /*
+             * The master carries the three with it, both ways.
+             *
+             * Revealing three switches that are all off would make turning the
+             * mode on do nothing visible, and leaving them on after the mode
+             * goes off would strand a page inspector with no setting on screen
+             * that explains it. So the master is the state, and these follow.
+             */
+            for (const key of DEV_TOOLS) setSetting(key, next);
+            toast.success(next ? copy.devModeOn : copy.devModeOff, {
+              ...(next ? { description: copy.devModeOnHint } : {}),
+            });
+            /* Two of the three live inside Browse. Offered, not done: an app
+               that connects itself because you opened a settings switch is a
+               worse surprise than a prompt you can ignore. */
+            if (next && !isInstalled("browser")) {
+              toast(copy.devNeedsBrowse, {
+                description: copy.devNeedsBrowseHint,
+                action: {
+                  label: copy.devConnectBrowse,
+                  /* Straight to `installApp`, which is the same call the
+                     permission sheet makes once you approve it. The sheet asks
+                     what an app may do; you have just said what you want, and
+                     asking again in a modal would be asking twice. */
+                  onClick: () => {
+                    installApp("browser");
+                    toast.success(copy.devBrowseConnected);
+                  },
+                },
+              });
+            }
+          }}
+        />
+        {/*
+          The individual tools, revealed by the switch above.
+
+          Rendered inside the same group rather than in one of their own: they
+          are what the switch is for, and a second card appearing below would
+          read as an unrelated section that happened to arrive at the same
+          moment. `DeveloperOnly` is the same gate every other app will use.
+        */}
+        <DeveloperOnly>
+          <Toggle
+            label={browsing.devToolsLabel}
+            hint={browsing.devToolsHint}
+            value={settings.devTools}
+            badge={browsing.devToolsShortcut}
+            onChange={(next) => {
+              setSetting("devTools", next);
+              toast.success(next ? browsing.devToolsOn : browsing.devToolsOff, {
+                ...(next ? { description: browsing.devWarn } : {}),
+              });
+            }}
+          />
+          <Toggle
+            label={browsing.devOverlayLabel}
+            hint={browsing.devOverlayHint}
+            value={settings.overlayInspector}
+            onChange={(next) => setSetting("overlayInspector", next)}
+          />
+          <Toggle
+            label={browsing.devUnsafeLabel}
+            hint={browsing.devUnsafeHint}
+            value={settings.unsignedRepos}
+            onChange={(next) => setSetting("unsignedRepos", next)}
+          />
+        </DeveloperOnly>
+      </Group>
+
       <Group title={copy.themeTitle} hint={copy.themeHint}>
         <ModePicker />
         {/* One look across every profile. Per-profile palettes were a way to
@@ -1089,7 +1759,6 @@ export function AboutPanel(): ReactNode {
         settings/beta-dialog.tsx stays in the tree for that day.
       */}
       <UpdatePanel />
-
     </>
   );
 }
@@ -1225,6 +1894,403 @@ function SettingsFooter(): ReactNode {
  * the hub uses, so the rail's gear lands somewhere that already feels like the
  * rest of the product.
  */
+/**
+ * Payments: what arrives, what leaves, and what happens without asking.
+ *
+ * Two halves, because money moves both ways and the decisions are unrelated.
+ * Receiving is about coins that turn up in something other than bitcoin.
+ * Spending is the pair that used to sit at the bottom of Permissions — which
+ * is the page about whether a site may spend at all, a different question from
+ * how much and whether you get asked. Permissions keeps the grant and points
+ * here.
+ */
+/**
+ * Which phone platform a linked device is, or none.
+ *
+ * Read off the build string the device reports, which is the only thing this
+ * list carries that distinguishes an iPhone from a laptop. A Mac says "Nexus
+ * for macOS", which does not contain "ios" — but the check is written as a
+ * word boundary anyway, because that near-miss is exactly the kind of thing a
+ * future platform name walks straight into.
+ */
+function phoneOs(device: LinkedDevice): "ios" | "android" | null {
+  if (/\bios\b/i.test(device.platform)) return "ios";
+  if (/android/i.test(device.platform)) return "android";
+  return null;
+}
+
+/**
+ * Cards: money coming in, so that money can go out.
+ *
+ * Under Receiving because a card buys bitcoin, which is the same direction;
+ * above Spending because the reason to have one connected is the row below,
+ * where a payment you cannot cover gets covered.
+ *
+ * A card here is not the browser's stored card. Autofill has a switch called
+ * "Payment cards" and it does the opposite thing — types a number into
+ * somebody else's checkout. The two would look like duplicates on a search
+ * results list, so this one says out loud what it is not.
+ */
+function CardsGroup(): ReactNode {
+  const copy = content.settings.payments;
+  const settings = useSettings();
+  const cards = useCards();
+  const devices = getLinkedDevices();
+  const { openApp } = useHub();
+  const [adding, setAdding] = useState(false);
+
+  return (
+    <>
+      <Group title={copy.cardsTitle} hint={copy.cardsHint}>
+        {cards.length === 0 ? (
+          <p className="text-muted-foreground px-3 py-2.5 text-xs">
+            {copy.cardNone}
+          </p>
+        ) : (
+          cards.map((card) => {
+            const from = devices.find((device) => device.id === card.capturedOn);
+            /* Three cases, and the third is the one worth having copy for: a
+               card whose device has since been unlinked still exists, and
+               saying nothing about where it came from is worse than saying the
+               device is gone. */
+            const origin = !card.capturedOn
+              ? copy.cardAddedHere
+              : from
+                ? (card.addedDaysAgo > 0
+                    ? copy.cardAddedFrom.replace(
+                        "{ago}",
+                        agoLabel(card.addedDaysAgo * 24 * 60),
+                      )
+                    : copy.cardAddedFromNew
+                  ).replace("{device}", from.label)
+                : copy.cardAddedFromUnknown;
+            return (
+              <div key={card.id} className="flex items-center gap-3 px-3 py-2.5">
+                <span
+                  className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-lg"
+                  aria-hidden="true"
+                >
+                  <CreditCard className="size-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  {/* Middle dots rather than asterisks, and four of them: this
+                      is how the digits are masked on every statement and every
+                      checkout anybody has read. */}
+                  <span className="block text-sm font-medium">
+                    {card.network} &middot;&middot;&middot;&middot; {card.last4}
+                  </span>
+                  <span className="text-muted-foreground mt-0.5 block text-[11px]">
+                    {copy.cardExpires.replace("{expiry}", card.expiry)} &middot;{" "}
+                    {origin}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    removeCard(card.id);
+                    toast.success(copy.cardRemoved);
+                  }}
+                  className="focus-ring text-muted-foreground hover:text-negative shrink-0 rounded-md px-2 py-1 text-xs font-medium"
+                >
+                  {copy.cardRemove}
+                </button>
+              </div>
+            );
+          })
+        )}
+
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="focus-ring hover:bg-surface-hover flex w-full items-center gap-3 px-3 py-2.5 text-left"
+        >
+          <span
+            className="bg-accent/12 text-accent grid size-9 shrink-0 place-items-center rounded-lg"
+            aria-hidden="true"
+          >
+            <Plus className="size-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="text-accent block text-sm font-semibold">
+              {copy.cardAdd}
+            </span>
+            <span className="text-muted-foreground mt-0.5 block text-[11px]">
+              {copy.cardAddHint}
+            </span>
+          </span>
+        </button>
+
+        {/* The deliberate half of "both": the switch below is the card firing
+            on its own, and this is the card because you said so. Only offered
+            once there is a card, since it opens the wallet with one chosen. */}
+        {cards.length > 0 && (
+          <Row
+            label={copy.cardBuy}
+            hint={copy.cardBuyHint}
+            onClick={() => openApp("wallet")}
+          />
+        )}
+
+        <Toggle
+          label={copy.cardTopUp}
+          hint={cards.length === 0 ? copy.cardTopUpNeedsCard : copy.cardTopUpHint}
+          value={cards.length > 0 && settings.cardTopUp}
+          onChange={(next) => {
+            if (cards.length === 0) {
+              toast.error(copy.cardTopUpNeedsCard);
+              return;
+            }
+            setSetting("cardTopUp", next);
+          }}
+        />
+        <p className="text-muted-foreground px-3 py-2.5 text-[11px] text-pretty">
+          {copy.cardsNotAutofill}
+        </p>
+      </Group>
+
+      {adding && <CardSheet onClose={() => setAdding(false)} />}
+    </>
+  );
+}
+
+/**
+ * Tap to pay, one row per linked phone.
+ *
+ * Per phone rather than one switch, because the row is not the same row on
+ * both platforms and pretending otherwise would mean inventing a control one
+ * of them does not have:
+ *
+ *   iOS authenticates every in-app payment with Face ID, Touch ID or the
+ *   passcode. There is no threshold, and PassKit gives an app no way to ask
+ *   for one. So the iOS row is a switch and a sentence.
+ *
+ *   Android gets the amount. It is Nexus's own ceiling and the copy says so —
+ *   Google Wallet's regional skip-the-unlock limits (about £45 in the UK,
+ *   CAD$100 in Canada) are being retired in favour of an unlock on every
+ *   payment, so a number here cannot promise anything about Google's prompt.
+ *   It only governs whether Nexus adds one of its own.
+ *
+ * Which phones are listed comes from the same fixture the pairing panel reads,
+ * so unlinking a device in General removes its row here.
+ */
+function WalletPayGroup(): ReactNode {
+  const copy = content.settings.payments;
+  const settings = useSettings();
+  const phones = getLinkedDevices().filter((device) => phoneOs(device));
+
+  function toggle(id: string, on: boolean): void {
+    setSetting(
+      "walletPayDevices",
+      on
+        ? [...settings.walletPayDevices, id]
+        : settings.walletPayDevices.filter((entry) => entry !== id),
+    );
+  }
+
+  return (
+    <Group title={copy.walletPayTitle} hint={copy.walletPayHint}>
+      {phones.length === 0 ? (
+        <p className="text-muted-foreground px-3 py-2.5 text-xs">
+          {copy.walletPayNone}
+        </p>
+      ) : (
+        phones.map((device) => {
+          const os = phoneOs(device);
+          const on = settings.walletPayDevices.includes(device.id);
+          return (
+            <div key={device.id}>
+              <div className="flex items-start gap-3 px-3 py-2.5">
+                <span
+                  className={`mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg ${
+                    on
+                      ? "bg-accent/12 text-accent"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                  aria-hidden="true"
+                >
+                  <SmartphoneNfc className="size-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">
+                    {os === "ios" ? copy.applePay : copy.googlePay}
+                  </span>
+                  <span className="text-muted-foreground mt-0.5 block text-[11px]">
+                    {device.label}
+                    {device.current && ` \u00b7 ${copy.walletPayThisPhone}`}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={on}
+                  aria-label={`${
+                    os === "ios" ? copy.applePay : copy.googlePay
+                  } on ${device.label}`}
+                  onClick={() => toggle(device.id, !on)}
+                  className={`focus-ring relative mt-1.5 h-5 w-9 shrink-0 rounded-full transition-colors ${
+                    on ? "bg-accent" : "bg-muted-foreground/40"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 size-4 rounded-full bg-white transition-all ${
+                      on ? "left-4.5" : "left-0.5"
+                    }`}
+                    aria-hidden="true"
+                  />
+                </button>
+              </div>
+              {/* Only under the row it belongs to, and only while it is on: an
+                  explanation of a switch nobody has touched is noise, and the
+                  asymmetry between the two platforms only matters once one of
+                  them is actually in use. */}
+              {on && os === "ios" && (
+                <p className="text-muted-foreground px-3 pb-2.5 pl-15 text-[11px] text-pretty">
+                  {copy.applePayAlways}
+                </p>
+              )}
+              {on && os === "android" && <WalletPayCap />}
+            </div>
+          );
+        })
+      )}
+    </Group>
+  );
+}
+
+/** Android's half: the amount Nexus will let through without a word. */
+function WalletPayCap(): ReactNode {
+  const copy = content.settings.payments;
+  const settings = useSettings();
+  const cents = settings.walletPayCapCents;
+  return (
+    <div className="px-3 pb-3 pl-15">
+      <p className="text-sm font-medium">{copy.googlePayCap}</p>
+      <p className="text-muted-foreground mt-0.5 text-[11px] text-pretty">
+        {copy.googlePayCapHint}
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {WALLET_PAY_CAPS.map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            onClick={() => setSetting("walletPayCapCents", preset)}
+            aria-pressed={cents === preset}
+            className={`focus-ring rounded-full border px-3 py-1 text-xs font-semibold tabular-nums transition-colors ${
+              cents === preset
+                ? "border-accent bg-accent/15 text-foreground"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {preset === 0
+              ? copy.walletPayCapAsk
+              : `$${(preset / 100).toFixed(2)}`}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function PaymentsPanel(): ReactNode {
+  const copy = content.settings.payments;
+  const settings = useSettings();
+  const { setSettingsCategory } = useHub();
+
+  return (
+    <>
+      <Group title={copy.receivingTitle} hint={copy.receivingHint}>
+        <Toggle
+          label={copy.autoSwap}
+          hint={copy.autoSwapHint}
+          value={settings.autoSwapToBsv}
+          onChange={(next) => setSetting("autoSwapToBsv", next)}
+        />
+        {/* Said here because a global switch reads as absolute. It sets the
+            box in Get paid; it does not weld it. */}
+        <p className="text-muted-foreground px-3 py-2.5 text-[11px] text-pretty">
+          {copy.autoSwapPerPayment}
+        </p>
+      </Group>
+
+      <CardsGroup />
+      <WalletPayGroup />
+
+      <Group title={copy.spendingTitle} hint={copy.spendingHint}>
+        {/* First, because it decides whether the cap under it is ever read
+            aloud: with this on, a paying action inside the cap happens without
+            a prompt. */}
+        <Toggle
+          label={copy.oneClick}
+          hint={copy.oneClickHint}
+          value={settings.oneClickPay}
+          onChange={(next) => setSetting("oneClickPay", next)}
+        />
+        {/* The swap sits between them: one-click decides whether a payment
+            asks, this decides whether COVERING that payment asks, and the cap
+            below is about the payment's own size. Three questions, narrowing. */}
+        <Toggle
+          label={copy.autoSwapSpend}
+          hint={copy.autoSwapSpendHint}
+          value={settings.autoSwapWhenSpending}
+          onChange={(next) => setSetting("autoSwapWhenSpending", next)}
+        />
+        <AutoSwapCap active={settings.autoSwapWhenSpending} />
+        <p className="text-muted-foreground px-3 py-2.5 text-[11px] text-pretty">
+          {copy.autoSwapWhich}
+        </p>
+
+        <div className="px-3 py-2.5">
+          <p className="text-sm font-medium">{copy.spendCap}</p>
+          <p className="text-muted-foreground mt-0.5 text-[11px] text-pretty">
+            {copy.spendCapHint}
+          </p>
+          <div className="mt-2">
+            <SatsAmount
+              label={copy.spendCap}
+              value={settings.spendCapSats}
+              presets={SPEND_CAPS}
+              offLabel={copy.capAsk}
+              onPick={(next) => setSetting("spendCapSats", next)}
+            />
+          </div>
+        </div>
+        {/* The other half of the same decision, kept where it belongs. A cap
+            means nothing until a site is allowed to spend, so the way to that
+            answer is on the screen that states the cap. */}
+        <button
+          type="button"
+          onClick={() => setSettingsCategory("permissions")}
+          className="focus-ring hover:bg-surface-hover flex w-full items-center gap-3 px-3 py-2.5 text-left"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium">{copy.grantsLink}</span>
+            <span className="text-muted-foreground mt-0.5 block text-[11px]">
+              {copy.grantsHint}
+            </span>
+          </span>
+          <ChevronRight
+            className="text-muted-foreground size-4 shrink-0"
+            aria-hidden="true"
+          />
+        </button>
+      </Group>
+    </>
+  );
+}
+
+/* Shortcuts either side of what a small purchase costs; the field takes the
+   rest. Zero means every payment asks, which is why it reads as "Ask". */
+const SPEND_CAPS = [21_800, 218_000];
+
+/* In cents. $2.18 is the default and the middle option, with an order of
+   magnitude either side and a zero that means every swap asks. */
+const AUTO_SWAP_CAPS = [0, 218, 2_180];
+
+/* In cents, and an order of magnitude above the swap cap: this one is a card
+   being charged rather than a coin being converted, and the real contactless
+   limits it stands in for are tens of currency units, not single ones. */
+const WALLET_PAY_CAPS = [0, 2_180, 21_800];
+
 export function SettingsApp(): ReactNode {
   const { settingsCategory: requestedCategory } = useHub();
   const settingsCategory = resolveCategory(requestedCategory);
@@ -1240,9 +2306,29 @@ export function SettingsApp(): ReactNode {
       <div className="mx-auto max-w-2xl px-5 py-6 sm:px-8">
         <header className="mb-5">
           <h1 className="text-lg font-bold">{category?.label}</h1>
-          <p className="text-muted-foreground mt-0.5 text-sm text-pretty">
-            {category?.hint}
-          </p>
+          {/*
+            About says which build this is, where every other category says what
+            it is for.
+
+            It used to sit in the rail, under the apps, which put a version
+            number on screen at all times for the one moment a year somebody
+            needs it. This is where they come looking, and the header line was
+            spending itself on "Version and what changed" directly above a group
+            titled Version.
+
+            The SHELL's version, which is the part the panel below cannot state:
+            that group reports the chrome's own release, and these two differ —
+            a desktop build carries a chrome it may have shipped a week earlier.
+            Renders nothing where no shell answers, which is the honest result in
+            a browser: there is no shell to have a version.
+          */}
+          {settingsCategory === "about" ? (
+            <ShellVersion className="mt-0.5" />
+          ) : (
+            <p className="text-muted-foreground mt-0.5 text-sm text-pretty">
+              {category?.hint}
+            </p>
+          )}
         </header>
         {/* Ours, and the one panel here that is live rather than drawn: keys,
             network and BRC-157 backup all reach @nexus/wallet-core. It sits
@@ -1250,7 +2336,10 @@ export function SettingsApp(): ReactNode {
             Settings at all. */}
         {settingsCategory === "wallet" && <WalletSettingsPanel />}
         {settingsCategory === "general" && <GeneralPanel />}
+        {settingsCategory === "profiles" && <ProfilesPanel />}
+        {settingsCategory === "security" && <SecurityPanel />}
         {settingsCategory === "privacy" && <PrivacyPanel />}
+        {settingsCategory === "payments" && <PaymentsPanel />}
         {settingsCategory === "permissions" && <PermissionsPanel />}
         {settingsCategory === "autofill" && <AutofillPanel />}
         {settingsCategory === "browsing" && <BrowsingPanel />}

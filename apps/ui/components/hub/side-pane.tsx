@@ -4,6 +4,7 @@ import { content } from "@/lib/data";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, X } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
+import { useHostOverlay } from "@/lib/wallet-data";
 
 /** Width the pane takes from the app column on desktop. */
 export const SIDE_PANE_WIDTH = 340;
@@ -50,6 +51,11 @@ export function SidePane({
    */
   actions?: ReactNode;
 }): ReactNode {
+  /* Holds the shell's page layer down while this is up: a browsed page is a
+     native view that paints above this document, so no z-index reaches over
+     it. See lib/wallet-data. */
+  useHostOverlay(open);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent): void => {
@@ -65,7 +71,7 @@ export function SidePane({
         {children}
       </div>
       {footer && (
-        <div className="shrink-0 border-t border-border bg-surface-raised px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="border-border bg-surface-raised shrink-0 border-t px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {footer}
         </div>
       )}
@@ -84,7 +90,7 @@ export function SidePane({
             exit={{ width: 0, opacity: 0 }}
             transition={{ type: "spring", damping: 32, stiffness: 340 }}
             aria-label={title}
-            className="relative z-30 hidden shrink-0 overflow-hidden rounded-l-xl border-l border-border bg-surface-raised text-foreground sm:block"
+            className="border-border bg-surface-raised text-foreground relative z-30 hidden shrink-0 overflow-hidden rounded-l-xl border-l sm:block"
           >
             <div
               className="flex h-full flex-col"
@@ -96,12 +102,12 @@ export function SidePane({
                   header's right edge, and opening it narrows that column out
                   from under the pointer, leaving the close button where the
                   cursor already was. The trigger looked like a toggle. */}
-              <div className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b border-border bg-surface-raised px-4 py-2.5">
+              <div className="border-border bg-surface-raised sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b px-4 py-2.5">
                 <button
                   type="button"
                   onClick={onClose}
                   aria-label={content.messages.media.close}
-                  className="focus-ring -ml-1.5 shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+                  className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground -ml-1.5 shrink-0 rounded-md p-1.5"
                 >
                   <X className="size-4" aria-hidden="true" />
                 </button>
@@ -126,14 +132,14 @@ export function SidePane({
             role="dialog"
             aria-modal="true"
             aria-label={title}
-            className="fixed inset-0 z-80 flex flex-col bg-background text-foreground sm:hidden"
+            className="bg-background text-foreground fixed inset-0 z-80 flex flex-col sm:hidden"
           >
-            <div className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b border-border bg-background px-3 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+            <div className="border-border bg-background sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b px-3 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
               <button
                 type="button"
                 onClick={onClose}
                 aria-label={content.messages.back}
-                className="focus-ring -ml-1 rounded-md p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+                className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground -ml-1 rounded-md p-1.5"
               >
                 <ArrowLeft className="size-5" aria-hidden="true" />
               </button>

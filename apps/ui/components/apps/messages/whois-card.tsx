@@ -18,6 +18,7 @@ import {
   getEffectsServerSnapshot,
   subscribeEffects,
 } from "@/lib/command-effects";
+import { Favicon } from "@/components/hub/favicon";
 import { useHub } from "@/components/hub/hub-provider";
 import { groupIconOf } from "@/lib/group-icon";
 import { Tooltip } from "@/components/hub/tooltip";
@@ -41,6 +42,7 @@ import {
   whoisFor,
 } from "@/lib/messages";
 import {
+  ExternalLink,
   BadgeCheck,
   CalendarDays,
   ChevronDown,
@@ -171,8 +173,20 @@ export function WhoisCard({
   compact?: boolean;
 }): ReactNode {
   const copy = content.messages;
-  const { openApp, closeDetailPane, setMessageThread, conversationIcons } =
-    useHub();
+  const {
+    openApp,
+    closeDetailPane,
+    setMessageThread,
+    conversationIcons,
+    openLinkInBrowser,
+    activeSpaceId,
+  } = useHub();
+  /* Somebody else's site opens where somebody else's sites open — a tab in
+     Browse, with the address bar and the back button that come with it. */
+  const openLink = (url: string): void => {
+    openLinkInBrowser(activeSpaceId, url.startsWith("http") ? url : `https://${url}`);
+    closeDetailPane();
+  };
   const who = whoisFor(person);
   const eco = getEcosystem(person.ecosystem);
   const presence = presenceFor(person.id);
@@ -213,10 +227,16 @@ export function WhoisCard({
             className="mt-0.5 text-xs text-muted-foreground"
           />
           {/* Same size as the handle above it, and closer to it: the two are
-              one block of identification, not a heading and a sentence. */}
-          <p className="mt-0.5 mb-2 text-xs text-muted-foreground">
-            {person.role}
-          </p>
+              one block of identification, not a heading and a sentence. Absent
+              when unset rather than an empty line, which would push the block
+              apart to say nothing. */}
+          {person.role.trim() ? (
+            <p className="text-muted-foreground mt-0.5 mb-2 text-xs">
+              {person.role}
+            </p>
+          ) : (
+            <div className="mb-2" />
+          )}
         </div>
       </div>
 
@@ -230,20 +250,32 @@ export function WhoisCard({
         </p>
       )}
 
-      <Section title={copy.whois.about}>
-        {/* As written, breaks included: people write their own bio in
-            paragraphs, and running them together is not our call. */}
-        <p className="text-sm leading-relaxed whitespace-pre-line text-pretty">
-          {person.bio}
-        </p>
-        {/* Actions sit directly under the bio: once you know who someone is, the
-            next thing you want is to do something about it. The web profile is
-            one of these rather than a full-width button of its own. */}
-        <div className="mt-3">
-          {/* No "open full profile" here: this is it. */}
+      {/*
+        The bio, and the things you can do about the person.
+
+        Two things in one section, and only one of them can be empty. An unset
+        bio drops the heading and the paragraph and keeps the actions, because
+        the actions are not "about" anybody — they are the reason most people
+        opened this card, and burying them behind a bio somebody never wrote
+        would punish the reader for the subject's silence.
+      */}
+      {person.bio.trim() ? (
+        <Section title={copy.whois.about}>
+          {/* As written, breaks included: people write their own bio in
+              paragraphs, and running them together is not our call. */}
+          <p className="text-sm leading-relaxed whitespace-pre-line text-pretty">
+            {person.bio}
+          </p>
+          <div className="mt-3">
+            {/* No "open full profile" here: this is it. */}
+            <ProfileActionsRow person={person} hideProfile />
+          </div>
+        </Section>
+      ) : (
+        <div className="border-border border-t py-3.5">
           <ProfileActionsRow person={person} hideProfile />
         </div>
-      </Section>
+      )}
 
       {person.registeredAt && (
         <Section title={copy.whois.registered}>
@@ -262,24 +294,67 @@ export function WhoisCard({
         </Section>
       )}
 
-      <Section title={copy.whois.expertise}>
-        {person.expertise?.length ? (
+      {person.expertise?.length ? (
+        <Section title={copy.whois.expertise}>
           <ul className="flex flex-wrap gap-1.5">
             {person.expertise.map((tag) => (
               <li
                 key={tag}
-                className="rounded-full bg-surface px-2 py-0.5 text-xs"
+                className="bg-surface rounded-full px-2 py-0.5 text-xs"
               >
                 {tag}
               </li>
             ))}
           </ul>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            {copy.whois.noExpertise}
-          </p>
-        )}
-      </Section>
+        </Section>
+      ) : null}
+
+      {/*
+        The places somebody points people at.
+
+        Buttons rather than a list of addresses: the label is the useful half —
+        "Portfolio" says what is on the other side where `https://…` makes you
+        work it out — and pressing it is what anybody wants to do with it.
+        Absent when nobody has set any, rather than a heading over "None yet",
+        because an empty section on a stranger's card is a fact about the form
+        rather than about them.
+      */}
+      {person.links?.length ? (
+        <Section title={copy.whois.links}>
+          {/* One per line and full width, rather than pills that wrap. Two
+              labels of different lengths on one row read as a tag cloud — a
+              description of somebody — where these are destinations, and a
+              destination wants to look like a thing you press. */}
+          <ul className="flex flex-col gap-1.5">
+            {person.links.map((link) => (
+              <li key={`${link.label}${link.url}`}>
+                <button
+                  type="button"
+                  onClick={() => openLink(link.url)}
+                  className="focus-ring border-border bg-surface hover:bg-surface-hover relative flex w-full items-center justify-center rounded-full border px-9 py-1.5 text-xs font-semibold"
+                >
+                  {/* Absolute, so the label is centred on the BUTTON rather
+                      than on what is left of it once a mark and a chevron have
+                      taken their share. */}
+                  <Favicon
+                    url={link.url}
+                    letter={(link.label || link.url).slice(0, 1).toUpperCase()}
+                    color="#4353ff"
+                    size={16}
+                    rounded="rounded-full"
+                    className="absolute left-2"
+                  />
+                  <span className="truncate">{link.label || link.url}</span>
+                  <ExternalLink
+                    className="text-muted-foreground absolute right-3 size-3"
+                    aria-hidden="true"
+                  />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
 
       <Section title={copy.whois.lastSeen}>
         <p className="flex items-center gap-2 text-sm">
@@ -352,8 +427,8 @@ export function WhoisCard({
         </Section>
       )}
 
-      <Section title={copy.whois.contactInfo}>
-        {hasContact ? (
+      {hasContact && (
+        <Section title={copy.whois.contactInfo}>
           <div>
             {contact.email && (
               <ContactLine
@@ -376,14 +451,12 @@ export function WhoisCard({
                 value={`@${contact.github}`}
               />
             )}
-            <p className="mt-2 text-[11px] text-pretty text-muted-foreground">
+            <p className="text-muted-foreground mt-2 text-[11px] text-pretty">
               {copy.whois.contactNote}
             </p>
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">{copy.whois.noContact}</p>
-        )}
-      </Section>
+        </Section>
+      )}
 
       <Section title={copy.whois.recentConversations}>
         {recent.length > 0 ? (

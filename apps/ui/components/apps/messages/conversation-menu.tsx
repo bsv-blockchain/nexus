@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { useHostOverlay } from "@/lib/wallet-data";
 
 /**
  * The conversation's overflow menu.
@@ -72,7 +73,7 @@ export function ConversationMenu({
   const effects = useSyncExternalStore(
     subscribeEffects,
     getEffects,
-    getEffectsServerSnapshot,
+    getEffectsServerSnapshot
   );
   const flags = conversationFlags[conversationId] ?? {};
   const tolled = effects.tolls.some((toll) => toll.personId === person.id);
@@ -96,7 +97,7 @@ export function ConversationMenu({
           aria-expanded={open}
           aria-haspopup="menu"
           aria-label={copy.open}
-          className="focus-ring rounded-full p-2 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+          className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground rounded-full p-2"
         >
           <MoreVertical className="size-5" aria-hidden="true" />
         </button>
@@ -144,8 +145,8 @@ export function ConversationMenu({
               seed?.(
                 tolled
                   ? `/trolltoll ${handleOf(person)} off`
-                  : `/trolltoll ${handleOf(person)}`,
-              ),
+                  : `/trolltoll ${handleOf(person)}`
+              )
             )
           }
         />
@@ -235,6 +236,11 @@ function ConfirmDelete({
   onCancel: () => void;
   onConfirm: () => void;
 }): ReactNode {
+  /* Holds the shell's page layer down while this is up: a browsed page is a
+     native view that paints above this document, so no z-index reaches over
+     it. See lib/wallet-data. */
+  useHostOverlay(true);
+
   const copy = content.messages.menu;
   return (
     <div className="fixed inset-0 z-100 grid place-items-center bg-black/40 p-4">
@@ -242,24 +248,24 @@ function ConfirmDelete({
         role="alertdialog"
         aria-modal="true"
         aria-label={copy.deleteTitle}
-        className="w-full max-w-sm rounded-2xl border border-border bg-surface-raised p-5 text-foreground shadow-2xl"
+        className="border-border bg-surface-raised text-foreground w-full max-w-sm rounded-2xl border p-5 shadow-2xl"
       >
         <p className="text-sm font-bold">{copy.deleteTitle}</p>
-        <p className="mt-1.5 text-sm text-pretty text-muted-foreground">
+        <p className="text-muted-foreground mt-1.5 text-sm text-pretty">
           {copy.deleteBody}
         </p>
         <div className="mt-4 flex justify-end gap-2">
           <button
             type="button"
             onClick={onCancel}
-            className="focus-ring rounded-full px-3 py-1.5 text-sm font-medium hover:bg-surface-hover"
+            className="focus-ring hover:bg-surface-hover rounded-full px-3 py-1.5 text-sm font-medium"
           >
             {copy.cancel}
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="focus-ring rounded-full bg-negative px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90"
+            className="focus-ring bg-negative rounded-full px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90"
           >
             {copy.deleteConfirm}
           </button>

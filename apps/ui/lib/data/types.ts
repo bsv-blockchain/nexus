@@ -26,7 +26,8 @@ export type NativeAppSlug =
   | "mail"
   | "identity"
   | "attestations"
-  | "roadmap";
+  | "roadmap"
+  | "timeline";
 
 /**
  * Listings that are somebody else's website.
@@ -45,11 +46,16 @@ export type WebAppSlug =
   | "pixel-war"
   | "omnibazaar"
   | "soundbase"
-  | "tonicpow-handcash"
   | "1sat-market"
   | "tonicpow"
+  | "handcash-market"
+  | "theme-token"
   | "jamify"
-  | "scribe";
+  | "scribe"
+  | "free-radio"
+  | "hexacities"
+  | "bsv-radar"
+  | "clndr";
 
 export type HubAppSlug = NativeAppSlug | WebAppSlug;
 
@@ -114,26 +120,101 @@ export type StoreCategory =
   | "social"
   | "wallets";
 
-/** table: app_collections — persona bundles that install several apps at once */
+/**
+ * table: app_collections — the setups offered in the App Store's column.
+ *
+ * These are the first run's presets, plus the one thing everybody gets whether
+ * they picked anything or not. Ids past "all" and "essentials" are `PresetId`
+ * values verbatim, so a card here and a card on the welcome screen are the same
+ * card — see lib/data/collections.ts, which builds this list from the presets
+ * rather than restating them. Restated here as literals only to keep this
+ * module free of an import cycle; collections.ts asserts the two agree.
+ */
 export type CollectionId =
   | "all"
-  | "core"
   | "essentials"
-  | "consumer"
-  | "knowledge"
-  | "creator"
-  | "developer";
+  | "thinker"
+  | "maker"
+  | "developer"
+  | "gamer"
+  /* Repository ids, verbatim from lib/data/repositories.ts. A catalogue card is
+     the repository, so giving it a second id would mean keeping two in step. */
+  | "repo-bsv"
+  | "repo-handcash"
+  | "repo-1sat";
+
+/**
+ * What a card is, which decides what its switch does.
+ *
+ * `preset` applies a whole setup — apps, rail folder, sources, settings.
+ * `always` is Essentials, which is on by definition and cannot be switched.
+ * `repository` turns an app source on or off; nothing is installed either way.
+ */
+export type CollectionKind = "preset" | "always" | "repository";
 
 export interface AppCollection {
   id: CollectionId;
+  kind: CollectionKind;
   name: string;
+  /**
+   * The line under the name, where a card has one worth reading.
+   *
+   * Catalogue cards use it for the repository's own note — "More from BSVA",
+   * "Featured 3rd party" — which is the only thing about a source that is not
+   * already written across its banner.
+   */
+  note?: string;
   description: string;
-  /** lucide icon name */
+  /** lucide icon name, for the places that draw a glyph rather than the card */
   icon: string;
-  /** apps toggled by this collection ("all" ignores this and uses every app) */
+  /** apps this connects ("all" ignores this and uses every app) */
   apps: HubAppSlug[];
-  /** persona bundle: also installs the Web apps and folds them into its rail folder */
-  bundlesWeb?: boolean;
+  /**
+   * The clip behind the card, and the frame it rests on.
+   *
+   * `video` is absent on Essentials, which is not a preset and has no clip of
+   * its own; it carries only a `poster`. The preset's accent is deliberately
+   * NOT here: the welcome screen grades its clips to it and the column does
+   * not, so carrying it would be an unused field that reads like a promise.
+   */
+  video?: string;
+  /** the still shown while the clip is not playing */
+  poster?: string;
+  /**
+   * Where in the clip that still was taken, in seconds.
+   *
+   * The card seeks back to it when the pointer leaves, so the frame you get
+   * before hovering and the frame you get after are the same one. Without it a
+   * card would rest on whatever it happened to be paused on.
+   */
+  posterAt?: number;
+  /**
+   * Stills to fade through while the pointer is on the card.
+   *
+   * Essentials has no clip of its own, so it borrows the welcome's opening
+   * sequence: the paintings that flicker behind the logo. `poster` is the one
+   * it rests on and is the first of these.
+   */
+  stills?: string[];
+  /**
+   * `object-position` down the source, 0 to 1.
+   *
+   * Per card, because these are portrait clips cropped to a wide slot and the
+   * subject is at a different height in each — one value for all of them put
+   * the reader's head above the slot and the gamer's below it. Picked by eye
+   * against the real crop; see the note in app-collections.tsx.
+   */
+  focus?: number;
+  /**
+   * Shown on, and not switchable.
+   *
+   * Essentials, and only Essentials: it is what every setup gets whatever was
+   * picked, so a switch on it would be a switch whose off position does not
+   * exist. Declared rather than inferred from whether every app in it is
+   * `essential` — four of the seven are not, and that rule would have let the
+   * card quietly disconnect Browse.
+   */
+  locked?: boolean;
 }
 
 /** table: hub_apps — installable apps shown in the icon rail / Apps manager */
@@ -160,9 +241,33 @@ export interface HubApp {
   slug: HubAppSlug;
   name: string;
   shortName: string;
+  /**
+   * Draw the name's vowels at reduced opacity.
+   *
+   * For a publisher whose wordmark is the word with its vowels dropped —
+   * clndr.im spells itself Calendar and lets you read the consonants. Stored as
+   * a flag rather than as markup in `name`, because `name` is also what search
+   * matches on, what a screen reader announces and what a toast quotes; a field
+   * that is sometimes a string and sometimes a fragment would have to be
+   * handled at all thirty-odd places one of those is read.
+   */
+  quietVowels?: boolean;
   description: string;
   /** two or three word subtitle for tiles and tooltips */
   tagline: string;
+  /**
+   * This app's slug on BSV Radar, where it has an entry.
+   *
+   * Stored rather than derived: the slugs are per-entry and inconsistent —
+   * `1satmarket` next to `bsv-browser` — so a rule that turned a name into one
+   * would be right about half the time and confidently wrong about the rest.
+   * Absent means not listed, which is the more common answer.
+   *
+   * Kept here rather than fetched. BSV Radar's API serves no CORS header, so a
+   * browser cannot ask it; this is the copy, and it goes stale the way any copy
+   * does — see the note in lib/data/hub-apps.
+   */
+  bsvRadar?: string;
   /** publishing organisation category */
   developer: AppDeveloper;
   /** 0–100 popularity score used for store sorting */
@@ -222,7 +327,59 @@ export interface Space {
 }
 
 /** internal pages that render in the main view instead of a website */
+/**
+ * A screen that replaces the browser canvas outright, tabs and all.
+ *
+ * Only Getting Started. Screens that belong IN a tab — the extensions manager,
+ * the search results page — are addressed instead, so they keep a title, an
+ * icon, a place in the strip and a Back button. See `INTERNAL_PAGES` in
+ * lib/tabs.
+ */
 export type PageId = "getting-started";
+
+/**
+ * A site somebody sent you through TumbleUpon.
+ *
+ * @see lib/data/tumbleupon.ts
+ */
+export interface TumbleInboxItem {
+  id: string;
+  /** a `messagePeople` id — the same person Messages knows */
+  fromPersonId: string;
+  /** the app they sent, by its slug in the catalogue */
+  appSlug: string;
+  message: string;
+  /**
+   * Minutes since it arrived, not a stamp.
+   *
+   * Same reasoning as `agoLabel` in lib/timeline: a static export has no "now",
+   * and an inbox whose only message is three months old reads as abandoned.
+   */
+  minutesAgo: number;
+  read: boolean;
+}
+
+/** An extension this browser is carrying. @see lib/data/extensions.ts */
+export interface BrowserExtension {
+  id: string;
+  name: string;
+  blurb: string;
+  version: string;
+  /** its mark, drawn rather than fetched — see the note in the fixture */
+  mark: { letters: string; background: string; color: string };
+  enabled: boolean;
+  /** what it asked for at install, in the words the prompt used */
+  permissions: string[];
+  site: string;
+  /**
+   * The things it can be given a keyboard shortcut for.
+   *
+   * Its own commands in its own order, because the shortcuts screen lists them
+   * verbatim and a re-ordered or invented list would be a screen about an
+   * extension nobody ships.
+   */
+  commands: string[];
+}
 
 /** table: space_items — folders, their children, live folders and pins */
 export interface SpaceItem {
@@ -308,6 +465,61 @@ export interface DownloadItem {
 }
 
 /** table: wallet_accounts */
+/**
+ * A place this identity is signed in.
+ *
+ * @see lib/data/devices.ts
+ */
+export interface LinkedDevice {
+  id: string;
+  /** what the person would call it — the model, or the name they gave it */
+  label: string;
+  /** which build is running there, which is what tells two Macs apart */
+  platform: string;
+  /** roughly where, because "somewhere I have never been" is the whole alarm */
+  place: string;
+  /**
+   * Minutes since it was last used, or null for the device you are holding.
+   *
+   * Minutes rather than a stamp, for the reason `agoLabel` gives in
+   * lib/timeline: a static export has no "now", so a fixture dated last
+   * Tuesday reads as three months stale by the time somebody opens the build.
+   */
+  lastActiveMinutes: number | null;
+  current: boolean;
+}
+
+/** table: funding_cards */
+/**
+ * A bank card connected to the wallet, as the wallet is allowed to remember it.
+ *
+ * Four digits, a network and a month — the parts a person needs to tell two of
+ * their own cards apart, and nothing a thief could spend. There is deliberately
+ * no field for the number: the wallet never holds one. A connected card is a
+ * token held by the processor, and this row is the receipt for that.
+ *
+ * `capturedOn` is the device the details were typed or photographed on, which
+ * is the whole point of the pairing flow: the number is entered once, on
+ * whichever screen you trust, and the desktop only ever learns the last four.
+ *
+ * @see lib/data/cards.ts
+ * @see components/apps/settings/card-sheet.tsx
+ */
+export interface FundingCard {
+  id: string;
+  network: "Visa" | "Mastercard" | "American Express";
+  /** the only digits anybody keeps */
+  last4: string;
+  /** MM/YY, the way it is embossed */
+  expiry: string;
+  /** as printed, which is to say shouting */
+  holder: string;
+  /** a LinkedDevice id — where the number was entered */
+  capturedOn: string;
+  /** days rather than a date, for the reason `lastActiveMinutes` gives above */
+  addedDaysAgo: number;
+}
+
 export interface WalletAccount {
   id: string;
   label: string;
@@ -321,6 +533,17 @@ export interface WalletAccount {
    * pretend that is impossible — but they can never be this.
    */
   identifier: string;
+  /**
+   * Which chain the balance is denominated in.
+   *
+   * Absent means BSV, which is every wallet here today and is why every amount
+   * in this file is named `...Satoshis`. It is declared rather than assumed so
+   * that a second chain is a row in a table instead of a rename across the app:
+   * a wallet on another chain sets this, and the amount fields keep meaning
+   * "the chain's smallest unit". `WalletTransaction.tokenId` is the same seam
+   * one level down, for assets carried ON a chain.
+   */
+  chain?: "bsv";
   /** the two stops of the wallet's gradient, so it is known by sight */
   colors: [string, string];
   /** a picture, where one has been set; without it the gradient carries it */
@@ -458,6 +681,7 @@ export type EcosystemId =
   | "twetch"
   | "handcash"
   | "commonsource"
+  | "lamint"
   | "mycelia";
 
 /** table: ecosystems — a handle-issuing authority, per BRC-169 section 2.1 */
@@ -502,9 +726,27 @@ export interface Token {
   ecosystem: EcosystemId | null;
   /** own mark; null falls back to the issuing ecosystem's */
   icon: string | null;
+  /**
+   * What to draw behind the mark, for an icon that is a glyph rather than a
+   * picture. Absent means the icon fills the circle on its own — which is what
+   * a full-bleed logo wants, and what a transparent one must not have.
+   */
+  plate?: string;
   /** brand tint, for generated tiles and accents */
   color: string;
   decimals: number;
+  /**
+   * The chain it lives on, where that is not BSV.
+   *
+   * Absent means BSV, which is every token this wallet issues. Present means
+   * the coin arrived by a cross-chain swap and is held on somebody else's
+   * chain — which is worth stating on the row, because "0.4 ETH" in a BSV
+   * wallet is otherwise a claim nobody can place.
+   *
+   * The value is ChangeNOW's network code, so a holding and a swap route are
+   * talking about the same network. See lib/swap-assets.
+   */
+  chain?: string;
   /** the base currency — the default for a bare amount */
   base?: boolean;
   /** fiat peg, for stablecoins */
@@ -517,6 +759,15 @@ export interface Token {
   blurb: string;
   /** minting protocol, e.g. BSV-21 or 1Sat */
   protocol: string;
+  /** where that protocol is documented, when it has a home worth opening */
+  protocolUrl?: string;
+  /**
+   * Who issued it, where that is neither an ecosystem in this app nor nobody.
+   * Bitcoin has an author and no issuing company, which "Independent" says
+   * poorly.
+   */
+  issuer?: string;
+  issuerUrl?: string;
   usdPerUnit: number;
   /** 24h move as a percentage */
   change24h: number;
@@ -541,6 +792,15 @@ export interface CollectibleTrait {
 
 export interface Collectible {
   id: string;
+  /**
+   * The wallet holding it.
+   *
+   * An item is held by a key, not by a person, so "my collectibles" is only
+   * ever the union of what each wallet holds — and a wallet you have selected
+   * should show you its own. Required rather than optional: an unattributed
+   * row would show up under every wallet, which is the bug this prevents.
+   */
+  accountId: string;
   bucket: CollectibleBucket;
   name: string;
   /** issuing organisation; items sharing one are bundled in the grid */
@@ -579,6 +839,8 @@ export interface Collectible {
 /** table: payment_links — a shareable request anyone can pay */
 export interface PaymentLink {
   id: string;
+  /** the wallet the money lands in */
+  accountId: string;
   /** last path segment of the shared link */
   code: string;
   description: string;
@@ -599,10 +861,26 @@ export interface PaymentLink {
 /** table: split_bills — an amount divided across handles, with who has paid */
 export interface SplitBill {
   id: string;
+  /** the wallet the shares settle into, or out of when somebody else raised it */
+  accountId: string;
   description: string;
   tokenId: string;
   totalUnits: number;
   createdAt: string;
+  /**
+   * Who raised it, when it was not you.
+   *
+   * Absent means this is yours and the shares are owed TO you. Set means
+   * somebody else divided an amount and named you in it, so one of the shares
+   * is yours to pay. The same row either way — a split is one object seen from
+   * two ends, and modelling the second as its own table would let the two
+   * disagree about what was owed.
+   */
+  raisedBy?: string;
+  /** which share is yours, on a split somebody else raised */
+  yourShareUnits?: number;
+  /** what your own share is doing, on a split somebody else raised */
+  yourShareStatus?: "paid" | "pending" | "failed";
   shares: {
     personId: string;
     units: number;
@@ -615,6 +893,19 @@ export interface SplitBill {
 export interface AttestedSocial {
   provider: "x" | "github" | "google" | "linkedin";
   handle: string;
+}
+
+/**
+ * One row of somebody's "link in bio".
+ *
+ * A label as well as a URL, because a bare address is a thing to read rather
+ * than a thing to press: "Portfolio" says what is on the other side and
+ * `https://…` makes you work it out. The label is what the card draws; the URL
+ * is what it opens.
+ */
+export interface ProfileLink {
+  label: string;
+  url: string;
 }
 
 export interface MessagePerson {
@@ -644,6 +935,14 @@ export interface MessagePerson {
    * have been linked, which is the common case.
    */
   socials?: AttestedSocial[];
+  /**
+   * The handful of places this person points people at.
+   *
+   * Ordered, because the first one is the one somebody actually wants found.
+   * Absent means none set, which is the common case and renders as nothing
+   * rather than as an empty heading.
+   */
+  links?: ProfileLink[];
   /** avatar image path; `null` falls back to the generated colour tile */
   photo: string | null;
   /** colour stops for the generated fallback avatar */
@@ -1143,6 +1442,15 @@ export interface MarketListing {
 /** table: vault_items — encrypted items in the vault app */
 export interface VaultItem {
   id: string;
+  /**
+   * The workspace whose vault this is in.
+   *
+   * A vault holds seeds, keys and papers, which are the most workspace-shaped
+   * things a person owns — the whole argument for separating work from home is
+   * that they do not share a key. The column header names the workspace, and
+   * that name has to be true of what is under it.
+   */
+  spaceId: string;
   label: string;
   kind: "seed-backup" | "key" | "credential" | "file";
   lastAccessedAt: string;
@@ -1154,6 +1462,15 @@ export interface VaultItem {
 export interface Connection {
   id: string;
   name: string;
+  /**
+   * The shelf it sits on, from the store's own set.
+   *
+   * The same `StoreCategory` the App Store filters by rather than a second
+   * vocabulary: a site you connected and an app you installed are the same kind
+   * of thing seen from two screens, and two lists of categories would disagree
+   * within a week of either being edited.
+   */
+  category: StoreCategory;
   origin: string;
   favicon: string;
   faviconColor: string;

@@ -1,13 +1,7 @@
 /**
  * tables: spaces, space_items, tabs, favorites, pages — placeholder rows.
  */
-import type {
-  BrowserTab,
-  Favorite,
-  MockPage,
-  Space,
-  SpaceItem,
-} from "./types";
+import type { BrowserTab, Favorite, MockPage, Space, SpaceItem } from "./types";
 
 export const favorites: Favorite[] = [
   {
@@ -33,12 +27,14 @@ export const favorites: Favorite[] = [
 export const spaces: Space[] = [
   {
     id: "space-my-hub",
-    name: "My Profile",
+    name: "My Workspace",
     // "hub" renders the Nexus brand mark via SpaceIcon (default profile icon).
-    /* One of the picker's own, like every other profile. The brand mark
-       said "this is Nexus" on a thing that is one profile among several, and
-       nobody could pick it again after changing it. */
-    emoji: "lucide:House",
+    /* One of the picker's own, like every other profile. The brand mark said
+       "this is Nexus" on a thing that is one profile among several, and nobody
+       could pick it again after changing it. A house is no longer one of the
+       picker's own either — the strip's Home button wears that — so this is the
+       nearest thing the picker still offers. */
+    emoji: "lucide:Coffee",
     sortOrder: 0,
     createdAt: "2026-02-01T10:00:00.000Z",
   },
@@ -201,5 +197,4 @@ export const mockPages: MockPage[] = [
     linkText: "Start learning",
     linkHref: "#",
   },
-
 ];

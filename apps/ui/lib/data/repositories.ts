@@ -51,7 +51,7 @@ export const defaultRepositories: AppRepository[] = [
     official: true,
     note: "Signature apps",
     website: "https://nexus.build",
-    iconSrc: "/icons/nexus.png",
+    iconSrc: "/icons/Nexus-logo-solid-BG2.png",
     versions: [
       { version: "2026.08", releasedAt: "2026-08-06T09:00:00.000Z" },
       { version: "2026.06", releasedAt: "2026-06-18T09:00:00.000Z" },
@@ -67,6 +67,10 @@ export const defaultRepositories: AppRepository[] = [
     official: true,
     note: "More from BSVA",
     website: "https://bsvblockchain.org",
+    /* The association's own mark rather than the generated "B". A source is
+       chosen by sight in a list of five, and a letter in a box is what every
+       source without an icon already looks like. */
+    iconSrc: "/icons/bsv-association.png",
     versions: [
       { version: "2026.06", releasedAt: "2026-06-18T09:00:00.000Z" },
       { version: "2026.04", releasedAt: "2026-04-15T09:00:00.000Z" },
@@ -115,12 +119,32 @@ export const defaultRepositories: AppRepository[] = [
    * where its listings land.
    */
   {
-    id: "repo-catallaxy",
-    name: "Catallaxy Capital",
-    url: "https://market.handcash.io/registry",
+    /* `id` stays `repo-catallaxy`: it is the key a saved subscription is
+       written under, and the apps below point at it. Renaming it would drop
+       this source for anybody who had already switched it on. */
+    id: "repo-tlon",
+    name: "Tlon.cc",
+    url: "https://tlon.cc/registry",
     official: false,
     note: "Community catalogue",
-    website: "https://catallaxy.capital",
+    website: "https://tlon.cc",
+    versions: [
+      { version: "2026.08", releasedAt: "2026-08-14T09:00:00.000Z" },
+      { version: "2026.06", releasedAt: "2026-06-03T09:00:00.000Z" },
+    ],
+    /* On by default, unlike Game Center below. One community source switched on
+       and one switched off is the pair that shows the difference: the store has
+       something from outside the official repos in it out of the box, and there
+       is still a source to turn on and watch land. */
+    enabled: true,
+  },
+  {
+    id: "repo-catallaxy",
+    name: "Game Center",
+    url: "https://gamecenter.dev/registry",
+    official: false,
+    note: "Community catalogue",
+    website: "https://gamecenter.dev",
     versions: [
       { version: "2026.07", releasedAt: "2026-07-22T09:00:00.000Z" },
       { version: "2026.05", releasedAt: "2026-05-20T09:00:00.000Z" },

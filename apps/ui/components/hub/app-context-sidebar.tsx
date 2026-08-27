@@ -1,17 +1,26 @@
 "use client";
 
 import { ConversationList } from "@/components/apps/messages/conversation-list";
+import { AppName } from "@/components/hub/app-name";
 import { RoadmapSidebar } from "@/components/apps/roadmap/roadmap-sidebar";
 import { SuggestFeature } from "@/components/apps/roadmap/suggest-feature";
 import { WALLET_SECTIONS } from "@/components/apps/wallet-app";
+import { WalletColumnHeader } from "@/components/apps/wallet/wallet-column";
 import { Tooltip } from "@/components/hub/tooltip";
 import { Favicon } from "@/components/hub/favicon";
+import { useGrantedConnections } from "@/lib/connections-store";
+import {
+  toggleRepoCollapsed,
+  useCollapsedRepos,
+} from "@/lib/collapsed-repos";
+import type { Connection } from "@/lib/data/types";
 import { AppHelpBar } from "@/components/hub/app-help-bar";
 import { useHub, type AppSlug } from "@/components/hub/hub-provider";
 import {
   content,
   getAppOnboarding,
   getConnections,
+  storeCategories,
   getCourses,
   getHubApp,
   getIdentityCertificates,
@@ -31,12 +40,14 @@ import {
   AtSign,
   BadgeCheck,
   Boxes,
+  ChevronDown,
   File,
   FileCheck,
   FileLock2,
   FileText,
   Inbox,
   KeyRound,
+  Lock,
   PanelLeftClose,
   PenTool,
   Plus,
@@ -51,8 +62,14 @@ import {
   Upload,
   User,
   Vault as VaultIcon,
+  X,
   type LucideIcon,
 } from "lucide-react";
+import { motion } from "motion/react";
+import { toast } from "sonner";
+import { toggleConnection, useSettings } from "@/lib/settings-store";
+import { useVault } from "@/lib/vault-store";
+import { VaultLockButton } from "@/components/apps/vault/vault-lock-button";
 import type { ReactNode } from "react";
 
 /** Apps whose sidebar column is contextual (everything except Browse). */
@@ -78,35 +95,75 @@ export function hasContextSidebar(slug: AppSlug | null): boolean {
   return slug !== null && CONTEXTUAL.includes(slug);
 }
 
-function Header({ slug }: { slug: AppSlug }): ReactNode {
+function Header({
+  slug,
+  onClose,
+}: {
+  slug: AppSlug;
+  /** set on a phone, where this is a sheet and there is no panel to fold */
+  onClose?: (() => void) | undefined;
+}): ReactNode {
   const app = getHubApp(slug);
   const {
     messagesUnreadOnly,
     setMessagesUnreadOnly,
     openNewConversation,
     toggleRail,
+    spaces,
+    activeSpaceId,
   } = useHub();
   if (!app) return null;
+
+  /*
+   * The Vault says whose it is; the other apps do not need to.
+   *
+   * Every app in this column is scoped to the workspace, but for most of them
+   * that is obvious from what is in the list — these are your messages, these
+   * are the sites you connected. A vault is a closed door with a count beside
+   * it, and the one thing you want to know before opening it is which one it
+   * is. Naming it here is cheaper than opening it to find out.
+   */
+  const space =
+    slug === "vault"
+      ? spaces.find((entry) => entry.id === activeSpaceId)
+      : undefined;
   return (
     <div className="flex items-center gap-2 px-1.5 pt-0.5 pb-3">
       {/* Closing the pane belongs beside what the pane is called, rather than
           in the rail's footer where it sat next to controls that have nothing
           to do with it. Re-opening is the rail's job, since this button goes
           with the panel it closes. */}
-      <Tooltip label={content.hub.collapsePanel}>
+      {/* On a phone this is a sheet rather than a column, so the leading
+          control shuts the sheet: there is no panel to fold away, and a
+          "close this panel" on something that is not one would be a button
+          claiming to do a thing the screen cannot do. */}
+      <Tooltip
+        label={onClose ? content.messages.media.close : content.hub.collapsePanel}
+      >
         <button
           type="button"
-          onClick={toggleRail}
-          aria-label={content.hub.collapsePanel}
+          onClick={onClose ?? toggleRail}
+          aria-label={
+            onClose ? content.messages.media.close : content.hub.collapsePanel
+          }
           className="focus-ring -ml-0.5 shrink-0 rounded-md p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
         >
-          <PanelLeftClose className="size-4" aria-hidden="true" />
+          {onClose ? (
+            <X className="size-4" aria-hidden="true" />
+          ) : (
+            <PanelLeftClose className="size-4" aria-hidden="true" />
+          )}
         </button>
       </Tooltip>
       {/* No app tile: the rail already shows which app is open, in the same
           mark, a few pixels to the left. Twice is not clearer. */}
       <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">
-        {app.name}
+        {space && (
+          <span className="text-muted-foreground font-normal">
+            {space.name}{" "}
+          </span>
+        )}
+        <AppName app={app} />
       </h2>
       {slug === "messages" && (
         <>
@@ -256,21 +313,52 @@ const VAULT_KINDS: { id: string; label: string; icon: LucideIcon }[] = [
 ];
 
 function VaultSidebar(): ReactNode {
-  const { vaultKind, setVaultKind } = useHub();
-  const items = getVaultItems();
+  const { vaultKind, setVaultKind, activeSpaceId } = useHub();
+  const { phase } = useVault();
+  const items = getVaultItems(activeSpaceId);
+
+  /*
+   * A shut vault has no contents to filter.
+   *
+   * Listing the kinds and their counts beside a closed door tells anybody
+   * looking over your shoulder what is inside and how much of it — which is
+   * most of what a vault is for keeping to yourself. One row, saying the only
+   * true thing about it right now.
+   */
+  if (phase !== "open") {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+        <div className="text-muted-foreground flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm">
+          <Lock className="size-4 shrink-0" aria-hidden="true" />
+          <span className="flex-1 text-left">{content.vault.lock.locked}</span>
+        </div>
+      </div>
+    );
+  }
+
   const countOf = (id: string): number =>
     id === "all"
       ? items.length
       : items.filter((item: VaultItem) => item.kind === id).length;
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
-      {VAULT_KINDS.map((kind) => {
+      {VAULT_KINDS.map((kind, index) => {
         const active = vaultKind === kind.id;
         return (
-          <button
+          /* Staggered with the canvas beside it, on the same curve and the same
+             step, so opening the vault is one thing arriving in two columns
+             rather than two lists that happen to appear at once. */
+          <motion.button
             key={kind.id}
             type="button"
             onClick={() => setVaultKind(kind.id)}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{
+              duration: 0.34,
+              ease: [0.4, 0, 0.2, 1],
+              delay: 0.08 + index * 0.055,
+            }}
             className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm ${
               active
                 ? "bg-accent/15 font-medium text-foreground"
@@ -282,7 +370,7 @@ function VaultSidebar(): ReactNode {
             <span className="text-xs text-muted-foreground">
               {countOf(kind.id)}
             </span>
-          </button>
+          </motion.button>
         );
       })}
     </div>
@@ -664,7 +752,9 @@ function SpendSidebar(): ReactNode {
   };
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-      <div className="flex flex-col gap-0.5">
+      {/* Above Cash, because everything under it is "…of this wallet". */}
+      <WalletColumnHeader />
+      <div className="-mt-4 flex flex-col gap-0.5">
         {WALLET_SECTIONS.map(({ id, label, icon: Icon }) => {
           const active = walletSection === id;
           return (
@@ -748,37 +838,140 @@ function AppContextFooter({ slug }: { slug: AppSlug }): ReactNode {
 
 function ConnectSidebar(): ReactNode {
   const { connectSelected, setConnectSelected } = useHub();
-  const connections = getConnections();
+  const settings = useSettings();
+  const collapsed = useCollapsedRepos();
+  /*
+   * Revoked sites leave this list rather than sitting in it greyed out.
+   *
+   * Safe to drop them because revoking still is not deleting: Settings › Sites
+   * lists them with their revoked state and the toggle back, and the toast below
+   * carries an Undo for the moment right after. This list answers "who can reach
+   * my wallet", and a row that cannot is a different question.
+   */
+  /* The seeded three plus anything this session has granted — a site opened
+     while auto-connect was on, or an app put on the rail. One list, because
+     from here they are the same fact: something that can reach the wallet. */
+  const connections = [...getConnections(), ...useGrantedConnections()].filter(
+    (conn) => !settings.revokedConnections.includes(conn.id),
+  );
   const activeId = connectSelected ?? connections[0]?.id ?? null;
+  const copy = content.connect;
+
+  /*
+   * Grouped onto the store's own shelves.
+   *
+   * A flat list answers "what have I connected" and nothing else. Past a dozen
+   * the question becomes "what have I given the block explorers", which is a
+   * question about kinds — and the kinds already exist, on the App Store's
+   * filter, so this borrows them rather than inventing a second vocabulary that
+   * would drift from the first within a week of either being edited.
+   *
+   * Only shelves with something on them, in the store's own order. An empty
+   * heading is a claim that you might have connected a wallet, which is not
+   * information.
+   */
+  const shelves = storeCategories
+    .map((category) => ({
+      category,
+      rows: connections.filter((conn) => conn.category === category.id),
+    }))
+    .filter((shelf) => shelf.rows.length > 0);
+
+  const disconnect = (conn: Connection): void => {
+    toggleConnection(conn.id);
+    /* Selection would otherwise point at a row that is no longer here, leaving
+       the pane beside it showing a site this list denies. */
+    if (conn.id === activeId) {
+      const next = connections.find((entry) => entry.id !== conn.id);
+      setConnectSelected(next?.id ?? null);
+    }
+    toast.success(conn.name, {
+      description: copy.disconnected,
+      action: {
+        label: content.hub.undo,
+        onClick: () => toggleConnection(conn.id),
+      },
+    });
+  };
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
-      {connections.map((conn) => {
-        const active = conn.id === activeId;
+    <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+      {shelves.map(({ category, rows }) => {
+        /* Namespaced into the store the App Store's sections already use, so
+           the two accordions behave identically — same persistence, same
+           "collapsed is what is remembered" rule — and a category here cannot
+           collide with a repository id there. */
+        const key = `conn:${category.id}`;
+        const shut = collapsed.has(key);
         return (
-          <button
-            key={conn.id}
-            type="button"
-            onClick={() => setConnectSelected(conn.id)}
-            className={`flex w-full items-center gap-2.5 rounded-lg p-2 text-left ${
-              active ? "bg-accent/10" : "hover:bg-surface-hover"
-            }`}
-          >
-            <Favicon
-              url={conn.origin}
-              letter={conn.favicon}
-              color={conn.faviconColor}
-              size={22}
-              rounded="rounded-lg"
-            />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">
-                {conn.name}
+          <section key={category.id}>
+            <button
+              type="button"
+              onClick={() => toggleRepoCollapsed(key)}
+              aria-expanded={!shut}
+              className="focus-ring text-muted-foreground hover:text-foreground flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-[10px] font-bold tracking-wide uppercase"
+            >
+              <ChevronDown
+                className={`size-3 shrink-0 transition-transform ${
+                  shut ? "-rotate-90" : ""
+                }`}
+                aria-hidden="true"
+              />
+              <span className="min-w-0 flex-1 truncate text-left">
+                {category.label}
               </span>
-              <span className="block truncate text-xs text-muted-foreground">
-                {conn.origin.replace(/^https?:\/\//, "")}
-              </span>
-            </span>
-          </button>
+              <span className="tabular-nums">{rows.length}</span>
+            </button>
+            {!shut && (
+              <div className="mt-0.5 flex flex-col gap-0.5">
+                {rows.map((conn) => {
+                  const active = conn.id === activeId;
+                  return (
+                    /* A row, not a button: the X is its own control, and a
+                       button inside a button is neither valid nor clickable. */
+                    <div
+                      key={conn.id}
+                      className={`group relative flex items-center rounded-lg ${
+                        active ? "bg-accent/10" : "hover:bg-surface-hover"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setConnectSelected(conn.id)}
+                        aria-current={active ? "true" : undefined}
+                        className="focus-ring flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-2 text-left"
+                      >
+                        <Favicon
+                          url={conn.origin}
+                          letter={conn.favicon}
+                          color={conn.faviconColor}
+                          size={22}
+                          rounded="rounded-lg"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate pr-6 text-sm font-medium">
+                            {conn.name}
+                          </span>
+                          <span className="text-muted-foreground block truncate pr-6 text-xs">
+                            {conn.origin.replace(/^https?:\/\//, "")}
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => disconnect(conn)}
+                        aria-label={`${copy.disconnect} ${conn.name}`}
+                        title={copy.disconnect}
+                        className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-negative absolute right-1.5 rounded p-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
+                      >
+                        <X className="size-3.5" aria-hidden="true" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         );
       })}
     </div>
@@ -972,7 +1165,24 @@ export function AppContextBody({ slug }: { slug: AppSlug }): ReactNode {
 }
 
 /** Full contextual sidebar column: header, scrolling body, docked CTAs. */
-export function AppContextSidebar({ slug }: { slug: AppSlug }): ReactNode {
+export function AppContextSidebar({
+  slug,
+  /**
+   * Set where this is the phone's sheet rather than the desktop's column.
+   *
+   * The whole panel it normally lives in is inside the shell's `hidden
+   * md:block`, so below that width every app's list — Mail's folders, the
+   * vault's sections, the roadmap's filters — simply was not there. Eleven of
+   * the fifteen apps with one had no phone equivalent at all. This is the same
+   * component in a bottom sheet rather than fifteen second implementations.
+   *
+   * @see components/hub/mobile-app-sheet.tsx
+   */
+  onClose,
+}: {
+  slug: AppSlug;
+  onClose?: (() => void) | undefined;
+}): ReactNode {
   /* Messages carries its own bar, with two controls this one has no business
      showing. Anything with nothing written about it gets no button rather than
      a button onto an empty pane. */
@@ -981,7 +1191,7 @@ export function AppContextSidebar({ slug }: { slug: AppSlug }): ReactNode {
   if (!helped) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <Header slug={slug} />
+        <Header slug={slug} onClose={onClose} />
         <AppContextBody slug={slug} />
         <AppContextFooter slug={slug} />
       </div>
@@ -1002,7 +1212,7 @@ export function AppContextSidebar({ slug }: { slug: AppSlug }): ReactNode {
   const hasCta = slug === "wallet" || slug === "roadmap";
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <Header slug={slug} />
+      <Header slug={slug} onClose={onClose} />
       <div
         className={`relative flex min-h-0 flex-1 flex-col ${
           hasCta ? "[&>*:first-child]:pb-28" : "[&>*:first-child]:pb-12"
@@ -1019,7 +1229,13 @@ export function AppContextSidebar({ slug }: { slug: AppSlug }): ReactNode {
           {/* CTAs first, then the bar: the help button is the least urgent
               thing in the column and belongs furthest from the content. */}
           <AppContextFooter slug={slug} />
-          <AppHelpBar slug={slug} />
+          {/* The vault is the one app whose column carries a setting: when it
+              shuts itself again. It goes in the help bar's left slot, which is
+              where App repositories sits in the Apps column — same bar, same
+              corner, same kind of thing. */}
+          <AppHelpBar slug={slug}>
+            {slug === "vault" ? <VaultLockButton /> : null}
+          </AppHelpBar>
         </div>
       </div>
     </div>

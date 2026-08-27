@@ -3,6 +3,8 @@
 import { AttestationsApp } from "@/components/apps/attestations-app";
 import { BasketsApp } from "@/components/apps/baskets-app";
 import { BrowserApp } from "@/components/apps/browser-app";
+import { TabStrip } from "@/components/hub/tab-strip";
+import { useSettings } from "@/lib/settings-store";
 import { ConnectApp } from "@/components/apps/connect-app";
 import { IdentityApp } from "@/components/apps/identity-app";
 import { LearnApp } from "@/components/apps/learn-app";
@@ -18,8 +20,11 @@ import { VoteApp } from "@/components/apps/vote-app";
 import { WalletApp } from "@/components/apps/wallet-app";
 import { WebAppView } from "@/components/apps/web-app";
 import { AppTile } from "@/components/hub/app-icon";
+import { AppName } from "@/components/hub/app-name";
 import { hasContextSidebar } from "@/components/hub/app-context-sidebar";
 import { SettingsApp } from "@/components/apps/settings-app";
+import { TimelineApp } from "@/components/apps/timeline-app";
+import { HomeApp } from "@/components/apps/home-app";
 import { AppStore } from "@/components/hub/app-store";
 import { DetailPane } from "@/components/hub/detail-pane";
 import { GettingStartedPage } from "@/components/hub/getting-started-page";
@@ -98,6 +103,7 @@ const appViews: Record<NativeAppSlug, () => ReactNode> = {
   identity: IdentityApp,
   attestations: AttestationsApp,
   roadmap: RoadmapApp,
+  timeline: TimelineApp,
 };
 
 /** Whether anything can draw this app — a view we ship, or a site to frame. */
@@ -141,7 +147,9 @@ function LauncherTile({
       <span className="bg-surface-raised ring-border/60 group-hover:ring-accent/50 flex size-18 items-center justify-center rounded-3xl shadow-sm ring-1 transition-all group-hover:-translate-y-0.5 group-hover:shadow-lg">
         <AppTile app={app} size={44} />
       </span>
-      <span className="text-sm font-semibold">{app.shortName}</span>
+      <span className="text-sm font-semibold">
+        <AppName app={app} short />
+      </span>
       <span
         className={`-mt-1 h-4 text-xs opacity-0 transition-opacity group-hover:opacity-100 ${
           hintAccent ? "text-accent font-semibold" : "text-muted-foreground"
@@ -217,6 +225,17 @@ function AppCanvas(): ReactNode {
   // (theme-reset restores the base light/dark palette). The launcher/empty
   // state is always themed.
   const resetTheme = Boolean(activeApp) && !signatureApps.has(activeApp!);
+  /*
+   * Tabs above the viewport, and only over a page.
+   *
+   * Gated on the browser rather than shown for every app because these are
+   * browser tabs: a strip of open pages above Messages labels nothing that is
+   * on screen. In vertical mode the library column draws them instead and this
+   * renders nothing at all — the two are exclusive, never stacked.
+   */
+  const showTabStrip =
+    useSettings().tabLayout === "horizontal" &&
+    (activeApp === "browser" || onSite);
   return (
     <div
       className={`flex min-h-0 flex-1 flex-col ${
@@ -226,7 +245,9 @@ function AppCanvas(): ReactNode {
       {app && app.slug !== "browser" && !selfChromedApps.has(app.slug) && (
         <header className="border-border flex shrink-0 items-center gap-2 border-b px-5 py-3">
           <AppTile app={app} size={24} />
-          <h1 className="min-w-0 flex-1 text-sm font-semibold">{app.name}</h1>
+          <h1 className="min-w-0 flex-1 text-sm font-semibold">
+            <AppName app={app} />
+          </h1>
           {/* Offered where something has been written for this app *and* its
               column does not already carry the button. Two ways into one pane,
               a few hundred pixels apart, teaches that they are different
@@ -250,6 +271,7 @@ function AppCanvas(): ReactNode {
           <AppMenu slug={app.slug} />
         </header>
       )}
+      {showTabStrip && <TabStrip />}
       {/* The app and its reference pane share the row, so opening the pane
           narrows the app rather than covering it. */}
       <div className="flex min-h-0 flex-1">
@@ -294,7 +316,8 @@ function SplitCanvas(): ReactNode {
 
 /** The right-hand canvas: Getting Started, app store, Profiles manager, or the active app. */
 export function MainView(): ReactNode {
-  const { activeApp, activePage, mainView, splitApp } = useHub();
+  const { activeApp, activePage, mainView, splitApp, isInstalled } = useHub();
+  const settings = useSettings();
   const isDesktop = useIsDesktop();
   const showStore = mainView === "store";
   /* Settings paints on the app background, never the browser page's. Without
@@ -302,6 +325,30 @@ export function MainView(): ReactNode {
      it, and renders dark-theme text on a white sheet. */
   const showSettings = mainView === "settings";
   const showProfiles = mainView === "profiles";
+  /*
+   * Timeline: the feed, and the two columns that frame it.
+   *
+   * Reached on purpose rather than by having nothing else to show, which is
+   * what makes it a place you can return to and link to (?view=timeline)
+   * instead of a state you fall into. It replaced the wall of app tiles that
+   * used to sit here — the rail and the App Store both open apps better than a
+   * grid of icons did, and neither of them had anything to say about what has
+   * happened since you last looked.
+   */
+  const showTimeline = mainView === "timeline";
+  /* Asked for by name. `?view=timeline` still falls back to it, but that is a
+     fallback rather than the only door. */
+  const showHome = mainView === "home";
+  /*
+   * Whether there is a Timeline to show.
+   *
+   * Two ways there is not: the listing is switched off in Preferences and the
+   * feed is simply the home screen — which is the default and shows the feed —
+   * or it is switched on, which makes it an app, and the app has since been
+   * disconnected. Only the second takes it away, which is the whole point of
+   * promoting it: a screen you cannot remove is not a screen you chose.
+   */
+  const timelineHere = !settings.timelineAsApp || isInstalled("timeline");
   const canvasIsBrowser = activeApp === "browser" && !activePage;
 
   /*
@@ -323,7 +370,26 @@ export function MainView(): ReactNode {
        render into and looked broken. */
     return (
       <div className="flex h-full min-w-0 flex-1">
-        <div className="h-full min-w-0 flex-1 overflow-x-auto">
+        {/*
+         * The columns run the full width of the window and scroll *under* the
+         * rail and its panel, rather than stopping at their edge.
+         *
+         * The negative margin reclaims the space the sidebar is standing on and
+         * the padding gives it straight back, so the first column still starts
+         * beside the panel while the track it slides along carries on behind
+         * it. Without this a wide set of workspaces ends at a hard edge, which
+         * reads as the end of the list rather than as the edge of a window.
+         *
+         * `--sidebar-width` is published by DesktopSidebar and is 0 on a phone,
+         * where there is no sidebar to hide behind — see hub-shell.
+         */}
+        <div
+          style={{
+            marginLeft: "calc(var(--sidebar-width, 0px) * -1)",
+            paddingLeft: "var(--sidebar-width, 0px)",
+          }}
+          className="h-full min-w-0 flex-1 overflow-x-auto"
+        >
           <ProfilesManager />
         </div>
         <DetailPane />
@@ -334,23 +400,31 @@ export function MainView(): ReactNode {
   /*
    * Two apps, side by side, and never more.
    *
-   * Only while an app is showing: the store and the profiles manager are
-   * already multi-column screens, and a split inside one of those is a third
-   * set of columns nobody asked for. Only on a desktop layout, because below it
-   * a split is two half-width apps, which is neither of them.
+   * Only while an app is showing: the store, the profiles manager and the
+   * Timeline are already multi-column screens, and a split inside one of those
+   * is a third set of columns nobody asked for. Only on a desktop layout,
+   * because below it a split is two half-width apps, which is neither of them.
+   *
+   * The Timeline was missing from that list, and `split=` survives in the
+   * address bar — so once a second pane had been opened, asking for the Timeline
+   * kept showing the split instead. Worse when the left half was Browse: a live
+   * page is a native view painting above this document, so the screen somebody
+   * asked for was behind a website they had not.
    */
   if (
     splitApp !== null &&
     !showStore &&
     !showSettings &&
     !showProfiles &&
+    !showTimeline &&
+    !showHome &&
     isDesktop
   ) {
     return (
       <div className="flex h-full min-w-0 flex-1 gap-2">
         <main
           id="main-content"
-          className={`border-border flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-xl ${
+          className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden ${
             canvasIsBrowser ? "bg-canvas" : "bg-background"
           }`}
         >
@@ -358,7 +432,7 @@ export function MainView(): ReactNode {
         </main>
         <section
           aria-label={content.appMenu.pickApp}
-          className="border-border bg-background flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-xl"
+          className="bg-background flex h-full min-w-0 flex-1 flex-col overflow-hidden"
         >
           <SplitPaneHeader />
           <div className="min-h-0 flex-1">
@@ -372,8 +446,8 @@ export function MainView(): ReactNode {
   return (
     <main
       id="main-content"
-      className={`border-border flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-xl ${
-        !showStore && !showSettings && canvasIsBrowser
+      className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden ${
+        !showStore && !showSettings && !showTimeline && !showHome && canvasIsBrowser
           ? "bg-canvas"
           : "bg-background"
       }`}
@@ -395,6 +469,28 @@ export function MainView(): ReactNode {
         <div className="min-h-0 flex-1">
           <GettingStartedPage />
         </div>
+
+      ) : showHome ? (
+        <HomeApp />
+      ) : showTimeline ? (
+        /*
+         * The Timeline, or the dashboard where there is no Timeline to show.
+         *
+         * `view=timeline` is what Home, the Workspaces panel and the end of the
+         * first run all reach for, so it is the name of the HOME SCREEN rather
+         * than of one app — and the screen behind that name has to survive the
+         * app being disconnected. It is: promoted to an app and then removed,
+         * this falls back to the dashboard, which answers the question somebody
+         * opening a window at nine in the morning is actually asking.
+         */
+        timelineHere ? (
+        /* No DetailPane: the Timeline brings its own right-hand column, and two
+           panes on the same edge would be one too many places for a reference
+           to open. */
+          <TimelineApp />
+        ) : (
+          <HomeApp />
+        )
       ) : showStore ? (
         /* Same row Settings uses: the store, then whatever pane is open beside
            it. Without this the Mods guide had a button and nowhere to render —

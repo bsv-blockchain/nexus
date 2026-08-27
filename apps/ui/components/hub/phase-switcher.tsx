@@ -1,6 +1,19 @@
 "use client";
 
 import {
+  getContentMode,
+  getContentModeServerSnapshot,
+  setContentMode,
+  subscribeContentMode,
+  type ContentMode,
+} from "@/lib/content-mode";
+import {
+  DEMO_DATA_COMPILED_IN,
+  resolveDataMode,
+  setDataMode,
+  type DataMode,
+} from "@/lib/data-mode";
+import {
   PHASE_FEATURES,
   PHASE_LABELS,
   PHASES,
@@ -19,6 +32,63 @@ import {
 } from "react";
 
 const ORDER: Record<Phase, number> = { now: 0, next: 1, later: 2 };
+
+/**
+ * The one red thing in the shell.
+ *
+ * Live means this session is reading real services, and the difference between
+ * that and a demo is not visible anywhere else — the rows look the same until
+ * one of them is your money. A recording light is the convention nobody has to
+ * be taught, so it is a plain dot with a halo rather than a badge with a word
+ * in it: it has to read at the size of a chip, in the corner of an eye.
+ */
+function LiveDot(): ReactNode {
+  return (
+    <span
+      aria-hidden="true"
+      className="size-1.5 shrink-0 rounded-full bg-red-500"
+      style={{ boxShadow: "0 0 0 2px rgba(239,68,68,.25)" }}
+    />
+  );
+}
+
+const DATA_MODES: readonly DataMode[] = ["demo", "live"];
+const DATA_MODE_LABELS: Record<DataMode, string> = {
+  demo: "Demo",
+  live: "Live",
+};
+
+/**
+ * Switch what this session reads, and reload so that everything agrees.
+ *
+ * `resolveDataMode()` is read during render by wallet-data, pay-data and the
+ * surfaces that branch on it — none of them subscribe, because the mode was
+ * never meant to change while a session was open. Flipping it in place would
+ * leave a portfolio drawn from fixtures beside a transaction list drawn from a
+ * wallet, which is worse than either. A reload is the honest way to make
+ * ninety-nine importers change their minds at once.
+ *
+ * Both directions pin an explicit override rather than clearing it. Auto-detect
+ * asks whether a shell with a wallet is present, so inside the Electron shell
+ * "Demo" has to overrule that answer to mean anything.
+ */
+function chooseDataMode(next: DataMode): void {
+  setDataMode(next);
+  window.location.reload();
+}
+
+/**
+ * Same reasoning, same reload — see `chooseDataMode` above.
+ *
+ * `isEmptyContent()` is read inside the data accessors, which are plain
+ * functions called during render by eighty-odd components, none of which
+ * subscribe. Flipping it in place emptied the ones that happened to re-render
+ * and left the rest showing a ledger the wallet says is gone.
+ */
+function chooseContentMode(next: ContentMode): void {
+  setContentMode(next);
+  window.location.reload();
+}
 
 function Level({
   label,
@@ -86,7 +156,20 @@ export function PhaseSwitcher(): ReactNode {
     };
   }, [open]);
 
+  /* Above the mount guard, unlike `resolveDataMode` below it: a hook cannot sit
+     after an early return, and this one is safe to call on the server because
+     it has a snapshot for it. */
+  const contentMode = useSyncExternalStore(
+    subscribeContentMode,
+    getContentMode,
+    getContentModeServerSnapshot,
+  );
+
   if (!mounted) return null;
+
+  /* Read after the mount guard, not through a hook: this is localStorage plus a
+     query parameter, and the server has neither. */
+  const dataMode = resolveDataMode();
 
   const rank = ORDER[phase];
   /* The selected state first with its own new features, then what it carries
@@ -102,7 +185,10 @@ export function PhaseSwitcher(): ReactNode {
        below the breakpoint where the bar exists. */
     <div
       ref={box}
-      className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-[70] md:bottom-4"
+      /* `right-18`, not `right-4`: the help circle owns the corner now and this
+         sits to its left. Both are fixed to the same spot otherwise, and the
+         chip would have been underneath it. */
+      className="fixed right-18 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-[70] md:bottom-4"
     >
       <AnimatePresence>
         {open && (
@@ -115,7 +201,7 @@ export function PhaseSwitcher(): ReactNode {
           >
             <div className="border-border/60 flex items-center gap-2 border-b p-3">
               <p className="text-muted-foreground flex-1 text-[10px] font-semibold tracking-[1px] uppercase">
-                Product state
+                Demo controls
               </p>
               <button
                 type="button"
@@ -127,7 +213,95 @@ export function PhaseSwitcher(): ReactNode {
               </button>
             </div>
 
+            {/* Only where there is something to switch to. With fixtures
+                compiled out `resolveDataMode` refuses a demo override and keeps
+                the session live, so this pair of buttons would offer a choice
+                the build cannot honour — the same "control that spends a tap to
+                say no" the Exchange action was dropped for. */}
+            {DEMO_DATA_COMPILED_IN && (
+              <div className="border-border/60 border-b p-3">
+                <p className="text-muted-foreground pb-1.5 text-[10px] font-semibold tracking-[1px] uppercase">
+                  Data
+                </p>
+                <div
+                  role="group"
+                  aria-label="Data source"
+                  className="bg-surface ring-border/60 grid grid-cols-2 gap-0.5 rounded-lg p-0.5 ring-1"
+                >
+                  {DATA_MODES.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      aria-pressed={dataMode === option}
+                      onClick={() => chooseDataMode(option)}
+                      className={`focus-ring rounded-md px-2 py-1.5 text-xs font-semibold transition-colors ${
+                        dataMode === option
+                          ? "bg-accent/20 text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <span className="flex items-center justify-center gap-1.5">
+                        {option === "live" && <LiveDot />}
+                        {DATA_MODE_LABELS[option]}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {/* Live in a demo build is the honest empty screen, not a broken
+                  one. Said here because the difference between "no service
+                  answers this" and "this failed" is invisible once the rows are
+                  gone, and somebody who flipped the switch a minute ago has
+                  already forgotten they did. */}
+                <p className="text-muted-foreground mt-1.5 text-[10px] leading-relaxed text-pretty">
+                  {dataMode === "demo"
+                    ? "Fixtures. Every surface has rows to show."
+                    : "Only what a service can answer. Empty states are correct here."}
+                </p>
+              </div>
+            )}
+
+            {/* What is IN the fixtures, as against where they come from. The
+                two sit together because from a demo's point of view they are
+                one question — what will this screen show — and apart because
+                only one of them is about whether a service answered. */}
+            {DEMO_DATA_COMPILED_IN && (
+              <div className="border-border/60 border-b p-3">
+                <p className="text-muted-foreground pb-1.5 text-[10px] font-semibold tracking-[1px] uppercase">
+                  History
+                </p>
+                <div
+                  role="group"
+                  aria-label="Account history"
+                  className="bg-surface ring-border/60 grid grid-cols-2 gap-0.5 rounded-lg p-0.5 ring-1"
+                >
+                  {(["empty", "seeded"] as const).map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      aria-pressed={contentMode === option}
+                      onClick={() => chooseContentMode(option)}
+                      className={`focus-ring rounded-md px-2 py-1.5 text-xs font-semibold transition-colors ${
+                        contentMode === option
+                          ? "bg-accent/20 text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {option === "empty" ? "New user" : "Lived in"}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-muted-foreground mt-1.5 text-[10px] leading-relaxed text-pretty">
+                  {contentMode === "empty"
+                    ? "What somebody sees an hour after installing. The feed still has posts, because everyone's does."
+                    : "Somebody else's inbox, ledger and vault. For screenshots and walkthroughs."}
+                </p>
+              </div>
+            )}
+
             <div className="border-border/60 border-b p-3">
+              <p className="text-muted-foreground pb-1.5 text-[10px] font-semibold tracking-[1px] uppercase">
+                Product state
+              </p>
               <div
                 role="group"
                 aria-label="Product state"
@@ -211,14 +385,24 @@ export function PhaseSwitcher(): ReactNode {
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-label="Switch product state"
-        /* Hover deepens in both themes. It was one `hover:bg-amber-200/90` for
-           both, which in dark mode swapped a near-black pill for a pale one
-           under pale text — the hover made it harder to read than at rest.
-           The lift and the brighter edge do the "you can press this" work. */
-        className="focus-ring flex items-center gap-1.5 rounded-full border border-amber-400/50 bg-amber-100/90 px-3 py-1.5 text-[11px] font-semibold tracking-wide text-amber-900 uppercase shadow-lg backdrop-blur transition-[background-color,border-color,box-shadow,translate] hover:-translate-y-px hover:border-amber-500/70 hover:bg-amber-200/95 hover:shadow-xl active:translate-y-0 dark:border-amber-400/30 dark:bg-amber-950/80 dark:text-amber-200 dark:hover:border-amber-300/60 dark:hover:bg-amber-900/90"
+        /*
+           Theme tokens, not amber.
+
+           It was two hand-tuned amber palettes, one per theme, which is two
+           things to keep in step with a product that can be re-themed from
+           Settings — and in a custom accent it was the one control on screen
+           still wearing the old scheme. The surface, border and text now come
+           from the same variables as every other floating control; the lift and
+           the brighter edge still do the "you can press this" work.
+        */
+        className="focus-ring bg-surface-raised/95 border-border text-foreground hover:border-ring flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold tracking-wide uppercase shadow-lg backdrop-blur transition-[background-color,border-color,box-shadow,translate] hover:-translate-y-px hover:shadow-xl active:translate-y-0"
       >
         <Wrench className="size-3.5" strokeWidth={2.2} aria-hidden="true" />
         {PHASE_LABELS[phase]}
+        {/* Live is the state worth noticing from across the room: the session is
+            reading real services rather than fixtures, and everything on screen
+            means something different because of it. */}
+        {dataMode === "live" && <LiveDot />}
       </button>
     </div>
   );

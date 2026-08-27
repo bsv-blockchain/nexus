@@ -505,6 +505,25 @@ html.theme-animate {
  * onto `documentElement`, so these `var()` references resolve to whichever
  * custom theme is active — nothing extra to wire.
  */
+/*
+ * Toasts are not part of the window you can drag by.
+ *
+ * They arrive top-centre, which on desktop is directly over the title bar —
+ * and that bar is `-webkit-app-region: drag`, which macOS resolves before the
+ * click reaches the page. So the dismiss X looked and behaved like a button
+ * right up until you pressed it, at which point the window moved instead. The
+ * toaster portals to `<body>`, outside the tree where title-bar.tsx sets this,
+ * so it has to opt out for itself.
+ *
+ * On the whole toaster rather than the button: an action you cannot press is
+ * the loudest version of the bug, but dragging the window by a toast you were
+ * trying to read is the same mistake wearing a quieter coat.
+ */
+html [data-sonner-toaster],
+html [data-sonner-toaster] [data-sonner-toast] {
+  -webkit-app-region: no-drag;
+}
+
 html [data-sonner-toaster][data-sonner-theme] {
   /* Dismiss belongs in the top-right corner. */
   --toast-close-button-start: unset;
@@ -675,4 +694,207 @@ html [data-sonner-toaster] [data-sonner-toast] [data-description] {
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+/*
+ * The active tab's manila-folder skirt.
+ *
+ * A border radius can only remove a corner; this has to ADD one. Each
+ * pseudo-element is a square sitting just outside the tab at its foot, filled
+ * with the tab's own surface, with a circle punched out of the corner nearest
+ * the tab. What is left is a quarter of a ring: the fill runs past the tab and
+ * curves down into the bar underneath, which is why the two must share a
+ * colour (--surface-raised, the same token `bg-surface-raised` uses).
+ *
+ * `bottom: 0` rather than a negative offset — the tab already sits flush on the
+ * bar, so the skirt belongs on the last row of the tab, not below it.
+ */
+.tab-flare::before,
+.tab-flare::after {
+  background-color: var(--surface-raised);
+  bottom: 0;
+  content: "";
+  height: 8px;
+  pointer-events: none;
+  position: absolute;
+  width: 8px;
+}
+
+.tab-flare::before {
+  left: -8px;
+  /* Circle at the top-left: what survives is the bottom-right of the square,
+     hugging the tab's left edge and flaring away from it. */
+  mask-image: radial-gradient(circle 8px at top left, transparent 8px, black 8px);
+}
+
+.tab-flare::after {
+  right: -8px;
+  mask-image: radial-gradient(
+    circle 8px at top right,
+    transparent 8px,
+    black 8px
+  );
+}
+
+/*
+ * The vault's refusal.
+ *
+ * A door that says no by moving is the one piece of feedback nobody has to be
+ * taught. Lives here rather than in a styled-jsx block because the component
+ * that uses it is a client component in a static export, and a <style> tag
+ * inside it would be re-parsed on every phase change.
+ */
+@keyframes vault-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-9px);
+  }
+  40% {
+    transform: translateX(8px);
+  }
+  60% {
+    transform: translateX(-5px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
+.vault-shake {
+  animation: vault-shake 420ms ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The doors still open, they just stop being an event. */
+  .vault-door,
+  .vault-dial {
+    transition-duration: 1ms !important;
+  }
+  .vault-shake {
+    animation: none;
+  }
+}
+
+/*
+ * A scroller with no visible bar.
+ *
+ * For the tab rows: a horizontal scrollbar sitting directly under a row of
+ * underlined tabs reads as a second, broken underline. The row still scrolls
+ * by wheel, trackpad and keyboard — only the furniture is gone.
+ */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * A slim, always-there scrollbar, for boxes only a few lines tall.
+ *
+ * The overlay bar above is 12px and its thumb fades in only while the element
+ * is being scrolled. On a three-line description that is most of the box's
+ * width spent on a bar that never announces there is more to read. This one is
+ * narrow, and visible whenever the content overflows — which is the only time
+ * a browser draws it at all.
+ */
+.scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.scrollbar-slim::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-slim::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  min-height: 18px;
+}
+
+.scrollbar-slim::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted-foreground);
+}
+
+/*
+ * The desktop shell's own strip, and the parts of it the platform has already
+ * spoken for.
+ *
+ * `--titlebar-height` is the strip. The two insets are the ends that belong to
+ * the operating system rather than to us:
+ *
+ *   - macOS draws its traffic lights inside our window. `hiddenInset` moves
+ *     them; it does not reserve room for them, so we do. In fullscreen they go
+ *     away entirely and the reservation goes with them, which is why the
+ *     fullscreen rule exists rather than a single constant.
+ *   - Windows draws minimise/maximise/close as an overlay on the right and
+ *     reports where through `env(titlebar-area-*)`. Read rather than assumed:
+ *     the width of that overlay changes with the display language and with
+ *     whether the window is snapped.
+ *   - Linux gets neither, because the strip draws those three buttons itself
+ *     there. Both insets stay at the plain padding.
+ *
+ * `data-platform` and `data-fullscreen` are written onto <html> by
+ * lib/desktop-window.ts. Outside the shell neither exists, the defaults hold,
+ * and nothing is drawn anyway.
+ */
+:root {
+  --titlebar-height: 40px;
+  --titlebar-inset-left: 0.5rem;
+  --titlebar-inset-right: 0.5rem;
+}
+
+html[data-platform="darwin"] {
+  /* Three 12px lights from x=16, 20px apart, plus a gap before our own
+     controls start. Measured against the real window, not derived. */
+  --titlebar-inset-left: 78px;
+}
+
+html[data-platform="darwin"][data-fullscreen="true"] {
+  --titlebar-inset-left: 0.5rem;
+}
+
+html[data-platform="win32"] {
+  --titlebar-inset-left: calc(env(titlebar-area-x, 0px) + 0.5rem);
+  --titlebar-inset-right: calc(
+    100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 0.5rem
+  );
+}
+
+/*
+ * The section search just took you to.
+ *
+ * A page of six near-identical cards answers "here it is" badly on its own —
+ * scrolling to something is not the same as pointing at it. A ring that fades
+ * says which one without moving anything, and it is gone before it becomes
+ * decoration. Removed by the caller after 1.6s; see settings-search.tsx.
+ */
+@keyframes settings-found {
+  from {
+    box-shadow: 0 0 0 3px var(--color-accent);
+  }
+  to {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+
+.settings-found > div {
+  border-radius: var(--radius-xl);
+  animation: settings-found 1600ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Still marked, just not animated into place. */
+  .settings-found > div {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--color-accent);
+  }
 }

@@ -1,11 +1,11 @@
 "use client";
 
 import { Favicon } from "@/components/hub/favicon";
+import { useHub } from "@/components/hub/hub-provider";
 import { content } from "@/lib/data";
 import {
   removeException,
   setCapability,
-  setSetting,
   setWalletCapability,
   useSettings,
   type CapabilityId,
@@ -27,7 +27,8 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { Group, SatsAmount, Toggle } from "@/components/apps/settings/blocks";
+import { Group } from "@/components/apps/settings/blocks";
+import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 
 const copy = content.settings.permissions;
@@ -123,10 +124,6 @@ function CapRow({
   );
 }
 
-/* Shortcuts either side of what a small purchase costs; the field takes the
-   rest. Zero means every payment asks, which is why it reads as "Ask". */
-const SPEND_CAPS = [21_800, 218_000];
-
 /**
  * What pages and apps are allowed to do.
  *
@@ -137,6 +134,7 @@ const SPEND_CAPS = [21_800, 218_000];
  */
 export function PermissionsPanel(): ReactNode {
   const settings = useSettings();
+  const { setSettingsCategory } = useHub();
   return (
     <>
       <Group title={copy.pageTitle} hint={copy.pageHint}>
@@ -152,15 +150,6 @@ export function PermissionsPanel(): ReactNode {
       </Group>
 
       <Group title={copy.walletTitle} hint={copy.walletHint}>
-        {/* First, because it is the one that decides whether the rest of this
-            group is ever read aloud: with it on, a paying action inside the cap
-            happens without a prompt. */}
-        <Toggle
-          label={copy.oneClick}
-          hint={copy.oneClickHint}
-          value={settings.oneClickPay}
-          onChange={(next) => setSetting("oneClickPay", next)}
-        />
         {WALLET_CAPS.map((cap) => (
           <CapRow
             key={cap.id}
@@ -170,24 +159,34 @@ export function PermissionsPanel(): ReactNode {
             onPick={(next) => setWalletCapability(cap.id, next)}
           />
         ))}
-        {/* The ceiling only means anything once spending is allowed, so it is
-            shown as part of that decision rather than as a separate setting
-            somebody might set and never reach. */}
-        <div className="px-3 py-2.5">
-          <p className="text-sm font-medium">{copy.spendCap}</p>
-          <p className="text-muted-foreground mt-0.5 text-[11px] text-pretty">
-            {copy.spendCapHint}
-          </p>
-          <div className="mt-2">
-            <SatsAmount
-              label={copy.spendCap}
-              value={settings.spendCapSats}
-              presets={SPEND_CAPS}
-              offLabel={copy.capAsk}
-              onPick={(next) => setSetting("spendCapSats", next)}
-            />
-          </div>
-        </div>
+        {/*
+          A pointer, not a duplicate.
+
+          One-click pay and the spending cap moved to Payments: this page
+          answers "may this site", and those answer "how much, and do I get
+          asked", which is the same question the pay sheet asks. Saying where
+          they went beats leaving somebody to search a page that used to have
+          them — and beats showing them in both places, where two copies of one
+          switch is a switch people stop trusting.
+        */}
+        <button
+          type="button"
+          onClick={() => setSettingsCategory("payments")}
+          className="focus-ring hover:bg-surface-hover flex w-full items-center gap-3 px-3 py-2.5 text-left"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium">
+              {copy.spendingMoved}
+            </span>
+            <span className="text-muted-foreground mt-0.5 block text-[11px] text-pretty">
+              {copy.spendingMovedHint}
+            </span>
+          </span>
+          <ChevronRight
+            className="text-muted-foreground size-4 shrink-0"
+            aria-hidden="true"
+          />
+        </button>
       </Group>
 
       <Group title={copy.exceptionsTitle} hint={copy.exceptionsHint}>

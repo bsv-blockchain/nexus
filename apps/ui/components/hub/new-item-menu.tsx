@@ -1,6 +1,7 @@
 "use client";
 
 import { useHub } from "@/components/hub/hub-provider";
+import { useCreateWorkspace } from "@/components/hub/use-create-workspace";
 import {
   MenuItem,
   MenuSeparator,
@@ -20,7 +21,8 @@ export function NewItemMenu({
   onClose: () => void;
   className?: string;
 }): ReactNode {
-  const { setCommandPaletteOpen, addSpaceFolder, createSpace, activeSpaceId } =
+  const createWorkspace = useCreateWorkspace();
+  const { setCommandPaletteOpen, addSpaceFolder, activeSpaceId } =
     useHub();
   const copy = content.newItemMenu;
 
@@ -35,7 +37,7 @@ export function NewItemMenu({
         icon={Copy}
         label={copy.newSpace}
         onClick={() => {
-          createSpace();
+          createWorkspace();
           onClose();
         }}
       />

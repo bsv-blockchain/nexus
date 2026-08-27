@@ -107,14 +107,24 @@ export function Collectible3DCard({
           }}
         >
           {/* Front */}
+          {/*
+            `object-contain`, and a surface behind it to land on.
+
+            The card is square and the art often is not. Filling the face meant
+            cropping a tall piece to its middle band — and this is the one view
+            where somebody is looking at the artwork itself rather than picking
+            it out of a grid, so losing its edges is losing the thing. It fits
+            whole now and the card shows through around it, which is what a mount
+            does.
+          */}
           <span
-            className="absolute inset-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-border"
+            className="absolute inset-0 overflow-hidden rounded-xl bg-surface-raised shadow-2xl ring-1 ring-border"
             style={{ backfaceVisibility: "hidden" }}
           >
             <CollectibleArt
               src={imageUrl}
               {...(posterUrl ? { poster: posterUrl } : {})}
-              className="size-full object-cover"
+              className="size-full object-contain"
             />
           </span>
 

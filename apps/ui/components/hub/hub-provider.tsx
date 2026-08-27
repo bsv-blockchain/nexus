@@ -28,6 +28,13 @@ import {
   type RoadmapStatus,
   type SpaceProfile,
 } from "@/lib/data";
+import { pruneHandlesTo, useSettings } from "@/lib/settings-store";
+import {
+  nextWorkspaceName,
+  pickUnused,
+  WORKSPACE_ICONS,
+} from "@/lib/data/workspace-defaults";
+import { pruneWalletsTo } from "@/lib/wallets-store";
 import { isVisibleInPhase, usePhase } from "@/lib/phase";
 import {
   reconcileRail,
@@ -57,7 +64,32 @@ import {
 export type AppSlug = HubApp["slug"];
 export type LibraryTab = "spaces" | "downloads" | "apps";
 /** What the main canvas shows, independent of which rail panel is open. */
-export type MainViewKind = "app" | "store" | "profiles" | "settings";
+export type MainViewKind =
+  | "app"
+  | "store"
+  | "profiles"
+  | "settings"
+  | "timeline"
+  /* The dashboard. Its own view rather than only what `timeline` falls back to,
+     so it can be linked to, returned to and pointed at — a screen defined by
+     the thing it replaces is a screen nobody can ask for. */
+  | "home";
+
+/**
+ * A page this space has been on, as the command bar needs it.
+ *
+ * A snapshot rather than a reference to a tab: the tab it came from may be
+ * closed by the time anybody reads this, which is exactly the case the list
+ * exists to serve. Carries its own favicon for the same reason.
+ */
+export interface RecentSite {
+  url: string;
+  title: string;
+  favicon: string;
+  faviconColor: string;
+  /** true when it got here by being closed rather than merely visited */
+  closed: boolean;
+}
 
 /**
  * The settings categories, in the narrow column.
@@ -68,7 +100,10 @@ export type MainViewKind = "app" | "store" | "profiles" | "settings";
  */
 export type SettingsCategory =
   | "general"
+  | "profiles"
+  | "security"
   | "privacy"
+  | "payments"
   | "permissions"
   | "autofill"
   | "browsing"
@@ -110,6 +145,16 @@ export interface WalletIntent {
   kind: "send" | "receive" | "exchange";
   tokenId?: string;
   personId?: string;
+  /** the amount to open the sheet on, where the caller already knows it */
+  units?: number;
+  /**
+   * The share this payment would settle, when it is one.
+   *
+   * Carried through rather than settled by the caller, because a share is paid
+   * when the money leaves — not when somebody presses a button that opens a
+   * sheet they can still cancel. The wallet marks it on `onSend`.
+   */
+  settles?: { splitId: string; personId: string };
 }
 
 /**
@@ -144,6 +189,8 @@ export interface DetailPane {
     | "onboarding"
     /** the licence this software is granted under */
     | "licence"
+    /** terms of use and privacy, as two tabs of one pane */
+    | "legal"
     /** one roadmap feature, `id` being its slug */
     | "feature"
     /** what each profile has downloaded */
@@ -153,7 +200,13 @@ export interface DetailPane {
     /** which language pages are asked for */
     | "languages"
     /** what to wipe, and the button that wipes it */
-    | "clear-data";
+    | "clear-data"
+    /** the form for a new payment link; `id` is unused */
+    | "new-payment-link"
+    /** the form for raising a split; `id` is unused */
+    | "new-split"
+    /** what each Settings category is for; `id` is unused */
+    | "settings-guide";
   /** MessagePerson id, or conversation id, per `kind` */
   id: string;
 }
@@ -166,11 +219,7 @@ export type WalletSection =
   | "links"
   | "contacts"
   | "splits";
-export type IdentitySection =
-  | "handles"
-  | "keys"
-  | "retired"
-  | "certificates";
+export type IdentitySection = "handles" | "keys" | "retired" | "certificates";
 export type AttestationFilter = "all" | "issued" | "received";
 export type AppPromptMode = "install" | "uninstall";
 export type AppPrompt =
@@ -214,6 +263,9 @@ function subscribeToUrl(onChange: () => void): () => void {
  * cannot send anybody. `app` is kept alongside rather than cleared, so a reload
  * on Profiles still knows which app the rail should return you to.
  */
+/** How many pages a space remembers for the command bar. */
+const RECENT_LIMIT = 12;
+
 const VIEW_PARAM = "view";
 /** The second app, when two are open side by side. */
 const SPLIT_PARAM = "split";
@@ -221,11 +273,19 @@ const VIEWS: Record<string, MainViewKind> = {
   apps: "store",
   profiles: "profiles",
   settings: "settings",
+  timeline: "timeline",
+  home: "home",
+  /* The launcher's old address. Timeline took the slot the wall of app tiles
+     used to hold, so a link somebody already has still lands somewhere true —
+     it just rewrites itself to ?view=timeline on arrival. */
+  feed: "timeline",
 };
 const VIEW_SLUGS: Partial<Record<MainViewKind, string>> = {
   store: "apps",
   profiles: "profiles",
   settings: "settings",
+  timeline: "timeline",
+  home: "home",
 };
 
 function urlAppSlug(): string | null {
@@ -291,7 +351,7 @@ function withoutRef(entries: RailEntry[], ref: RailRef): RailEntry[] {
         : {
             ...entry,
             members: entry.members.filter((member) => !sameRef(member, ref)),
-          },
+          }
     )
     .filter((entry) => !(entry.type === "single" && sameRef(entry.ref, ref)));
 }
@@ -353,9 +413,18 @@ interface HubState {
   reorderRailRef: (
     dragRef: RailRef,
     targetRef: RailRef,
-    position: "before" | "after",
+    position: "before" | "after"
   ) => void;
   presetGroup: (name: string, refs: RailRef[]) => void;
+  /**
+   * Lay the rail out from scratch, for the workspace this is called in.
+   *
+   * The first run's presets need to place folders *and* the loose tiles around
+   * them in one decided order. `presetGroup` appends, so building a rail out of
+   * four calls to it would put every folder after the apps that are supposed to
+   * sit above them. This takes the whole arrangement at once.
+   */
+  applyRailPlan: (entries: RailEntry[]) => void;
   renameGroup: (id: string, name: string) => void;
   setGroupColor: (id: string, color: string) => void;
 
@@ -494,13 +563,13 @@ interface HubState {
   conversationGates: Record<string, GroupGates | null>;
   setConversationGates: (
     conversationId: string,
-    gates: GroupGates | null,
+    gates: GroupGates | null
   ) => void;
   /** Role maps per conversation, edited in the same pane as the gates. */
   conversationRoles: Record<string, RoomRoles | null>;
   setConversationRoles: (
     conversationId: string,
-    roles: RoomRoles | null,
+    roles: RoomRoles | null
   ) => void;
   /**
    * Private notes per conversation, as editor HTML.
@@ -532,7 +601,7 @@ interface HubState {
   setConversationFlag: (
     conversationId: string,
     flag: ConversationFlag,
-    on: boolean,
+    on: boolean
   ) => void;
   setWalletFilter: (filter: WalletFilter) => void;
   connectSelected: string | null;
@@ -581,7 +650,7 @@ interface HubState {
     itemId: string,
     fromSpaceId: string,
     toSpaceId: string,
-    index: number,
+    index: number
   ) => void;
   renameSpace: (id: string, name: string) => void;
   setSpaceEmoji: (id: string, emoji: string) => void;
@@ -591,9 +660,10 @@ interface HubState {
   moveSpace: (
     dragId: string,
     targetId: string,
-    position: "before" | "after",
+    position: "before" | "after"
   ) => void;
-  createSpace: () => void;
+  /** returns the new workspace's id, so a caller can finish dressing it */
+  createSpace: () => string;
   deleteSpace: (id: string) => void;
   addSpaceFolder: (spaceId: string) => void;
   addLiveFolder: (spaceId: string, title: string, icon: string) => void;
@@ -615,11 +685,30 @@ interface HubState {
   /** open tabs per space — session state seeded from lib/data rows */
   tabsBySpace: Record<string, BrowserTab[]>;
   /** Move an open tab to another profile, at a position in its list. */
+  /**
+   * Reorder a tab WITHIN its own space.
+   *
+   * Separate from moveTabToSpace, which returns early when the two spaces match:
+   * moving between columns and reordering inside one are the same gesture to a
+   * person and different operations to the data — the cross-space path removes
+   * from one list and inserts into another, and doing that to a single list
+   * drops the tab before it works out where to put it back.
+   */
+  reorderTab: (spaceId: string, tabId: string, index: number) => void;
+  /**
+   * Pages this space has been on lately, most recent first.
+   *
+   * Fed by navigation and by closing a tab, so it answers both "where was I"
+   * and "bring that back" from one list. Per space because a workspace is the
+   * unit of separation here: Work's history has no business surfacing in a
+   * Personal command bar.
+   */
+  recentBySpace: Record<string, RecentSite[]>;
   moveTabToSpace: (
     tabId: string,
     fromSpaceId: string,
     toSpaceId: string,
-    index: number,
+    index: number
   ) => void;
   activeTabId: string | null;
   activeTab: BrowserTab | null;
@@ -711,7 +800,7 @@ function parseByProfile(raw: string | null): Record<string, AppSlug[]> | null {
     if (!parsed || typeof parsed !== "object") return null;
     const out: Record<string, AppSlug[]> = {};
     for (const [spaceId, slugs] of Object.entries(
-      parsed as Record<string, unknown>,
+      parsed as Record<string, unknown>
     )) {
       if (!Array.isArray(slugs)) continue;
       out[spaceId] = withEssentials(slugs as AppSlug[]);
@@ -749,7 +838,7 @@ function getInstalledMapSnapshot(): Record<string, AppSlug[]> {
 /** A profile's list, falling back to the shared starting set. */
 function installedFor(
   map: Record<string, AppSlug[]>,
-  spaceId: string,
+  spaceId: string
 ): AppSlug[] {
   return map[spaceId] ?? map["*"] ?? defaultInstalled;
 }
@@ -902,13 +991,13 @@ const BROWSER_REF: RailRef = { kind: "app", slug: "browser" };
 
 function seedTabsBySpace(): Record<string, BrowserTab[]> {
   return Object.fromEntries(
-    getSpaces().map((space) => [space.id, getBrowserTabs(space.id)]),
+    getSpaces().map((space) => [space.id, getBrowserTabs(space.id)])
   );
 }
 
 function seedSpaceItemsBySpace(): Record<string, SpaceItem[]> {
   return Object.fromEntries(
-    getSpaces().map((space) => [space.id, getSpaceItems(space.id)]),
+    getSpaces().map((space) => [space.id, getSpaceItems(space.id)])
   );
 }
 
@@ -918,7 +1007,7 @@ interface TabHistory {
 }
 
 function seedHistory(
-  tabsBySpace: Record<string, BrowserTab[]>,
+  tabsBySpace: Record<string, BrowserTab[]>
 ): Record<string, TabHistory> {
   const history: Record<string, TabHistory> = {};
   for (const tabs of Object.values(tabsBySpace)) {
@@ -945,7 +1034,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   const installedMap = useSyncExternalStore(
     subscribeToInstalledApps,
     getInstalledMapSnapshot,
-    getInstalledMapServerSnapshot,
+    getInstalledMapServerSnapshot
   );
   /* Declared here rather than beside the other space state because what is
      installed now depends on which profile is active, and the phase filter
@@ -958,18 +1047,18 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
      inside setState callbacks where the render's value is already stale. */
   const installedHere = useCallback(
     (): AppSlug[] => installedFor(getInstalledMapSnapshot(), activeSpaceId),
-    [activeSpaceId],
+    [activeSpaceId]
   );
   /* Any profile's list, for the manager, which shows several columns at once. */
   const installedForSpace = useCallback(
     (spaceId: string): AppSlug[] => installedFor(installedMap, spaceId),
-    [installedMap],
+    [installedMap]
   );
 
   const pinnedSites = useSyncExternalStore(
     subscribeToPinnedSites,
     getPinnedSitesSnapshot,
-    getPinnedSitesServerSnapshot,
+    getPinnedSitesServerSnapshot
   );
 
   // `null` means nothing has been picked in this session yet, so the address
@@ -989,7 +1078,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     // Keep the identity when the ref is unchanged, so navigating inside the
     // browser does not re-render every consumer of the context.
     setSelectedRef((current) =>
-      current && ref && sameRef(current, ref) ? current : ref,
+      current && ref && sameRef(current, ref) ? current : ref
     );
   }, []);
 
@@ -1032,32 +1121,43 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
    */
   const shippedInstalled = useMemo(
     () => new Set(getDefaultInstalledAppSlugs()),
-    [],
+    []
   );
   const [askedFor, setAskedFor] = useState<Set<AppSlug>>(() => new Set());
+  /*
+   * Which apps the rail draws.
+   *
+   * Browse drops out of this list when it is pinned under Workspaces instead
+   * (Settings > Browsing). It has not been uninstalled — every other reader of
+   * `installedApps` still sees it, so the App Store and the workspace's
+   * connections still know it is connected and can still disconnect it. It has
+   * only stopped being one of the tiles, because it is now one of the buttons.
+   */
+  const browsePinned = useSettings().browseAsButton;
   const visibleApps = useMemo(
     () =>
       installedApps.filter(
         (slug) =>
-          !shippedInstalled.has(slug) ||
-          askedFor.has(slug) ||
-          isVisibleInPhase(slug, phase),
+          (!browsePinned || slug !== "browser") &&
+          (!shippedInstalled.has(slug) ||
+            askedFor.has(slug) ||
+            isVisibleInPhase(slug, phase))
       ),
-    [installedApps, phase, askedFor, shippedInstalled],
+    [installedApps, phase, askedFor, shippedInstalled, browsePinned]
   );
   /* Always reconciled, never rendered raw: a stored layout can name a site that
      has since been disconnected, an app this profile no longer carries, or a
      group left holding one member. */
   const railEntries = useMemo(
     () => reconcileRail(railLayout, presentRefs(visibleApps, pinnedSites)),
-    [railLayout, visibleApps, pinnedSites],
+    [railLayout, visibleApps, pinnedSites]
   );
   /* The rail callbacks reconcile against the live present-list, read out here
      rather than inside the updater: an updater has to be pure, and React is
      free to run it more than once. */
   const presentHere = useCallback(
     (): RailRef[] => presentRefs(installedHere(), getPinnedSitesSnapshot()),
-    [installedHere],
+    [installedHere]
   );
   // The rail is always shown; collapsing hides the wider panel column.
   const [railCollapsed, setRailCollapsed] = useState(false);
@@ -1077,6 +1177,24 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   const [identityKeys, setIdentityKeys] =
     useState<IdentityKey[]>(getIdentityKeys);
   const [spaces, setSpaces] = useState<Space[]>(getSpaces);
+  /*
+   * Hand back what a profile that no longer exists was holding.
+   *
+   * Only one profile may wear a handle, so a claim that outlives its claimant
+   * takes the name with it — greyed out on behalf of somewhere nobody can
+   * visit, with no way left to free it. Two ways that happens: a profile is
+   * deleted, and a reload, since settings are persisted and profiles are not.
+   * Both are the same reconciliation, so it is done here rather than on the
+   * delete path, where only the first would be caught.
+   *
+   * Here because this is the only part of the app that knows which profiles are
+   * real; the stores hold assignments and take the list as told.
+   */
+  useEffect(() => {
+    const ids = spaces.map((space) => space.id);
+    pruneHandlesTo(ids);
+    pruneWalletsTo(ids);
+  }, [spaces]);
   const [spaceItemsBySpace, setSpaceItemsBySpace] = useState<
     Record<string, SpaceItem[]>
   >(seedSpaceItemsBySpace);
@@ -1089,19 +1207,19 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   const [tabsBySpace, setTabsBySpace] =
     useState<Record<string, BrowserTab[]>>(seedTabsBySpace);
   const [historyByTab, setHistoryByTab] = useState<Record<string, TabHistory>>(
-    () => seedHistory(seedTabsBySpace()),
+    () => seedHistory(seedTabsBySpace())
   );
+  const [recentBySpace, setRecentBySpace] = useState<
+    Record<string, RecentSite[]>
+  >({});
   const [activeTabId, setActiveTabId] = useState<string | null>(
-    () => getBrowserTabs(defaultSpace.id)[0]?.id ?? null,
+    () => getBrowserTabs(defaultSpace.id)[0]?.id ?? null
   );
   const [favorites, setFavorites] = useState<Favorite[]>(getFavorites);
   const [tabDragging, setTabDragging] = useState(false);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const toggleRail = useCallback(
-    () => setRailCollapsed((value) => !value),
-    [],
-  );
+  const toggleRail = useCallback(() => setRailCollapsed((value) => !value), []);
 
   // Per-app context selections, driving the contextual sidebar column.
   const [mailFolder, setMailFolder] = useState("Inbox");
@@ -1113,19 +1231,19 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       setMessageThread(conversationId);
       setMessageFocus(messageId);
     },
-    [],
+    []
   );
   const clearMessageFocus = useCallback(() => setMessageFocus(null), []);
   const [messagesUnreadOnly, setMessagesUnreadOnly] = useState(false);
   const [roadmapStatus, setRoadmapStatus] = useState<RoadmapStatus | "all">(
-    "all",
+    "all"
   );
   const [roadmapSort, setRoadmapSort] = useState<RoadmapSort>("top-funded");
   const [roadmapQuery, setRoadmapQuery] = useState("");
   const [conversationsVersion, setConversationsVersion] = useState(0);
   const bumpConversations = useCallback(
     () => setConversationsVersion((n) => n + 1),
-    [],
+    []
   );
   const [vaultKind, setVaultKind] = useState<string>("all");
   const [learnCourse, setLearnCourse] = useState<string | null>(null);
@@ -1133,7 +1251,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   const [exploreQuery, setExploreQuery] = useState("");
   const [exploreKind, setExploreKind] = useState<string>("all");
   const [marketFilters, setMarketFilters] = useState<MarketFilters>(
-    DEFAULT_MARKET_FILTERS,
+    DEFAULT_MARKET_FILTERS
   );
   const [walletFilter, setWalletFilter] = useState<WalletFilter>("all");
   const [walletSection, setWalletSection] = useState<WalletSection>("cash");
@@ -1149,12 +1267,12 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   const newConversationOpen = detailPane?.kind === "new";
   const openNewConversation = useCallback(
     () => setDetailPane({ kind: "new", id: "" }),
-    [],
+    []
   );
   const closeNewConversation = useCallback(() => setDetailPane(null), []);
   const openDetailPane = useCallback(
     (pane: DetailPane) => setDetailPane(pane),
-    [],
+    []
   );
   const closeDetailPane = useCallback(() => setDetailPane(null), []);
   const [conversationTitles, setConversationTitles] = useState<
@@ -1166,7 +1284,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         ...current,
         [conversationId]: title,
       })),
-    [],
+    []
   );
   const [conversationMembers, setConversationMembersState] = useState<
     Record<string, string[]>
@@ -1177,7 +1295,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         ...current,
         [conversationId]: ids,
       })),
-    [],
+    []
   );
   const [conversationIcons, setConversationIconsState] = useState<
     Record<string, string | null>
@@ -1188,7 +1306,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         ...current,
         [conversationId]: icon,
       })),
-    [],
+    []
   );
   const [conversationGates, setConversationGatesState] = useState<
     Record<string, GroupGates | null>
@@ -1199,7 +1317,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         ...current,
         [conversationId]: gates,
       })),
-    [],
+    []
   );
   const [conversationRoles, setConversationRolesState] = useState<
     Record<string, RoomRoles | null>
@@ -1210,7 +1328,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         ...current,
         [conversationId]: roles,
       })),
-    [],
+    []
   );
   const [composerSeed, setComposerSeed] = useState<{
     text: string;
@@ -1222,13 +1340,13 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         text: `${text} `,
         nonce: (current?.nonce ?? 0) + 1,
       })),
-    [],
+    []
   );
   const [notes, setNotes] = useState<Record<string, string>>(conversationNotes);
   const setConversationNote = useCallback(
     (conversationId: string, html: string) =>
       setNotes((current) => ({ ...current, [conversationId]: html })),
-    [],
+    []
   );
   const [flags, setFlags] = useState<
     Record<string, Partial<Record<ConversationFlag, boolean>>>
@@ -1239,7 +1357,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         ...current,
         [conversationId]: { ...current[conversationId], [flag]: on },
       })),
-    [],
+    []
   );
   const [connectSelected, setConnectSelected] = useState<string | null>(null);
   const [basketSelected, setBasketSelected] = useState<string | null>(null);
@@ -1252,12 +1370,12 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   const openAppPrompt = useCallback(
     (slug: AppSlug, mode: AppPromptMode) =>
       setAppPrompt({ kind: "app", slug, mode }),
-    [],
+    []
   );
   const openCollectionPrompt = useCallback(
     (id: CollectionId, mode: AppPromptMode) =>
       setAppPrompt({ kind: "collection", id, mode }),
-    [],
+    []
   );
   const closeAppPrompt = useCallback(() => setAppPrompt(null), []);
 
@@ -1267,9 +1385,13 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     requestedView ?? (urlViewSlug ? (VIEWS[urlViewSlug] ?? "app") : "app");
 
   /* Same shape as the view: the address bar wins until something asks. */
-  const urlSplitSlug = useSyncExternalStore(subscribeToUrl, urlSplit, () => null);
+  const urlSplitSlug = useSyncExternalStore(
+    subscribeToUrl,
+    urlSplit,
+    () => null
+  );
   const [requestedSplit, setRequestedSplit] = useState<AppSlug | "" | null>(
-    null,
+    null
   );
   const [splitTouched, setSplitTouched] = useState(false);
   /* An empty `split=` in the address bar is a pane that was open and waiting,
@@ -1279,8 +1401,9 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     ? requestedSplit
     : urlSplitSlug === null
       ? null
-      : ((getHubApps().find((app) => app.slug === urlSplitSlug)?.slug ??
-          "") as AppSlug | "");
+      : ((getHubApps().find((app) => app.slug === urlSplitSlug)?.slug ?? "") as
+          | AppSlug
+          | "");
   const setSplitApp = useCallback((slug: AppSlug | "" | null) => {
     setSplitTouched(true);
     setRequestedSplit(slug);
@@ -1298,9 +1421,8 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
      writes one. Hand-typed, it falls through to Browse rather than to a frame
      that will come back empty. */
   const fromUrl =
-    getHubApps().find(
-      (app) => app.slug === urlApp && app.web?.embeds !== false,
-    )?.slug ?? null;
+    getHubApps().find((app) => app.slug === urlApp && app.web?.embeds !== false)
+      ?.slug ?? null;
 
   /**
    * What the rail shows as open.
@@ -1351,7 +1473,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       if (current.includes(slug)) return;
       writeInstalledFor(target, [...current, slug]);
     },
-    [activeSpaceId],
+    [activeSpaceId]
   );
 
   const uninstallApp = useCallback(
@@ -1361,11 +1483,11 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       writeInstalledFor(
         target,
         installedFor(getInstalledMapSnapshot(), target).filter(
-          (app) => app !== slug,
-        ),
+          (app) => app !== slug
+        )
       );
     },
-    [activeSpaceId],
+    [activeSpaceId]
   );
 
   /**
@@ -1383,7 +1505,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       if (web) return pinnedSites.some((site) => sameUrl(site.url, web.url));
       return installedApps.includes(slug);
     },
-    [installedApps, pinnedSites],
+    [installedApps, pinnedSites]
   );
 
   const groupRefs = useCallback(
@@ -1397,7 +1519,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
           return base.map((entry) =>
             entry.type === "group" && entry.id === target.id
               ? { ...entry, members: [...entry.members, dragRef] }
-              : entry,
+              : entry
           );
         }
         const count = base.filter((entry) => entry.type === "group").length;
@@ -1409,11 +1531,11 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
                 name: `Group ${count + 1}`,
                 members: [entry.ref, dragRef],
               }
-            : entry,
+            : entry
         );
       });
     },
-    [presentHere],
+    [presentHere]
   );
 
   const ungroupRef = useCallback(
@@ -1425,7 +1547,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         return [...base, { type: "single", ref }];
       });
     },
-    [presentHere],
+    [presentHere]
   );
 
   // Move a rail slot to just before/after another top-level entry.
@@ -1440,7 +1562,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         const targetIndex = base.findIndex((entry) =>
           entry.type === "single"
             ? sameRef(entry.ref, targetRef)
-            : entry.members.some((member) => sameRef(member, targetRef)),
+            : entry.members.some((member) => sameRef(member, targetRef))
         );
         const dragged: RailEntry = { type: "single", ref: dragRef };
         if (targetIndex === -1) return [...base, dragged];
@@ -1450,7 +1572,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         return next;
       });
     },
-    [presentHere],
+    [presentHere]
   );
 
   const presetGroup = useCallback(
@@ -1462,7 +1584,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         let base = entries;
         for (const ref of refs) base = withoutRef(base, ref);
         base = normalizeGroups(base).filter(
-          (entry) => !(entry.type === "group" && entry.name === name),
+          (entry) => !(entry.type === "group" && entry.name === name)
         );
         return [
           ...base,
@@ -1470,7 +1592,18 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         ];
       });
     },
-    [presentHere],
+    [presentHere]
+  );
+
+  const applyRailPlan = useCallback(
+    (entries: RailEntry[]) => {
+      /* Reconciled rather than trusted: a plan can name an app this profile has
+         not got, and `reconcileRail` drops those and appends anything present
+         that the plan forgot — so the rail is never left missing a tile for
+         something that is actually installed. */
+      setRailLayout(reconcileRail(entries, presentHere()));
+    },
+    [presentHere]
   );
 
   const renameGroup = useCallback(
@@ -1478,11 +1611,11 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       const present = presentHere();
       setRailLayout((prev) =>
         reconcileRail(prev, present).map((entry) =>
-          entry.type === "group" && entry.id === id ? { ...entry, name } : entry,
-        ),
+          entry.type === "group" && entry.id === id ? { ...entry, name } : entry
+        )
       );
     },
-    [presentHere],
+    [presentHere]
   );
 
   const setGroupColor = useCallback(
@@ -1492,11 +1625,11 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         reconcileRail(prev, present).map((entry) =>
           entry.type === "group" && entry.id === id
             ? { ...entry, color }
-            : entry,
-        ),
+            : entry
+        )
       );
     },
-    [presentHere],
+    [presentHere]
   );
 
   /*
@@ -1506,18 +1639,21 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
    * second attempt is not a failure — the caller reveals the row it got back.
    * Null means the input was not a usable URL at all.
    */
-  const pinSite = useCallback((url: string, title?: string): PinnedSite | null => {
-    const current = getPinnedSitesSnapshot();
-    const result = addPinnedSite(current, {
-      url,
-      ...(title === undefined ? {} : { title }),
-      now: new Date().toISOString(),
-      id: newId("site"),
-    });
-    if (!result) return null;
-    if (result.sites !== current) writePinnedSites(result.sites);
-    return result.site;
-  }, []);
+  const pinSite = useCallback(
+    (url: string, title?: string): PinnedSite | null => {
+      const current = getPinnedSitesSnapshot();
+      const result = addPinnedSite(current, {
+        url,
+        ...(title === undefined ? {} : { title }),
+        now: new Date().toISOString(),
+        id: newId("site"),
+      });
+      if (!result) return null;
+      if (result.sites !== current) writePinnedSites(result.sites);
+      return result.site;
+    },
+    []
+  );
 
   const unpinSite = useCallback((id: string) => {
     writePinnedSites(removePinnedSite(getPinnedSitesSnapshot(), id));
@@ -1544,12 +1680,11 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         activeSpaceId,
         current
           .filter((entry) => set.has(entry))
-          .concat([...set].filter((entry) => !current.includes(entry))),
+          .concat([...set].filter((entry) => !current.includes(entry)))
       );
     },
-    [activeSpaceId],
+    [activeSpaceId]
   );
-
 
   /*
    * Moving between profiles.
@@ -1559,15 +1694,12 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
    * has no way to use, and refusing the drop would be refusing the clearer
    * request of the two.
    */
-  const ensureBrowser = useCallback(
-    (spaceId: string) => {
-      const current = installedFor(getInstalledMapSnapshot(), spaceId);
-      if (current.includes("browser")) return;
-      writeInstalledFor(spaceId, [...current, "browser"]);
-      setAskedFor((asked) => new Set(asked).add("browser"));
-    },
-    [],
-  );
+  const ensureBrowser = useCallback((spaceId: string) => {
+    const current = installedFor(getInstalledMapSnapshot(), spaceId);
+    if (current.includes("browser")) return;
+    writeInstalledFor(spaceId, [...current, "browser"]);
+    setAskedFor((asked) => new Set(asked).add("browser"));
+  }, []);
 
   const moveItemToSpace = useCallback(
     (itemId: string, fromSpaceId: string, toSpaceId: string, index: number) => {
@@ -1601,7 +1733,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         };
       });
     },
-    [ensureBrowser],
+    [ensureBrowser]
   );
 
   const moveTabToSpace = useCallback(
@@ -1626,32 +1758,65 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         };
       });
     },
-    [ensureBrowser],
+    [ensureBrowser]
   );
 
-  const openTab = useCallback((tabId: string) => {
-    setActiveTabId(tabId);
-    setActiveRef(BROWSER_REF);
-    setActivePage(null);
-    setMainView("app");
-    setMobileSheetOpen(false);
-    setCommandPaletteOpen(false);
-  }, [setActiveRef]);
+  /**
+   * Reorder within one space.
+   *
+   * `index` is the slot the tab should END UP in, counted against the list with
+   * the tab already removed — which is what a drop indicator between two rows
+   * means. Computing it the other way round makes a drag one place to the right
+   * a no-op, because the tab is still occupying the slot being aimed at.
+   */
+  const reorderTab = useCallback(
+    (spaceId: string, tabId: string, index: number) => {
+      setTabsBySpace((current) => {
+        const tabs = current[spaceId] ?? [];
+        const from = tabs.findIndex((tab) => tab.id === tabId);
+        if (from === -1) return current;
+        const without = tabs.filter((tab) => tab.id !== tabId);
+        const at = Math.max(0, Math.min(index, without.length));
+        const next = [
+          ...without.slice(0, at),
+          tabs[from]!,
+          ...without.slice(at),
+        ].map((tab, order) => ({ ...tab, sortOrder: order }));
+        return { ...current, [spaceId]: next };
+      });
+    },
+    []
+  );
+
+  const openTab = useCallback(
+    (tabId: string) => {
+      setActiveTabId(tabId);
+      setActiveRef(BROWSER_REF);
+      setActivePage(null);
+      setMainView("app");
+      setMobileSheetOpen(false);
+      setCommandPaletteOpen(false);
+    },
+    [setActiveRef]
+  );
 
   const toggleFolder = useCallback((id: string) => {
     setExpandedFolders((current) =>
       current.includes(id)
         ? current.filter((folderId) => folderId !== id)
-        : [...current, id],
+        : [...current, id]
     );
   }, []);
 
-  const openPage = useCallback((id: PageId) => {
-    setActivePage(id);
-    setActiveRef(BROWSER_REF);
-    setMainView("app");
-    setMobileSheetOpen(false);
-  }, [setActiveRef]);
+  const openPage = useCallback(
+    (id: PageId) => {
+      setActivePage(id);
+      setActiveRef(BROWSER_REF);
+      setMainView("app");
+      setMobileSheetOpen(false);
+    },
+    [setActiveRef]
+  );
 
   /*
    * Open a URL in a new tab and focus it.
@@ -1667,6 +1832,30 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
    * updater was the other half of it. An updater has to be pure; these are
    * effects, and they belong out here where they run once.
    */
+  /**
+   * File a page under a space's recents.
+   *
+   * Deduped by URL and newest-first, so revisiting a page moves it up rather
+   * than filling the list with the same row — a command bar that shows one site
+   * five times is a command bar nobody can find anything in. Capped, because
+   * this is a shortcut list and not a history archive.
+   */
+  const rememberRecent = useCallback(
+    (spaceId: string, site: RecentSite): void => {
+      if (!site.url) return;
+      setRecentBySpace((current) => {
+        const kept = (current[spaceId] ?? []).filter(
+          (entry) => entry.url !== site.url
+        );
+        return {
+          ...current,
+          [spaceId]: [site, ...kept].slice(0, RECENT_LIMIT),
+        };
+      });
+    },
+    []
+  );
+
   const createTab = useCallback(
     (input: string) => {
       const tabs = tabsBySpace[activeSpaceId] ?? [];
@@ -1679,6 +1868,13 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         ...h,
         [tab.id]: { stack: [tab.url], index: 0 },
       }));
+      rememberRecent(activeSpaceId, {
+        url: tab.url,
+        title: tab.title,
+        favicon: tab.favicon,
+        faviconColor: tab.faviconColor,
+        closed: false,
+      });
       setActiveTabId(tab.id);
       setActiveRef(BROWSER_REF);
       setActivePage(null);
@@ -1686,7 +1882,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       setMobileSheetOpen(false);
       setCommandPaletteOpen(false);
     },
-    [activeSpaceId, tabsBySpace, setActiveRef],
+    [activeSpaceId, tabsBySpace, setActiveRef, rememberRecent]
   );
 
   /*
@@ -1723,7 +1919,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       setActivePage(null);
       setMainView("app");
     },
-    [tabsBySpace, setActiveRef],
+    [tabsBySpace, setActiveRef]
   );
 
   /*
@@ -1750,33 +1946,56 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       setLibraryTab("spaces");
       setMobileSheetOpen(false);
     },
-    [activeSpaceId, openLinkInBrowser, setActiveRef],
+    [activeSpaceId, openLinkInBrowser, setActiveRef]
   );
 
-  const closeTab = useCallback((tabId: string) => {
-    setTabsBySpace((current) => {
-      const next: Record<string, BrowserTab[]> = {};
-      for (const [spaceId, tabs] of Object.entries(current)) {
-        next[spaceId] = tabs.filter((tab) => tab.id !== tabId);
+  const closeTab = useCallback(
+    (tabId: string) => {
+      /*
+       * Filed BEFORE the updater runs, not inside it.
+       *
+       * `rememberRecent` is a state setter, and a setter called from within
+       * another setter's updater makes that updater impure — React is free to
+       * re-run or discard it, which it does, and the close then either loses
+       * unrelated tabs or silently does nothing. Reading the current list here
+       * costs a dependency and keeps the updater a pure function of its input.
+       */
+      for (const [spaceId, tabs] of Object.entries(tabsBySpace)) {
+        const going = tabs.find((tab) => tab.id === tabId);
+        if (!going) continue;
+        rememberRecent(spaceId, {
+          url: going.url,
+          title: going.title,
+          favicon: going.favicon,
+          faviconColor: going.faviconColor,
+          closed: true,
+        });
       }
-      setActiveTabId((activeId) => {
-        if (activeId !== tabId) return activeId;
-        // Closing the active tab activates its space's first remaining tab.
+      setTabsBySpace((current) => {
+        const next: Record<string, BrowserTab[]> = {};
         for (const [spaceId, tabs] of Object.entries(current)) {
-          if (tabs.some((tab) => tab.id === tabId)) {
-            return next[spaceId]?.[0]?.id ?? null;
-          }
+          next[spaceId] = tabs.filter((tab) => tab.id !== tabId);
         }
-        return null;
+        setActiveTabId((activeId) => {
+          if (activeId !== tabId) return activeId;
+          // Closing the active tab activates its space's first remaining tab.
+          for (const [spaceId, tabs] of Object.entries(current)) {
+            if (tabs.some((tab) => tab.id === tabId)) {
+              return next[spaceId]?.[0]?.id ?? null;
+            }
+          }
+          return null;
+        });
+        return next;
       });
-      return next;
-    });
-  }, []);
+    },
+    [rememberRecent, tabsBySpace]
+  );
 
   const clearTabs = useCallback((spaceId: string) => {
     setTabsBySpace((current) => {
       setActiveTabId((activeId) =>
-        current[spaceId]?.some((tab) => tab.id === activeId) ? null : activeId,
+        current[spaceId]?.some((tab) => tab.id === activeId) ? null : activeId
       );
       return { ...current, [spaceId]: [] };
     });
@@ -1789,7 +2008,14 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         createTab(input);
         return;
       }
+      // Plain strings rather than one nullable object, matching landedUrl above:
+      // a variable only ever assigned inside the updater is narrowed to null by
+      // the compiler, which cannot see that the callback runs.
       let landedUrl = "";
+      let landedSpace = "";
+      let landedTitle = "";
+      let landedFavicon = "";
+      let landedFaviconColor = "";
       setTabsBySpace((current) => {
         const next: Record<string, BrowserTab[]> = {};
         for (const [spaceId, tabs] of Object.entries(current)) {
@@ -1797,6 +2023,13 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
             if (tab.id !== activeTabId) return tab;
             const fresh = buildTab(input, spaceId, tab.sortOrder);
             landedUrl = fresh.url;
+            // Captured here, recorded after the updater returns — same reason
+            // landedUrl is threaded out rather than acted on in place: this
+            // function has to stay a pure function of `current`.
+            landedSpace = spaceId;
+            landedTitle = fresh.title;
+            landedFavicon = fresh.favicon;
+            landedFaviconColor = fresh.faviconColor;
             return { ...fresh, id: tab.id, createdAt: tab.createdAt };
           });
         }
@@ -1806,11 +2039,23 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         const entry = h[activeTabId] ?? { stack: [], index: -1 };
         const trimmed = entry.stack.slice(0, entry.index + 1);
         trimmed.push(landedUrl);
-        return { ...h, [activeTabId]: { stack: trimmed, index: trimmed.length - 1 } };
+        return {
+          ...h,
+          [activeTabId]: { stack: trimmed, index: trimmed.length - 1 },
+        };
       });
+      if (landedSpace && landedUrl) {
+        rememberRecent(landedSpace, {
+          url: landedUrl,
+          title: landedTitle,
+          favicon: landedFavicon,
+          faviconColor: landedFaviconColor,
+          closed: false,
+        });
+      }
       focusBrowser();
     },
-    [activeTabId, createTab, focusBrowser],
+    [activeTabId, createTab, focusBrowser, rememberRecent]
   );
 
   // Moves the active tab along its history without pushing a new entry.
@@ -1838,7 +2083,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       });
       focusBrowser();
     },
-    [activeTabId, focusBrowser],
+    [activeTabId, focusBrowser]
   );
 
   const goBack = useCallback(() => stepHistory(-1), [stepHistory]);
@@ -1873,12 +2118,12 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         ];
       });
     },
-    [tabsBySpace],
+    [tabsBySpace]
   );
 
   const removeFavorite = useCallback((favoriteId: string) => {
     setFavorites((current) =>
-      current.filter((favorite) => favorite.id !== favoriteId),
+      current.filter((favorite) => favorite.id !== favoriteId)
     );
   }, []);
 
@@ -1887,50 +2132,43 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     if (!trimmed) return;
     setSpaces((current) =>
       current.map((space) =>
-        space.id === id ? { ...space, name: trimmed } : space,
-      ),
+        space.id === id ? { ...space, name: trimmed } : space
+      )
     );
   }, []);
 
   const setSpaceEmoji = useCallback((id: string, emoji: string) => {
     setSpaces((current) =>
-      current.map((space) =>
-        space.id === id ? { ...space, emoji } : space,
-      ),
+      current.map((space) => (space.id === id ? { ...space, emoji } : space))
     );
   }, []);
 
   const setSpaceThemeColor = useCallback((id: string, color: string) => {
     setSpaces((current) =>
       current.map((space) =>
-        space.id === id ? { ...space, themeColor: color } : space,
-      ),
+        space.id === id ? { ...space, themeColor: color } : space
+      )
     );
   }, []);
 
   const setSpaceProfile = useCallback((id: string, profile: SpaceProfile) => {
     setSpaces((current) =>
-      current.map((space) =>
-        space.id === id ? { ...space, profile } : space,
-      ),
+      current.map((space) => (space.id === id ? { ...space, profile } : space))
     );
   }, []);
 
-  const reorderSpace = useCallback(
-    (id: string, direction: "up" | "down") => {
-      setSpaces((current) => {
-        const index = current.findIndex((space) => space.id === id);
-        if (index === -1) return current;
-        const target = direction === "up" ? index - 1 : index + 1;
-        if (target < 0 || target >= current.length) return current;
-        const next = [...current];
-        const [moved] = next.splice(index, 1);
-        next.splice(target, 0, moved!);
-        return next.map((space, order) => ({ ...space, sortOrder: order }));
-      });
-    },
-    [],
-  );
+  const reorderSpace = useCallback((id: string, direction: "up" | "down") => {
+    setSpaces((current) => {
+      const index = current.findIndex((space) => space.id === id);
+      if (index === -1) return current;
+      const target = direction === "up" ? index - 1 : index + 1;
+      if (target < 0 || target >= current.length) return current;
+      const next = [...current];
+      const [moved] = next.splice(index, 1);
+      next.splice(target, 0, moved!);
+      return next.map((space, order) => ({ ...space, sortOrder: order }));
+    });
+  }, []);
 
   // Drag-reorder: drop a profile just before/after another (Profiles manager).
   const moveSpace = useCallback(
@@ -1942,24 +2180,36 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         const without = current.filter((space) => space.id !== dragId);
         const targetIndex = without.findIndex((space) => space.id === targetId);
         if (targetIndex === -1) return current;
-        const insertAt =
-          position === "before" ? targetIndex : targetIndex + 1;
+        const insertAt = position === "before" ? targetIndex : targetIndex + 1;
         const next = [...without];
         next.splice(insertAt, 0, dragged);
         return next.map((space, order) => ({ ...space, sortOrder: order }));
       });
     },
-    [],
+    []
   );
 
+  /*
+   * Named, marked and (by the caller) coloured, rather than "New Profile".
+   *
+   * Four workspaces called "New Profile" with the same house on them is four
+   * rows nobody can tell apart, and the fix costs nothing to somebody who was
+   * going to rename it anyway. Name and mark are decided here because this is
+   * where the existing ones are in scope; the colour is not, because the theme
+   * store sits INSIDE this provider — see `useCreateWorkspace`, which is what
+   * the buttons actually call.
+   */
   const createSpace = useCallback(() => {
     const id = newId("space");
     setSpaces((current) => [
       ...current,
       {
         id,
-        name: "New Profile",
-        emoji: "lucide:House",
+        name: nextWorkspaceName(current.map((space) => space.name)),
+        emoji: pickUnused(
+          WORKSPACE_ICONS,
+          current.map((space) => space.emoji),
+        ),
         sortOrder: current.length,
         createdAt: new Date().toISOString(),
       },
@@ -1973,6 +2223,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     setLibraryTab("spaces");
     // Surface the new profile in the manager.
     setMainView("profiles");
+    return id;
   }, []);
 
   const createIdentityKey = useCallback(() => {
@@ -1999,16 +2250,14 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
   const retireIdentityKey = useCallback((id: string) => {
     setIdentityKeys((current) =>
       current.map((key) =>
-        key.id === id && !key.primary ? { ...key, retired: true } : key,
-      ),
+        key.id === id && !key.primary ? { ...key, retired: true } : key
+      )
     );
   }, []);
 
   const restoreIdentityKey = useCallback((id: string) => {
     setIdentityKeys((current) =>
-      current.map((key) =>
-        key.id === id ? { ...key, retired: false } : key,
-      ),
+      current.map((key) => (key.id === id ? { ...key, retired: false } : key))
     );
   }, []);
 
@@ -2016,9 +2265,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     const trimmed = label.trim();
     if (!trimmed) return;
     setIdentityKeys((current) =>
-      current.map((key) =>
-        key.id === id ? { ...key, label: trimmed } : key,
-      ),
+      current.map((key) => (key.id === id ? { ...key, label: trimmed } : key))
     );
   }, []);
 
@@ -2027,7 +2274,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       if (current.length <= 1) return current; // never delete the last space
       const remaining = current.filter((space) => space.id !== id);
       setActiveSpaceId((activeId) =>
-        activeId === id ? (remaining[0]?.id ?? activeId) : activeId,
+        activeId === id ? (remaining[0]?.id ?? activeId) : activeId
       );
       return remaining;
     });
@@ -2062,7 +2309,9 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
     (spaceId: string, title: string, icon: string) => {
       setSpaceItemsBySpace((current) => {
         const items = current[spaceId] ?? [];
-        if (items.some((item) => item.kind === "live" && item.title === title)) {
+        if (
+          items.some((item) => item.kind === "live" && item.title === title)
+        ) {
           return current;
         }
         const live: SpaceItem = {
@@ -2078,7 +2327,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
         return { ...current, [spaceId]: [...items, live] };
       });
     },
-    [],
+    []
   );
 
   // Generated in the click handler (not during render) to stay pure.
@@ -2115,6 +2364,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       ungroupRef,
       reorderRailRef,
       presetGroup,
+      applyRailPlan,
       renameGroup,
       setGroupColor,
       appsCollection,
@@ -2167,6 +2417,8 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       openShare,
       tabsBySpace,
       moveTabToSpace,
+      reorderTab,
+      recentBySpace,
       activeTabId,
       activeTab,
       openTab,
@@ -2280,6 +2532,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       ungroupRef,
       reorderRailRef,
       presetGroup,
+      applyRailPlan,
       renameGroup,
       setGroupColor,
       appsCollection,
@@ -2322,6 +2575,8 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       openShare,
       tabsBySpace,
       moveTabToSpace,
+      reorderTab,
+      recentBySpace,
       activeTabId,
       activeTab,
       openTab,
@@ -2398,7 +2653,7 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       openAppPrompt,
       openCollectionPrompt,
       closeAppPrompt,
-    ],
+    ]
   );
 
   return <HubContext.Provider value={value}>{children}</HubContext.Provider>;

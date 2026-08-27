@@ -26,14 +26,27 @@ import type { ReactNode } from "react";
  */
 export function AppHelpBar({
   slug,
+  pane,
   children,
 }: {
   slug: OnboardingSlug;
+  /**
+   * A pane to open instead of this slug's guide.
+   *
+   * Settings has no app behind it and no fixture guide — what it needs
+   * explaining is its own list of categories, which is built in the component
+   * rather than written down in lib/data. So the bar stays the bar, and only
+   * what it opens changes; a second bar beside the first, looking almost the
+   * same, is how a shell stops feeling like one product.
+   */
+  pane?: { kind: "settings-guide"; id: string };
   children?: ReactNode;
 }): ReactNode {
   const { detailPane, openDetailPane, closeDetailPane } = useHub();
-  const open = detailPane?.kind === "onboarding" && detailPane.id === slug;
-  const helped = Boolean(getAppOnboarding(slug));
+  const target = pane ?? { kind: "onboarding" as const, id: slug };
+  const open =
+    detailPane?.kind === target.kind && detailPane.id === target.id;
+  const helped = pane ? true : Boolean(getAppOnboarding(slug));
   if (!helped && !children) return null;
 
   return (
@@ -42,11 +55,7 @@ export function AppHelpBar({
       {helped && (
         <button
           type="button"
-          onClick={() =>
-            open
-              ? closeDetailPane()
-              : openDetailPane({ kind: "onboarding", id: slug })
-          }
+          onClick={() => (open ? closeDetailPane() : openDetailPane(target))}
           aria-pressed={open}
           aria-label={content.onboarding.button}
           title={content.onboarding.button}

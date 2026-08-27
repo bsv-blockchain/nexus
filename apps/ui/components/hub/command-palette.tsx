@@ -2,7 +2,9 @@
 
 import { Favicon } from "@/components/hub/favicon";
 import { useHub } from "@/components/hub/hub-provider";
+import { useHostOverlay } from "@/lib/wallet-data";
 import { content, type BrowserTab } from "@/lib/data";
+import type { RecentSite } from "@/components/hub/hub-provider";
 import { ArrowRight, Globe, Info, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -13,6 +15,20 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
  */
 export function CommandPalette(): ReactNode {
   const { commandPaletteOpen, setCommandPaletteOpen } = useHub();
+
+  /*
+   * Hide the tab layer while this is up.
+   *
+   * A browsed page is a native view in both shells and always paints ABOVE this
+   * document, so the palette opened correctly and was then covered by whatever
+   * page was behind it. Nothing in the DOM can out-rank a native sibling; the
+   * only fix is to ask the shell to take it away, which is what this does.
+   *
+   * Called here rather than inside the content below because a hook cannot sit
+   * behind the early return, and refcounted by `useHostOverlay` so closing this
+   * cannot uncover a page some other sheet is still hiding.
+   */
+  useHostOverlay(commandPaletteOpen);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -31,6 +47,7 @@ export function CommandPalette(): ReactNode {
 
 type PaletteEntry =
   | { kind: "tab"; tab: BrowserTab }
+  | { kind: "recent"; site: RecentSite }
   | { kind: "open"; query: string };
 
 function CommandPaletteContent({
@@ -38,31 +55,61 @@ function CommandPaletteContent({
 }: {
   onClose: () => void;
 }): ReactNode {
-  const { tabsBySpace, openTab, createTab } = useHub();
+  const {
+    tabsBySpace,
+    recentBySpace,
+    activeSpaceId,
+    spaces,
+    openTab,
+    createTab,
+  } = useHub();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const copy = content.commandPalette;
+  const spaceName =
+    spaces.find((space) => space.id === activeSpaceId)?.name ?? "";
 
   const entries = useMemo<PaletteEntry[]>(() => {
     const needle = query.toLowerCase();
-    const tabEntries: PaletteEntry[] = Object.values(tabsBySpace)
-      .flat()
-      .filter(
-        (tab) =>
-          tab.title.toLowerCase().includes(needle) ||
-          tab.url.toLowerCase().includes(needle),
-      )
+    const matches = (title: string, url: string): boolean =>
+      title.toLowerCase().includes(needle) ||
+      url.toLowerCase().includes(needle);
+
+    /*
+     * This workspace only, and open tabs before pages that are merely
+     * remembered.
+     *
+     * It used to search every space at once, which put Work's tabs in front of
+     * somebody typing in Personal — the one thing separate workspaces are for.
+     * Open tabs lead because switching to a tab you already have beats opening
+     * a second copy of it.
+     */
+    const tabEntries: PaletteEntry[] = (tabsBySpace[activeSpaceId] ?? [])
+      .filter((tab) => matches(tab.title, tab.url))
       .map((tab) => ({ kind: "tab", tab }));
+
+    const openUrls = new Set(
+      (tabsBySpace[activeSpaceId] ?? []).map((tab) => tab.url)
+    );
+    // A page that is already open is offered as the tab, never twice.
+    const recentEntries: PaletteEntry[] = (recentBySpace[activeSpaceId] ?? [])
+      .filter(
+        (site) => !openUrls.has(site.url) && matches(site.title, site.url)
+      )
+      .map((site) => ({ kind: "recent", site }));
+
+    const found = [...tabEntries, ...recentEntries];
     return query.trim().length > 0
-      ? [...tabEntries, { kind: "open", query: query.trim() }]
-      : tabEntries;
-  }, [tabsBySpace, query]);
+      ? [...found, { kind: "open", query: query.trim() }]
+      : found;
+  }, [tabsBySpace, recentBySpace, activeSpaceId, query]);
 
   const selected = Math.min(selectedIndex, Math.max(0, entries.length - 1));
 
   const activate = (entry: PaletteEntry | undefined): void => {
     if (!entry) return;
     if (entry.kind === "tab") openTab(entry.tab.id);
+    else if (entry.kind === "recent") createTab(entry.site.url);
     else createTab(entry.query);
   };
 
@@ -87,10 +134,7 @@ function CommandPaletteContent({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center gap-3 px-4 py-3.5">
-          <Search
-            className="size-5 shrink-0 opacity-50"
-            aria-hidden="true"
-          />
+          <Search className="size-5 shrink-0 opacity-50" aria-hidden="true" />
           <input
             autoFocus
             value={query}
@@ -102,7 +146,7 @@ function CommandPaletteContent({
               if (event.key === "ArrowDown") {
                 event.preventDefault();
                 setSelectedIndex((index) =>
-                  Math.min(index + 1, entries.length - 1),
+                  Math.min(index + 1, entries.length - 1)
                 );
               } else if (event.key === "ArrowUp") {
                 event.preventDefault();
@@ -149,6 +193,35 @@ function CommandPaletteContent({
                   </span>
                   <span className={trailingClass}>
                     {copy.openNewTab}
+                    <ArrowRight className="size-3.5" aria-hidden="true" />
+                  </span>
+                </button>
+              );
+            }
+
+            if (entry.kind === "recent") {
+              return (
+                <button
+                  key={`recent-${entry.site.url}`}
+                  type="button"
+                  onClick={() => activate(entry)}
+                  onMouseEnter={() => setSelectedIndex(index)}
+                  className={rowClass}
+                >
+                  <Favicon
+                    url={entry.site.url}
+                    letter={entry.site.favicon}
+                    color={entry.site.faviconColor}
+                    size={20}
+                  />
+                  <span className="min-w-0 flex-1 truncate font-medium">
+                    {entry.site.title}
+                  </span>
+                  {/* The workspace it belongs to, not a verb: these rows all do
+                      the same thing, and the useful thing to say is whose page
+                      this was. */}
+                  <span className={trailingClass}>
+                    {spaceName}
                     <ArrowRight className="size-3.5" aria-hidden="true" />
                   </span>
                 </button>

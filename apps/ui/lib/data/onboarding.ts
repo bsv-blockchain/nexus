@@ -23,7 +23,18 @@ type AppSlug = HubApp["slug"];
  * pane, one help button, and the store's entry is written the same way as
  * everything else's.
  */
-export type OnboardingSlug = AppSlug | "store" | "profiles";
+export type OnboardingSlug =
+  | AppSlug
+  | "store"
+  | "profiles"
+  | "timeline"
+  /* Focus is a view rather than an app, like the Timeline and the store, so it
+     needs a slug of its own here to have a guide at all. */
+  | "focus"
+  /* Settings has no fixture guide — its pane is built from the category list in
+     the component, because that list is filtered per build. The slug exists so
+     the help bar at the foot of its column has something to be about. */
+  | "settings";
 
 /**
  * The band at the top of the pane.
@@ -80,50 +91,136 @@ function band(slug: string, alt: string): OnboardingMedia {
 
 export const appOnboarding: AppOnboarding[] = [
   {
-slug: "profiles",
-    title: "Profiles",
+    slug: "focus",
+    title: "Focus",
+    headline: "One day at a time, over a photograph.",
+    features: [
+      {
+        id: "goal",
+        title: "One line for the day",
+        summary: "Written in the morning, struck through in the evening.",
+        body: "A day holds one thing you will remember having done, so the screen asks for one rather than for a list. It is kept with the date it was written on: yesterday's is not a goal you failed, it is a goal that expired, so the screen asks again rather than showing you somebody else's Tuesday.",
+      },
+      {
+        id: "tasks",
+        title: "A list, and a note",
+        summary: "The small things, beside the one big thing.",
+        body: "The list is for what has to happen today and nothing else — it is not a project tracker, and the column beside it counts what is left rather than what has ever been on it. Clear what is finished when the list stops being what is left and starts being a history.",
+        steps: [
+          "Type into the last row to add a task; press Enter to keep it.",
+          "Clear what is finished from the column on the left.",
+        ],
+      },
+      {
+        id: "timer",
+        title: "Twenty-five minutes, counted",
+        summary: "Focus, then break, and the column keeps the score.",
+        body: "The timer is the ordinary pomodoro, and the only thing it does differently is remember. Every finished focus block is a mark in the column — breaks do not count, because a break you sat through is not work — so at the end of the day there is a number where usually there is only a feeling.",
+        steps: [
+          "The count resets overnight, like the goal.",
+          "Only whole finished blocks count; stopping early does not.",
+        ],
+      },
+      {
+        id: "corner",
+        title: "What is waiting, and what you have",
+        summary: "Unread messages and your wallet, in the corner.",
+        body: "The two figures are real: the unread count is the same one the rail's dot reads, and the balance is the wallet this workspace spends from, named underneath so it is never the wrong one. The eye shuts the balance without moving anything, for the times somebody is reading over your shoulder.",
+      },
+      {
+        id: "swap",
+        title: "Or have the feed instead",
+        summary: "Preferences decides what a window opens on.",
+        body: "Focus and the Timeline answer different questions — what am I doing today, and what has happened since I last looked — and neither is right for everybody. Preferences carries the choice under Homescreen, and the first run makes a guess from what you said you were there for.",
+      },
+    ],
+  },
+  {
+    slug: "timeline",
+    title: "Timeline",
+    headline: "What everyone is saying, and what your apps have been doing.",
+    features: [
+      {
+        id: "what",
+        title: "One feed, several ecosystems",
+        summary: "Nexus handles and foreign ones, in the same column.",
+        body: "A post carries the handle that signed it, suffix and all, so a name from another ecosystem is legible as one rather than quietly reformatted into a local one. The face beside it is the same face that person wears in a conversation and on a wallet contact.",
+      },
+      {
+        id: "strips",
+        title: "Four ways to read it",
+        summary:
+          "For you ranks, Following narrows, Posts is yours, Activity is your apps.",
+        body: "The first three are strips of the same list, so a post cannot say one thing under For you and another under Following. Activity is the other direction entirely: not what people posted, but what the apps this workspace is connected to actually did.",
+        steps: [
+          "Follow somebody from Who to follow and they join the Following strip.",
+          "Activity only reports apps this workspace holds \u2014 connect one and its events appear.",
+        ],
+      },
+      {
+        id: "topics",
+        title: "Topics narrow it, and can stay",
+        summary: "Filter from the left column, or pin one as a tab.",
+        body: "Every topic is counted off the posts behind it, so the column never offers a filter with nothing in it. The plus at the end of the tab row pins the topic you keep coming back to, and it stays until you unpin it.",
+      },
+      {
+        id: "handles",
+        title: "You post as this workspace",
+        summary:
+          "The handle at the top of the left column is the one that signs.",
+        body: "Switching workspace switches the handle, which is why it is stated rather than assumed. Work and Personal can hold the same conversation on the same timeline without either one knowing about the other.",
+      },
+    ],
+  },
+  {
+    slug: "profiles",
+    title: "Workspaces",
     headline: "One device, several lives, kept apart.",
     features: [
       {
         id: "what",
         title: "A context, not an account",
-        summary: "Nothing to sign into. You are the same person in all of them.",
-        body: "A profile answers which version of you is doing this, and the answer decides which name people see and which money moves. Work and Personal are the obvious pair; a shop, a side project or a shared household are the same idea.",
+        summary:
+          "Nothing to sign into. You are the same person in all of them.",
+        body: "A workspace answers which version of you is doing this, and the answer decides which name people see and which money moves. Work and Personal are the obvious pair; a shop, a side project or a shared household are the same idea.",
       },
       {
         id: "connections",
         title: "One handle, one wallet, its own apps",
-        summary: "Connected from what you own, not owned by the profile.",
-        body: "One of each rather than several: a context holding three wallets puts which one did that come from back on every payment, which is what a profile is meant to settle. The same wallet can serve two profiles, and the left column says when it does.",
+        summary: "Connected from what you own, not owned by the workspace.",
+        body: "One of each rather than several: a context holding three wallets puts which one did that come from back on every payment, which is what a workspace is meant to settle. The same wallet can serve two workspaces, and the left column says when it does.",
         steps: [
-          "Pick a handle and a wallet under a profile's Connections tab.",
-          "Connect an app another profile already has from the row above its list.",
+          "Pick a handle and a wallet under a workspace's Connections tab.",
+          "Connect an app another workspace already has from the row above its list.",
           "Anything new comes from Apps, which asks for permissions first.",
         ],
       },
       {
         id: "switching",
         title: "Switching moves everything with it",
-        summary: "The rail, the wallet and your handle follow the ringed column.",
+        summary:
+          "The rail, the wallet and your handle follow the ringed column.",
         body: "Clicking a column makes it active and leaves you here, so several can be set up in a row without being thrown into each one.",
       },
       {
         id: "browsing",
         title: "Browsing stays where it happened",
-        summary: "Tabs and bookmarks belong to the profile that opened them.",
-        body: "A tab opened in Work stays in Work. Drag one onto another column to move it — a profile without Browse gets it connected on the drop, since a bookmark it cannot open is no use to it.",
+        summary: "Tabs and bookmarks belong to the workspace that opened them.",
+        body: "A tab opened in Work stays in Work. Drag one onto another column to move it — a workspace without Browse gets it connected on the drop, since a bookmark it cannot open is no use to it.",
       },
     ],
   },
   {
     slug: "store",
     title: "Apps",
-    headline: "Mini apps you connect to Nexus, and what they can do once you do.",
+    headline:
+      "Mini apps you connect to Nexus, and what they can do once you do.",
     features: [
       {
         id: "what",
         title: "An app runs inside Nexus, not beside it",
-        summary: "Connecting one puts it in the rail; disconnecting takes it out.",
+        summary:
+          "Connecting one puts it in the rail; disconnecting takes it out.",
         body: "A mini app borrows the parts of Nexus you already have — your keys, your wallet, your identity — rather than asking you to set them up again. That is the whole reason it connects rather than being a bookmark, and also the reason it has to ask permission before it does anything with them.",
         steps: [
           "Connect from the store and the app appears in the left rail.",
@@ -140,13 +237,15 @@ slug: "profiles",
       {
         id: "permissions",
         title: "What it asked for is not what it keeps",
-        summary: "Permissions are granted once here and changed any time in Connect.",
+        summary:
+          "Permissions are granted once here and changed any time in Connect.",
         body: "Identifying you and acting without asking are two separate grants, and an app can have one without the other. Both are revocable, and revoking is not disconnecting — an app can stay in your rail with nothing but the screen it draws.",
       },
       {
         id: "repositories",
         title: "The store is a view over lists you chose",
-        summary: "Repositories decide what appears; you decide the repositories.",
+        summary:
+          "Repositories decide what appears; you decide the repositories.",
         body: "Nexus ships with a few and you can add your own. What appears in one is decided by whoever runs it and nobody else, including us — so an unsigned repository is off by default, and turning it on is a setting with a warning attached rather than a checkbox.",
         steps: [
           "Open App repositories at the foot of this column.",
@@ -158,12 +257,16 @@ slug: "profiles",
   {
     slug: "roadmap",
     headline: "What is being built, and what people are asking for.",
-    media: band("roadmap", "The Nexus roadmap board, three columns of feature cards"),
+    media: band(
+      "roadmap",
+      "The Nexus roadmap board, three columns of feature cards"
+    ),
     features: [
       {
         id: "columns",
         title: "Three columns, three different claims",
-        summary: "Fundable, funded, shipped — and they are not the same as a backlog.",
+        summary:
+          "Fundable, funded, shipped — and they are not the same as a backlog.",
         body: "Fundable means nobody has paid for it yet. Funded means the money is here and the work is not, which is the uncomfortable column and the reason the board is worth having. Shipped is not written by hand: it is read from the release notes, so a feature cannot appear there without a release claiming it.",
         steps: [
           "Filter to one column from the left, which is also how the board reads on a phone.",
@@ -194,12 +297,16 @@ slug: "profiles",
   {
     slug: "messages",
     headline: "Conversations that can carry money, proof and secrets.",
-    media: band("messages", "A Nexus conversation with command pills in the thread"),
+    media: band(
+      "messages",
+      "A Nexus conversation with command pills in the thread"
+    ),
     features: [
       {
         id: "commands",
         title: "Type a command in the message box",
-        summary: "Pay, request, sign or look somebody up without leaving the chat.",
+        summary:
+          "Pay, request, sign or look somebody up without leaving the chat.",
         body: "A command reads as the line you typed, and the pill it leaves carries every parameter it took. Nothing moves until you confirm it, and nothing you receive is ever parsed as a command — only what you compose locally.",
         steps: [
           "Type / to see every command this client runs.",
@@ -226,7 +333,10 @@ slug: "profiles",
   {
     slug: "wallet",
     headline: "Pay a handle, not an address.",
-    media: band("wallet", "The Nexus wallet showing balance and recent activity"),
+    media: band(
+      "wallet",
+      "The Nexus wallet showing balance and recent activity"
+    ),
     features: [
       {
         id: "handles",
@@ -273,13 +383,13 @@ slug: "profiles",
   {
     slug: "browser",
     headline: "The web, with a wallet and an identity already in it.",
-    media: band("browser", "Browsing with Nexus profiles and spaces"),
+    media: band("browser", "Browsing with Nexus workspaces"),
     features: [
       {
         id: "spaces",
-        title: "Spaces keep contexts apart",
-        summary: "Each profile has its own tabs, theme and identity.",
-        body: "Work and personal browsing do not share a key, a history or a look. Switching profile switches all three at once, so there is no state left behind to leak between them.",
+        title: "Workspaces keep contexts apart",
+        summary: "Each workspace has its own tabs, theme and identity.",
+        body: "Work and personal browsing do not share a key, a history or a look. Switching workspace switches all three at once, so there is no state left behind to leak between them.",
       },
       {
         id: "connect",
@@ -486,7 +596,7 @@ slug: "profiles",
 ];
 
 export function getAppOnboarding(
-  slug: OnboardingSlug,
+  slug: OnboardingSlug
 ): AppOnboarding | undefined {
   return appOnboarding.find((entry) => entry.slug === slug);
 }

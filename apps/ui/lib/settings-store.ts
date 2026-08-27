@@ -4,9 +4,14 @@
  * Everything Settings can change, in one place.
  *
  * Same module-store shape as {@link file://./command-effects.ts}: a value read
- * through `useSyncExternalStore`, a server snapshot that matches the prerender,
- * and no persistence. Nothing here is written to disk — a prototype that
- * remembers you blocked a camera would be claiming to have a camera policy.
+ * through `useSyncExternalStore` and a server snapshot that matches the
+ * prerender.
+ *
+ * It is written to `localStorage`, because a preference that forgets itself on
+ * every reload is not a preference. That does mean the store now remembers
+ * answers this build cannot act on — a camera set to "block" is a note, not a
+ * policy, since nothing here holds a camera. Better a note that survives than
+ * a switch that lies about being a switch by resetting itself.
  *
  * The point of keeping it in one store rather than in each panel's `useState` is
  * that several of these are read outside the panel that sets them. Developer
@@ -15,6 +20,7 @@
  * setting, it is a light.
  */
 
+import { setTimelineListed } from "@/lib/data";
 import { useSyncExternalStore } from "react";
 
 /** What a capability does when a page asks for it. */
@@ -44,6 +50,8 @@ export type ClearOnQuit = "nothing" | "history" | "everything";
 export type OpenLinksIn = "nexus" | "native";
 /** How long a tab sits untouched before it is filed away. */
 export type ArchiveAfter = 0 | 1 | 7 | 30;
+/** Where the open tabs are drawn. */
+export type TabLayout = "horizontal" | "vertical";
 
 export interface SettingsState {
   /* ---- Permissions ---------------------------------------------------- */
@@ -92,6 +100,155 @@ export interface SettingsState {
   translateOffer: boolean;
   /** days a tab may sit untouched before archiving; 0 never archives */
   archiveAfter: ArchiveAfter;
+  /**
+   * Whether tabs run across the top of the page or down the library column.
+   *
+   * A layout rather than a preference about ornament: horizontal moves the open
+   * tabs OUT of the sidebar and into a strip above the viewport, so the two
+   * modes must never both draw the list — a tab in two places is two tabs as
+   * far as anybody clicking is concerned. Spaces, folders and bookmarks stay in
+   * the column either way; only the tab list moves.
+   */
+  tabLayout: TabLayout;
+  /**
+   * Whether Browse is a pinned button rather than one of your apps.
+   *
+   * On, it leaves the app section of the rail and sits under Workspaces with
+   * the other things that are part of the client rather than installed into
+   * it — which is what browsing actually is here. Off, it is an app like any
+   * other and appears wherever it is connected.
+   *
+   * The two are exclusive on purpose: Browse in the pinned block AND in the
+   * app list is one thing with two doors, and the second door teaches that
+   * they are different places.
+   */
+  browseAsButton: boolean;
+  /**
+   * Whether Workspaces has a button at the top of the rail.
+   *
+   * Off by default, which is not the same as saying workspaces are hidden. The
+   * list of them is already in the column beside the rail, every one of them
+   * carries its own menu, and the desktop shell now names them along its top
+   * strip. A rail button on top of all that is a fourth door onto a room most
+   * people only visit to add a second workspace.
+   *
+   * Kept as a setting rather than removed, because somebody who lives in four
+   * workspaces at once wants it exactly where it was.
+   */
+  workspacesInRail: boolean;
+  /**
+   * Whether the Timeline is an app rather than only the home screen.
+   *
+   * Off by default, which is the shape it has always had: a view with no icon,
+   * reached from Workspaces and from Home. On, it becomes a listing like any
+   * other — a tile on the rail, a card in the store, a row in a workspace's
+   * connections — and therefore something that can be disconnected. Which is
+   * the point: the screen you land on should be a choice, and it cannot be one
+   * while the only way to it is a view nothing can remove.
+   *
+   * @see lib/data/index.ts `setTimelineListed` — how the catalogue learns
+   */
+  timelineAsApp: boolean;
+  /**
+   * Which screen Home opens on.
+   *
+   * The Timeline is a room with other people in it; Focus is a room with your
+   * own day in it. Both are reasonable first things to see and neither is
+   * reasonable for everybody, so this is asked rather than assumed — seeded
+   * from the presets on the way in, and changeable in Preferences after.
+   *
+   * @see components/hub/use-apply-presets.ts — what the first run seeds it with
+   */
+  homescreen: "timeline" | "focus";
+  /**
+   * What a stranger attaches, in US cents.
+   *
+   * Held in cents rather than satoshis because it is a PRICE — the thing being
+   * asked for is "about a penny", and a penny is a fixed number of cents and a
+   * moving number of satoshis. Storing the sats would freeze today's exchange
+   * rate into a policy that outlives it, so the conversion happens at the point
+   * of display against the live rate.
+   *
+   * Only in force while `reach` is `toll`; see PrivacyPanel.
+   */
+  /**
+   * Convert anything paid to you into bitcoin as it lands.
+   *
+   * Off by default, because the honest default is that you keep what somebody
+   * chose to send you. On, it is the standing answer rather than the only one:
+   * Get paid shows the box already ticked and says this setting did it, and a
+   * single payment can still be kept in the coin it came in. A global that
+   * could not be overridden per payment would be a trip to Settings and back
+   * every time somebody wanted one exception.
+   */
+  autoSwapToBsv: boolean;
+  /**
+   * Cover a payment by converting what you hold, rather than refusing it.
+   *
+   * A web3-native site asks the wallet for BSV. Holding ether and being told
+   * no is the failure this removes: with it on, enough of something else is
+   * swapped to cover the charge and the payment goes through.
+   *
+   * Off by default, like its receiving twin. Both are about money moving in a
+   * form you did not pick, and the honest default for that is to ask.
+   */
+  autoSwapWhenSpending: boolean;
+  /**
+   * How much may be swapped that way before it becomes a question.
+   *
+   * In cents, because it is a decision about what a thing is worth rather than
+   * about a number of satoshis — the same reason `strangerFeeCents` is. The
+   * screen states the satoshi equivalent beside it at the live rate.
+   */
+  autoSwapCapCents: number;
+  /**
+   * Whether a connected card may buy BSV mid-payment to cover a shortfall.
+   *
+   * The last link in a chain the two settings above start: one-click decides
+   * whether paying asks, auto-swap converts something else you hold, and this
+   * one runs when there is nothing left to convert. Off by default, because
+   * it is the only one of the three that reaches outside the wallet and moves
+   * somebody's actual bank money.
+   */
+  cardTopUp: boolean;
+  /**
+   * Linked phone ids where tap-to-pay is switched on.
+   *
+   * Per device rather than one global flag, because the answer genuinely
+   * differs per device: the phone you carry and the one in a drawer are not
+   * the same decision, and the platform underneath changes what the row can
+   * even offer.
+   */
+  walletPayDevices: string[];
+  /**
+   * How much Google Pay may approve before Nexus asks, in cents.
+   *
+   * Android only, and this is Nexus's own ceiling rather than Google's — worth
+   * being exact about, because the platform's threshold is going away. Google
+   * Wallet used to skip the device unlock under a regional limit (about £45 in
+   * the UK, CAD$100 in Canada) and is moving to requiring an unlock for every
+   * payment everywhere. So this number cannot promise that nothing happens; it
+   * only says whether Nexus adds a prompt of its own on top.
+   *
+   * iOS has no equivalent and is not given one. Apple authenticates every
+   * in-app payment with Face ID, Touch ID or the passcode, with no threshold
+   * and no way for an app to ask for one — see PKPaymentAuthorizationController.
+   */
+  walletPayCapCents: number;
+  strangerFeeCents: number;
+  /**
+   * Whether a metanet-enabled site gets your wallet without being asked.
+   *
+   * Auto by default. A site that speaks BRC-100 is asking for the identity
+   * handshake, and answering it by hand every time is a dialog people learn to
+   * dismiss rather than read — which is worse than no dialog, because it trains
+   * the reflex that the spending prompts then have to fight.
+   *
+   * It grants identity only. Spending is asked for every time whatever this
+   * says, because a preference switch must not be able to hand out money
+   * quietly. See lib/connections-store.
+   */
+  autoConnectSites: "auto" | "manual";
 
   /* ---- Autofill ------------------------------------------------------- */
   autofillAddresses: boolean;
@@ -115,6 +272,17 @@ export interface SettingsState {
    * than kept as a second inventory.
    */
   revokedConnections: string[];
+
+  /**
+   * Payment links the holder has put away, by id.
+   *
+   * Archiving is not closing. A link's `status` is what the link itself is doing
+   * — open, closed, expired — and belongs to the link; this is a note about
+   * whether its owner wants to look at it, and belongs here. A closed link with
+   * takings worth remembering stays out of the archive; an open one nobody used
+   * can go in.
+   */
+  archivedPaymentLinks: string[];
 
   /* ---- Shortcuts ------------------------------------------------------ */
   /**
@@ -140,7 +308,15 @@ export interface SettingsState {
    * Which handle each profile answers to.
    *
    * Per profile rather than global, since that is what profiles are for — Work
-   * and Personal wearing the same name defeats having both.
+   * and Personal wearing the same name defeats having both. That is also why
+   * it is exclusive: a handle is one identity, and two profiles answering to it
+   * is the exact thing the separation exists to prevent.
+   *
+   * A profile missing from this map has no handle rather than falling back to
+   * the first one held. Falling back meant a profile made a second ago arrived
+   * already wearing somebody's name, which is both untrue and the one state
+   * exclusivity cannot survive — every new profile would collide with the
+   * oldest one.
    */
   activeHandle: Record<string, string>;
   /** handles offered for sale, and the asking price in dollars */
@@ -210,6 +386,39 @@ const INITIAL: SettingsState = {
   openPdfsInNexus: true,
   translateOffer: true,
   archiveAfter: 7,
+  // Horizontal is the shipping default: a strip above the page is what a person
+  // arriving from another browser expects to find, and the column is then free
+  // to be a library rather than a tab list with bookmarks underneath it.
+  tabLayout: "horizontal",
+  // On by default: browsing is what this client is, not an app you added.
+  browseAsButton: true,
+  // Off by default. See the field above for why a button nobody asked for is
+  // not the same thing as a feature nobody can reach.
+  workspacesInRail: false,
+  // See the field above. Off is the behaviour every install has had until now.
+  timelineAsApp: false,
+  /* The feed, for anybody who never answers the question. The first run
+     overwrites this from the presets before it is ever read. */
+  homescreen: "timeline",
+  /* A cent. Small enough that nobody with something to say is stopped by it,
+     and large enough that sending a hundred thousand of them costs real money,
+     which is the entire mechanism. */
+  autoSwapToBsv: false,
+  autoSwapWhenSpending: false,
+  /* $2.18 — the house number, and the same figure the cross-chain fee is a
+     percentage of. Small enough that a swap under it is not a decision. */
+  autoSwapCapCents: 218,
+  cardTopUp: false,
+  /* The phone in your pocket, already set up. The Pixel is not, so the screen
+     shows both sides of the switch without anybody having to press it. */
+  walletPayDevices: ["dev-phone"],
+  /* $21.80 — the house number an order of magnitude up, which also lands where
+     the real contactless limits sit: £45 in the UK, CAD$100 in Canada. A
+     coffee goes through, a coat does not. */
+  walletPayCapCents: 2_180,
+  strangerFeeCents: 1,
+  // See the field above for why the default is the permissive one.
+  autoConnectSites: "auto",
 
   autofillAddresses: true,
   autofillCards: false,
@@ -217,9 +426,15 @@ const INITIAL: SettingsState = {
   offerToSavePasswords: false,
 
   revokedConnections: [],
+  archivedPaymentLinks: [],
   keymap: {},
   handles: ["crumbs", "breadcrumbs"],
-  activeHandle: {},
+  /* The shipped profiles wear one each. A prototype where both answer to the
+     same name demonstrates nothing about why a profile has a handle, and with
+     the fallback gone something has to say what they start as. Space ids are
+     written out rather than derived, the same way wallets-store seeds its two —
+     see lib/data/spaces.ts. */
+  activeHandle: { "space-my-hub": "crumbs", "space-work": "breadcrumbs" },
   listedForSale: {},
   avatar: null,
   previousHandle: null,
@@ -232,10 +447,139 @@ const INITIAL: SettingsState = {
   updateChannel: "stable",
 };
 
-let state: SettingsState = INITIAL;
+/**
+ * Where it is kept, and which shape is kept there.
+ *
+ * Versioned so that a rename or a retyped field is a discarded blob rather than
+ * a crash on somebody's next launch: an unrecognised version is dropped and the
+ * defaults stand. Bump it when a field changes meaning, not when one is added —
+ * added fields are handled by `restore` merging over the defaults.
+ */
+const STORE_KEY = "nexus.settings";
+const STORE_VERSION = 1;
+
+/**
+ * Saved settings, laid over the defaults.
+ *
+ * The two permission maps are merged key by key rather than replaced, so a
+ * capability added after somebody last saved arrives with its default instead
+ * of as `undefined` — which every reader of those maps would then have to guard
+ * against forever.
+ */
+function restore(saved: Partial<SettingsState>): SettingsState {
+  return {
+    ...INITIAL,
+    ...saved,
+    capabilities: { ...INITIAL.capabilities, ...(saved.capabilities ?? {}) },
+    walletCapabilities: {
+      ...INITIAL.walletCapabilities,
+      ...(saved.walletCapabilities ?? {}),
+    },
+    /* Merged for the same reason the permission maps are: absence used to mean
+       "the first handle" and now means "none", so a blob saved before the
+       seeded profiles were written down would leave them nameless. What
+       somebody actually chose still wins. */
+    activeHandle: { ...INITIAL.activeHandle, ...(saved.activeHandle ?? {}) },
+  };
+}
+
+function load(): SettingsState {
+  /* Undefined during the prerender, which is the whole reason
+     `getSettingsServerSnapshot` exists — see the note on it below. */
+  if (typeof window === "undefined") return INITIAL;
+  try {
+    const raw = window.localStorage.getItem(STORE_KEY);
+    if (!raw) return INITIAL;
+    const saved = JSON.parse(raw) as {
+      v?: number;
+      state?: Partial<SettingsState>;
+    };
+    if (saved.v !== STORE_VERSION || !saved.state) return INITIAL;
+    return restore(saved.state);
+  } catch {
+    /* Corrupt, or storage that refuses to be read. The defaults are always a
+       valid answer, and a settings store that throws takes the app with it. */
+    return INITIAL;
+  }
+}
+
+function write(value: SettingsState): boolean {
+  try {
+    window.localStorage.setItem(
+      STORE_KEY,
+      JSON.stringify({ v: STORE_VERSION, state: value }),
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function save(): void {
+  if (typeof window === "undefined") return;
+  if (write(state)) return;
+  /*
+   * One retry without the avatar.
+   *
+   * It is the only field here that can be megabytes — a data URL rather than a
+   * reference — so it is also the only one that can push the whole blob past
+   * the quota. Dropping it costs a picture; not retrying would silently stop
+   * saving every other setting for as long as that picture is set, which is the
+   * kind of failure nobody would connect back to uploading an avatar.
+   */
+  write({ ...state, avatar: null });
+}
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Coalesced, because some of these are dragged rather than clicked.
+ *
+ * A zoom stepper held down emits on every frame, and serialising the whole
+ * store sixty times a second to record a number that is still moving is work
+ * for nothing. The flush below is what makes the delay safe.
+ */
+function scheduleSave(): void {
+  if (typeof window === "undefined") return;
+  if (saveTimer !== null) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    save();
+  }, 150);
+}
+
+if (typeof window !== "undefined") {
+  /* `pagehide` rather than `beforeunload`: it fires on the paths that one
+     misses, including a tab being frozen on mobile, and it does not block the
+     unload. Without it, a setting changed in the last 150ms of a session is a
+     setting that was never really changed. */
+  window.addEventListener("pagehide", () => {
+    if (saveTimer === null) return;
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    save();
+  });
+}
+
+let state: SettingsState = load();
+/* Once at module load, for the value that came back from storage. `emit` covers
+   every change after this, but nothing has emitted yet. */
+setTimelineListed(state.timelineAsApp);
 const listeners = new Set<() => void>();
 
+/**
+ * Notify, and remember.
+ *
+ * Saving lives here rather than in each setter because every mutation in this
+ * file already ends by calling it, and there are two dozen of them. A setter
+ * added later gets persistence by doing the one thing it has to do anyway.
+ */
 function emit(): void {
+  scheduleSave();
+  /* The catalogue is a plain function with no way to subscribe, so it is told
+     rather than asked. Here rather than in the setter, so a value restored from
+     storage lands as well as one somebody just changed. */
+  setTimelineListed(state.timelineAsApp);
   for (const listener of listeners) listener();
 }
 
@@ -248,6 +592,14 @@ export function getSettings(): SettingsState {
   return state;
 }
 
+/**
+ * What the prerender saw, which is never what storage holds.
+ *
+ * React renders the hydration pass from this and then re-reads `getSettings`,
+ * so restored settings arrive one render later instead of tearing the HTML.
+ * Returning the live state here would make the server's markup and the client's
+ * first paint disagree for anybody who has ever changed a setting.
+ */
 export function getSettingsServerSnapshot(): SettingsState {
   return INITIAL;
 }
@@ -310,6 +662,18 @@ export function toggleConnection(id: string): void {
   emit();
 }
 
+/** Puts a payment link away, or takes it back out. Reversible, like revoking. */
+export function toggleArchivedPaymentLink(id: string): void {
+  const archived = state.archivedPaymentLinks.includes(id);
+  state = {
+    ...state,
+    archivedPaymentLinks: archived
+      ? state.archivedPaymentLinks.filter((entry) => entry !== id)
+      : [...state.archivedPaymentLinks, id],
+  };
+  emit();
+}
+
 /** Rebinds a shortcut. Passing null restores the one that shipped. */
 export function setShortcut(id: string, keys: string[] | null): void {
   const next = { ...state.keymap };
@@ -322,30 +686,107 @@ export function setShortcut(id: string, keys: string[] | null): void {
 /** How long a surrendered handle is held before anybody else can take it. */
 export const HANDLE_GRACE_MS = 60_000;
 
-/** The handle a profile answers to, falling back to the first one held. */
+/** The handle a profile answers to, or "" where it has none yet. */
 export function activeHandleFor(spaceId: string): string {
-  return state.activeHandle[spaceId] ?? state.handles[0] ?? "";
+  return state.activeHandle[spaceId] ?? "";
+}
+
+/**
+ * The profile already wearing a handle, if it is not this one.
+ *
+ * The question every caller actually asks — "would taking this cost somebody
+ * else theirs?" — and the answer both controls need to say so out loud, since
+ * "Work has it" is what turns connecting a handle from a switch into a
+ * decision. Taking it is allowed; taking it silently is not.
+ */
+export function handleHeldElsewhere(
+  handle: string,
+  spaceId: string,
+): string | undefined {
+  return Object.entries(state.activeHandle).find(
+    ([entry, worn]) => entry !== spaceId && worn === handle,
+  )?.[0];
+}
+
+/**
+ * The map with one handle worn by one profile and nobody else.
+ *
+ * The exclusivity rule, in the one place both ways of connecting a handle go
+ * through. Enforced by the store rather than by whichever view happens to be
+ * rendering, because an invariant kept in the views lasts until somebody adds
+ * a third view.
+ */
+function wearing(handle: string, spaceId: string): Record<string, string> {
+  const next = { ...state.activeHandle };
+  for (const [entry, worn] of Object.entries(next)) {
+    if (worn === handle) delete next[entry];
+  }
+  next[spaceId] = handle;
+  return next;
 }
 
 /** Adds a handle to the portfolio and points the given profile at it. */
 export function addHandle(handle: string, spaceId: string): void {
   const next = handle.trim().toLowerCase().replace(/^@/, "");
-  if (state.handles.includes(next)) {
-    state = { ...state, activeHandle: { ...state.activeHandle, [spaceId]: next } };
-    emit();
-    return;
-  }
   state = {
     ...state,
-    handles: [...state.handles, next],
-    activeHandle: { ...state.activeHandle, [spaceId]: next },
+    handles: state.handles.includes(next)
+      ? state.handles
+      : [...state.handles, next],
+    activeHandle: wearing(next, spaceId),
   };
   emit();
 }
 
-/** Points a profile at a handle already held. */
+/**
+ * Takes a profile's handle off it, leaving it with none.
+ *
+ * The other half of `setHandleFor`. A handle is the name a profile answers to,
+ * and there has to be a way back to answering to nothing — otherwise the only
+ * route out of a handle you did not mean to connect is to connect a different
+ * one, which is not the same thing.
+ */
+export function clearHandleFor(spaceId: string): void {
+  if (!(spaceId in state.activeHandle)) return;
+  const { [spaceId]: _gone, ...rest } = state.activeHandle;
+  state = { ...state, activeHandle: rest };
+  emit();
+}
+
+/**
+ * Forgets the handles of profiles that no longer exist.
+ *
+ * Settings survive a reload and profiles do not, so a profile made in one
+ * session leaves its handle claimed by an id nothing answers to any more — and
+ * because the claim is exclusive, that handle would be locked out of every
+ * profile forever, greyed with the name of nowhere. Reconciled by the one part
+ * of the app that knows which profiles are real; see hub-provider.
+ */
+export function pruneHandlesTo(liveSpaceIds: string[]): void {
+  const live = new Set(liveSpaceIds);
+  const stale = Object.keys(state.activeHandle).filter((id) => !live.has(id));
+  if (stale.length === 0) return;
+  const activeHandle = { ...state.activeHandle };
+  for (const id of stale) delete activeHandle[id];
+  state = { ...state, activeHandle };
+  emit();
+}
+
+/**
+ * Points a profile at a handle already held, taking it off whoever had it.
+ *
+ * Always a move, never a copy: a handle is one identity, so connecting it
+ * somewhere is the same act as disconnecting it from where it was. The profile
+ * it came from is left with none rather than handed the next name along — see
+ * the note on `activeHandle` for why that is the safer of the two.
+ *
+ * It moves without asking because it is not the thing that asks. The two
+ * controls that call it — the profile column's picker and Identity's handle
+ * list — put the consequence in front of somebody first, since "@crumbs is on
+ * Work" is only a surprise if you find out afterwards.
+ */
 export function setHandleFor(spaceId: string, handle: string): void {
-  state = { ...state, activeHandle: { ...state.activeHandle, [spaceId]: handle } };
+  state = { ...state, activeHandle: wearing(handle, spaceId) };
   emit();
 }
 
@@ -359,8 +800,12 @@ export function releaseHandleFrom(handle: string, now: number): void {
   if (state.handles.length <= 1) return;
   const handles = state.handles.filter((entry) => entry !== handle);
   const activeHandle = { ...state.activeHandle };
+  /* Left with no handle rather than handed the next one along. Moving them all
+     to `handles[0]` was how one release could put three profiles on one name,
+     and it also decided on somebody's behalf which identity a profile should
+     wear next — which is the one choice this control has no business making. */
   for (const [spaceId, active] of Object.entries(activeHandle)) {
-    if (active === handle) activeHandle[spaceId] = handles[0]!;
+    if (active === handle) delete activeHandle[spaceId];
   }
   const listed = { ...state.listedForSale };
   delete listed[handle];

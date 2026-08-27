@@ -9,6 +9,7 @@ import type { PaymentLink, SplitBill } from "./types";
 export const paymentLinks: PaymentLink[] = [
   {
     id: "pl-samples",
+    accountId: "acct-work",
     code: "a3f19c4d",
     description: "Sample kit, forty-farm batch",
     tokenId: "nutri",
@@ -17,12 +18,23 @@ export const paymentLinks: PaymentLink[] = [
     createdAt: "2026-07-27T15:10:00.000Z",
     expiresAt: "2026-08-27T15:10:00.000Z",
     payments: [
-      { id: "plp-1", personId: "isa-van-den-berg", units: 25, paidAt: "2026-07-28T09:12:00.000Z" },
-      { id: "plp-2", personId: "dan-kittredge", units: 25, paidAt: "2026-07-28T11:40:00.000Z" },
+      {
+        id: "plp-1",
+        personId: "isa-van-den-berg",
+        units: 25,
+        paidAt: "2026-07-28T09:12:00.000Z",
+      },
+      {
+        id: "plp-2",
+        personId: "dan-kittredge",
+        units: 25,
+        paidAt: "2026-07-28T11:40:00.000Z",
+      },
     ],
   },
   {
     id: "pl-overlay",
+    accountId: "acct-main",
     code: "7b02c9e1",
     description: "Overlay topic review, pay what you like",
     tokenId: "bsv",
@@ -30,11 +42,17 @@ export const paymentLinks: PaymentLink[] = [
     createdAt: "2026-07-28T17:05:00.000Z",
     expiresAt: "2026-08-11T17:05:00.000Z",
     payments: [
-      { id: "plp-3", personId: "tw-shruggr", units: 0.05, paidAt: "2026-07-29T08:22:00.000Z" },
+      {
+        id: "plp-3",
+        personId: "tw-shruggr",
+        units: 0.05,
+        paidAt: "2026-07-29T08:22:00.000Z",
+      },
     ],
   },
   {
     id: "pl-fieldday",
+    accountId: "acct-work",
     code: "c81a5b34",
     description: "Brix field day entry",
     tokenId: "eursv",
@@ -43,16 +61,51 @@ export const paymentLinks: PaymentLink[] = [
     createdAt: "2026-07-14T08:00:00.000Z",
     expiresAt: "2026-07-15T08:00:00.000Z",
     payments: [
-      { id: "plp-4", personId: "marcel-van-silfhout", units: 12, paidAt: "2026-07-14T09:02:00.000Z" },
-      { id: "plp-5", personId: "sophie-meijer", units: 12, paidAt: "2026-07-14T09:31:00.000Z" },
-      { id: "plp-6", personId: "isa-van-den-berg", units: 12, paidAt: "2026-07-14T10:04:00.000Z" },
+      {
+        id: "plp-4",
+        personId: "marcel-van-silfhout",
+        units: 12,
+        paidAt: "2026-07-14T09:02:00.000Z",
+      },
+      {
+        id: "plp-5",
+        personId: "sophie-meijer",
+        units: 12,
+        paidAt: "2026-07-14T09:31:00.000Z",
+      },
+      {
+        id: "plp-6",
+        personId: "isa-van-den-berg",
+        units: 12,
+        paidAt: "2026-07-14T10:04:00.000Z",
+      },
     ],
   },
 ];
 
 export const splitBills: SplitBill[] = [
   {
+    /* One somebody else raised. `raisedBy` is what makes it a bill rather than
+       a ledger: the shares here are what everyone owes THEM, and one of them is
+       yours. */
+    id: "sb-studio",
+    accountId: "acct-main",
+    description: "Studio time, four ways",
+    tokenId: "bsv",
+    totalUnits: 0.048,
+    createdAt: "2026-08-19T16:20:00.000Z",
+    raisedBy: "rhea-mensah",
+    yourShareUnits: 0.012,
+    yourShareStatus: "pending",
+    shares: [
+      { personId: "tomas-lindqvist", units: 0.012, status: "paid" },
+      { personId: "amara-okonkwo", units: 0.012, status: "paid" },
+      { personId: "sanne-verhoeven", units: 0.012, status: "pending" },
+    ],
+  },
+  {
     id: "sb-coordination",
+    accountId: "acct-shared",
     description: "Week's coordination costs",
     tokenId: "bsv",
     totalUnits: 0.68965517,
@@ -66,6 +119,7 @@ export const splitBills: SplitBill[] = [
   },
   {
     id: "sb-seeding",
+    accountId: "acct-main",
     description: "Month of seeding, three ways",
     tokenId: "bsv",
     totalUnits: 0.001,
@@ -78,6 +132,7 @@ export const splitBills: SplitBill[] = [
   },
   {
     id: "sb-lab",
+    accountId: "acct-shared",
     description: "Spectral run, split with the institute",
     tokenId: "eursv",
     totalUnits: 46,

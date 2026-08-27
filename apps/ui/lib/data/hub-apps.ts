@@ -54,7 +54,10 @@ export const hubApps: HubApp[] = [
     id: "app-wallet",
     slug: "wallet",
     name: "Payments",
-    shortName: "Wallet",
+    /* The rail reads `shortName`, which had been left behind when the app was
+       renamed — so the store said Payments and the rail beside it said Wallet.
+       Not shorter than the name it abbreviates, but the rail has room for it. */
+    shortName: "Payments",
     description:
       "Make payments, check your balance and browse your full transaction history.",
     tagline: "Payments & balance",
@@ -121,8 +124,14 @@ export const hubApps: HubApp[] = [
   {
     id: "app-connect",
     slug: "connect",
-    name: "Web3 Connect",
-    shortName: "Connections",
+    /* Renamed from "Web3 Connect". The slug stays `connect` — it is the key an
+       install list is written under, and renaming it would disconnect the app
+       for everybody who already had it. */
+    name: "Connected Apps",
+    /* The rail truncates every label to one line, and the full name lands as
+       "Connected …" — which is what `shortName` is for. It already differed
+       from the name before this rename; it just said "Connections". */
+    shortName: "Connected",
     description:
       "Manage which sites and apps are connected to your identity and approve their permissions.",
     tagline: "Manage connections",
@@ -179,7 +188,7 @@ export const hubApps: HubApp[] = [
     description:
       "Publish images, videos and documents to the blockchain and manage your library.",
     tagline: "Publish on-chain",
-    developer: "open-protocol-labs",
+    developer: "bsv-association",
     popularity: 60,
     iconSrc: "/icons/publish.png",
     accent: "#db2777",
@@ -191,7 +200,7 @@ export const hubApps: HubApp[] = [
     category: "media",
     categories: ["media", "productivity"],
     version: "2026.01.5",
-    repoId: "repo-1sat",
+    repoId: "repo-bsv",
     reviews: 610,
     rating: 4.1,
     publisher: "Nexus",
@@ -227,7 +236,7 @@ export const hubApps: HubApp[] = [
     description:
       "A fast, keyboard-driven inbox for your on-chain and everyday email.",
     tagline: "Encrypted email",
-    developer: "handcash",
+    developer: "bsv-association",
     popularity: 65,
     iconSrc: "/icons/mail.png",
     accent: "#2563eb",
@@ -235,7 +244,7 @@ export const hubApps: HubApp[] = [
     category: "social",
     categories: ["social", "productivity"],
     version: "2026.03.1",
-    repoId: "repo-handcash",
+    repoId: "repo-bsv",
     reviews: 1470,
     rating: 3.9,
     publisher: "Nexus",
@@ -271,7 +280,7 @@ export const hubApps: HubApp[] = [
     description:
       "Buy and sell ordinals, tokens and domains on the open marketplace.",
     tagline: "Buy & sell ordinals",
-    developer: "handcash",
+    developer: "bsv-association",
     popularity: 84,
     iconSrc: "/icons/market.png",
     accent: "#f59e0b",
@@ -279,7 +288,7 @@ export const hubApps: HubApp[] = [
     category: "finance",
     categories: ["marketplaces", "collectibles"],
     version: "2026.04.3",
-    repoId: "repo-handcash",
+    repoId: "repo-bsv",
     reviews: 3120,
     rating: 3.7,
     publisher: "Nexus",
@@ -298,10 +307,10 @@ export const hubApps: HubApp[] = [
     iconSrc: "/icons/vault.png",
     accent: "#64748b",
     defaultInstalled: false,
-    category: "identity",
+    category: "core",
     categories: ["productivity"],
     version: "2026.04.4",
-    repoId: "repo-bsv",
+    repoId: "repo-nexus",
     reviews: 2050,
     rating: 4.5,
     publisher: "Nexus",
@@ -377,10 +386,16 @@ export const hubApps: HubApp[] = [
   /* ------------------------------------------------------------------
    * Websites, listed as apps.
    *
-   * No `iconSrc`: their marks come from their own favicons, with a letter
-   * tile behind that — a bundled icon would be us drawing somebody else's
-   * logo. `embeds` is what each host actually answers to being framed,
-   * checked rather than assumed; the two that say no open in Browse.
+   * `iconSrc` is the site's own mark, taken from the largest one it publishes
+   * — a manifest icon or an apple-touch-icon, never a 16px favicon.ico
+   * upscaled — and squared on transparency without cropping. Still their logo,
+   * not one we drew: the file in /public/app-icons is their artwork at a size
+   * that survives a 52px tile, which is the whole reason to carry it rather
+   * than fetch it. A listing with no published mark keeps `iconSrc: ""` and
+   * falls back to its favicon, then to a letter tile.
+   *
+   * `embeds` is what each host actually answers to being framed, checked
+   * rather than assumed; the two that say no open in Browse.
    * ------------------------------------------------------------------ */
 
   {
@@ -393,7 +408,7 @@ export const hubApps: HubApp[] = [
     tagline: "Idle clicker, real sats",
     developer: "third-party",
     popularity: 44,
-    iconSrc: "",
+    iconSrc: "/app-icons/cookie-clucker.png",
     accent: "#f59e0b",
     defaultInstalled: false,
     category: "gaming",
@@ -416,7 +431,7 @@ export const hubApps: HubApp[] = [
     tagline: "Play for stakes",
     developer: "third-party",
     popularity: 38,
-    iconSrc: "",
+    iconSrc: "/app-icons/pelf.png",
     accent: "#10b981",
     defaultInstalled: false,
     category: "gaming",
@@ -437,9 +452,10 @@ export const hubApps: HubApp[] = [
     description:
       "A shared canvas where each pixel costs a satoshi and anyone can paint over yours.",
     tagline: "One pixel at a time",
+    bsvRadar: "pixelwar",
     developer: "third-party",
     popularity: 41,
-    iconSrc: "",
+    iconSrc: "/app-icons/pixel-war.png",
     accent: "#ef4444",
     defaultInstalled: false,
     category: "gaming",
@@ -462,18 +478,46 @@ export const hubApps: HubApp[] = [
     tagline: "Buy and sell anything",
     developer: "third-party",
     popularity: 47,
-    iconSrc: "",
+    iconSrc: "/app-icons/omnibazaar.png",
     accent: "#8b5cf6",
     defaultInstalled: false,
     category: "marketplace",
     categories: ["marketplaces", "media"],
     web: { url: "https://omnibazaar.vercel.app", embeds: true },
     version: "2026.07.1",
-    repoId: "repo-catallaxy",
+    repoId: "repo-tlon",
     reviews: 95,
     rating: 3.9,
     publisher: "OmniBazaar",
     createdAt: "2026-07-22T09:00:00.000Z",
+  },
+
+  {
+    /* Handcash's own market, added when Market moved to the BSV Association
+       repo. The two are not the same shop: this one sells the items their
+       wallet already holds, and the copy is theirs — "A wallet you trust. A
+       market for everything." is the description their page serves. */
+    id: "app-handcash-market",
+    slug: "handcash-market",
+    name: "HandCash Market",
+    shortName: "HC Market",
+    description:
+      "Buy and sell the items your wallet already holds, from game gear to collectibles, settled on chain.",
+    tagline: "A market for everything",
+    developer: "handcash",
+    popularity: 58,
+    iconSrc: "",
+    accent: "#22c55e",
+    defaultInstalled: false,
+    category: "marketplace",
+    categories: ["marketplaces", "collectibles", "gaming"],
+    web: { url: "https://handcash.io/items/market", embeds: true },
+    version: "2026.04.1",
+    repoId: "repo-handcash",
+    reviews: 640,
+    rating: 4.4,
+    publisher: "Handcash",
+    createdAt: "2026-04-15T09:00:00.000Z",
   },
 
   {
@@ -484,6 +528,7 @@ export const hubApps: HubApp[] = [
     description:
       "Music published on-chain, where a play pays the artist directly instead of a quarterly statement.",
     tagline: "Music that pays out",
+    bsvRadar: "soundbase",
     developer: "third-party",
     popularity: 52,
     iconSrc: "",
@@ -500,34 +545,6 @@ export const hubApps: HubApp[] = [
     createdAt: "2026-04-15T09:00:00.000Z",
   },
   {
-    /* The brief said tonicpow.app for this one, which does not resolve — the
-       listing points at the live domain instead, so the card opens something.
-       Two repos carrying the same app is ordinary; two carrying a dead one is
-       not. */
-    id: "app-tonicpow-handcash",
-    slug: "tonicpow-handcash",
-    name: "TonicPow",
-    shortName: "TonicPow",
-    description:
-      "Pay-per-click promotion where advertisers settle with the people who actually shared the link.",
-    tagline: "Promotion, paid per click",
-    developer: "third-party",
-    popularity: 45,
-    iconSrc: "",
-    accent: "#0ea5e9",
-    defaultInstalled: false,
-    category: "media",
-    categories: ["media", "productivity"],
-    web: { url: "https://tonicpow.com/", embeds: true },
-    version: "2026.03.1",
-    repoId: "repo-handcash",
-    reviews: 210,
-    rating: 4.1,
-    publisher: "TonicPow",
-    createdAt: "2026-03-02T09:00:00.000Z",
-  },
-
-  {
     id: "app-1sat-market",
     slug: "1sat-market",
     name: "1Sat Market",
@@ -535,6 +552,7 @@ export const hubApps: HubApp[] = [
     description:
       "The exchange for 1Sat Ordinals and BSV-20 tokens, with listings, bids and transfers settled on-chain.",
     tagline: "Trade ordinals & tokens",
+    bsvRadar: "1satmarket",
     developer: "open-protocol-labs",
     popularity: 68,
     iconSrc: "",
@@ -552,6 +570,30 @@ export const hubApps: HubApp[] = [
     createdAt: "2026-06-01T09:00:00.000Z",
   },
   {
+    id: "app-theme-token",
+    slug: "theme-token",
+    name: "Theme Token",
+    shortName: "Theme",
+    description:
+      "Themes and artwork published as tokens, so the look you buy is a thing you own rather than a licence you rent.",
+    tagline: "Own the look",
+    developer: "open-protocol-labs",
+    popularity: 39,
+    iconSrc: "/app-icons/theme-token.png",
+    accent: "#f59e0b",
+    defaultInstalled: false,
+    category: "media",
+    categories: ["media", "collectibles"],
+    web: { url: "https://themetoken.dev/", embeds: true },
+    version: "2026.08.1",
+    repoId: "repo-1sat",
+    reviews: 86,
+    rating: 4.2,
+    publisher: "Theme Token",
+    createdAt: "2026-08-05T09:00:00.000Z",
+  },
+
+  {
     id: "app-tonicpow",
     slug: "tonicpow",
     name: "TonicPow",
@@ -559,9 +601,10 @@ export const hubApps: HubApp[] = [
     description:
       "Pay-per-click promotion where advertisers settle with the people who actually shared the link.",
     tagline: "Promotion, paid per click",
+    bsvRadar: "tonicpow",
     developer: "third-party",
     popularity: 45,
-    iconSrc: "",
+    iconSrc: "/app-icons/tonicpow.svg",
     accent: "#0ea5e9",
     defaultInstalled: false,
     category: "media",
@@ -584,7 +627,7 @@ export const hubApps: HubApp[] = [
     tagline: "Sessions on-chain",
     developer: "third-party",
     popularity: 36,
-    iconSrc: "",
+    iconSrc: "/app-icons/jamify.svg",
     accent: "#14b8a6",
     defaultInstalled: false,
     category: "media",
@@ -620,5 +663,133 @@ export const hubApps: HubApp[] = [
     rating: 4.2,
     publisher: "Scribe",
     createdAt: "2026-06-01T09:00:00.000Z",
+  },
+  /* Three sites listed as apps. Descriptions and embeddability are the sites'
+     own: each one's `<meta name="description">` read as published, and `embeds`
+     checked against the response headers rather than assumed — none of the
+     three sends X-Frame-Options or a frame-ancestors policy, so all three sit
+     in a tab rather than being pushed out to Browse. */
+  {
+    id: "app-free-radio",
+    slug: "free-radio",
+    name: "Free Radio",
+    shortName: "Free Radio",
+    description:
+      "Live voice rooms on a frequency. Scan a band, find a Co-Channel, and talk.",
+    tagline: "Voice rooms on a band",
+    developer: "third-party",
+    popularity: 41,
+    iconSrc: "/app-icons/free-radio.png",
+    accent: "#f97316",
+    defaultInstalled: false,
+    category: "social",
+    categories: ["social", "media"],
+    web: { url: "https://freeradio.bsvb.net", embeds: true },
+    version: "2026.08.1",
+    repoId: "repo-tlon",
+    reviews: 118,
+    rating: 4.3,
+    publisher: "Free Radio",
+    createdAt: "2026-08-14T09:00:00.000Z",
+  },
+  {
+    id: "app-hexacities",
+    slug: "hexacities",
+    name: "Hexacities",
+    shortName: "Hexacities",
+    description:
+      "Every homepage on Hexacities owns a hexagon. Pan the city, click a hex, meet the neighbours.",
+    tagline: "A city of homepages",
+    developer: "third-party",
+    popularity: 36,
+    iconSrc: "/app-icons/hexacities.svg",
+    accent: "#8b5cf6",
+    defaultInstalled: false,
+    category: "gaming",
+    categories: ["gaming", "social"],
+    web: { url: "https://www.hexacities.com/", embeds: true },
+    version: "2026.07.2",
+    repoId: "repo-catallaxy",
+    reviews: 94,
+    rating: 4.1,
+    publisher: "Hexacities",
+    createdAt: "2026-07-30T09:00:00.000Z",
+  },
+  {
+    id: "app-timeline",
+    slug: "timeline",
+    name: "Timeline",
+    shortName: "Timeline",
+    description:
+      "Posts from the people and ecosystems you follow, and a place to say something back.",
+    tagline: "What people are saying",
+    developer: "nexus",
+    popularity: 88,
+    iconSrc: "/icons/timeline.svg",
+    accent: "#0ea5e9",
+    /* Not connected out of the box. It is the home screen until somebody asks
+       for it as an app, and a listing that arrives already installed would put
+       a second way into the same screen on the rail of every install. */
+    defaultInstalled: false,
+    category: "social",
+    categories: ["social", "media"],
+    version: "2026.08.1",
+    repoId: "repo-nexus",
+    reviews: 1_940,
+    rating: 4.7,
+    publisher: "Nexus",
+    createdAt: "2026-08-20T09:00:00.000Z",
+  },
+  {
+    id: "app-clndr",
+    slug: "clndr",
+    /* Spelled in full and read as "Clndr", which is how the publisher writes
+       it: the vowels are set at a third of the weight rather than left out, so
+       the word is still the word for anybody searching, quoting or hearing it
+       and only the eye does the dropping. See `quietVowels`. */
+    name: "Calendar",
+    shortName: "Calendar",
+    quietVowels: true,
+    description:
+      "A calendar that lives on the chain. Share a Clndr link, take bookings, and keep every invitation yours.",
+    tagline: "Time, on the chain",
+    developer: "third-party",
+    popularity: 44,
+    iconSrc: "/app-icons/clndr.png",
+    accent: "#3b53c9",
+    defaultInstalled: false,
+    category: "productivity",
+    categories: ["productivity", "social"],
+    web: { url: "https://www.clndr.im/home", embeds: true },
+    version: "2026.08.1",
+    repoId: "repo-tlon",
+    reviews: 86,
+    rating: 4.4,
+    publisher: "Clndr",
+    createdAt: "2026-08-14T09:00:00.000Z",
+  },
+  {
+    id: "app-bsv-radar",
+    slug: "bsv-radar",
+    name: "BSV Radar",
+    shortName: "BSV Radar",
+    description:
+      "Discover, compare, and access all applications built on the Bitcoin SV blockchain.",
+    tagline: "Every app on the chain",
+    bsvRadar: "bsvradar",
+    developer: "third-party",
+    popularity: 57,
+    iconSrc: "/app-icons/bsv-radar.png",
+    accent: "#22d3ee",
+    defaultInstalled: false,
+    category: "productivity",
+    categories: ["productivity", "education"],
+    web: { url: "https://bsvradar.com", embeds: true },
+    version: "2026.08.1",
+    repoId: "repo-tlon",
+    reviews: 203,
+    rating: 4.6,
+    publisher: "BSV Radar",
+    createdAt: "2026-08-11T09:00:00.000Z",
   },
 ];

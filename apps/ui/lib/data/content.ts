@@ -6,23 +6,34 @@ export const content = {
   brand: {
     name: "Nexus",
     /** the short one, for a lockup where a full sentence will not fit */
-    slogan: "All the net you need",
+    slogan: "Let the light in",
     tagline: "Your apps, your keys, your Nexus.",
     description:
       "Nexus is a workspace that bundles a browser, wallet, signing, publishing and transaction tools into one place.",
   },
   library: {
     spaces: {
-      title: "Spaces",
+      /* The key stays `spaces` — it is read in a dozen places and renaming it
+         buys nothing — but what a person sees is Workspaces, which is what
+         they are called everywhere else in the app. */
+      title: "Workspaces",
       newTab: "New Tab",
       clear: "Clear",
+      /* Screen-reader names for the horizontal strip. The visible row is
+         favicons and titles; these are what it is called when it cannot be
+         seen. */
+      tabs: "Tabs",
+      close: "Close",
+      browse: "Browse",
+      browseDesc:
+        "The web, with your wallet in it. Pinned here rather than sitting among your apps.",
       dragHint: "Drag to add Favorites",
       dragSubHint: "Favorites keep your most used sites and apps close",
     },
     downloads: {
       title: "Downloads",
-      empty: "Nothing downloaded in this profile.",
-      profile: "Profile",
+      empty: "Nothing downloaded in this workspace.",
+      profile: "Workspace",
       failed: "Stopped before it finished",
       retry: "Try again",
     },
@@ -31,7 +42,7 @@ export const content = {
      *
      * "Connect" is the web3 word — the same act Coinbase calls a dapp connection
      * and MetaMask calls a connected site — and it means a grant against this
-     * profile's wallet. It is never a synonym for downloading: a built-in app was
+     * workspace's wallet. It is never a synonym for downloading: a built-in app was
      * already in the binary, and a web app stays on somebody else's server.
      *
      * So nothing here says install, purchase or update. "Add to rail" is the whole
@@ -46,6 +57,8 @@ export const content = {
       availableSection: "Available",
       install: "Connect",
       uninstall: "Disconnect",
+      expandDescription: "Read the full description of",
+      collapseDescription: "Shorten the description of",
       essential: "Essential",
       installedBadge: "Connected",
       empty: "No apps connected. Add one below.",
@@ -57,7 +70,7 @@ export const content = {
        */
       sitesTitle: "Connected sites",
       subtitle:
-        "Websites you've connected to this profile. Opening one opens the website.",
+        "Websites you've connected to this workspace. Opening one opens the website.",
       onRail: "On your rail",
       add: "Add to rail",
       remove: "Remove from rail",
@@ -78,7 +91,7 @@ export const content = {
     },
   },
   wallet: {
-    /* The multi-wallet switcher, shared by the wallet app and Profiles. */
+    /* The multi-wallet switcher, shared by the wallet app and Workspaces. */
     switcher: {
       title: "Wallets",
       active: "Spending from this",
@@ -108,13 +121,23 @@ export const content = {
       importWarning:
         "Anything typed here can spend everything it holds. Nothing in this prototype is sent anywhere, but that is a habit worth keeping outside it.",
       importAction: "Import",
-      added: "Added, and active in this profile",
+      added: "Added, and active in this workspace",
       scopeNote:
-        "Picking one connects it to this profile. A profile uses one wallet at a time.",
+        "Picking one connects it to this workspace. A workspace uses one wallet at a time.",
     },
     balanceLabel: "Total balance",
     totalValue: "Portfolio value",
-    change24h: "past 24 hours",
+    /* Not "past 24 hours": bitcoin's move is measured against the last
+       daily close, which is the finest thing the explorer answers with.
+       See getBsvChange in lib/exchange-rate. */
+    change24h: "today",
+    /* The month chart on a token's own page. `label` names what the scrub is
+       choosing between; `reading` is what a screen reader is told at each
+       stop, which is the same sentence the header shows visually. */
+    chart: {
+      label: "Historical value of your balance",
+      reading: "{date}, {value} for {units} {symbol} at {rate} per {symbol}",
+    },
     noRate: "Exchange rate unavailable",
     assets: "Assets",
     baseCurrency: "Base",
@@ -146,6 +169,11 @@ export const content = {
     },
     collectibles: {
       title: "Collectibles",
+      /* The accessible name for the field that replaced the collection's
+         heading. The visible watermark is the collection's own name, which says
+         where you are but not what the box does. */
+      searchCollection: "Search",
+      noMatches: "Nothing in here matches that.",
       /* Tab labels, so short enough to sit in a row of three. */
       buckets: {
         permanent: "Permanent",
@@ -189,16 +217,68 @@ export const content = {
     openMarket: "Open Market",
     noCollectibles: "Nothing held yet.",
     links: "Payment links",
+    /* The wallet column's handle row. "Paying as" rather than "Handle": the row
+       is about the name money leaves under, which is the only reason a wallet
+       has anything to say about a handle at all. */
+    payingAs: "Paying as",
+    disconnectHandle: "Disconnect this handle",
+    handleOff: "No longer the handle for",
     newLink: "New link",
     linksHint:
       "A link anyone can pay, without needing your address. Share it, and payments land against your handle.",
-    linkStatus: { open: "Open", closed: "Closed", expired: "Expired" },
+    /* "Active" rather than "Open": a payment link is not a door, and next to
+       Closed and Expired the question it answers is whether it still takes
+       money. */
+    linkStatus: { open: "Active", closed: "Closed", expired: "Expired" },
+    linkTabs: { active: "Active", archived: "Archived" },
+    archiveLink: "Archive",
+    restoreLink: "Restore",
+    previewLink: "Preview",
+    /* The preview is somebody else's screen, which is the whole reason to look
+       at it — you cannot see your own link the way the person paying does. */
+    previewTitle: "What the payer sees",
+    previewAccepting: "Accepting until",
+    previewPay: "Pay",
+    previewNote: "A preview. Nothing here is live, and no payment can be made.",
+    linkArchived: "Archived",
+    linkRestored: "Back in Active",
+    noArchivedLinks: "Nothing archived.",
+    /*
+     * The new-link form.
+     *
+     * Two kinds of link, because that is what the seeded ones are: one names a
+     * price and one lets the payer decide. Everything else — which asset, how
+     * long it lasts, what it is for — every link has.
+     */
+    newLinkPane: {
+      title: "New payment link",
+      descriptionLabel: "What is it for",
+      /* The kinds of thing rather than one of them. The old watermark was a
+         seeded link's own description, which read as an instruction to sell
+         agricultural sample kits. */
+      descriptionPlaceholder: "Deposit, invoice, ticket…",
+      descriptionHint: "The payer sees this, so name the thing being paid for.",
+      kindLabel: "Amount",
+      kindFixed: "Fixed price",
+      kindOpen: "Payer chooses",
+      kindFixedHint: "Everyone pays the same amount.",
+      kindOpenHint: "Each payer decides what to send.",
+      amountLabel: "Price per payer",
+      assetLabel: "Paid in",
+      assetEmpty: "Choose an asset",
+      expiryLabel: "Stops accepting",
+      expiryDays: "days from now",
+      submit: "Create link",
+      created: "Payment link created",
+      /* Said once, on the form, rather than discovered after sharing it. */
+      noBackendNote:
+        "Nothing is published. A link made here lasts as long as this session.",
+    },
     perPayer: "per payer",
     payerChooses: "Payer chooses the amount",
     collected: "collected",
     copyLink: "Copy link",
     linkCopied: "Link copied",
-    linkComingSoon: "Creating links is coming soon",
     contacts: "Contacts",
     searchContacts: "Search name or handle",
     searchActivity: "Search activity",
@@ -218,12 +298,14 @@ export const content = {
     unfavourited: "removed from favourites",
     splits: {
       title: "Splits",
-      hint: "An amount divided across handles. Shares are independent, so one failing does not undo the others.",
+      hint: "What you are owed, and what you owe. Each share is its own payment.",
       ways: "ways",
       of: "of",
       settledCount: "settled",
       settled: "Fully settled",
       stillOwed: "still owed to you",
+      /** the same figure on a split somebody else raised, where it is not yours */
+      stillOutstanding: "still outstanding",
       markPaid: "Mark paid",
       remind: "Send a reminder",
       retry: "Retry this share",
@@ -231,9 +313,47 @@ export const content = {
       settledUp: "settled up",
       independentNote:
         "Each share is its own payment. A failed one can be retried without touching the rest.",
+      /* Raising one. The form is a side pane, like a new payment link. */
+      newSplit: "New split",
+      newTitle: "Split an amount",
+      newHint:
+        "Divide it across handles. Each share is its own payment, so one failing does not undo the others.",
+      descriptionLabel: "What it is for",
+      descriptionPlaceholder: "Studio time, four ways",
+      amountLabel: "Total",
+      /* Says which total, because the two readings differ by a share. What is
+         recorded is what the others owe; whatever you are covering yourself is
+         not part of it, the same way the seeded splits are written. */
+      amountHint: "What you are owed back. Your own share is not part of it.",
+      peopleLabel: "Split with",
+      peopleHint: "Search your contacts.",
+      /** the field around the even/custom choice, which the options then name */
+      sharesLabel: "Shares",
+      evenly: "Split evenly",
+      custom: "Set each share",
+      remainder: "Left to allocate",
+      over: "That is more than the total.",
+      raise: "Raise the split",
+      raised: "Split raised",
+      needPeople: "Add at least one person.",
+      needAmount: "Enter a total above zero.",
+      /* Two sides of the same object. */
+      owedToYou: "Owed to you",
+      youOwe: "You owe",
+      raisedByLabel: "Raised by",
+      yourShare: "Your share",
+      payShare: "Pay your share",
+      yourSharePaid: "You have paid your share",
+      remove: "Delete this split",
+      removed: "Split deleted",
+      /* What a reminder actually does — it opens the thread with the line
+         written, rather than sending on somebody's behalf. */
+      reminderDraft: "about {what}: your share is {amount}.",
+      empty: "No splits yet.",
+      emptyHint: "Divide an amount across handles and track who has settled.",
     },
     contactsHint:
-      "The same people you message. A verified handle is one whose certificate checks out and whose key at least one peer vouches for.",
+      "Everyone you message, ready to pay. A check means the handle is verified, so the money reaches the person it names.",
     verified: "Verified",
     verifiedHint:
       "This handle's certificate is valid and peers have attested to its key, so you are paying the person the handle names.",
@@ -350,6 +470,11 @@ export const content = {
         profile: "Open full profile",
         vouches: "Who vouches for them",
         message: "Message",
+        /* Follow is not a Messages action — it is an account-level fact the
+           Timeline reads. Its copy lives here because this is where the row
+           that shows it is defined. */
+        follow: "Follow on Timeline",
+        unfollow: "Unfollow on Timeline",
         pay: "Pay",
         request: "Request payment",
         vouch: "Vouch for them",
@@ -960,9 +1085,15 @@ export const content = {
         "Display name and avatar are supplied by the ecosystem host and are not attested.",
       localIdentity: "A Nexus identity, with no external profile to open.",
       /* section headings, each divided by a rule */
-      about: "About",
+      /* "Bio" rather than "About", so the card and the field that fills it
+         are called the same thing. */
+      about: "Bio",
       registered: "Registered",
-      expertise: "Expertise",
+      /* "Interests" rather than "Expertise": one is a claim about competence
+         that nobody can check, the other is a statement about attention that
+         does not need checking. */
+      expertise: "Interests",
+      links: "Links",
       lastSeen: "Last seen",
       contactInfo: "Contact",
       recentConversations: "Recent conversations",
@@ -975,11 +1106,9 @@ export const content = {
       email: "Email",
       phone: "Phone",
       github: "GitHub",
-      noContact: "Nothing published.",
       contactNote:
         "Published by the ecosystem host, which does not attest to it. Check another way before acting on it.",
       noConversations: "No conversations yet.",
-      noExpertise: "Not stated.",
       /* relative ages, e.g. "4 years 3 months ago" */
       age: {
         year: "year",
@@ -1175,15 +1304,79 @@ export const content = {
     addAction: "Add to vault",
     lastAccessed: "Last accessed",
     encryptedNote: "End-to-end encrypted with your identity key.",
+    /** the door, and everything it takes to get through it */
+    lock: {
+      locked: "Locked",
+      sealed: "Sealed",
+      verifying: "Verifying",
+      open: "Open",
+      openAction: "Open vault",
+      sealAction: "Seal the vault",
+      /* The chooser. Worded as a question about proof rather than about
+         sign-in: nobody is signing in to their own vault. */
+      chooseTitle: "Unlock the vault",
+      chooseBody: "Choose how you want to prove it is you.",
+      cancel: "Cancel",
+      back: "Back",
+      continueAction: "Continue",
+      methods: {
+        password: "Passphrase",
+        qr: "Scan QR code",
+        "security-key": "Use security key",
+        otp: "One-time code",
+      },
+      /* When Security has been stripped back to nothing. A vault with no way
+         in is a bug somewhere else, so this points at where it was made. */
+      noMethods: "No way in is switched on. Turn one on in Security settings.",
+      openSecurity: "Security settings",
+      passwordTitle: "Passphrase",
+      passwordBody: "Enter the passphrase that seals this vault.",
+      passwordPlaceholder: "••••••••",
+      passwordLabel: "Vault passphrase",
+      unlockAction: "Unlock",
+      needPassphrase: "Enter a passphrase",
+      qrTitle: "Scan QR code",
+      qrBody:
+        "Scan this code with a device already holding your identity key. It expires in a minute.",
+      qrWaiting: "Waiting for the other device",
+      keyTitle: "Use security key",
+      keyBody: "Insert your security key and touch it to confirm.",
+      keyWaiting: "Waiting for the key",
+      otpTitle: "One-time code",
+      otpBody: "Enter the six-digit code from your authenticator app.",
+      otpLabel: "One-time code",
+      otpBadCode: "That code is not six digits.",
+      /* The policy popover, opened from the contextual column's help bar. */
+      policyButton: "When to lock",
+      policyTitle: "Lock the vault",
+      policy: {
+        "on-leave": "When I leave the app",
+        "on-leaveDesc": "The doors are shut every time you come back.",
+        timed: "After five minutes",
+        timedDesc: "Stays open while you are working, shuts itself after.",
+        never: "Never, until I seal it",
+        neverDesc: "Stays open until you shut it or reload.",
+      },
+    },
   },
   identity: {
     handles: {
       title: "Handles",
       yoursTitle: "Your handles",
       yoursHint:
-        "The names people reach you by. Up to five, and each profile answers to one of them.",
+        "The names people reach you by. Up to five, and each workspace answers to one of them.",
       active: "Active here",
       useHere: "Use here",
+      /* Where the name is now. A handle is one identity, so taking it here is
+         the same act as taking it off there — and saying which workspace that
+         is turns "Use here" from a switch into a decision. */
+      heldBy: "Held by {name}",
+      moveTitle: "@{handle} is on {name}",
+      moveBody:
+        "A handle answers for one workspace at a time. Using it here takes it off {name}, which is left without one until you give it another.",
+      moveCancel: "Leave it there",
+      moveConfirm: "Use it here",
+      movedFrom: "Moved off {name}",
       addTitle: "Claim another",
       marketTitle: "Handles for sale",
       marketHint:
@@ -1201,7 +1394,7 @@ export const content = {
       buyFor: "Buy for {price}",
       forSaleBy: "For sale by {seller}",
       bought:
-        "Bought. It is yours, and the profile you were on now answers to it.",
+        "Bought. It is yours, and the workspace you were on now answers to it.",
       onNexus: "On Nexus, and anywhere your handle resolves",
       change: "Change",
       cancel: "Cancel",
@@ -1296,6 +1489,9 @@ export const content = {
     lastUsed: "Last used",
     disconnect: "Disconnect",
     reconnect: "Reconnect",
+    /* Past tense, for the toast that confirms it. Deliberately not "Removed":
+       the access is gone, the record is not — Settings › Sites still has it. */
+    disconnected: "Disconnected. It can no longer reach your wallet.",
   },
   baskets: {
     title: "Output baskets",
@@ -1305,7 +1501,19 @@ export const content = {
       "Baskets group your wallet's outputs by protocol for building apps.",
   },
   appStore: {
-    collectionsTitle: "Collections",
+    /* Named for what they are. "Collections" was a word this app used nowhere
+       else; these five are the first run's presets, and the three below them
+       are the repositories the store already calls sources. */
+    /* The cross a rail tile grows when it is held down. "Remove" rather than
+       "Disconnect" on the label because the tile is what you are pointing at;
+       what it does is disconnect, which the toast then says. */
+    railRemove: "Remove from rail:",
+    railRemoved: "Removed from the rail",
+    presetsTitle: "Nexus Presets",
+    sourcesTitle: "App repositories",
+    /* Shown on a folded section, so closing one saves room without losing the
+       answer. */
+    collectionsOn: "{on} of {total} on",
     reorderCollections: "Reorder collections",
     enableAll: "Connect all",
     disableAll: "Disconnect all",
@@ -1364,8 +1572,9 @@ export const content = {
     installSubtitle: "Connect to your Nexus",
     permsIntro: "If you add this app, it can:",
     permsIntroCollapsed: "If you add this app, it can use",
-    permsIntroCollection: "If you enable these apps, they can:",
-    permsIntroCollectionCollapsed: "If you enable these apps, they can use",
+    permsIntroCollection: "If you turn on this setup, its apps can:",
+    permsIntroCollectionCollapsed:
+      "If you turn on this setup, its apps can use",
     learnMore: "Learn more",
     perm1: "Verify your identity to sign you in",
     perm2: "Request payments, small ones auto-approved, large ones ask you",
@@ -1455,27 +1664,27 @@ export const content = {
     emptyColumn: "Nothing here yet.",
   },
   newItemMenu: {
-    newSpace: "New Profile",
+    newSpace: "New Workspace",
     newFolder: "New Folder",
     newTab: "New Tab",
   },
   spaceMenu: {
-    changeIcon: "Change Profile Icon",
-    rename: "Rename Profile",
+    changeIcon: "Change Workspace Icon",
+    rename: "Rename Workspace",
     editTheme: "Edit Theme Color…",
-    setProfile: "Set Profile",
+    setProfile: "Set Workspace",
     newFolder: "New Folder",
     liveFolders: "Live Folders",
-    shareSpace: "Share Profile",
-    manageSpaces: "Manage Profiles",
-    deleteSpace: "Delete Profile",
+    shareSpace: "Share Workspace",
+    manageSpaces: "Manage Workspaces",
+    deleteSpace: "Delete Workspace",
     // sub-panels
     iconPanelTitle: "Change icon",
     themePanelTitle: "Theme color",
-    profilePanelTitle: "Set profile",
+    profilePanelTitle: "Set workspace",
     liveFoldersPanelTitle: "Add live folder",
     back: "Back",
-    // profile options
+    // workspace options
     profilePersonal: "Personal",
     profileWork: "Work",
     profileShared: "Shared",
@@ -1484,14 +1693,14 @@ export const content = {
     liveTodaysTabs: "Today's Tabs",
     liveFavorites: "Favorites",
     // dialogs
-    renameTitle: "Rename profile",
+    renameTitle: "Rename workspace",
     renameSave: "Save",
     renameCancel: "Cancel",
-    deleteTitle: "Delete this profile?",
+    deleteTitle: "Delete this workspace?",
     deleteBody: "Its tabs and folders will be removed. This can't be undone.",
-    deleteConfirm: "Delete profile",
-    deleteCancel: "Keep profile",
-    manageTitle: "Manage profiles",
+    deleteConfirm: "Delete workspace",
+    deleteCancel: "Keep workspace",
+    manageTitle: "Manage workspaces",
     manageMoveUp: "Move up",
     manageMoveDown: "Move down",
   },
@@ -1502,6 +1711,13 @@ export const content = {
     noResults: "No matching tabs.",
   },
   browserSettings: {
+    /* The quick action that replaced "Boost", which was a wand that did
+       nothing. Pinning is what connects a web listing, so this says "rail"
+       rather than "bookmark" — the rail is where it lands. */
+    addToRail: "Add to rail",
+    addToRailDone: "Added to the rail",
+    addToRailAlready: "Already on the rail",
+    addToRailRefused: "This page cannot be added to the rail",
     extensions: "Extensions",
     settings: "Settings",
     appearance: "Appearance",
@@ -1565,11 +1781,126 @@ export const content = {
     copy: "Copy link",
     copied: "Copied!",
   },
+  /* TumbleUpon: the toolbar, its inbox and its details page. */
+  tumbleupon: {
+    name: "TumbleUpon",
+    tagline: "Discover the best of web3, one click at a time.",
+    tumble: "Tumble!",
+    like: "I like it!",
+    likedIt: "Saved to your likes",
+    unliked: "Taken out of your likes",
+    dislike: "Not for me",
+    notThisApp: "Not this app",
+    /* Paired with the line above, in the same shape, because they are the same
+       decision at two grains. The category is named underneath rather than in
+       the label: an app can sit on two shelves, and "Not this category" on its
+       own would not say which. */
+    notThisCategory: "Not this category",
+    offCatalogue: "This page is not in the catalogue, so there is nothing here to mute.",
+    nothingFrom: "Nothing from {name}",
+    blockedApp: "{app} will not come round again",
+    blockedCategory: "{name} is out of the rotation",
+    share: "Share",
+    shareTitle: "Send this to somebody",
+    sharePageFallback: "The page you are on",
+    shareTo: "Who to send it to",
+    sharePlaceholder: "Search handles…",
+    shareNobody: "No handle matches that.",
+    shareNote: "Say something about it…",
+    send: "Send",
+    cancel: "Cancel",
+    sentTo: "Sent to",
+    connections: "Connections",
+    radarListed: "See {app} on BSV Radar",
+    radarUnlisted: "Not listed on BSV Radar",
+    inboxTooltip: "What people have sent you",
+    inboxEmpty: "Nothing waiting. Somebody has to find something first.",
+    closeInbox: "Close the inbox",
+    says: "says:",
+    openIt: "Open {app}",
+    filterLabel: "Narrow what you tumble into",
+    filterPlaceholder: "Anything — or type to narrow it",
+    filterCategories: "Categories",
+    removeFilter: "Stop filtering by",
+    clearFilter: "Clear the filter",
+    filterEmpty: "Nothing matched that filter, so this one is from everything.",
+    nothingToTumble: "Nothing left to tumble into — try un-blocking something.",
+    thisPage: "this page",
+    shareLine: "{app} — found it on TumbleUpon. {url}",
+    copiedWhatsApp: "Copied. Paste it into WhatsApp.",
+    copiedInstagram: "Copied. Paste it into an Instagram DM or story.",
+    shareWhatsApp: "Share on WhatsApp",
+    shareX: "Share on X",
+    shareInstagram: "Share on Instagram",
+    /* The details page. */
+    detailsTitle: "TumbleUpon",
+    people: "People",
+    peopleHint: "Handles you tumble with. They can send you a site, and you can send them one.",
+    addPerson: "Add a handle",
+    addPersonPlaceholder: "Search handles to add…",
+    added: "Added",
+    removePerson: "Remove",
+    removed: "Removed",
+    nobodyMatches: "No handle matches that.",
+    expand: "Show",
+    collapse: "Hide",
+    likes: "Likes",
+    likesHint: "What you said yes to.",
+    likesEmpty: "Nothing yet. Press the thumb on something worth keeping.",
+    muted: "Out of rotation",
+    mutedHint: "What you waved away. Put anything back and it can come round again.",
+    mutedEmpty: "Nothing muted.",
+    restore: "Put it back",
+    sentTitle: "Sent",
+    sentEmpty: "You have not sent anybody anything yet.",
+    permissions: "What it can do",
+  },
+  /* The extensions manager, on the canvas the page would have had. */
+  extensions: {
+    title: "Extensions",
+    search: "Search extensions",
+    searchPlaceholder: "Search extensions",
+    developerMode: "Developer mode",
+    installed: "My extensions",
+    shortcuts: "Keyboard shortcuts",
+    allExtensions: "All extensions",
+    details: "Details",
+    remove: "Remove",
+    on: "on",
+    off: "off",
+    manage: "Manage",
+    /* On the plus, which is otherwise a shape with no noun. */
+    addTooltip: "Get extensions",
+    version: "Version",
+    homepage: "Homepage",
+    turnOn: "Turn on",
+    turnOff: "Turn off",
+    permissionsTitle: "What it can do",
+    removedToast: "{name} removed",
+    removedNote: "This extension is no longer installed. What you are reading is the record of what it was.",
+    uninstall: "Remove",
+    notSet: "Not set",
+    editShortcut: "Set a shortcut",
+    clearShortcut: "Clear the shortcut",
+    /* Where a chord applies. Chrome offers "In Chrome" or "Global"; this is
+       the same choice named for the browser it is in. */
+    inNexus: "In Nexus",
+    discover: "Discover more extensions and themes on the",
+    storeName: "Chrome Web Store",
+    storeUrl: "https://chromewebstore.google.com/",
+    noneMatch: "Nothing installed matches “{query}”.",
+  },
   gettingStarted: {
-    headingLine1: "Let's settle in!",
-    headingLine2: "Here are the basics.",
-    learnShortcuts: "Learn Essential Shortcuts",
-    helpResources: "Help & Resources",
+    /*
+     * Two lines because the layout gives it two, and the second one has to earn
+     * its break. "Here are the basics" described the page rather than saying
+     * anything — this says what the four steps are actually for, which is the
+     * shortest useful thing a first screen can do.
+     */
+    headingLine1: "Welcome to Nexus.",
+    headingLine2: "Four things worth knowing.",
+    learnShortcuts: "Essential shortcuts",
+    helpResources: "Help & resources",
     helpUrl: "https://bsvassociation.org/education/blockchain-101/",
     steps: [
       /*
@@ -1582,32 +1913,46 @@ export const content = {
        */
       {
         icon: "LayoutGrid",
-        title: "Add apps to your Nexus",
-        body: "Open the Apps tab to connect a wallet, publisher or explorer. Connected apps live in your sidebar rail.",
+        title: "Put the apps you use on the rail",
+        body: "Open Apps to find a wallet, a publisher, an explorer. Anything you add gets an icon on the left, and the icon opens the site.",
       },
       {
+        /*
+         * Rewritten twice over. It said "Group your tabs and folders into
+         * Spaces" — folders are not a thing here, and tabs are the least of
+         * what a workspace holds. What actually changes when you switch one is
+         * the whole context: the rail, the wallet paying, the handle you are
+         * wearing, the colour of the window. That is the idea worth teaching
+         * on a first screen, and it is why the split is not just tidiness.
+         */
         icon: "Layers",
-        title: "Organize with Spaces",
-        body: "Group your tabs and folders into Spaces for work, life or a project, then switch between them in a click.",
+        title: "Keep separate lives separate",
+        body: "A workspace carries its own apps, wallet, handle and colour. Switch workspace and all four change together, so work and home never share a key or a history.",
       },
       {
         icon: "Globe",
-        title: "Browse the BSV web",
-        body: "Type a URL or search from the address bar. Your tabs, favorites and history stay tucked in the sidebar.",
+        title: "Browse with a wallet already in it",
+        body: "Type an address or a search. Sites that speak to the wallet ask before they take anything — a payment or a signature is a prompt you can refuse.",
       },
       {
         icon: "Wallet",
-        title: "Make your first payment",
-        body: "Open Payments from the rail to send BSV, check your balance and browse your full transaction history.",
+        title: "Send your first payment",
+        body: "Payments holds your balance, your history and your handle. Anyone can pay that handle, and nothing leaves without you saying so.",
       },
     ],
     shortcutsTitle: "Essential shortcuts",
     shortcutsPlaceholder: "Keyboard shortcuts",
+    /* Four, and every one of them is bound in this build — Settings has the
+       full table, and a welcome screen that taught a chord nothing answers to
+       would be the first thing it got wrong. */
     shortcuts: [
-      { keys: "⌘ T", label: "Search or open a new tab" },
-      { keys: "⌘ \\", label: "Toggle the sidebar" },
+      { keys: "⌘ T", label: "Search your tabs, or open a new one" },
+      { keys: "⌘ \\", label: "Show or hide the side panel" },
       { keys: "Esc", label: "Close menus and overlays" },
-      { keys: "Drag", label: "Drop a tab onto Favorites to pin it" },
+      /* Not a chord, and kept for that reason: the one thing on this list
+         somebody would never guess. Dropping a tab on Favorites is how you pin
+         a site, and nothing on screen says so. */
+      { keys: "Drag", label: "Drop a tab on Favorites to pin it" },
     ],
   },
   mobile: {
@@ -1622,6 +1967,10 @@ export const content = {
     openTabs: "Open tabs",
     newTab: "New tab",
     urlDetails: "Page options",
+    /* The same chevron, when the canvas is an app rather than a page.
+       Parallel wording on purpose: it is the same corner asking the same
+       question, and only the thing it is about has changed. */
+    appOptions: "{app} options",
     search: "Search…",
     incognito: "Incognito",
     incognitoTitle: "You're browsing Incognito",
@@ -1639,7 +1988,7 @@ export const content = {
     hub: "Sync with Nexus Desktop",
     sync: {
       title: "Sync with Nexus Desktop",
-      subtitle: "Search, browse, and pin to your profiles on the go.",
+      subtitle: "Search, browse, and pin to your workspaces on the go.",
       signIn: "Sign in with Nexus",
       noAccount: "I don't have an account",
     },
@@ -1666,8 +2015,8 @@ export const content = {
       startupNewTab: "A new tab",
       startupContinue: "Where you left off",
       startupHome: "Your home page",
-      restoreProfile: "Reopen the profile you were last in",
-      restoreProfileHint: "Off always starts in your first profile.",
+      restoreProfile: "Reopen the workspace you were last in",
+      restoreProfileHint: "Off always starts in your first workspace.",
 
       /* Rows that used to toast "coming soon". Each is a real setting now, so
          each needs the words for what it does. */
@@ -1712,6 +2061,36 @@ export const content = {
 
   /** the settings surface the rail's gear opens */
   settings: {
+    /* The Settings guide, which is the one guide built from the app rather
+       than written here — only its framing lives in content. */
+    guide: {
+      blurb:
+        "Everything this client can be told to do, in ten places. Each one below says what it decides; the button takes you there.",
+      open: "Open {name}",
+      here: "You are here",
+    },
+    /* The first-run controls. Kept in Settings rather than a hidden gesture
+       because the people who most need to replay it are the ones showing it to
+       somebody else. */
+    onboarding: {
+      title: "Onboarding",
+      hint: "What a new arrival is shown, and how to see it again.",
+      /* The confirmation before the first run is replayed. It says what will be
+   rebuilt and what will not, because "are you sure" on its own asks
+   somebody to guess the blast radius. */
+      confirmTitle: "Run the welcome again?",
+      confirmBody:
+        "You will pick your presets again. This workspace's rail and its connected apps are rebuilt; nothing else is touched.",
+      confirmGo: "Run it again",
+      confirmCancel: "Cancel",
+      firstRunLabel: "First run",
+      firstRunHint: "The welcome cards and the handle you picked.",
+      replay: "Show again",
+      flowLabel: "Guided setup",
+      flowHint: "The longer walk-through that follows the welcome.",
+      soon: "Not built yet",
+      replayTour: "Run it again",
+    },
     title: "Settings",
     soon: "Coming soon",
     /* Pairing a phone to this Nexus, at the head of General. */
@@ -1719,11 +2098,55 @@ export const content = {
       title: "Sync Nexus by QR code",
       codeLabel: "Pairing code",
       step1: "Open Nexus on your phone",
-      step2: "Go to Settings › Devices › Add device",
+      step2: "Go to Settings › General › Link desktop device",
       step3: "Point your phone at this screen to confirm",
-      /* The way past the QR for somebody who already has the app open and
-         would rather type a code than hold a phone up to a screen. */
-      hasApp: "I have already downloaded Nexus mobile",
+      /*
+       * The way out for the person the steps do not work for.
+       *
+       * It used to read "I have already downloaded Nexus mobile", which is the
+       * one group of people the three steps above already serve — they have the
+       * app, they can scan. The gap is the other way round: somebody reading
+       * "open Nexus on your phone" who has no Nexus on their phone. So this is
+       * where to go and get one.
+       */
+      hasApp: "I have not yet downloaded Nexus Mobile",
+      /* The mobile client, on the web, so there is something to open before
+         there is anything to install. */
+      getAppUrl: "web.nexus.free",
+      /*
+       * The phone's half is not a code, it is a register.
+       *
+       * Which device shows the code and which one reads it is decided by which
+       * you are holding — the desktop displays, the phone is the camera. But
+       * "point your camera at a thing" is a step, not a screen, and a phone
+       * whose settings only offer that step has nowhere to answer the question
+       * people actually open this to ask: what is signed in as me, and how do
+       * I stop one of them.
+       *
+       * So the phone gets what every messenger's phone gets: the list, with
+       * linking as the action at the top of it. Telegram's shape, because it
+       * is the one people have already learned.
+       */
+      /* The way out of a full-screen search on a phone, where there is no
+         backdrop to tap past and no Escape key to reach for. */
+      searchCancel: "Cancel",
+      devicesTitle: "Devices",
+      devicesHint: "Where you are signed in, and what you can sign out.",
+      linkDevice: "Link desktop device",
+      linkDeviceHint: "Scan the code shown on Nexus for desktop or web.",
+      /* Not "This device": General already has a group by that name, holding
+         the app icon and the keyboard. Two identical headings on one screen is
+         a screen that has to be read twice, and they would also share an
+         anchor, so search could only ever find the first of them. */
+      thisDevice: "Signed in here",
+      otherDevices: "Active sessions",
+      online: "online now",
+      lastActive: "last active",
+      endSession: "Sign out",
+      endSessionDone: "Signed out",
+      endOthers: "Sign out of all other devices",
+      endOthersDone: "Signed out everywhere else",
+      noOthers: "Nothing else is signed in.",
     },
     general: {
       title: "General",
@@ -1753,6 +2176,16 @@ export const content = {
       reachToll: "Strangers pay a toll",
       reachTollHint: "Open to anyone willing to attach the amount below.",
       reachSaved: "Reachable by",
+      feeTitle: "What a stranger pays",
+      feeHint:
+        "Set in cents and sent in satoshis, converted at the rate when the message is sent — so the price stays a price rather than drifting with the market.",
+      /* The rate is stated, not just used. A number converted by something the
+         reader cannot see is a number they have to take on trust. */
+      feeRate: "at {rate} / BSV, from WhatsOnChain",
+      feeRateStale: "at {rate} / BSV, last known",
+      feeApplies: "In force because strangers pay a toll to reach you.",
+      feeIdle:
+        "Not in force: anyone can reach you for nothing under the setting above.",
       tollTitle: "Message toll",
       tollHint:
         "What a stranger attaches to each message. You keep it whether or not you reply. Same setting as /trolltoll.",
@@ -1812,6 +2245,133 @@ export const content = {
       revoke: "Withdraw access",
       restore: "Restore access",
     },
+    payments: {
+      title: "Payments",
+      hint: "What arrives, what leaves, and what happens without asking.",
+      receivingTitle: "Receiving",
+      receivingHint:
+        "What to do with money that turns up in something other than bitcoin.",
+      autoSwap: "Auto-swap into BSV when receiving payments",
+      autoSwapHint:
+        "Anything paid to you in another coin is converted as it lands. Cross-chain swaps carry a 2.18% fee in the rate; two BSV instruments do not.",
+      autoSwapStanding: "On by default from Settings → Payments.",
+      autoSwapPerPayment:
+        "Get paid still lets you keep a single payment in the coin it was sent in.",
+      /* ---- Cards, between the two halves ------------------------------
+         A card is money coming in, so it sits under Receiving; it is money
+         coming in so that money can go out, so it sits above Spending. */
+      cardsTitle: "Cards",
+      cardsHint:
+        "A bank card the wallet can buy bitcoin with \u2014 to top itself up mid-payment, or because you asked it to.",
+      /* Said once, here, because Autofill has a switch with almost this name
+         and they are opposite things: that one types a number into somebody
+         else's checkout, this one funds the wallet you pay from. */
+      cardsNotAutofill:
+        "Not the same as Autofill\u2019s payment cards, which fills a number into someone else\u2019s checkout. This one only ever buys bitcoin.",
+      cardAdd: "Connect a card",
+      cardAddHint: "Enter it on your phone, or here.",
+      cardNone: "No card connected.",
+      cardAddedFrom: "Added from {device}, {ago} ago",
+      /* Separate rather than a clever suffix: `agoLabel` answers "now" for
+         anything under a minute, and "Added from your phone, now ago" is what
+         a template gets you for it. */
+      cardAddedFromNew: "Added from {device}, just now",
+      cardAddedHere: "Added on this device",
+      cardAddedFromUnknown: "Added on a device that is no longer linked",
+      cardExpires: "Expires {expiry}",
+      cardRemove: "Remove",
+      cardRemoved: "Card removed",
+      cardConnected: "Card connected",
+      cardBuy: "Buy bitcoin with this card",
+      cardBuyHint: "Opens the wallet, with the card already chosen.",
+      cardTopUp: "Top up with a card when a swap cannot cover it",
+      cardTopUpHint:
+        "The last resort, after converting something you already hold. Off, a payment you cannot cover is simply refused.",
+      cardTopUpNeedsCard: "Connect a card first.",
+
+      /* ---- The connect sheet ------------------------------------------- */
+      cardSheetTitle: "Connect a card",
+      cardSheetLead:
+        "The number is entered once, on whichever screen you trust. Nexus keeps the last four digits and nothing else.",
+      cardSheetPhone: "Use your phone",
+      cardSheetPhoneHint:
+        "Point Nexus on your phone at this code. It will offer to photograph the card or take it typed.",
+      cardSheetSteps: [
+        "Open Nexus on your phone",
+        "Settings \u203a Payments \u203a Connect a card",
+        "Point it at this code",
+      ],
+      cardSheetOr: "or",
+      cardSheetScan: "Photograph the card",
+      cardSheetScanHint: "The camera reads the number off the front.",
+      cardSheetType: "Type it in",
+      cardSheetTypeHere: "Type it here instead",
+      cardSheetScanning: "Hold the card inside the frame",
+      cardSheetScanned: "Read from the card. Check it before you continue.",
+      cardSheetNumber: "Card number",
+      cardSheetExpiry: "Expires",
+      cardSheetCvc: "Security code",
+      cardSheetHolder: "Name on the card",
+      cardSheetSubmit: "Connect",
+      cardSheetBack: "Back",
+      cardSheetNote:
+        "Nothing is sent anywhere. A card connected here lasts as long as this browser remembers it.",
+      cardSheetInvalid: "That does not look like a card number.",
+
+      /* ---- Tap to pay, one row per linked phone ------------------------- */
+      walletPayTitle: "Tap to pay",
+      walletPayHint:
+        "Paying from a phone you are holding, using the card already in it. One row per linked phone, because the platform decides what the row can offer.",
+      walletPayNone: "No phone linked yet. Pair one in General to pay by tap.",
+      applePay: "Apple Pay",
+      googlePay: "Google Pay",
+      /* Stated rather than implied. Somebody who has just set an amount on the
+         Android row will look for one here, and the honest answer is that iOS
+         does not have the concept \u2014 not that we forgot to build it. */
+      applePayAlways:
+        "Every payment is confirmed with Face ID, Touch ID or your passcode. Apple has no threshold to set and does not let an app add one.",
+      googlePayCap: "Approve up to this without asking",
+      googlePayCapHint:
+        "Nexus\u2019s own ceiling, not Google\u2019s. Above it, Nexus asks as well. Google Wallet is separately moving to requiring a device unlock for every payment, which happens whatever this says.",
+      walletPayCapAsk: "Always ask",
+      walletPayThisPhone: "the phone you are holding",
+      walletPayOff: "Off",
+
+      spendingTitle: "Spending",
+      autoSwapSpend: "Auto-swap into BSV when spending",
+      autoSwapSpendHint:
+        "A web3-native site charges in BSV. If you are short, enough of something else is converted to cover it rather than the payment being refused.",
+      autoSwapCap: "Swap this much without asking",
+      autoSwapCapHint:
+        "Above this, a swap needs your approval even when the payment does not. Set it to nothing and every conversion asks.",
+      autoSwapCapAsk: "Always ask",
+      autoSwapCapRate: "At {rate} per BSV.",
+      autoSwapCapIdle: "Applies once auto-swap is on.",
+      autoSwapCapActive: "In use now.",
+      /* Which sites count. The same rule auto-connect uses, said the same way:
+         one definition of "web3-native" across the app, or two that drift. */
+      autoSwapWhich: "Web3-native means a site the App Store lists as an app, which is how this build recognises one.",
+      spendingHint:
+        "How much a page can spend on your behalf, and whether it has to ask first.",
+      /* Moved here from Permissions, where they sat under the per-site grid.
+         Which sites may spend is a permission; how much and whether you are
+         asked is a decision about your money, and it belongs with the money. */
+      oneClick: "One-click pay",
+      oneClickHint:
+        "Skip the confirm step for paying actions like likes and branches. The cap below still applies.",
+      spendCap: "Most a page may spend without asking again",
+      spendCapHint:
+        "Only applies once you have allowed a page to spend. Set it to nothing and every payment asks.",
+      capAsk: "Ask",
+      grantsLink: "Which sites may spend at all →",
+      grantsHint: "Set per site in Permissions.",
+      search: "Search settings",
+      searchPlaceholder: "Search settings",
+      searchEmpty: "Nothing in Settings matches that.",
+      searchCategories: "Categories",
+      searchSections: "Sections",
+      searchHint: "Type to find a category or a section inside one.",
+    },
     permissions: {
       title: "Permissions",
       hint: "What pages and apps are allowed to do.",
@@ -1823,12 +2383,14 @@ export const content = {
       capAsk: "Ask",
       capAllow: "Allow",
       capBlock: "Block",
-      oneClick: "One-click pay",
-      oneClickHint:
-        "Skip the confirm step for paying actions like likes and branches. The cap below still applies.",
-      spendCap: "Most a page may spend without asking again",
-      spendCapHint:
-        "Only applies once you have allowed a page to spend. Set it to nothing and every payment asks.",
+      /* The two controls that used to sit under this grid now live in Payments.
+         This page answers "may this site", and those answer "how much, and do
+         I get asked" — the same question the pay sheet asks, so they belong
+         together rather than at the bottom of a permissions list. */
+      spendingMoved: "How much, and whether you are asked",
+      spendingMovedHint:
+        "One-click pay and the spending cap are in Payments.",
+      spendingMovedLink: "Open Payments →",
       exceptionsTitle: "Sites you have answered for",
       exceptionsHint: "These override the defaults above.",
       exceptionsNone: "Nothing overridden.",
@@ -1886,17 +2448,33 @@ export const content = {
     browsing: {
       title: "Browsing",
       hint: "Sites, tabs and downloads.",
+      browseTitle: "Browse",
+      browseAsButtonLabel: "Pin Browse to the rail",
+      /* No longer "sits under Workspaces": that button is opt-in now, so on most
+         installs Browse is the top of the pinned block rather than under
+         anything. See `workspacesInRail` in lib/settings-store. */
+      browseAsButtonHint:
+        "Sits at the top of the rail instead of among your apps. Turn off to keep it as an app.",
       sitesTitle: "Sites",
       tabsTitle: "Tabs",
+      tabLayoutHorizontal: "Horizontal tabs",
+      tabLayoutHorizontalHint: "A strip across the top of the page.",
+      tabLayoutVertical: "Vertical tabs",
+      tabLayoutVerticalHint: "A list down the sidebar, under this space.",
       filesTitle: "Files",
-      downloadsHint: "What each profile has downloaded.",
+      downloadsHint: "What each workspace has downloaded.",
       devTitle: "Developer",
       devHint: "Off by default. These change what pages can see and do.",
-      devToolsLabel: "Developer tools",
+      /* "Page inspector" rather than "Developer tools", now that it sits under
+         a section of that name next to the switch that reveals it. Two rows
+         reading "Developer tools" one above the other said nothing about which
+         was which, and this one has always been the narrower thing: a panel
+         docked under a web page, not the mode. */
+      devToolsLabel: "Page inspector",
       devToolsHint:
         "Inspect a page, read its console, and watch what it asks the wallet for.",
-      devToolsOn: "Developer tools are on",
-      devToolsOff: "Developer tools are off",
+      devToolsOn: "Page inspector is on",
+      devToolsOff: "Page inspector is off",
       devToolsShortcut: "⌥⌘I",
       devOverlayLabel: "Overlay network inspector",
       devOverlayHint:
@@ -1905,7 +2483,7 @@ export const content = {
       devUnsafeHint:
         "Lets a repository serve apps with no signature to check. Nothing vets them, including us.",
       devWarn:
-        "A page with developer tools open can be told things by somebody reading over your shoulder. Turn them off when you are done.",
+        "A page with the inspector open can be told things by somebody reading over your shoulder. Turn it off when you are done.",
       readingTitle: "Reading",
       zoom: "Page zoom",
       fontSize: "Base font size",
@@ -1978,14 +2556,60 @@ export const content = {
     appearance: {
       title: "Preferences",
       hint: "Theme, colour and what things are called.",
+      /* The master switch, and the three it reveals. Moved here from Browsing:
+         they were never only about browsing, and a developer looking for them
+         had to guess which app owned them. */
+      devTitle: "Developer Tools",
+      devHint:
+        "Off by default. Reveals diagnostic surfaces across Nexus, and remembers that it is on.",
+      devModeLabel: "Developer tools",
+      devModeHint:
+        "Show the developer surfaces built into each app. Nothing here changes what anyone else sees.",
+      devModeOn: "Developer tools are on",
+      devModeOff: "Developer tools are off",
+      devModeOnHint:
+        "Developer surfaces are now shown wherever an app has them.",
+      /* Two of the three tools live inside Browse, so turning them on without
+         it is switching on a light in a room that is not there. Offered rather
+         than done, and offered once — a prompt that connects an app behind your
+         back is worse than one you can ignore. */
+      devNeedsBrowse: "Browse is not connected in this workspace",
+      devNeedsBrowseHint:
+        "The page inspector and the overlay inspector both live in it.",
+      devConnectBrowse: "Connect Browse",
+      devBrowseConnected: "Browse is connected",
+      /* The rail's own contents. Desktop only, because there is no rail on a
+         phone to put a button on. */
+      /* "Rail" rather than "Workspaces in rail": the group holds two switches
+         now and neither of them is only about workspaces. */
+      railTitle: "Rail",
+      railHint:
+        "Workspaces & Timeline in rail as native experiences or as apps.",
+      railWorkspacesLabel: "Show Workspaces",
+      railWorkspacesHint:
+        "Puts it back at the top of the rail. Your workspaces are in the column beside it either way.",
+      homeTitle: "Homescreen",
+      homeHint: "What a new window opens on.",
+      homeTimeline: "Timeline",
+      homeTimelineHint:
+        "Posts from the people and ecosystems you follow, and what has happened since you last looked.",
+      homeFocus: "Focus",
+      homeFocusHint:
+        "Your day: one goal, a list, a note and a timer, over a photograph.",
+      timelineLabel: "Show Timeline as app",
+      /* Says what turning it on costs as well as what it gives: the Timeline
+         stops being a screen nothing can take away, which is the point and also
+         the surprise. */
+      timelineHint:
+        "Gives it a tile on the rail and a listing in the App Store, so it can be disconnected like anything else. Home shows your dashboard instead.",
       themeTitle: "Theme",
       themeHint: "Light, dark, or whatever this device is set to.",
       modeLight: "Light",
       modeDark: "Dark",
       modeAuto: "Match this device",
-      themeDefault: "Every profile uses the default styling.",
-      themeReset: "Reset profile colours",
-      themeResetDone: "Every profile is back to the default styling",
+      themeDefault: "Every workspace uses the default styling.",
+      themeReset: "Reset workspace colours",
+      themeResetDone: "Every workspace is back to the default styling",
       brandTitle: "Name for the chain",
       brandHint: "Two names for one network. Pick the one you use.",
       brandScope:
@@ -1998,6 +2622,152 @@ export const content = {
     title: "Getting started with",
     button: "What this app does",
     open: "Open",
+  },
+
+  /**
+   * The first run — five cards, then a name.
+   *
+   * Written to Raycast's discipline, which is the reference: two or three words
+   * of title, one sentence under it, and never a second. A first run is read
+   * standing up, and the reader has not agreed to anything yet.
+   *
+   * The middle three are Browse, Payments and Workspaces — the two surfaces
+   * that actually ship, and the one piece of chrome the rest hangs off. Nothing
+   * here promises a feature this build does not have.
+   */
+  /* The Guided Tour's chrome — everything that is not a card's own words. */
+  /* The desktop shell's own strip, above the app. */
+  titleBar: {
+    updateNow: "Update now",
+    home: "Home",
+    newWorkspace: "New workspace",
+    /* On the tab you are already on, which is the one place a tooltip has
+       something to add: the others say which workspace they are by name and by
+       colour, and this one has to explain why it looks different. */
+    youAreIn: "You are in {name}",
+    /* On the tabs you are not in. "Move to" rather than "Switch to": a
+       workspace is somewhere you are, which is what the tooltip on the active
+       one says, and going to another one is going somewhere. */
+    moveTo: "Move to {name}",
+    /* The three facts that decide whether you want to be there — who you are,
+       what you spend from, and how much is set up. Stated because the strip has
+       room for a name and nothing else. */
+    tabApps: "{n} connected apps",
+    tabOneApp: "1 connected app",
+    tabNoHandle: "No handle",
+    tabNoWallet: "No wallet",
+    minimize: "Minimise",
+    maximize: "Maximise",
+    restore: "Restore",
+    close: "Close",
+  },
+  tour: {
+    of: "of",
+    start: "Get started",
+    next: "Next",
+    previous: "Previous",
+    skip: "Skip",
+    close: "Close",
+    gotIt: "Got it",
+    dismiss: "Close the tour",
+    invite: "Take the tour",
+    inviteBody: "Two minutes on what you just set up.",
+    inviteAction: "Start",
+  },
+  /* The help circle, bottom right, and everything it offers. */
+  /* The terms-and-privacy pane. The documents themselves are in
+     lib/data/legal.ts; this is only the chrome around them. */
+  legal: {
+    title: "Legal summary",
+    updated: "Last updated",
+    disclaimer:
+      "A summary written to be read, not a substitute for the licence or for advice. Where this and the licence disagree, the licence is the one that binds.",
+    readLicence: "Read the software licence",
+  },
+  help: {
+    label: "Help & resources",
+    restartTour: "Restart Guided Tour",
+    helpCentre: "Help Center",
+    helpCentreUrl: "https://nexus.free/help",
+    community: "Ask the community",
+    communityUrl: "https://bsvblockchain.org/forum/nexus",
+    videos: "YouTube videos",
+    videosUrl: "https://www.youtube.com/@placeholder",
+    releaseNotes: "Release notes",
+    legal: "Legal summary",
+    feedback: "Submit feedback",
+    abuse: "Report abuse",
+    shortcuts: "Keyboard shortcuts",
+    shortcutsKeys: "⌃⇧?",
+    guidedSetup: "Guided setup",
+  },
+  firstRun: {
+    /* The preset picker, which is the last thing the first run asks. */
+    presets: {
+      eyebrow: "One more thing",
+      /* The answers are nouns — Thinker, Maker, Developer, Gamer — so the
+         question asks for one. "What are you here for?" asks for a purpose,
+         and "to read things" is not on the cards. "Which of these" also reads
+         correctly whether somebody picks one of them or all four. */
+      title: "Which of these are you?",
+      body: "Pick as many as you like. You can change any of it later.",
+      skip: "Set up without a preset",
+      continueOne: "Set up with 1 preset",
+      continueMany: "Set up with {count} presets",
+    },
+    next: "Next",
+    finish: "Finish",
+    skip: "Skip",
+    back: "Back",
+    stepLabel: "Step",
+    steps: {
+      welcome: {
+        title: "Welcome to Nexus",
+        /* The same three things as before — the web, money, a name — said as
+           what they are to a person rather than as a list of parts. "One name
+           they know you by" is the claim the old "in one place" was making, and
+           it names who the you is talking to. */
+        body: "Everywhere you go, everyone you pay, and one name they know you by.",
+      },
+      browse: {
+        title: "The web, with a wallet in it",
+        body: "Pages load as they always did. The ones that speak Bitcoin can now ask.",
+      },
+      pay: {
+        title: "You're a name, not a number",
+        /* What you can move and how, rather than what you are spared. "No chain
+           to choose" answers an objection somebody arriving has not raised yet,
+           and spends the only sentence this card gets on the machinery. */
+        body: "Send and receive BSV, tokens and collectibles, or share a link anyone can pay.",
+      },
+      workspaces: {
+        title: "Several devices, several lives",
+        /* Two claims in one line: the workspaces are separate, and they are the
+           same wherever you open them. Naming the devices rather than saying
+           "everywhere" — a phone and a laptop are what somebody pictures. */
+        body: "Phone or laptop, each workspace keeps its own tabs, wallet and name.",
+      },
+    },
+    handle: {
+      title: "Pick your handle",
+      body: "This is the name people pay. You can change it later.",
+      label: "Your handle",
+      shuffle: "Suggest another",
+      claim: "Claim it",
+      /* Where it lives afterwards, not a warning. The line above already says
+         it can be changed; this says where, because "you can change it later"
+         is only reassuring if somebody can find the later. Identity › Your
+         handles is the screen that holds them. */
+      changeNote:
+        "Change it whenever you like in Identity, and keep more than one if you need to.",
+      status: {
+        ok: "Available",
+        taken: "Already taken",
+        malformed: "Letters and numbers only, three to twenty.",
+        empty: "Pick something.",
+      },
+      claimed: "Your handle is",
+    },
   },
 
   /** the What's new pane, read from lib/data/releases.ts */
@@ -2039,6 +2809,34 @@ export const content = {
     cancel: "Cancel",
     suggest: "Suggest a feature",
     suggestHint: "Costs 1,000 sats, so the board stays worth reading.",
+    /* Feedback, which is the other thing somebody standing at a roadmap wants
+       to do. Free, because it is not asking for anybody's time — but signed,
+       so a board of anonymous complaints is not what gets read. */
+    feedback: "Submit feedback",
+    feedbackHint: "Free to send, signed with your keys.",
+    feedbackSummaryPlaceholder: "In one line",
+    /* A template rather than a prompt. "What happened" gets a sentence; three
+       numbered lines get the three things somebody actually needs to repeat it,
+       and they are already in the order they should be written in. Newlines
+       survive in a placeholder, so the shape is visible before anyone types. */
+    feedbackBodyPlaceholder:
+      "1. What you did\n2. What happened\n3. What you expected",
+    /* The field's name, separately: the placeholder is three lines now, and a
+       three-line accessible name is read out as one long run of words. */
+    feedbackBodyLabel: "Detail",
+    feedbackSign: "Sign and send",
+    feedbackSent: "Feedback signed and sent",
+    feedbackSentBody: "Signed as {handle}.",
+    /* What the sheet says once it has done the thing, instead of vanishing.
+       A sheet that closes on submit leaves somebody staring at the board it
+       came from, wondering whether the button worked. */
+    feedbackSentTitle: "Signed and sent",
+    feedbackSentDetail:
+      "It went out signed as {handle}. Nothing was charged, and nothing lands on the public board.",
+    suggestedTitle: "Your feature is on the board",
+    suggestedDetail:
+      "It sits in Fundable at zero, like everything else. Share it and it can be funded.",
+    done: "Done",
     fund: "Fund this feature",
     fundCaveat:
       "A signal, not an order. Funding weighs on what gets picked up next; it does not buy the work.",
@@ -2119,24 +2917,494 @@ export const content = {
     pickerTitle: "Pick an app for this pane",
     pickerSearch: "Search your apps",
     pickerNoMatch: "Nothing matches that.",
-    noneToSplit: "No other app is connected to this profile.",
-    disconnect: "Disconnect from this profile",
+    noneToSplit: "No other app is connected to this workspace.",
+    disconnect: "Disconnect from this workspace",
     disconnected: "Disconnected from",
   },
 
-  /** the profiles manager: what each profile is connected to */
+  /** Profiles: yourself, as everybody else gets you */
+  profilesPanel: {
+    title: "Profiles",
+    hint: "How you appear, and which one this workspace wears.",
+    add: "New profile",
+    untitled: "Untitled",
+    identityTitle: "Who you are",
+    identityHint: "The parts of the card people read first.",
+    name: "Display name",
+    handle: "Handle",
+    role: "Role",
+    bio: "Bio",
+    /* Interests moved up here with the bio, so "Who you are" holds the three
+       things somebody writes about themselves and "Where you are" holds the two
+       facts about where they sit. */
+    expertise: "Interests",
+    expertiseHint: "Separate with commas.",
+    linksLabel: "Link in bio",
+    linksHint: "A name, and where it goes. Shown as buttons on your card.",
+    linkLabel: "Label",
+    linkUrl: "Link",
+    linkAdd: "Add another link",
+    linkRemove: "Remove this link",
+    whereTitle: "Where you are",
+    whereHint: "Context under the name.",
+    organization: "Organisation",
+    city: "City",
+    contactTitle: "Off-protocol contact",
+    contactHint:
+      "Published beside your handle. Nothing here is attested \u2014 it is a claim, like the display name.",
+    email: "Email",
+    github: "GitHub",
+    useTitle: "This workspace",
+    useHint:
+      "One profile per workspace, the same way a handle or a wallet is connected to one.",
+    connectedHere: "Connected to {workspace}.",
+    notConnected: "Not connected to this workspace.",
+    inUse: "In use",
+    connect: "Connect here",
+    remove: "Delete this profile",
+    previewTitle: "What people see",
+  },
+
+  /** Security: what you can prove yourself with, and where you are asked to */
+  security: {
+    autoConnectTitle: "Auto connect to metanet enabled sites",
+    autoConnectHint:
+      "A site that speaks BRC-100 is asking to know who you are. This decides whether it is answered for you.",
+    autoConnectAuto: "Connect automatically",
+    autoConnectAutoHint:
+      "The wallet this workspace uses is offered as soon as a metanet site opens. Identity only \u2014 spending is always asked for.",
+    autoConnectManual: "Ask me each time",
+    autoConnectManualHint:
+      "Nothing is connected until you say so, on every site and in every workspace.",
+    title: "Security",
+    hint: "Passphrase, keys and where you are asked.",
+    passphrase: {
+      title: "Vault passphrase",
+      body: "One of the ways into the vault. Changing it does not re-encrypt anything \u2014 a passphrase unwraps a key, it is not the key.",
+      set: "Set",
+      unset: "Not set",
+      change: "Change passphrase",
+      newLabel: "New passphrase",
+      confirmLabel: "Repeat it",
+      save: "Save passphrase",
+      cancel: "Cancel",
+      mismatch: "Those do not match.",
+      tooShort: "Use at least eight characters.",
+      saved: "Passphrase changed.",
+    },
+    keys: {
+      title: "Security keys",
+      body: "Hardware you touch to prove it is you. Any registered key opens the vault.",
+      add: "Add a security key",
+      waiting: "Insert your security key and touch it",
+      nameTitle: "Name this key",
+      nameBody:
+        "It reported itself as the model below. Rename it if you hold more than one.",
+      nameLabel: "Key name",
+      confirm: "Add key",
+      cancel: "Cancel",
+      remove: "Remove",
+      empty: "No security keys registered.",
+    },
+    otp: {
+      title: "One-time codes",
+      body: "Six-digit codes from an authenticator app on your phone.",
+      on: "On",
+      off: "Off",
+      toggle: "Use one-time codes",
+      setupTitle: "Set up one-time codes",
+      setupBody:
+        "Scan this with your authenticator app, then type the code it shows.",
+      secretLabel: "Or enter this key by hand",
+      codeLabel: "Six-digit code",
+      confirm: "Turn on",
+      cancel: "Cancel",
+      badCode: "That code is not six digits.",
+    },
+    phones: {
+      title: "Paired devices",
+      body: "A phone that answers the vault's QR code. Scanning from a device that already holds your key is what proves it is you.",
+      add: "Pair a phone",
+      scanTitle: "Scan to pair",
+      scanBody: "Open Nexus on the phone and scan this code.",
+      waiting: "Waiting for the phone",
+      nameTitle: "Name this device",
+      nameBody:
+        "It reported the model below. Rename it if you pair more than one.",
+      nameLabel: "Device name",
+      confirm: "Pair device",
+      cancel: "Cancel",
+      remove: "Unpair",
+      empty: "No devices paired.",
+    },
+    exempt: {
+      title: "Apps that skip authentication",
+      body: "Every app is behind the lock unless you say otherwise. Tick the ones that should open without asking.",
+      search: "Search apps",
+      all: "Every app",
+      allDesc: "Nothing but the vault itself will ask.",
+      noMatch: "No apps match that.",
+      none: "Nothing exempt",
+    },
+  },
+
+  /** the Timeline: the feed, its contextual column and its right rail */
+  timeline: {
+    title: "Timeline",
+    strips: {
+      "for-you": "For you",
+      following: "Following",
+      posts: "Posts",
+      activity: "Activity",
+    },
+    /* `Posts` is your own, which the tab alone does not say — the tooltip is
+       where that gets settled rather than in a longer tab label that would
+       push Activity off a narrow column. */
+    stripHints: {
+      "for-you": "Ranked across everyone",
+      following: "Only people you follow",
+      posts: "Everything you have posted",
+      activity: "What your connected apps did",
+    },
+    pin: "Pin a topic as a tab",
+    pinNone: "Every topic is already pinned.",
+    unpin: "Unpin",
+    composer: {
+      placeholder: "What's happening?",
+      post: "Post",
+      /* Mocked, per the brief — the row is here because a composer without it
+         reads as a comment box, and these are the affordances that make it a
+         post. */
+      attach: "Add an image",
+      gif: "Add a GIF",
+      poll: "Add a poll",
+      emoji: "Add an emoji",
+      schedule: "Schedule",
+      location: "Tag a place",
+      pay: "Attach a payment",
+    },
+    refresh: "Show {count} posts",
+    /* One post is the common case here — arrivals are sporadic and you look
+       often — so it is worth a string rather than an "(s)". */
+    refreshOne: "Show 1 post",
+    /* The Activity strip's own pair. Different nouns rather than a shared
+       "Show {count} new", because the two strips hold different things and a
+       bar that would not say which is a bar you have to click to find out. */
+    refreshActivity: "Show {count} activities",
+    refreshActivityOne: "Show 1 activity",
+    pullToRefresh: "Pull to refresh",
+    /* The timestamp's tooltip. It names the block and says what clicking does,
+       because a bare number in a tooltip is a fact with no verb. */
+    inBlock: "In block {height} — open on WhatsOnChain",
+    /* Your own actions, as the Activity strip reports them back. The name is
+       appended by the row so it can carry a hovercard. */
+    events: {
+      app: "Timeline",
+      follow: "You followed",
+      unfollow: "You unfollowed",
+      /* Each ends where the person's name is appended, so the row reads as one
+         sentence: "You liked a post by Rhea Mensah". */
+      like: "You liked a post by",
+      unlike: "You removed a like from a post by",
+      repost: "You reposted",
+      unrepost: "You undid a repost of",
+      reply: "You replied to",
+      quote: "You quoted",
+    },
+    empty: {
+      "for-you": "Nothing ranked yet. Follow a few people and it fills in.",
+      following: "You are not following anyone in this workspace yet.",
+      posts: "You have not posted from this workspace.",
+      activity: "None of this workspace's apps have done anything yet.",
+    },
+    topicEmpty: "Nothing under this topic yet.",
+    post: {
+      reply: "Reply",
+      repost: "Repost",
+      like: "Like",
+      views: "Views",
+      share: "Share",
+      tipped: "{amount} tipped",
+      more: "More",
+    },
+    /* The profile switcher, opened from the posting-as row. */
+    switcher: {
+      title: "This workspace posts as",
+      switchTo: "Switch to",
+      edit: "Edit profile",
+      untitled: "Untitled",
+      close: "Close",
+    },
+    sidebar: {
+      postingAs: "Posting as",
+      topics: "Topics",
+      ecosystems: "Ecosystems",
+      allEcosystems: "Every ecosystem",
+      allTopics: "Everything",
+      saved: "Saved",
+      lists: "Lists",
+      muted: "Muted",
+      backToHub: "Back to workspaces",
+    },
+    rail: {
+      search: "Search Timeline",
+      searching: "Searching",
+      sync: {
+        title: "Nexus Sync",
+        blurb:
+          "Seamlessly sync your Nexus across every device, while staying in full control",
+        cta: "Turn on Sync",
+      },
+      onAir: {
+        title: "On air now",
+        listeners: "{count} listening",
+        showMore: "Show more",
+        allTitle: "On air now",
+      },
+      follow: {
+        title: "Who to follow",
+        action: "Follow",
+        following: "Following",
+        showMore: "Show more",
+        allTitle: "Who to follow",
+      },
+      back: "Back to the timeline",
+    },
+    /* A post's overflow menu. Handles are appended by the row, so an item
+       reads "Mute @rheam@yours" rather than naming a stranger in the abstract. */
+    postMenu: {
+      label: "More",
+      notInterested: "Not interested in this post",
+      dismissed: "Fewer posts like that.",
+      undo: "Undo",
+      follow: "Follow",
+      unfollow: "Unfollow",
+      subscribe: "Subscribe to",
+      unsubscribe: "Unsubscribe from",
+      subscribed: "Subscribed. Their posts will be flagged.",
+      unsubscribed: "Unsubscribed.",
+      lists: "Lists",
+      save: "Save post",
+      unsave: "Remove from Saved",
+      saved: "Saved.",
+      unsaved: "Removed from Saved.",
+      mute: "Mute",
+      unmute: "Unmute",
+      muted: "Muted. Their posts are hidden.",
+      unmuted: "Unmuted.",
+      block: "Block",
+      unblock: "Unblock",
+      blocked: "Blocked. They are hidden and unfollowed.",
+      unblocked: "Unblocked.",
+      activity: "View post activity",
+      /* The numbers already on the row, said once in a sentence — an analytics
+         pane would be a screen this prototype has nothing to put in. */
+      activitySummary: "{views} views · {replies} replies · {reposts} reposts",
+      embed: "Embed post",
+      embedded: "Embed code copied.",
+    },
+    /* The Activity strip's own header: what it is, and what it shows. */
+    activityBar: {
+      /* The distinction worth being unambiguous about. Everything on this
+         strip is yours except the part that never was. */
+      privateNote: "Only you can see this. ",
+      publicNote:
+        "The posts and follows behind it are public; the rest never leaves this device.",
+      range: "Any time",
+      rangeLabel: "Period",
+      from: "From",
+      to: "To",
+      ranges: {
+        all: "Any time",
+        hour: "Last hour",
+        day: "Last 24 hours",
+        week: "Last 7 days",
+        month: "Last 30 days",
+      },
+      apps: "All apps",
+      appsLabel: "Apps",
+      appsSome: "{count} apps",
+      appsOne: "1 app",
+      appsSearch: "Search apps",
+      appsAll: "All connected apps",
+      /* The Timeline is not in `installedApps` — it is the canvas, not a mod —
+         so the filter has to name it itself or your own rows would be the one
+         thing on this strip you could not narrow to. */
+      appsTimeline: "Timeline",
+      appsNoMatch: "No apps match that.",
+      clear: "Reset",
+    },
+    /* One post, read on its own, with its replies under it. */
+    thread: {
+      title: "Post",
+      back: "Back to the timeline",
+      /* "ago" spelled out because the meta line is read as a sentence, unlike
+         the "6m" in a feed row where the column does the explaining. */
+      metaViews: "{views} views",
+      replyPlaceholder: "Post your reply",
+      reply: "Reply",
+      sort: "Relevant",
+      sortNewest: "Newest first",
+      sortRelevant: "Relevant",
+      quotes: "View quotes",
+      quotesSoon: "Quotes are not wired up yet.",
+      noReplies: "No replies yet. Be the first.",
+      yours: "Your reply",
+    },
+    /* Saved, Lists and Muted — the three the contextual column keeps. */
+    panes: {
+      back: "Back to the timeline",
+      savedTitle: "Saved",
+      savedEmpty: "Nothing saved yet. Keep a post from its menu.",
+      listsTitle: "Lists",
+      listsEmpty: "No lists yet.",
+      listMembers: "{count} people",
+      remove: "Remove from list",
+      mutedTitle: "Muted",
+      mutedEmpty: "Nobody is muted.",
+      unmute: "Unmute",
+    },
+    /* The activity sheet, opened from a post's views count or its menu. */
+    analytics: {
+      title: "Post activity",
+      close: "Close",
+      impressions: "Impressions",
+      impressionsWhy:
+        "Times this post was on somebody's screen, counting repeat views by the same person.",
+      engagements: "Engagements",
+      engagementsWhy:
+        "Every interaction with this post: replies, reposts, likes, expands and profile visits.",
+      expands: "Detail expands",
+      expandsWhy: "Times somebody opened the post to read the whole of it.",
+      visits: "Profile visits",
+      visitsWhy:
+        "Times somebody went from this post to the profile that wrote it.",
+      more: "What this counts",
+      /* The three counts already under the post, repeated here as the row X
+         puts above the metrics — the same numbers, gathered rather than spread
+         along an action bar. */
+      likes: "likes",
+      reposts: "reposts",
+      replies: "replies",
+      note: "Counted by the overlay this post was published through. Nothing here leaves your device.",
+    },
+    /* The repost menu, from the repost count. */
+    repostMenu: {
+      label: "Repost",
+      repost: "Repost",
+      undoRepost: "Undo repost",
+      quote: "Quote",
+      reposted: "Reposted.",
+      unreposted: "Repost removed.",
+    },
+    /* The reply composer, opened from a post's reply count. */
+    replyTo: {
+      title: "Reply",
+      quoteTitle: "Quote",
+      quotePlaceholder: "Add a comment",
+      quoteAction: "Post",
+      quoteSent: "Quote posted.",
+      close: "Close",
+      replyingTo: "Replying to",
+      placeholder: "Post your reply",
+      action: "Reply",
+      /* X calls this "Everyone can reply". Mocked here, like the rest of the
+         composer row — it is on the sheet because who may answer is part of
+         writing a reply, not a setting somewhere else. */
+      audience: "Everyone can reply",
+      sent: "Reply posted.",
+    },
+    /* The upgrade sheet, opened by the Sync panel's button. */
+    upgrade: {
+      title: "Turn on Nexus Sync",
+      /* One line, drawn from the three benefits on the card: every device in
+         step, a backup only you can open, and your own activity exportable. */
+      blurb:
+        "Every device in step, a backup only you can open, and your activity yours to export",
+      close: "Close",
+      you: "You",
+      name: "Name",
+      asCompany: "Bill as a company",
+      business: "Business name",
+      businessPlaceholder: "Acme Inc.",
+      vat: "VAT / GST number (optional)",
+      asCompanyHint: "For an invoice in the company's name.",
+      vatPlaceholder: "123456789",
+      payWith: "Payment method",
+      card: "Card",
+      cardNumber: "Card number",
+      cardExpiry: "Expiry",
+      cardCvc: "CVC",
+      cardPostcode: "Postal code",
+      wallet: "Pay from wallet",
+      walletDesc: "Charged in bitcoin at the rate on the day, from {wallet}.",
+      walletAvailable: "{amount} available",
+      walletOff: "6.9% off",
+      walletSaves: "Saves {amount} against the card price",
+      /* Prepaid, so there is nothing to auto-renew and nothing to consent to.
+         The card path keeps its renewal checkbox; this one has no renewal. */
+      walletPrepaid: "Pays for {span} up front. Does not renew.",
+      spanMonth: "one month",
+      spanYear: "one year",
+      walletShort:
+        "Not enough in {wallet} for the {period} charge. Top it up or pay by card.",
+      walletLocked: "{wallet} is sealed. Unlock it to pay from it.",
+      walletNone: "No wallet is connected to this workspace.",
+      billing: "Billing",
+      monthly: "Pay monthly",
+      annually: "Pay annually",
+      perMonth: "/ month",
+      perYear: "/ year",
+      firstMonthOff: "50% off first month",
+      bestValue: "Best value",
+      saves: "Saves {amount} a year",
+      confirm: "Confirm",
+      dueNow: "Due now",
+      renews: "Then {amount} {every}, until you cancel.",
+      autoRenew:
+        "Nexus Sync renews automatically at the price above plus any tax, unless cancelled. Cancel from Settings before the renewal date to avoid further charges.",
+      terms: "terms",
+      cta: "Turn on Nexus Sync",
+      needsConsent: "Agree to the renewal terms first.",
+      done: "Nexus Sync is on.",
+      /* Two grammatical slots, so neither sentence has to bend. "the {period}
+         charge" wants an adjective; "then $99 {every}" wants an adverbial. */
+      periodMonth: "monthly",
+      periodYear: "annual",
+      everyMonth: "a month",
+      everyYear: "a year",
+    },
+    /* The search palette. Grouped, because an unlabelled list of topics, people
+       and posts is three kinds of thing wearing one shape. */
+    search: {
+      placeholder: "Search posts, people and topics",
+      groupTopics: "Topics",
+      groupPeople: "People",
+      groupPosts: "Posts",
+      groupRooms: "On air now",
+      hintTopic: "Filter the feed",
+      hintPerson: "See their posts",
+      hintPost: "Go to post",
+      hintRoom: "See what is on",
+      noResults: "Nothing on the timeline matches that.",
+      /* The strip header, once search has narrowed the feed to somebody. */
+      byline: "Posts from",
+      clear: "Clear",
+    },
+  },
+
+  /** the workspaces manager: what each workspace is connected to */
   profiles: {
     sidebar: {
-      title: "Profiles",
-      statProfiles: "profiles",
+      title: "Workspaces",
+      viewFeed: "Show Timeline",
+      statProfiles: "workspaces",
       statHandles: "handles",
       statWallets: "wallets",
-      allProfiles: "All profiles",
+      allProfiles: "All workspaces",
       current: "You are here",
       rowSummary: "{handle} · {wallet}",
-      sharedTitle: "Shared across profiles",
-      sharedHint:
-        "Not a mistake, but worth knowing about if you are keeping these apart.",
+      sharedTitle: "Shared across workspaces",
     },
     tabConnections: "Connections",
     tabBrowsing: "Browsing",
@@ -2150,8 +3418,8 @@ export const content = {
       wallet: "Wallet",
       connectHandle: "Connect a handle",
       connectWallet: "Connect a wallet",
-      pickHandle: "Handle for this profile",
-      pickWallet: "Wallet for this profile",
+      pickHandle: "Handle for this workspace",
+      pickWallet: "Wallet for this workspace",
       newHandle: "Claim another handle",
       newWallet: "Add a wallet",
       nowWallet: "Now the wallet for",
@@ -2160,20 +3428,130 @@ export const content = {
       /* The trigger is a watermark in a 288px column; the popover's label is
          where the whole sentence belongs. */
       addApp: "Connect an app",
-      addAppLabel: "Connect an app from another profile",
+      addAppLabel: "Connect an app from another workspace",
       connectedTo: "Connected to",
       morePile: "+{n} more",
       locked: "Locked",
       essential: "Essential",
       unknownRepo: "Unknown source",
       nowOn: "Now the handle for",
+      /* On the row rather than after the click: a picker that looks like a free
+         choice and then asks a question is a picker that made you read the
+         question. This way the sheet confirms something you already knew. */
+      heldBy: "Held by {name}",
+      moveTitle: "@{handle} is on {name}",
+      moveBody:
+        "A handle answers for one workspace at a time. Connecting it here takes it off {name}, which is left without one until you give it another.",
+      moveCancel: "Leave it there",
+      moveConfirm: "Move it here",
+      movedFrom: "Moved off {name}",
       disconnected: "Disconnected from",
       noApps: "No apps connected.",
-      /* Apps are still connected for the whole Nexus rather than per profile,
+      /* Apps are still connected for the whole Nexus rather than per workspace,
          and the note says so rather than letting the surrounding switches imply
          otherwise. */
-      footnote: "Permissions are scoped to this profile's wallet.",
+      footnote: "Permissions are scoped to this workspace's wallet.",
     },
+  },
+
+  /**
+   * The home screen, for when the Timeline is not it.
+   *
+   * Short and unbranded on purpose: this screen is mostly a photograph and one
+   * question, and every extra word on it is a word between somebody and their
+   * morning.
+   */
+  home: {
+    morning: "Good morning",
+    afternoon: "Good afternoon",
+    evening: "Good evening",
+    goalAsk: "What is your focus for today?",
+    /* Two figures, top right, where Momentum puts the weather and a step count.
+       Both of those would be invented here; these are things this app already
+       knows, which is the only reason they earn the corner. */
+    unread: "unread",
+    balance: "in {wallet}",
+    balanceNone: "no wallet",
+    openMessages: "Open Messages",
+    openWallet: "Open Payments",
+    balanceShow: "Show the balance",
+    balanceHide: "Hide the balance",
+    /* The column beside it. Not filters — there is nothing to filter — but the
+       three facts the screen produces and does not otherwise keep. */
+    columnTitle: "Focus",
+    columnToday: "Today",
+    columnNoGoal: "No focus set yet.",
+    columnDone: "Done",
+    columnOf: "{done} of {total}",
+    columnClear: "Clear what is finished",
+    columnSessions: "Sessions",
+    columnNoSessions: "Twenty-five minutes at a time.",
+    columnSessionsHint: "Each one is a finished twenty-five minutes.",
+    goalDone: "Mark today's focus done",
+    goalClear: "Set a different focus",
+    tasks: "Tasks",
+    tasksLeft: "{n} left",
+    taskNew: "New task",
+    taskRemove: "Remove",
+    note: "Notes",
+    notePlaceholder: "Anything worth keeping.",
+    /* The card, which is not the screen: the screen is Focus and the column
+       says so, and two headings reading "Focus" one above the other would say
+       nothing about which was which. */
+    timer: "Timer",
+    focusMode: "Focus",
+    breakMode: "Break",
+    start: "Start",
+    pause: "Pause",
+    reset: "Start it over",
+    quoteAnother: "Another",
+    /*
+     * One per workspace, not one per day.
+     *
+     * A workspace is a context somebody is in for weeks, so the line under the
+     * photograph is part of what that context feels like rather than a fact
+     * about the date — Work and Personal saying the same thing on the same
+     * Tuesday was the tell that it was decoration. Which one is drawn from the
+     * workspace's own id, so it is stable without anything being stored, and
+     * the refresh beside it writes an override for anybody who disagrees.
+     *
+     * Three to seven words. Under a mountain, at the bottom of the screen, a
+     * sentence long enough to need reading twice is a sentence nobody reads
+     * once — and the one that used to sit here ran to sixteen.
+     *
+     * Twenty-seven of them, which is the number that makes the per-workspace
+     * draw work: with seven, two workspaces landed on the same line often
+     * enough to look like a bug rather than a coincidence.
+     */
+    quotes: [
+      "The work is the point.",
+      "Let the light in.",
+      "Slow progress is better than no progress.",
+      "Begin, and the rest is easier.",
+      "You can do anything, but not everything.",
+      "Well begun is half done.",
+      "Doing beats planning to.",
+      "Start before you feel ready.",
+      "Small things, done often.",
+      "Finish one thing today.",
+      "Attention is the whole game.",
+      "The hard part is starting.",
+      "Leave it better than you found it.",
+      "One thing at a time.",
+      "Depth beats speed.",
+      "The plan is not the work.",
+      "Protect the first hour.",
+      "Progress hides in ordinary days.",
+      "Make room for the quiet.",
+      "Nothing good is built quickly.",
+      "Say no more often.",
+      "Begin badly, but begin.",
+      "Today is enough to carry.",
+      "Notice what you keep avoiding.",
+      "Half an hour, uninterrupted.",
+      "Let the hard thing be first.",
+      "Come back to it tomorrow.",
+    ],
   },
 
   /** shell chrome that is not any one app's */
@@ -2181,6 +3559,15 @@ export const content = {
     collapsePanel: "Close this panel",
     expandPanel: "Open the panel",
     undo: "Undo",
+    /*
+     * Two lengths for one action, because the row it sits in is narrow.
+     * `addSiteShort` is what a tab row has space for once a title has had its
+     * turn; the full sentence is the accessible name and the tooltip, where
+     * there is no width to lose. A button reading "Add" with no context is fine
+     * to look at and useless to a screen reader.
+     */
+    addSiteShort: "Add",
+    addSiteToRail: "Add this site to the rail",
   },
 
   repositories: {
@@ -2233,7 +3620,7 @@ export const content = {
     dark: "Dark",
     /* Said on the way past, because picking a mode also drops a custom
        palette and somebody who spent a minute on theirs deserves the word. */
-    modeReset: "Default palette, for this profile",
+    modeReset: "Default palette, for this workspace",
     ofTheme: "theme",
     savedTitle: "Saved themes",
     delete: "Delete",

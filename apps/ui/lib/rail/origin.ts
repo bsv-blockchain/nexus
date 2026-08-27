@@ -97,8 +97,49 @@ export function isPinnableUrl(url: string): boolean {
  * wallet browser. BSV Browser derives the same URL in BookmarkList.tsx.
  */
 export function faviconUrlFor(url: string): string | null {
+  return faviconCandidates(url)[0] ?? null;
+}
+
+/**
+ * The marks a site might be serving, biggest first.
+ *
+ * `/favicon.ico` is 16 or 32 pixels and looks it on a 52px tile, but almost
+ * every site that has anything better publishes it at one of these well-known
+ * paths — the conventions browsers and phones already probe for. Tried in
+ * order and each failure moves to the next, which is what `Favicon` does with
+ * this list; the last entry is the one that has always worked.
+ *
+ * Guessed rather than read. Reading the page's own `<link rel="icon">` means
+ * reaching into a document on somebody else's origin, which this side of the
+ * app cannot do and should not be able to.
+ */
+export function faviconCandidates(url: string): string[] {
   const origin = deriveOrigin(url);
-  return origin && origin !== "null" ? `${origin}/favicon.ico` : null;
+  if (!origin || origin === "null") return [];
+  return [
+    `${origin}/apple-touch-icon.png`,
+    `${origin}/apple-touch-icon-precomposed.png`,
+    `${origin}/icon.png`,
+    `${origin}/favicon.ico`,
+  ];
+}
+
+/**
+ * A page title, cut down to something that fits under a rail tile.
+ *
+ * Page titles are written for a browser tab and a search result, so they carry
+ * the site's name AND the page's AND a tagline, separated by whichever dash the
+ * author reached for. The first segment is the name in nearly every case; the
+ * host is the fallback, because "example.com" is at least true.
+ */
+export function shortNameFor(title: string, url: string): string {
+  const first = (title ?? "")
+    .split(/\s[|\u2013\u2014\u00b7\u2022-]\s/)[0]
+    ?.trim();
+  const name = first && first.length > 1 ? first : displayOrigin(url);
+  /* Long enough for "Open Protocol Labs", short enough that the rail's own
+     ellipsis is rare rather than usual. */
+  return name.length > 22 ? `${name.slice(0, 21).trimEnd()}\u2026` : name;
 }
 
 /**

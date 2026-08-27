@@ -1092,7 +1092,7 @@ function HandleReceive(): ReactNode {
       ) : null}
       {/* Only true while there is a box to read. With no server the sentence
           would be a promise the rail cannot keep. */}
-      <p className="text-center text-xs text-muted-foreground">
+      <p className="text-center text-xs text-balance text-muted-foreground">
         {canRead
           ? "Payments sent to your handle are credited automatically while this is open."
           : "Choose a message box server below before sharing your handle."}

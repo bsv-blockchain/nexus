@@ -27,7 +27,13 @@ export function Providers({ children }: { children: ReactNode }): ReactNode {
         {/* No `richColors`: its tinted cards are hardcoded and ignore a custom
             theme. Toasts take the Nexus surface from globals.css instead, with
             the type carried by the icon colour. */}
-        <Toaster position="bottom-right" theme="system" closeButton />
+        {/* Top centre, not bottom right.
+
+            The browsed page is a native view stacked above this document, and
+            it fills the canvas from the address bar down — so a toast in the
+            bottom corner was raised into the one region of the window it could
+            not be seen in. The top of the window is chrome on every layout. */}
+        <Toaster position="top-center" theme="system" closeButton />
       </ReducedMotionProvider>
     </ThemeProvider>
   );

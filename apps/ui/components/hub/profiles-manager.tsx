@@ -2,6 +2,7 @@
 
 import { PRIMARY_CTA } from "@/components/hub/cta";
 import { useHub } from "@/components/hub/hub-provider";
+import { useCreateWorkspace } from "@/components/hub/use-create-workspace";
 import { SpaceContent } from "@/components/hub/space-content";
 import {
   SpaceDragProvider,
@@ -14,8 +15,18 @@ import { ThemeButton } from "@/components/hub/theme-picker";
 import { useCustomTheme } from "@/components/hub/theme-provider";
 import { content, type Space } from "@/lib/data";
 import { derivePalette, paletteVars, themeGradient } from "@/lib/theme";
+import {
+  consumeNewWorkspaceRequest,
+  useNewWorkspaceRequested,
+} from "@/lib/workspace-request";
 import { MoreHorizontal, Move, Pencil, Plus } from "lucide-react";
-import { useState, type CSSProperties, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 
 const SPACE_DRAG = "application/x-nexus-space";
 
@@ -59,7 +70,8 @@ function columnTheme(
  * with an edit affordance, a drag handle to reorder, and an options menu.
  */
 export function ProfilesManager(): ReactNode {
-  const { spaces, moveSpace, createSpace } = useHub();
+  const { spaces, moveSpace } = useHub();
+  const createWorkspace = useCreateWorkspace();
   /*
    * Every profile, the active one included.
    *
@@ -76,6 +88,37 @@ export function ProfilesManager(): ReactNode {
     side: "before" | "after";
   } | null>(null);
 
+  /*
+   * The title bar's "+" asks for this one to be brought into sight.
+   *
+   * It cannot scroll this view itself — it has no idea how many columns there
+   * are or how wide they came out — so it leaves a request and the view answers
+   * it. The request is taken back once it has been served, so arriving here
+   * some other way later does not yank the scroll position about.
+   *
+   * While it stands, the circle wears the help button's ring: something moved
+   * on screen because of a control somewhere else, and the eye needs telling
+   * where it landed. Hovering it is proof enough that it has been found.
+   */
+  const requested = useNewWorkspaceRequested();
+  const plus = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!requested) return;
+    /* `end` rather than `nearest`: the point is to push the columns left and
+       show what is past them, which a minimal scroll would not do. `nearest`
+       vertically, so nothing above this view moves. */
+    plus.current?.scrollIntoView({
+      behavior: "smooth",
+      inline: "end",
+      block: "nearest",
+    });
+    /* Long enough to be noticed, short enough not to become wallpaper if
+       nobody ever points at it. */
+    const timer = setTimeout(consumeNewWorkspaceRequest, 6000);
+    return () => clearTimeout(timer);
+  }, [requested]);
+
   const canDrop = (event: React.DragEvent): boolean =>
     event.dataTransfer.types.includes(SPACE_DRAG);
   const sideOf = (event: React.DragEvent): "before" | "after" => {
@@ -89,7 +132,11 @@ export function ProfilesManager(): ReactNode {
 
   return (
     <SpaceDragProvider>
-    <div className="flex h-full items-stretch gap-3 py-4 pr-2 pl-4">
+    {/* pb-24 below `md`: the browse bar is fixed over the bottom of a phone,
+        and a column that ends underneath it ends with its own footer buried —
+        which on this screen is Reorder, Theme and the options menu, three
+        controls that were on screen and could not be pressed. */}
+    <div className="flex h-full items-stretch gap-3 py-4 pr-2 pb-24 pl-4 md:pb-4">
       {columns.map((space) => (
         <ProfileColumn
           key={space.id}
@@ -118,12 +165,26 @@ export function ProfilesManager(): ReactNode {
 
       <div className="flex h-full shrink-0 items-center px-3">
         <button
+          ref={plus}
           type="button"
-          onClick={createSpace}
+          onPointerEnter={consumeNewWorkspaceRequest}
+          onFocus={consumeNewWorkspaceRequest}
+          onClick={() => {
+            consumeNewWorkspaceRequest();
+            createWorkspace();
+          }}
           aria-label={content.newItemMenu.newSpace}
-          className={`focus-ring flex size-10 items-center justify-center rounded-full ${PRIMARY_CTA}`}
+          className={`focus-ring relative flex size-10 items-center justify-center rounded-full ${PRIMARY_CTA}`}
         >
           <Plus className="size-5" aria-hidden="true" />
+          {/* `pointer-events-none` so the ring never eats the click it is
+              advertising — the same reason the help circle's does. */}
+          {requested && (
+            <span
+              aria-hidden="true"
+              className="bg-accent/40 pointer-events-none absolute inset-0 animate-ping rounded-full"
+            />
+          )}
         </button>
       </div>
     </div>

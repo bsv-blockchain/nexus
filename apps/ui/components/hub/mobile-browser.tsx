@@ -2,12 +2,20 @@
 
 import { AppTile, SiteTile } from "@/components/hub/app-icon";
 import { Favicon } from "@/components/hub/favicon";
-import { MobileSettings } from "@/components/hub/mobile-settings";
+import { MobileAppSheet } from "@/components/hub/mobile-app-sheet";
+import { hasContextSidebar } from "@/components/hub/app-context-sidebar";
+import { GroupSettingsDialog } from "@/components/hub/group-settings-dialog";
+import { getEssentialAppSlugs } from "@/lib/data";
 import { OriginChip } from "@/components/hub/origin-chip";
+import { SpaceIcon } from "@/components/hub/space-icon";
+import { homeView } from "@/lib/home-view";
+import { requestNewWorkspace } from "@/lib/workspace-request";
 import { useScrollDirection } from "@/lib/scroll-direction";
 import { useIsDesktop } from "@/lib/use-is-desktop";
+import { openSearch } from "@/lib/timeline-store";
 import {
   useHub,
+  type AppSlug,
   type RailEntry,
   type RailRef,
 } from "@/components/hub/hub-provider";
@@ -22,30 +30,38 @@ import {
 import { refKey } from "@/lib/rail/layout";
 import type { PinnedSite } from "@/lib/rail/sites";
 import { DEMO_SURFACES } from "@/lib/surfaces";
+import { HelpSheet } from "@/components/hub/help-circle";
+import { content as allContent } from "@/lib/data";
+import { isPinnableUrl, shortNameFor } from "@/lib/rail/origin";
+import { useSettings } from "@/lib/settings-store";
 import { useHostOverlay } from "@/lib/wallet-data";
 import {
-  AlignLeft,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
   Download,
   Folder,
   Gift,
+  Globe,
+  House,
   Layers,
   LayoutGrid,
+  LifeBuoy,
   Link2,
   Mic,
   Monitor,
   Pin,
   Plus,
   RotateCw,
+  Search,
   Settings,
   Share,
+  SquarePlus,
   TextSearch,
   Type,
+  type LucideIcon,
   VenetianMask,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import {
   AnimatePresence,
@@ -83,7 +99,13 @@ function hostOf(url: string): string {
 }
 
 /** A small faux "web page" thumbnail used in the bottom-bar tab stack. */
-function PageThumb({ tab, className = "" }: { tab: BrowserTab; className?: string }): ReactNode {
+function PageThumb({
+  tab,
+  className = "",
+}: {
+  tab: BrowserTab;
+  className?: string;
+}): ReactNode {
   return (
     <div
       className={`flex flex-col overflow-hidden rounded-[7px] bg-white ring-1 ring-black/10 dark:bg-neutral-100 ${className}`}
@@ -131,7 +153,7 @@ function TabStack({
           className="absolute inset-0 top-0.5 left-1 size-9 rotate-6 shadow-lg"
         />
       ) : (
-        <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-surface-raised text-[10px] font-semibold text-muted-foreground ring-1 ring-border">
+        <span className="bg-surface-raised text-muted-foreground ring-border absolute inset-0 flex items-center justify-center rounded-lg text-[10px] font-semibold ring-1">
           0
         </span>
       )}
@@ -168,6 +190,8 @@ function BottomBar({
   onSwitcher,
   onAddress,
   onDetails,
+  detailsLabel,
+  timeline = false,
 }: {
   tabs: BrowserTab[];
   site: boolean;
@@ -177,6 +201,17 @@ function BottomBar({
   onSwitcher: () => void;
   onAddress: () => void;
   onDetails: () => void;
+  /**
+   * The Timeline has the canvas.
+   *
+   * The centre control is "what does this button open next" rather than a fixed
+   * new-tab: on a timeline the useful next thing is search, and a plus that
+   * opened a browser tab from a feed would be answering a question nobody asked
+   * there.
+   */
+  timeline?: boolean;
+  /** what the chevron is about, which is the page or the app it is over */
+  detailsLabel: string;
 }): ReactNode {
   return (
     <motion.div
@@ -204,9 +239,9 @@ function BottomBar({
         type="button"
         onClick={onRail}
         aria-label={content.mobileBrowser.appRail}
-        className="focus-ring pointer-events-auto flex size-11 items-center justify-center justify-self-start rounded-full bg-surface-raised/95 shadow-lg ring-1 ring-border backdrop-blur transition-transform active:scale-95"
+        className="focus-ring bg-surface-raised/95 ring-border pointer-events-auto flex size-11 items-center justify-center justify-self-start rounded-full shadow-lg ring-1 backdrop-blur transition-transform active:scale-95"
       >
-        <LayoutGrid className="size-5 text-foreground" aria-hidden="true" />
+        <LayoutGrid className="text-foreground size-5" aria-hidden="true" />
       </button>
       {/* Never a missing cell: this is a three-column grid, and a dropped child
           would let the right-hand group slide into the middle — moving the two
@@ -218,11 +253,19 @@ function BottomBar({
       ) : (
         <button
           type="button"
-          onClick={onAddress}
-          aria-label={content.mobileBrowser.newTab}
-          className="focus-ring pointer-events-auto flex h-11 w-28 items-center justify-center justify-self-center rounded-full bg-surface-raised/95 shadow-lg ring-1 ring-border backdrop-blur transition-transform active:scale-95"
+          onClick={timeline ? openSearch : onAddress}
+          aria-label={
+            timeline
+              ? content.timeline.rail.search
+              : content.mobileBrowser.newTab
+          }
+          className="focus-ring bg-surface-raised/95 ring-border pointer-events-auto flex h-11 w-28 items-center justify-center justify-self-center rounded-full shadow-lg ring-1 backdrop-blur transition-transform active:scale-95"
         >
-          <Plus className="size-5 text-foreground" aria-hidden="true" />
+          {timeline ? (
+            <Search className="text-foreground size-5" aria-hidden="true" />
+          ) : (
+            <Plus className="text-foreground size-5" aria-hidden="true" />
+          )}
         </button>
       )}
       <div className="pointer-events-auto flex items-center gap-3 justify-self-end">
@@ -230,10 +273,10 @@ function BottomBar({
         <button
           type="button"
           onClick={onDetails}
-          aria-label={content.mobileBrowser.urlDetails}
-          className="focus-ring flex size-11 items-center justify-center rounded-full bg-surface-raised/95 shadow-lg ring-1 ring-border backdrop-blur transition-transform active:scale-95"
+          aria-label={detailsLabel}
+          className="focus-ring bg-surface-raised/95 ring-border flex size-11 items-center justify-center rounded-full shadow-lg ring-1 backdrop-blur transition-transform active:scale-95"
         >
-          <ChevronUp className="size-5 text-foreground" aria-hidden="true" />
+          <ChevronUp className="text-foreground size-5" aria-hidden="true" />
         </button>
       </div>
     </motion.div>
@@ -361,9 +404,11 @@ function SheetShell({
 function UrlDetailsSheet({
   onClose,
   onOpenAddress,
+  onOpenHelp,
 }: {
   onClose: () => void;
   onOpenAddress: () => void;
+  onOpenHelp: () => void;
 }): ReactNode {
   const {
     activeTab,
@@ -374,6 +419,8 @@ function UrlDetailsSheet({
     navigateActiveTab,
     addFavoriteFromTab,
     openShare,
+    pinSite,
+    pinnedSites,
   } = useHub();
   const copy = content.mobileBrowser;
   const host = activeTab ? hostOf(activeTab.url) : "";
@@ -389,24 +436,50 @@ function UrlDetailsSheet({
   };
 
   /*
-   * Find on Page and Summarize are demo-only.
+   * This page, on the rail as an app.
    *
-   * Neither does anything: Summarize raised a "coming soon" toast, and Find on
-   * Page was worse — it just closed the sheet, which looks like it worked. Both
-   * stay in the demo, where the grid of four is the point; a shipping build shows
-   * the two that are real rather than four buttons where half answer nothing.
+   * The same act the App Store performs when you connect a web listing —
+   * pinning the URL — reached from the page itself, which is where somebody
+   * who has just found something wants it. It took the slot Summarize held,
+   * which raised a "coming soon" toast and nothing else.
+   */
+  const addToRail = (): void => {
+    if (!activeTab) return;
+    const settings = content.browserSettings;
+    if (!isPinnableUrl(activeTab.url)) {
+      toast.error(settings.addToRailRefused);
+      return;
+    }
+    const name = shortNameFor(activeTab.title, activeTab.url);
+    const already = pinnedSites.some((site) => site.url === activeTab.url);
+    const site = pinSite(activeTab.url, name);
+    onClose();
+    if (!site) {
+      toast.error(settings.addToRailRefused);
+      return;
+    }
+    toast.success(
+      already ? settings.addToRailAlready : settings.addToRailDone,
+      { description: name }
+    );
+  };
+
+  /*
+   * Find on Page is demo-only.
+   *
+   * It does nothing: it just closes the sheet, which looks like it worked. It
+   * stays in the demo, where the grid of four is the point; a shipping build
+   * shows the three that are real rather than four where one answers nothing.
    */
   const actions: { label: string; icon: LucideIcon; onClick: () => void }[] = [
     ...(DEMO_SURFACES
-      ? [
-          { label: copy.actions.findOnPage, icon: TextSearch, onClick: onClose },
-          {
-            label: copy.actions.summarize,
-            icon: AlignLeft,
-            onClick: () => toast.info("Summarize is coming soon"),
-          },
-        ]
+      ? [{ label: copy.actions.findOnPage, icon: TextSearch, onClick: onClose }]
       : []),
+    {
+      label: content.browserSettings.addToRail,
+      icon: SquarePlus,
+      onClick: addToRail,
+    },
     {
       label: copy.actions.pin,
       icon: Pin,
@@ -428,13 +501,13 @@ function UrlDetailsSheet({
   return (
     <SheetShell onClose={onClose}>
       {/* Address pill */}
-      <div className="flex items-center gap-1 rounded-full bg-surface px-2 py-1.5 ring-1 ring-border">
+      <div className="bg-surface ring-border flex items-center gap-1 rounded-full px-2 py-1.5 ring-1">
         <button
           type="button"
           aria-label="Back"
           disabled={!canGoBack}
           onClick={goBack}
-          className="focus-ring rounded-full p-1.5 text-muted-foreground disabled:opacity-30"
+          className="focus-ring text-muted-foreground rounded-full p-1.5 disabled:opacity-30"
         >
           <ChevronLeft className="size-5" aria-hidden="true" />
         </button>
@@ -443,7 +516,7 @@ function UrlDetailsSheet({
           aria-label="Forward"
           disabled={!canGoForward}
           onClick={goForward}
-          className="focus-ring rounded-full p-1.5 text-muted-foreground disabled:opacity-30"
+          className="focus-ring text-muted-foreground rounded-full p-1.5 disabled:opacity-30"
         >
           <ChevronRight className="size-5" aria-hidden="true" />
         </button>
@@ -458,7 +531,7 @@ function UrlDetailsSheet({
           type="button"
           aria-label="Copy link"
           onClick={copyLink}
-          className="focus-ring rounded-full p-1.5 text-muted-foreground"
+          className="focus-ring text-muted-foreground rounded-full p-1.5"
         >
           <Link2 className="size-4.5" aria-hidden="true" />
         </button>
@@ -466,7 +539,7 @@ function UrlDetailsSheet({
           type="button"
           aria-label="Reload"
           onClick={() => activeTab && navigateActiveTab(activeTab.url)}
-          className="focus-ring rounded-full p-1.5 text-muted-foreground"
+          className="focus-ring text-muted-foreground rounded-full p-1.5"
         >
           <RotateCw className="size-4.5" aria-hidden="true" />
         </button>
@@ -481,14 +554,35 @@ function UrlDetailsSheet({
             onClick={action.onClick}
             className="focus-ring flex flex-col items-center gap-1.5"
           >
-            <span className="flex aspect-square w-full items-center justify-center rounded-2xl bg-surface ring-1 ring-border">
+            <span className="bg-surface ring-border flex aspect-square w-full items-center justify-center rounded-2xl ring-1">
               <action.icon className="size-6" aria-hidden="true" />
             </span>
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-muted-foreground text-[11px]">
               {action.label}
             </span>
           </button>
         ))}
+      </div>
+
+      {/* Help sits outside the demo gate below, because it is the one row here
+          that does something: on a phone there is no floating "?" to reach the
+          same menu from, so this is the only way to it. */}
+      <div className="mt-3 space-y-2">
+        <button
+          type="button"
+          onClick={onOpenHelp}
+          className="focus-ring bg-surface ring-border flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-medium ring-1"
+        >
+          <LifeBuoy
+            className="text-muted-foreground size-5"
+            aria-hidden="true"
+          />
+          <span className="flex-1 text-left">{allContent.help.label}</span>
+          <ChevronRight
+            className="text-muted-foreground size-4"
+            aria-hidden="true"
+          />
+        </button>
       </div>
 
       {/* Rows. Both are demo-only: neither has anything behind it yet, and a row
@@ -498,21 +592,24 @@ function UrlDetailsSheet({
           <button
             type="button"
             onClick={() => toast.info("Display options coming soon")}
-            className="focus-ring flex w-full items-center gap-3 rounded-2xl bg-surface px-4 py-3.5 text-sm font-medium ring-1 ring-border"
+            className="focus-ring bg-surface ring-border flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-medium ring-1"
           >
-            <Type className="size-5 text-muted-foreground" aria-hidden="true" />
+            <Type className="text-muted-foreground size-5" aria-hidden="true" />
             <span className="flex-1 text-left">{copy.displayOptions}</span>
             <ChevronRight
-              className="size-4 text-muted-foreground"
+              className="text-muted-foreground size-4"
               aria-hidden="true"
             />
           </button>
           <button
             type="button"
             onClick={() => toast.info("Site settings coming soon")}
-            className="focus-ring flex w-full items-center gap-3 rounded-2xl bg-surface px-4 py-3.5 text-sm font-medium ring-1 ring-border"
+            className="focus-ring bg-surface ring-border flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-medium ring-1"
           >
-            <Settings className="size-5 text-muted-foreground" aria-hidden="true" />
+            <Settings
+              className="text-muted-foreground size-5"
+              aria-hidden="true"
+            />
             <span className="flex-1 text-left">{copy.siteSettings}</span>
           </button>
         </div>
@@ -635,17 +732,17 @@ function AddressSheet({
           onKeyDown={(event) => {
             if (event.key === "Enter") submit(event.currentTarget.value);
           }}
-          className="min-w-0 flex-1 bg-transparent text-[17px] outline-none placeholder:text-muted-foreground"
+          className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[17px] outline-none"
         />
         {incognito && (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-muted-foreground text-sm">
             {copy.incognito}
           </span>
         )}
         <button
           type="button"
           aria-label="Voice search"
-          className="focus-ring shrink-0 rounded-full p-1 text-muted-foreground"
+          className="focus-ring text-muted-foreground shrink-0 rounded-full p-1"
         >
           <Mic className="size-5" aria-hidden="true" />
         </button>
@@ -666,20 +763,20 @@ function AddressSheet({
         {incognito ? (
           <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
             <VenetianMask
-              className="size-8 text-muted-foreground"
+              className="text-muted-foreground size-8"
               aria-hidden="true"
             />
             <p className="text-lg font-semibold">{copy.incognitoTitle}</p>
-            <p className="max-w-xs text-sm text-muted-foreground">
+            <p className="text-muted-foreground max-w-xs text-sm">
               {copy.incognitoHint}
             </p>
           </div>
         ) : tabs.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">
+          <p className="text-muted-foreground py-10 text-center text-sm">
             {copy.noTabs}
           </p>
         ) : (
-          <div className="divide-y divide-border/60">
+          <div className="divide-border/60 divide-y">
             {tabs.map((tab) => {
               const favId = favByUrl.get(tab.url);
               return (
@@ -724,10 +821,21 @@ function SwitcherCard({
   // Effective distance from the centered position, tracking live drag.
   const offset = useTransform(drag, (dx) => index - center - dx / spacing);
   const x = useTransform(offset, (o) => o * spacing);
-  const scale = useTransform(offset, (o) => 1 - Math.min(Math.abs(o) * 0.14, 0.55));
-  const opacity = useTransform(offset, (o) => 1 - Math.min(Math.abs(o) * 0.32, 0.85));
-  const rotateY = useTransform(offset, (o) => Math.max(-32, Math.min(32, -o * 16)));
-  const zIndex = useTransform(offset, (o) => 100 - Math.round(Math.abs(o) * 10));
+  const scale = useTransform(
+    offset,
+    (o) => 1 - Math.min(Math.abs(o) * 0.14, 0.55)
+  );
+  const opacity = useTransform(
+    offset,
+    (o) => 1 - Math.min(Math.abs(o) * 0.32, 0.85)
+  );
+  const rotateY = useTransform(offset, (o) =>
+    Math.max(-32, Math.min(32, -o * 16))
+  );
+  const zIndex = useTransform(
+    offset,
+    (o) => 100 - Math.round(Math.abs(o) * 10)
+  );
   const page = getMockPage(tab.url);
 
   return (
@@ -756,7 +864,10 @@ function SwitcherCard({
             {hostOf(tab.url)}
           </span>
           {isActive && (
-            <span className="size-2 rounded-full bg-accent" aria-hidden="true" />
+            <span
+              className="bg-accent size-2 rounded-full"
+              aria-hidden="true"
+            />
           )}
         </div>
         <div className="min-h-0 flex-1 overflow-hidden px-5 py-4">
@@ -800,7 +911,7 @@ function TabSwitcher({
 }): ReactNode {
   const startIndex = Math.max(
     0,
-    tabs.findIndex((tab) => tab.id === activeTabId),
+    tabs.findIndex((tab) => tab.id === activeTabId)
   );
   const [center, setCenter] = useState(startIndex);
   const drag = useMotionValue(0);
@@ -824,7 +935,7 @@ function TabSwitcher({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex flex-col bg-background md:hidden"
+      className="bg-background fixed inset-0 z-50 flex flex-col md:hidden"
     >
       {/* Centered tab title */}
       <div className="flex h-16 items-center justify-center px-10 pt-4">
@@ -879,7 +990,7 @@ function TabSwitcher({
         </div>
         {tabs.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               {content.mobileBrowser.noTabs}
             </p>
           </div>
@@ -955,7 +1066,7 @@ function TabSwitcher({
             type="button"
             onClick={onHub}
             aria-label={content.mobileBrowser.hub}
-            className="focus-ring flex size-12 items-center justify-center justify-self-start rounded-full bg-surface-raised text-muted-foreground ring-1 ring-border"
+            className="focus-ring bg-surface-raised text-muted-foreground ring-border flex size-12 items-center justify-center justify-self-start rounded-full ring-1"
           >
             <Monitor className="size-5" aria-hidden="true" />
           </button>
@@ -966,16 +1077,16 @@ function TabSwitcher({
           type="button"
           onClick={onNewTab}
           aria-label={content.mobileBrowser.newTab}
-          className="focus-ring flex h-12 w-20 items-center justify-center justify-self-center rounded-full bg-surface-raised shadow-md ring-1 ring-border transition-transform active:scale-95"
+          className="focus-ring bg-surface-raised ring-border flex h-12 w-20 items-center justify-center justify-self-center rounded-full shadow-md ring-1 transition-transform active:scale-95"
         >
-          <Plus className="size-6 text-foreground" aria-hidden="true" />
+          <Plus className="text-foreground size-6" aria-hidden="true" />
         </button>
         {onSettings ? (
           <button
             type="button"
             onClick={onSettings}
             aria-label={content.mobileBrowser.settings.title}
-            className="focus-ring flex size-12 items-center justify-center justify-self-end rounded-full bg-surface-raised text-muted-foreground ring-1 ring-border"
+            className="focus-ring bg-surface-raised text-muted-foreground ring-border flex size-12 items-center justify-center justify-self-end rounded-full ring-1"
           >
             <Settings className="size-5" aria-hidden="true" />
           </button>
@@ -987,7 +1098,7 @@ function TabSwitcher({
         type="button"
         onClick={onClose}
         aria-label="Close tab switcher"
-        className="focus-ring absolute top-4 right-4 rounded-full p-2 text-muted-foreground"
+        className="focus-ring text-muted-foreground absolute top-4 right-4 rounded-full p-2"
       >
         <X className="size-5" aria-hidden="true" />
       </button>
@@ -996,41 +1107,96 @@ function TabSwitcher({
 }
 
 /** A single icon tile in the mobile rail (system tab or app). */
+/** As long as the desktop rail holds a tile before it offers to remove it. */
+const LONG_PRESS_MS = 500;
+
 function RailTile({
   icon,
   active,
   onClick,
+  onHold,
+  onRemove,
+  removing,
   label,
   children,
 }: {
   icon?: LucideIcon;
   active: boolean;
   onClick: () => void;
+  /** what a long press does, where a long press means anything */
+  onHold?: (() => void) | undefined;
+  /** the cross's action, once a hold has revealed one */
+  onRemove?: (() => void) | undefined;
+  removing?: boolean;
   label: string;
   children?: ReactNode;
 }): ReactNode {
   const Icon = icon;
+  const timer = useRef<number | null>(null);
+  const cancel = (): void => {
+    if (timer.current === null) return;
+    window.clearTimeout(timer.current);
+    timer.current = null;
+  };
+  /* Cleared on unmount as well as on release: the sheet closes on a tap, and a
+     timer that outlives the tile it belongs to fires into a dead component. */
+  useEffect(() => cancel, []);
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      aria-pressed={active}
-      className={`focus-ring flex size-14 shrink-0 items-center justify-center rounded-2xl transition-colors ${
-        active
-          ? "bg-surface-raised shadow-sm ring-1 ring-border"
-          : "hover:bg-surface-hover"
-      }`}
-    >
-      {Icon ? (
-        <Icon
-          className={`size-6 ${active ? "text-foreground" : "text-muted-foreground"}`}
-          aria-hidden="true"
-        />
-      ) : (
-        children
-      )}
-    </button>
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={onClick}
+        onPointerDown={
+          onHold
+            ? () => {
+                cancel();
+                timer.current = window.setTimeout(onHold, LONG_PRESS_MS);
+              }
+            : undefined
+        }
+        onPointerUp={onHold ? cancel : undefined}
+        onPointerLeave={onHold ? cancel : undefined}
+        onPointerCancel={onHold ? cancel : undefined}
+        aria-label={label}
+        aria-pressed={active}
+        className={`focus-ring flex size-14 items-center justify-center rounded-2xl transition-colors ${
+          active
+            ? "bg-surface-raised ring-border shadow-sm ring-1"
+            : "hover:bg-surface-hover"
+        }`}
+      >
+        {Icon ? (
+          <Icon
+            className={`size-6 ${active ? "text-foreground" : "text-muted-foreground"}`}
+            aria-hidden="true"
+          />
+        ) : (
+          children
+        )}
+      </button>
+      {/* The same cross the desktop rail reveals after the same half second,
+          in the same corner. A phone has no right-click and no drag that this
+          column could tell apart from a scroll, so the hold is the whole of
+          its editing vocabulary — which is why it does the one act that
+          matters and leaves reordering to a mouse. */}
+      <AnimatePresence>
+        {removing && onRemove && (
+          <motion.button
+            type="button"
+            initial={{ scale: 0.4, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.4, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 520, damping: 24 }}
+            onClick={onRemove}
+            aria-label={`${content.appStore.railRemove} ${label}`}
+            className="focus-ring border-background bg-negative absolute top-0 right-0 z-20 grid size-5 place-items-center rounded-full border-2 text-white shadow-lg"
+          >
+            <X className="size-3" strokeWidth={3} aria-hidden="true" />
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -1050,10 +1216,60 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
     setMobileSheetOpen,
     openShare,
     pinnedSites,
+    spaces,
     activeSpaceId,
+    setActiveSpaceId,
+    setMainView,
     openLinkInBrowser,
+    isInstalled,
+    uninstallApp,
+    unpinSite,
   } = useHub();
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  /*
+   * Which tile is wearing a cross, and which group is being renamed.
+   *
+   * Both are what the desktop rail does with a long press — one act each, the
+   * one that fits what was held. A phone cannot drag a tile without the column
+   * mistaking it for a scroll, so reordering and folding into a folder stay a
+   * mouse's job; removing something you no longer want does not.
+   */
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [groupSettings, setGroupSettings] = useState<{
+    id: string;
+    name: string;
+    color?: string | undefined;
+  } | null>(null);
+
+  /* Essential apps refuse to be uninstalled, so they are not offered it. */
+  const essential = new Set<string>(getEssentialAppSlugs());
+  const removable = (ref: RailRef): boolean =>
+    ref.kind !== "app" || !essential.has(ref.slug);
+  const removeRef = (ref: RailRef): void => {
+    setRemoving(null);
+    if (ref.kind === "app") uninstallApp(ref.slug as AppSlug, activeSpaceId);
+    else unpinSite(ref.id);
+  };
+  /*
+   * Pinning Browse to the rail is one setting, and this is a rail.
+   *
+   * `visibleApps` in hub-provider drops Browse from the tiles when the setting
+   * is on, because on desktop the rail puts it back as a button. This rail did
+   * not, so switching the setting on took Browse off the phone entirely — the
+   * one control whose whole job is to move a door was closing it.
+   *
+   * Workspaces above is deliberately NOT gated the same way. `workspacesInRail`
+   * is safe to switch off on desktop because the workspace list is in the
+   * column beside the rail either way; on a phone this button is the only way
+   * to reach it, and hiding it would take away the room rather than a door.
+   */
+  const settings = useSettings();
+  const browsePinned = settings.browseAsButton && isInstalled("browser");
+  /* Home is a question, not a destination — see lib/home-view. */
+  const home = homeView(
+    settings.homescreen,
+    !settings.timelineAsApp || isInstalled("timeline"),
+  );
 
   const systemTabs: {
     id: string;
@@ -1062,6 +1278,24 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
     active: boolean;
     onClick: () => void;
   }[] = [
+    /*
+     * First, because it is the way back.
+     *
+     * It lived only in the desktop title bar, which a phone does not have —
+     * so until this row existed there was no way to reach whichever homescreen
+     * an install uses without going through an app. Top of the column for the
+     * same reason it is the leftmost thing in the strip on a desktop.
+     */
+    {
+      id: "home",
+      label: content.titleBar.home,
+      icon: House,
+      active: mainView === "home" || mainView === "timeline",
+      onClick: () => {
+        onClose();
+        setMainView(home);
+      },
+    },
     {
       id: "spaces",
       label: content.library.spaces.title,
@@ -1069,6 +1303,23 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
       active: mainView === "profiles",
       onClick: openProfilesManager,
     },
+    ...(browsePinned
+      ? [
+          {
+            id: "browse",
+            label: content.library.spaces.browse,
+            icon: Globe,
+            active:
+              mainView === "app" &&
+              activeRef.kind === "app" &&
+              activeRef.slug === "browser",
+            onClick: () => {
+              onClose();
+              openApp("browser");
+            },
+          },
+        ]
+      : []),
     {
       id: "apps",
       label: content.library.apps.title,
@@ -1123,9 +1374,23 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
           label={app.name}
           active={active}
           onClick={() => {
+            /* A tile wearing a cross is a tile being edited, so the tap that
+               would have opened it puts the cross away instead. Otherwise the
+               only way out of edit mode is to open something. */
+            if (removing !== null) {
+              setRemoving(null);
+              return;
+            }
             openApp(app.slug);
             onClose();
           }}
+          {...(removable(ref)
+            ? {
+                onHold: () => setRemoving(refKey(ref)),
+                onRemove: () => removeRef(ref),
+                removing: removing === refKey(ref),
+              }
+            : {})}
         >
           <AppTile app={app} size={38} className={active ? "" : "grayscale"} />
         </RailTile>
@@ -1139,7 +1404,14 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
         key={refKey(ref)}
         label={site.title}
         active={active}
+        onHold={() => setRemoving(refKey(ref))}
+        onRemove={() => removeRef(ref)}
+        removing={removing === refKey(ref)}
         onClick={() => {
+          if (removing !== null) {
+            setRemoving(null);
+            return;
+          }
           /* A site is a tab, so it opens through the browser's own path — same
              native tab layer and history as a URL typed into the address bar.
              The ref is an argument because openLinkInBrowser ends by setting the
@@ -1154,12 +1426,25 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
     );
   };
 
+  /* Held rather than tapped, because a tap already does the other thing a
+     folder can do — open it. Same split the desktop rail makes. */
+  const groupTimer = useRef<number | null>(null);
+  const cancelGroupPress = (): void => {
+    if (groupTimer.current === null) return;
+    window.clearTimeout(groupTimer.current);
+    groupTimer.current = null;
+  };
+
   /** The 2x2 peek inside a collapsed folder — tiles only, no slot chrome. */
   const refThumb = (ref: RailRef): ReactNode => {
     const key = refKey(ref);
     if (ref.kind === "app") {
       const app = appFor(ref.slug);
-      return app ? <AppTile key={key} app={app} size={16} /> : <span key={key} />;
+      return app ? (
+        <AppTile key={key} app={app} size={16} />
+      ) : (
+        <span key={key} />
+      );
     }
     const site = siteFor(ref.id);
     return site ? (
@@ -1178,10 +1463,24 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
         <button
           type="button"
           onClick={() => setExpandedGroup(expanded ? null : entry.id)}
+          onPointerDown={() => {
+            groupTimer.current = window.setTimeout(() => {
+              setGroupSettings({
+                id: entry.id,
+                name: entry.name,
+                color: entry.color,
+              });
+            }, LONG_PRESS_MS);
+          }}
+          onPointerUp={cancelGroupPress}
+          onPointerLeave={cancelGroupPress}
+          onPointerCancel={cancelGroupPress}
           aria-label={entry.name}
           aria-expanded={expanded}
           className={`focus-ring flex size-14 shrink-0 items-center justify-center rounded-2xl transition-colors ${
-            expanded ? "bg-surface-raised ring-1 ring-border" : "hover:bg-surface-hover"
+            expanded
+              ? "bg-surface-raised ring-border ring-1"
+              : "hover:bg-surface-hover"
           }`}
         >
           {expanded ? (
@@ -1202,7 +1501,7 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
           )}
         </button>
         {expanded && (
-          <div className="flex flex-col items-center gap-1 rounded-2xl bg-surface p-1">
+          <div className="bg-surface flex flex-col items-center gap-1 rounded-2xl p-1">
             {entry.members.map(refTile)}
           </div>
         )}
@@ -1218,8 +1517,60 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
         animate={{ x: 0 }}
         exit={{ x: "-100%" }}
         transition={spring}
-        className="flex h-full w-[84px] shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-border bg-background/95 py-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-xl"
+        className="border-border bg-background/95 flex h-full w-[84px] shrink-0 flex-col items-center gap-1 overflow-y-auto border-r py-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-xl"
       >
+        {/*
+         * The workspaces, as tiles, at the top.
+         *
+         * The desktop wears these as tabs across the title bar; a phone has no
+         * title bar, and the only route here was Workspaces below — which opens
+         * the manager, a screen for EDITING a workspace rather than for
+         * stepping into one. Two taps and a horizontal scroll to do the thing
+         * the desktop does in one.
+         *
+         * Marks rather than names: a column 84px wide has room for an icon and
+         * not for "Personal", and the manager underneath is where the names
+         * are. Same order as the strip, so the two agree about which is first.
+         */}
+        {spaces.map((space) => {
+          const active = space.id === activeSpaceId;
+          return (
+            <button
+              key={space.id}
+              type="button"
+              onClick={() => {
+                /* Already here: the press would otherwise do nothing, which is
+                   the same trap the desktop tab avoids by opening the manager. */
+                if (active) openProfilesManager();
+                else setActiveSpaceId(space.id);
+                onClose();
+              }}
+              aria-label={space.name}
+              aria-current={active ? "page" : undefined}
+              className={`focus-ring flex size-11 shrink-0 items-center justify-center rounded-full transition-colors ${
+                active
+                  ? "bg-accent/15 text-foreground ring-accent/40 ring-1"
+                  : "text-muted-foreground hover:bg-surface-hover"
+              }`}
+            >
+              <SpaceIcon value={space.emoji} size={18} />
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            openProfilesManager();
+            requestNewWorkspace();
+          }}
+          aria-label={content.titleBar.newWorkspace}
+          className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground flex size-11 shrink-0 items-center justify-center rounded-full"
+        >
+          <Plus className="size-5" aria-hidden="true" />
+        </button>
+        <div className="bg-border my-2 h-px w-10 shrink-0" aria-hidden="true" />
+
         {systemTabs.map((tab) => (
           <RailTile
             key={tab.id}
@@ -1230,14 +1581,17 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
           />
         ))}
         {railEntries.length > 0 && (
-          <div className="my-2 h-px w-10 shrink-0 bg-border" aria-hidden="true" />
+          <div
+            className="bg-border my-2 h-px w-10 shrink-0"
+            aria-hidden="true"
+          />
         )}
         {railEntries.map(renderEntry)}
         <button
           type="button"
           onClick={openShare}
           aria-label="Share Nexus"
-          className="focus-ring mt-auto flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+          className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground mt-auto flex size-11 shrink-0 items-center justify-center rounded-full"
         >
           <Gift className="size-5" aria-hidden="true" />
         </button>
@@ -1246,12 +1600,34 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
       <motion.button
         type="button"
         aria-label="Close app rail"
-        onClick={onClose}
+        onClick={() => {
+          /* A cross showing means the column is being edited, and tapping off
+             a tile is how every phone leaves that state. Only then does the
+             same tap close the rail. */
+          if (removing !== null) {
+            setRemoving(null);
+            return;
+          }
+          onClose();
+        }}
         className="flex-1 bg-black/20"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
       />
+
+      {/* Renaming and recolouring a folder, which is what the desktop rail
+          opens when one is held. The same dialog, so the two cannot drift. */}
+      {groupSettings && (
+        <GroupSettingsDialog
+          key={groupSettings.id}
+          open
+          onClose={() => setGroupSettings(null)}
+          groupId={groupSettings.id}
+          initialName={groupSettings.name}
+          initialColor={groupSettings.color}
+        />
+      )}
     </div>
   );
 }
@@ -1286,7 +1662,11 @@ const syncContainer = {
 } as const;
 const syncItem = {
   hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] } },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] },
+  },
 } as const;
 
 /** Full-screen "Sync with Nexus Desktop" onboarding, staggered fade-in. */
@@ -1314,7 +1694,7 @@ function SyncScreen({ onClose }: { onClose: () => void }): ReactNode {
         type="button"
         onClick={onClose}
         aria-label="Close"
-        className="focus-ring absolute top-[max(1rem,env(safe-area-inset-top))] left-4 z-10 rounded-full p-2 text-foreground/70 hover:bg-black/5 dark:hover:bg-white/10"
+        className="focus-ring text-foreground/70 absolute top-[max(1rem,env(safe-area-inset-top))] left-4 z-10 rounded-full p-2 hover:bg-black/5 dark:hover:bg-white/10"
       >
         <X className="size-6" aria-hidden="true" />
       </button>
@@ -1326,13 +1706,13 @@ function SyncScreen({ onClose }: { onClose: () => void }): ReactNode {
       </motion.div>
       <motion.h1
         variants={syncItem}
-        className="mt-6 text-center text-4xl font-extrabold tracking-tight text-balance text-accent"
+        className="text-accent mt-6 text-center text-4xl font-extrabold tracking-tight text-balance"
       >
         {copy.title}
       </motion.h1>
       <motion.p
         variants={syncItem}
-        className="mt-4 max-w-xs text-center text-lg text-balance text-foreground/70"
+        className="text-foreground/70 mt-4 max-w-xs text-center text-lg text-balance"
       >
         {copy.subtitle}
       </motion.p>
@@ -1343,7 +1723,7 @@ function SyncScreen({ onClose }: { onClose: () => void }): ReactNode {
         variants={syncItem}
         type="button"
         onClick={() => toast.info("Sign in with Nexus: coming soon")}
-        className="focus-ring w-full max-w-md rounded-2xl bg-accent py-4 text-center text-base font-bold text-accent-foreground shadow-lg transition-transform active:scale-[0.98]"
+        className="focus-ring bg-accent text-accent-foreground w-full max-w-md rounded-2xl py-4 text-center text-base font-bold shadow-lg transition-transform active:scale-[0.98]"
       >
         {copy.signIn}
       </motion.button>
@@ -1351,7 +1731,7 @@ function SyncScreen({ onClose }: { onClose: () => void }): ReactNode {
         variants={syncItem}
         type="button"
         onClick={onClose}
-        className="focus-ring mt-3 mb-[max(1.5rem,env(safe-area-inset-bottom))] w-full max-w-md rounded-2xl bg-accent/12 py-4 text-center text-base font-bold text-accent transition-transform active:scale-[0.98]"
+        className="focus-ring bg-accent/12 text-accent mt-3 mb-[max(1.5rem,env(safe-area-inset-bottom))] w-full max-w-md rounded-2xl py-4 text-center text-base font-bold transition-transform active:scale-[0.98]"
       >
         {copy.noAccount}
       </motion.button>
@@ -1363,10 +1743,16 @@ type Sheet =
   | "none"
   | "rail"
   | "details"
+  /* The open app's contextual column. The chevron opens this instead of the
+     page sheet whenever the canvas is an app rather than a page — see
+     mobile-app-sheet for why that is the same question. */
+  | "context"
   | "address"
   | "switcher"
-  | "settings"
-  | "sync";
+  | "sync"
+  /* Owned here rather than inside the details sheet: opening it has to CLOSE
+     that one, and a sheet cannot outlive the component that renders it. */
+  | "help";
 
 /**
  * Arc-style mobile browser chrome: a floating bottom bar plus the page-options,
@@ -1382,10 +1768,12 @@ export function MobileBrowser({
     tabsBySpace,
     activeTabId,
     openTab,
+    activeApp,
     activeRef,
     activeTab,
     mainView,
     activePage,
+    openSettings,
     setActiveRef,
     unpinSite,
   } = useHub();
@@ -1400,6 +1788,7 @@ export function MobileBrowser({
      be re-rendering mobile chrome nobody can see. */
   const isDesktop = useIsDesktop();
   const { hidden, reveal } = useScrollDirection(!isDesktop && sheet === "none");
+  const onTimeline = mainView === "timeline";
 
   /*
    * What the CANVAS is showing, not what the ref names.
@@ -1435,6 +1824,18 @@ export function MobileBrowser({
       />
     ) : null;
 
+  /*
+   * What the chevron asks about, which is whatever the canvas is showing.
+   *
+   * For a page that is the page's own options — the address, back and forward,
+   * copy the link, add it to the rail. For an app the same sheet was talking
+   * about a page that is not on screen, while the app's own list was
+   * unreachable below `md`. So the answer follows the canvas, and so does the
+   * label on the button.
+   */
+  const chevronOpens: Sheet =
+    !siteCanvas && hasContextSidebar(activeApp) ? "context" : "details";
+
   // Push the page back behind the matte while a bottom sheet is open.
   useEffect(() => {
     onDimChange(sheet === "details" || sheet === "address");
@@ -1460,7 +1861,13 @@ export function MobileBrowser({
       */}
       <AnimatePresence initial={false}>
         {sheet === "none" &&
-          (hidden ? (
+          /*
+           * The pill answers "where am I" for somebody reading a page. On the
+           * Timeline the column itself says that on every row, so the pill was
+           * a second answer to a question already answered — and it took the
+           * search button away with it the moment anybody scrolled.
+           */
+          (hidden && !onTimeline ? (
             <ContextPill key="pill" tabs={tabs} onExpand={reveal} />
           ) : (
             <BottomBar
@@ -1474,13 +1881,34 @@ export function MobileBrowser({
                 setIncognito(false);
                 setSheet("address");
               }}
-              onDetails={() => setSheet("details")}
+              /*
+               * The chevron asks "what else is there about this".
+               *
+               * For a page that has always been the page's own options — the
+               * address, back and forward, copy the link, add it to the rail.
+               * For an app it was the same sheet talking about a page that is
+               * not on screen, while the app's own list was unreachable. So
+               * the answer follows the canvas.
+               */
+              onDetails={() => setSheet(chevronOpens)}
+              detailsLabel={
+                chevronOpens === "context"
+                  ? content.mobileBrowser.appOptions.replace(
+                      "{app}",
+                      (activeApp ? getHubApp(activeApp)?.name : "") ?? "",
+                    )
+                  : content.mobileBrowser.urlDetails
+              }
+              timeline={onTimeline}
             />
           ))}
       </AnimatePresence>
 
       <AnimatePresence>
         {sheet === "rail" && <MobileRail key="rail" onClose={close} />}
+        {sheet === "context" && activeApp && (
+          <MobileAppSheet key="context" slug={activeApp} onClose={close} />
+        )}
         {sheet === "details" && (
           <UrlDetailsSheet
             key="details"
@@ -1489,8 +1917,10 @@ export function MobileBrowser({
               setIncognito(false);
               setSheet("address");
             }}
+            onOpenHelp={() => setSheet("help")}
           />
         )}
+        {sheet === "help" && <HelpSheet key="help" open onClose={close} />}
         {sheet === "address" && (
           <AddressSheet
             key="address"
@@ -1513,24 +1943,30 @@ export function MobileBrowser({
               setSheet("address");
             }}
             /*
-             * Both destinations are demo-only, so in a shipping build the buttons
-             * that reach them are not rendered at all. SettingsSheet is twelve
-             * rows of "coming soon" and one working toggle; SyncScreen's only
-             * action is a "Sign in with Nexus" that signs in to nothing.
+             * Settings is not demo-only any more, and the note that used to sit
+             * here was describing a component that no longer exists: a sheet of
+             * twelve "coming soon" rows and one working toggle. What it opens
+             * now is the desktop's own panels, drilled into one at a time — the
+             * wallet's keys and BRC-157 backup among them, which is the last
+             * thing a shipped phone build should be missing. Hoisted to the
+             * shell so that every route into Settings lands on it; this only
+             * asks.
+             *
+             * SyncScreen stays gated. Its one action is a "Sign in with Nexus"
+             * that signs in to nothing.
              */
-            onSettings={DEMO_SURFACES ? () => setSheet("settings") : undefined}
+            onSettings={openSettings}
             onHub={DEMO_SURFACES ? () => setSheet("sync") : undefined}
             onClose={close}
           />
         )}
-        {/* Gated at the render too, not only at the two buttons above. With
+        {/* Gated at the render too, not only at the button above. With
             DEMO_SURFACES folded to a literal false the branch is dead code and
             the component leaves the bundle, so "is it reachable" stops depending
             on nobody adding a second route to it later. */}
-        {DEMO_SURFACES && sheet === "settings" && (
-          <MobileSettings key="settings" onClose={() => setSheet("switcher")} />
+        {DEMO_SURFACES && sheet === "sync" && (
+          <SyncScreen key="sync" onClose={close} />
         )}
-        {DEMO_SURFACES && sheet === "sync" && <SyncScreen key="sync" onClose={close} />}
       </AnimatePresence>
     </>
   );

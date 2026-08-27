@@ -9,12 +9,8 @@
  * file. Functions are synchronous today; when Postgres lands they become
  * async server queries.
  */
-import {
-  courses,
-  marketListings,
-  proposals,
-  vaultItems,
-} from "./apps-content";
+import { courses, marketListings, proposals, vaultItems } from "./apps-content";
+import { isEmptyContent } from "@/lib/content-mode";
 import {
   chatMessages,
   chatThreads,
@@ -23,7 +19,11 @@ import {
   nexusBot,
 } from "./messages";
 import { ecosystems } from "./ecosystems";
-import { tokenBalances, tokens } from "./tokens";
+import { linkedDevices } from "./devices";
+import { fundingCards } from "./cards";
+import { browserExtensions } from "./extensions";
+import { tumbleConnections, tumbleInbox } from "./tumbleupon";
+import { foreignTokens, tokenBalances, tokens } from "./tokens";
 import { attributeColors, collectibles } from "./collectibles";
 import { paymentLinks, splitBills } from "./wallet-extras";
 import { connections, outputBaskets } from "./developer";
@@ -46,6 +46,10 @@ import { chainTransactions } from "./transactions";
 import { walletAccounts, walletTransactions } from "./wallet";
 import { DEMO_SURFACES, shippedApps } from "../surfaces";
 import type {
+  BrowserExtension,
+  TumbleInboxItem,
+  LinkedDevice,
+  FundingCard,
   AppCollection,
   BrowserTab,
   ChainTransaction,
@@ -99,6 +103,12 @@ export {
   type SocialProvider,
 } from "./handles";
 export { licence, type LicenceBlock } from "./licence";
+export {
+  legalDocuments,
+  legalUpdated,
+  type LegalDocument,
+  type LegalSection,
+} from "./legal";
 export {
   shortcutGroups,
   shortcuts,
@@ -161,8 +171,39 @@ export { conversationNotes } from "./notes";
  * so narrowing here narrows all of them at once. In a demo build the filter is the
  * identity function. See lib/surfaces.ts for what "shipped" means.
  */
+/**
+ * What a surface returns when this session has no history of its own.
+ *
+ * Read here rather than at each of the eighty-odd call sites, because "empty"
+ * has to mean the same thing everywhere or the screens disagree about whether
+ * you are a new user. See lib/content-mode for what is emptied and what is not
+ * — the short version is that anything that could only exist because you used
+ * the app goes, and anything that is simply the world stays.
+ */
+function whenSeeded<T>(rows: T[]): T[] {
+  return isEmptyContent() ? [] : rows;
+}
+
+/**
+ * Whether the Timeline is in the catalogue at all.
+ *
+ * Off until somebody asks for it in Preferences. Pushed in rather than read
+ * out, because this module is fixtures and reaching into the settings store
+ * from here would make every catalogue read depend on a client store — the
+ * same shape, and the same reason, as `setBsvPricing` in lib/wallet.
+ *
+ * @see lib/settings-store.ts `timelineAsApp`, which is what calls this
+ */
+let timelineListed = false;
+
+export function setTimelineListed(on: boolean): void {
+  timelineListed = on;
+}
+
 export function getHubApps(): HubApp[] {
-  return shippedApps(hubApps);
+  return shippedApps(hubApps).filter(
+    (app) => app.slug !== "timeline" || timelineListed,
+  );
 }
 export function getHubApp(slug: HubApp["slug"]): HubApp | undefined {
   return getHubApps().find((app) => app.slug === slug);
@@ -179,14 +220,16 @@ export function getEssentialAppSlugs(): HubApp["slug"][] {
     .filter((app) => app.essential)
     .map((app) => app.slug);
 }
-/** Apps in the "system" folder (browse, web3 connect). */
+/** Apps in the "system" folder (browse, connected apps). */
 export function getSystemAppSlugs(): HubApp["slug"][] {
   return getHubApps()
     .filter((app) => app.category === "system")
     .map((app) => app.slug);
 }
 export function isEssentialApp(slug: HubApp["slug"]): boolean {
-  return getHubApps().some((app) => app.slug === slug && app.essential === true);
+  return getHubApps().some(
+    (app) => app.slug === slug && app.essential === true
+  );
 }
 
 /*
@@ -209,7 +252,7 @@ export function getCollectionAppSlugs(id: CollectionId): HubApp["slug"][] {
   const shipped = new Set(getHubApps().map((app) => app.slug));
   if (id === "all") return [...shipped];
   return (appCollections.find((c) => c.id === id)?.apps ?? []).filter((slug) =>
-    shipped.has(slug),
+    shipped.has(slug)
   );
 }
 
@@ -223,10 +266,10 @@ export function getIdentityCertificates(): IdentityCertificate[] {
 
 /* connections (Connect app) + output_baskets (Baskets app) */
 export function getConnections(): Connection[] {
-  return connections;
+  return whenSeeded(connections);
 }
 export function getOutputBaskets(): OutputBasket[] {
-  return outputBaskets;
+  return whenSeeded(outputBaskets);
 }
 
 /* spaces */
@@ -306,6 +349,20 @@ export function getDownloads(spaceId?: string): DownloadItem[] {
 
 /* wallet */
 export function getWalletAccounts(): WalletAccount[] {
+  /*
+   * One wallet, empty, rather than none.
+   *
+   * A person who installed this an hour ago HAS a wallet — the shell makes one
+   * — they just have not been paid yet. Returning nothing would put every
+   * screen into "no wallet connected", which is a different and much rarer
+   * state, and would take the switcher, the handle row and the pay flow with
+   * it. So the four seeded accounts become the one you would actually have,
+   * with nothing in it.
+   */
+  if (isEmptyContent()) {
+    const first = walletAccounts[0];
+    return first ? [{ ...first, locked: false, balanceSatoshis: 0 }] : [];
+  }
   return walletAccounts;
 }
 /** The everyday wallet, for the surfaces that predate there being several. */
@@ -315,6 +372,7 @@ export function getWalletAccount(): WalletAccount {
   return account;
 }
 export function getWalletTransactions(accountId: string): WalletTransaction[] {
+  if (isEmptyContent()) return [];
   return walletTransactions
     .filter((tx) => tx.accountId === accountId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -326,19 +384,19 @@ export function getSigningKeys(): SigningKey[] {
 }
 export function getSignableDocuments(): SignableDocument[] {
   return [...signableDocuments].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
+    b.createdAt.localeCompare(a.createdAt)
   );
 }
 export function getSignEnvelopes(): SignEnvelope[] {
   return [...signEnvelopes].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
+    b.createdAt.localeCompare(a.createdAt)
   );
 }
 
 /* publications */
 export function getPublications(): Publication[] {
   return [...publications].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
+    b.createdAt.localeCompare(a.createdAt)
   );
 }
 export function getMintTiers(): MintTier[] {
@@ -347,20 +405,21 @@ export function getMintTiers(): MintTier[] {
 
 /* transactions */
 export function getChainTransactions(): ChainTransaction[] {
-  return [...chainTransactions].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
+  return [...whenSeeded(chainTransactions)].sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt)
   );
 }
 export function getChainTransaction(
-  txid: string,
+  txid: string
 ): ChainTransaction | undefined {
   return chainTransactions.find((tx) => tx.txid === txid);
 }
 
 /* mail */
 export function getMailMessages(): MailMessage[] {
+  if (isEmptyContent()) return [];
   return [...mailMessages].sort((a, b) =>
-    b.receivedAt.localeCompare(a.receivedAt),
+    b.receivedAt.localeCompare(a.receivedAt)
   );
 }
 
@@ -378,12 +437,113 @@ export function getLocalEcosystem(): Ecosystem {
   return local;
 }
 
+/* tumbleupon */
+/** The seeded handles, before anything you have added or dropped. */
+export function tumbleConnectionHandles(): string[] {
+  return tumbleConnections;
+}
+
+/**
+ * People, from a list of handles.
+ *
+ * Takes the list rather than reading the fixture, because the live one is the
+ * fixture plus what the store remembers — see `connectionHandles` in
+ * lib/tumbleupon-store. Two callers with two answers about who you tumble with
+ * is the bug this signature prevents.
+ */
+export function getTumbleConnections(handles: string[]): MessagePerson[] {
+  return handles
+    .map((id) => messagePeople.find((person) => person.handle === id))
+    .filter((person): person is MessagePerson => Boolean(person));
+}
+
+/** What is waiting in the TumbleUpon inbox, newest first. */
+export function getTumbleInbox(): TumbleInboxItem[] {
+  return [...tumbleInbox].sort((a, b) => a.minutesAgo - b.minutesAgo);
+}
+
+/**
+ * Everything Tumble! can land on.
+ *
+ * The store's catalogue minus the Essentials, which are the apps every setup
+ * already has — being sent to a wallet you are already signed into is not
+ * discovery. Web apps only: there is nothing to open for an app with no
+ * address.
+ */
+export function getTumbleCatalogue(): HubApp[] {
+  return getHubApps().filter((app) => !app.essential && app.web);
+}
+
+/* extensions */
+/**
+ * The extensions this browser carries.
+ *
+ * Not gated on the empty content mode: an extension is part of the browser's
+ * own setup rather than something seeded into a workspace, and a browser that
+ * forgot its blocker when you emptied the fixtures would be a browser that had
+ * uninstalled something.
+ */
+export function getExtensions(): BrowserExtension[] {
+  return browserExtensions;
+}
+
+/* devices */
+/**
+ * Where this identity is signed in, the current device first.
+ *
+ * Not gated on the empty content mode: a wallet with no money is still signed
+ * in somewhere, and a device list that empties when the fixtures do would be
+ * claiming you had been logged out.
+ */
+export function getLinkedDevices(): LinkedDevice[] {
+  return [...linkedDevices].sort((a, b) => Number(b.current) - Number(a.current));
+}
+
+/* cards */
+/**
+ * The bank cards already connected to the wallet.
+ *
+ * Not gated on the empty content mode, for the same reason the device list is
+ * not: a wallet with no satoshis in it still has whatever you connected to fund
+ * it, and a card that disappeared when the fixtures emptied would be claiming
+ * your bank had dropped you.
+ */
+export function getFundingCards(): FundingCard[] {
+  return fundingCards;
+}
+
 /* tokens */
+/**
+ * The assets this wallet supports on chains that are not BSV.
+ *
+ * Exported rather than hidden behind a getter because it is a catalogue, not a
+ * holding — what the wallet can hold, whether or not it does. `getTokenBalances`
+ * is the one that answers what is actually there, and it is gated on the empty
+ * content mode; this is not, because a wallet with no money still supports
+ * ether.
+ */
+export { foreignTokens } from "./tokens";
+
+/**
+ * The tokens this wallet can act on: issue, request, gate, split.
+ *
+ * BSV-native only. A coin that arrived by swap sits on somebody else's chain,
+ * so it can be held and shown and swapped back, but it cannot be the currency
+ * of a payment link or a token gate — those are BSV transactions. Callers that
+ * want the whole hand, foreign coins included, want `getTokenBalances`.
+ */
 export function getTokens(): Token[] {
   return tokens;
 }
+/**
+ * Look up a token by id, wherever it lives.
+ *
+ * Both tables, because a balance row naming `doge` is a real holding and a
+ * lookup that returned nothing for it would drop the row on the floor — the
+ * quiet kind of bug where money simply is not there.
+ */
 export function getToken(id: string): Token | undefined {
-  return tokens.find((t) => t.id === id);
+  return tokens.find((t) => t.id === id) ?? foreignTokens.find((t) => t.id === id);
 }
 /** BSV — the base currency and the default for a bare amount. */
 export function getBaseToken(): Token {
@@ -396,21 +556,58 @@ export function getTokenBySymbol(symbol: string): Token | undefined {
   const needle = symbol.trim().toLowerCase();
   return tokens.find((t) => t.symbol.toLowerCase() === needle);
 }
-export function getTokenBalances(): { token: Token; units: number }[] {
-  return tokenBalances
-    .map(({ tokenId, units }) => {
+/**
+ * What one wallet holds, or every wallet's holding of each token summed.
+ *
+ * Summed, not concatenated. Four wallets each holding BSV is four rows in the
+ * table and one asset in the hand, so the unscoped answer has to add them up —
+ * a list with the same token in it four times is not a holding, it is the
+ * table, and every reader of it would have to do this itself. React noticed
+ * first, because four rows keyed by token id are four children with one key.
+ */
+export function getTokenBalances(
+  accountId?: string,
+): { token: Token; units: number }[] {
+  if (isEmptyContent()) return [];
+  const rows = tokenBalances.filter(
+    (row) => accountId === undefined || row.accountId === accountId,
+  );
+  const summed = new Map<string, number>();
+  for (const row of rows) {
+    summed.set(row.tokenId, (summed.get(row.tokenId) ?? 0) + row.units);
+  }
+  return [...summed]
+    .map(([tokenId, units]) => {
       const token = getToken(tokenId);
       return token ? { token, units } : null;
     })
+    /* Unordered on purpose. `holdings()` in lib/wallet.ts sorts by real value
+       with BSV pinned first, and it is the one that knows bitcoin's market
+       price — a second sort here would order the same list by the fallback
+       rate and disagree with the first as soon as the market moved. */
     .filter((row): row is { token: Token; units: number } => Boolean(row));
 }
 
 /* collectibles */
-export function getCollectibles(): Collectible[] {
-  return collectibles;
+/**
+ * What one wallet holds, or everything when no wallet is named.
+ *
+ * Every reader in the Wallet app passes an account, because a wallet you have
+ * selected showing another wallet's items is the bug this argument exists to
+ * prevent. It stays optional for the readers that are genuinely about the whole
+ * holding — a share card, a search — rather than about one key.
+ */
+export function getCollectibles(accountId?: string): Collectible[] {
+  if (isEmptyContent()) return [];
+  return accountId === undefined
+    ? collectibles
+    : collectibles.filter((item) => item.accountId === accountId);
 }
-export function getCollectiblesIn(bucket: CollectibleBucket): Collectible[] {
-  return collectibles.filter((item) => item.bucket === bucket);
+export function getCollectiblesIn(
+  bucket: CollectibleBucket,
+  accountId?: string,
+): Collectible[] {
+  return getCollectibles(accountId).filter((item) => item.bucket === bucket);
 }
 export function getCollectible(id: string): Collectible | undefined {
   return collectibles.find((item) => item.id === id);
@@ -421,16 +618,22 @@ export function getAttributeColor(key: string): string | undefined {
 }
 
 /* payment_links + split_bills */
-export function getPaymentLinks(): PaymentLink[] {
-  return [...paymentLinks].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
-  );
+/** Links that pay into one wallet, newest first. */
+export function getPaymentLinks(accountId?: string): PaymentLink[] {
+  if (isEmptyContent()) return [];
+  return [...paymentLinks]
+    .filter((link) => accountId === undefined || link.accountId === accountId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 export function getPaymentLink(code: string): PaymentLink | undefined {
   return paymentLinks.find((link) => link.code === code);
 }
-export function getSplitBills(): SplitBill[] {
-  return [...splitBills].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+/** Splits settling through one wallet, newest first. */
+export function getSplitBills(accountId?: string): SplitBill[] {
+  if (isEmptyContent()) return [];
+  return [...splitBills]
+    .filter((bill) => accountId === undefined || bill.accountId === accountId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 /**
@@ -438,12 +641,35 @@ export function getSplitBills(): SplitBill[] {
  * you have paid is a handle you can message and vice versa. Ordered by how
  * recently you exchanged messages, with favourites being the most recent.
  */
-export function getWalletContacts(): MessagePerson[] {
+export function getWalletContacts(accountId?: string): MessagePerson[] {
+  /* No address book. The people themselves still exist — the Timeline is full
+     of them — but "who have I paid" is a fact about having paid somebody. */
+  if (isEmptyContent()) return [];
+  /*
+   * Narrowed to the people this wallet has actually moved money with.
+   *
+   * Derived from the ledger rather than stored: a contact list is a fact about
+   * what a key has done, and a second table saying who a wallet "knows" would
+   * be free to disagree with the transactions that are the evidence. A wallet
+   * with no payments to a handle shows the directory unfiltered, because an
+   * empty Contacts tab teaches nothing about what the tab is for.
+   */
+  if (accountId !== undefined) {
+    const handles = new Set(
+      walletTransactions
+        .filter((tx) => tx.accountId === accountId)
+        .map((tx) => tx.counterparty.replace(/^@/, "").toLowerCase()),
+    );
+    const paid = messagePeople.filter((person) =>
+      handles.has(person.handle.toLowerCase()),
+    );
+    if (paid.length > 0) return paid;
+  }
   const order = new Map<string, number>();
   const threads = chatThreads;
   for (const thread of threads) {
     for (const message of chatMessages.filter(
-      (m) => m.conversationId === thread.id && m.senderId !== "me",
+      (m) => m.conversationId === thread.id && m.senderId !== "me"
     )) {
       const seen = order.get(message.senderId);
       const at = new Date(message.createdAt).getTime();
@@ -495,7 +721,10 @@ export function addChatThread(thread: ChatThread): void {
 }
 
 function allThreads(): ChatThread[] {
-  return [...chatThreads, ...sessionThreads];
+  /* Seeded threads go; ones started this session stay. A conversation you
+     opened a minute ago is not somebody else's history, and watching it vanish
+     because the mode says "new user" would be the switch eating your work. */
+  return [...whenSeeded(chatThreads), ...sessionThreads];
 }
 
 /** Every conversation, newest activity first. */
@@ -513,7 +742,7 @@ export function getChatThread(id: string): ChatThread | undefined {
 }
 /** The 1:1 conversation with a person, if one exists. */
 export function getChatThreadForPerson(
-  personId: string,
+  personId: string
 ): ChatThread | undefined {
   return allThreads().find((thread) => thread.personId === personId);
 }
@@ -526,8 +755,7 @@ export function getChatThreadForPerson(
 export function getThreadsWithPerson(personId: string): ChatThread[] {
   return getChatThreads().filter(
     (thread) =>
-      thread.personId === personId ||
-      thread.group?.memberIds.includes(personId),
+      thread.personId === personId || thread.group?.memberIds.includes(personId)
   );
 }
 
@@ -553,13 +781,24 @@ export function getCourses(): Course[] {
 /* market */
 export function getMarketListings(): MarketListing[] {
   return [...marketListings].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
+    b.createdAt.localeCompare(a.createdAt)
   );
 }
 
 /* vault */
-export function getVaultItems(): VaultItem[] {
-  return [...vaultItems].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+/**
+ * What one workspace keeps locked up, or everything when none is named.
+ *
+ * Scoped, because the column header names the workspace and a header that
+ * names one vault over another's contents is worse than no header at all. A
+ * workspace made after this fixture was written has an empty vault, which is
+ * the honest answer — nothing has been put in it yet.
+ */
+export function getVaultItems(spaceId?: string): VaultItem[] {
+  if (isEmptyContent()) return [];
+  return vaultItems
+    .filter((item) => spaceId === undefined || item.spaceId === spaceId)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
 /* vote */

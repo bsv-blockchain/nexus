@@ -25,15 +25,19 @@ export const currentMessageUser: MessagePerson = {
   name: "Crumbs",
   handle: "crumbs",
   ecosystem: "nexus",
-  role: "Overlay engineer",
+  role: "Story teller",
   bio: "Builds overlay services and payment rails on BSV. Keeps one foot in the food-network world.",
   organization: "Nexus",
-  city: "Amsterdam",
+  city: "Zug",
   photo: "/avatars/fox1.png",
   avatarColors: ["#4353ff", "#0ea5e9", "#16a34a"],
   registeredAt: "2022-04-01T09:00:00.000Z",
-  expertise: ["Overlay services", "Payment rails", "SPV"],
-  contact: { email: "vincent@nexus.example", github: "crumbs" },
+  expertise: ["Product design", "Business development", "Philosophy"],
+  links: [
+    { label: "Portfolio", url: "https://crumbs.example" },
+    { label: "Writing", url: "https://crumbs.example/notes" },
+  ],
+  contact: { email: "crumbs@nexus.free", github: "crumbs" },
 };
 
 /**
@@ -53,7 +57,7 @@ export const nexusBot: MessagePerson = {
   bio: "Answers command questions locally. Nothing it says is sent to anyone.",
   organization: null,
   city: "",
-  photo: "/icons/nexus.png",
+  photo: "/icons/Nexus-logo-solid-BG2.png",
   avatarColors: ["#4353ff", "#7c3aed", "#0ea5e9"],
 };
 
@@ -72,6 +76,10 @@ export const messagePeople: MessagePerson[] = [
     avatarColors: ["#7c3aed", "#4353ff", "#0ea5e9"],
     registeredAt: "2022-09-14T09:00:00.000Z",
     expertise: ["SPV proofs", "Overlay topics", "Spec review"],
+    links: [
+      { label: "Specs", url: "https://bsvassociation.example/specs" },
+      { label: "Talks", url: "https://rhea.example/talks" },
+    ],
     contact: { email: "rhea@bsvassociation.example", github: "rheam" },
   },
   {
@@ -87,6 +95,7 @@ export const messagePeople: MessagePerson[] = [
     avatarColors: ["#16a34a", "#0891b2", "#4353ff"],
     registeredAt: "2023-01-20T09:00:00.000Z",
     expertise: ["Micropayments", "Batching", "Fees"],
+    links: [{ label: "Wallet", url: "https://babbage.example" }],
     contact: { email: "tomas@bsvassociation.example" },
   },
   {
@@ -102,6 +111,10 @@ export const messagePeople: MessagePerson[] = [
     avatarColors: ["#f59e0b", "#db2777", "#7c3aed"],
     registeredAt: "2023-06-02T09:00:00.000Z",
     expertise: ["Data protocols", "Indexing"],
+    links: [
+      { label: "Indexer", url: "https://amara.example/indexer" },
+      { label: "Notes", url: "https://amara.example" },
+    ],
     contact: { github: "amaraok" },
   },
   {
@@ -152,6 +165,7 @@ export const messagePeople: MessagePerson[] = [
     avatarColors: ["#0ea5e9", "#4353ff", "#16a34a"],
     registeredAt: "2019-06-11T09:00:00.000Z",
     expertise: ["Distributed systems", "Project management", "Teranode"],
+    links: [{ label: "Teranode", url: "https://bsvblockchain.org/teranode" }],
     contact: { email: "siggi.oskarsson@bsvassociation.org", github: "icellan" },
     attestations: 21,
   },
@@ -169,6 +183,7 @@ export const messagePeople: MessagePerson[] = [
     avatarColors: ["#f59e0b", "#db2777", "#7c3aed"],
     registeredAt: "2020-02-19T09:00:00.000Z",
     expertise: ["SDKs", "Developer experience", "Application protocols"],
+    links: [{ label: "SDK docs", url: "https://docs.bsvblockchain.org" }],
     contact: { email: "d.kellenschwiler@bsvassociation.org", github: "deggen" },
     attestations: 18,
   },
@@ -551,6 +566,39 @@ export const messagePeople: MessagePerson[] = [
   },
 
   /* --------------------------------------------------------------- twetch */
+  /* LaMint issues collectibles, so its people are minters and curators rather
+     than posters. Generated avatar tiles: the ecosystem is new here and a
+     borrowed photograph would be a claim about a person who does not exist. */
+  {
+    id: "lm-pia",
+    name: "Pia Vandenberg",
+    handle: "pia",
+    ecosystem: "lamint",
+    role: "Mint operator",
+    bio: "Runs the press. If an issue is short by one, it is because somebody asked me to burn it.",
+    organization: "LaMint",
+    city: "Antwerp",
+    photo: null,
+    avatarColors: ["#22d3ee", "#f9a8f0", "#a855f7"],
+    registeredAt: "2024-09-04T09:00:00.000Z",
+    expertise: ["Issuance", "Provenance"],
+    profileUrl: "https://lamint.io/u/pia",
+  },
+  {
+    id: "lm-arto",
+    name: "Arto Salmi",
+    handle: "arto",
+    ecosystem: "lamint",
+    role: "Curator",
+    bio: "Looks at a series before it goes out and asks whether anyone will want the twentieth one.",
+    organization: "LaMint",
+    city: "Helsinki",
+    photo: null,
+    avatarColors: ["#f9a8f0", "#38bdf8", "#6366f1"],
+    registeredAt: "2025-01-22T09:00:00.000Z",
+    expertise: ["Curation", "Editions"],
+    profileUrl: "https://lamint.io/u/arto",
+  },
   /* Twetch user numbers are the handle — @3 is the third account ever made. */
   {
     id: "tw-randy",
