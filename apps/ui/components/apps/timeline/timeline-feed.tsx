@@ -13,6 +13,7 @@ import { ProfileHovercard } from "@/components/apps/messages/profile-hovercard";
 import { ActivityBar } from "@/components/apps/timeline/activity-bar";
 import { useComposerTokens } from "@/lib/use-composer-tokens";
 import { PostRow } from "@/components/apps/timeline/post-row";
+import { TimelineRail } from "@/components/apps/timeline/timeline-rail";
 import { AppTile } from "@/components/hub/app-icon";
 import { JumpingDots } from "@/components/hub/jumping-dots";
 import { PopoverMenu, MenuItem } from "@/components/hub/popover-menu";
@@ -35,6 +36,7 @@ import {
   RANGE_MINUTES,
   TIMELINE_SLUG,
   clearFocus,
+  openNav,
   pinTopic,
   selectAuthor,
   selectStrip,
@@ -51,6 +53,7 @@ import {
   ListPlus,
   MapPin,
   Plus,
+  SlidersHorizontal,
   Smile,
   type LucideIcon,
 } from "lucide-react";
@@ -197,6 +200,23 @@ function StripTabs(): ReactNode {
       fade="from-surface"
       action={
         <>
+          {/*
+            The contextual column, on a phone.
+
+            Saved, Lists, Muted, the ecosystems and the topics live in a panel
+            that is `hidden md:block` two components up, so below that width
+            the feed had no way to be aimed. Here rather than in the browse bar
+            at the bottom because it narrows THIS list, and it sits in the row
+            the list is already labelled by.
+          */}
+          <button
+            type="button"
+            onClick={openNav}
+            aria-label={content.timeline.title}
+            className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground shrink-0 px-3 md:hidden"
+          >
+            <SlidersHorizontal className="size-4" aria-hidden="true" />
+          </button>
           <button
             type="button"
             onClick={(event) =>
@@ -810,6 +830,18 @@ export function TimelineFeed(): ReactNode {
         ) : (
           posts.map((post) => <PostRow key={post.id} post={post} />)
         )}
+
+        {/*
+          What the rail carries, at the end of the reading.
+
+          The right-hand column does not render below `md`, so Nexus Sync, who
+          is on air and who to follow were three things a phone could not see
+          at all. Not in the nav sheet with the filters: those are things you
+          go looking for and these are things to notice, and the place you
+          notice something is where you stopped scrolling. `md:hidden` lives
+          inside the component, so the column never renders twice.
+        */}
+        <TimelineRail asCards />
       </div>
     </div>
   );

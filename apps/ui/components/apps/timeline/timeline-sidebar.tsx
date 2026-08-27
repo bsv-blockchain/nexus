@@ -31,6 +31,7 @@ import { timelinePosts } from "@/lib/data/timeline";
 import { activeHandleFor } from "@/lib/settings-store";
 import { timelineEcosystems } from "@/lib/timeline";
 import {
+  closeNav,
   openPane,
   selectEcosystem,
   selectTopic,
@@ -45,6 +46,7 @@ import {
   PanelLeftClose,
   Pencil,
   VolumeX,
+  X,
 } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
@@ -109,7 +111,19 @@ function NavRow({
   );
 }
 
-export function TimelineSidebar(): ReactNode {
+export function TimelineSidebar({
+  /**
+   * Whether this is the column, or the phone's sheet of it.
+   *
+   * The only difference is the header: the column's leading control folds the
+   * panel away, which is a thing a phone has no panel to do. The sheet gets a
+   * close in its place — see timeline-nav-sheet, which is the only caller that
+   * passes this.
+   */
+  asSheet = false,
+}: {
+  asSheet?: boolean;
+} = {}): ReactNode {
   const { toggleRail, activeSpaceId, setMainView } = useHub();
   const { topic, pinned, pane, saved, lists, muted, ecosystem } = useTimeline();
   const topics = useTopics();
@@ -125,11 +139,17 @@ export function TimelineSidebar(): ReactNode {
       <div className="flex items-center gap-2 px-1.5 pb-2">
         <button
           type="button"
-          onClick={toggleRail}
-          aria-label={content.hub.collapsePanel}
+          onClick={asSheet ? closeNav : toggleRail}
+          aria-label={
+            asSheet ? content.messages.media.close : content.hub.collapsePanel
+          }
           className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground -ml-0.5 shrink-0 rounded-md p-1"
         >
-          <PanelLeftClose className="size-4" aria-hidden="true" />
+          {asSheet ? (
+            <X className="size-4" aria-hidden="true" />
+          ) : (
+            <PanelLeftClose className="size-4" aria-hidden="true" />
+          )}
         </button>
         <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">
           {content.timeline.title}

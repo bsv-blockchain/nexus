@@ -194,7 +194,32 @@ function SuggestionRow({ suggestion }: { suggestion: Suggestion }): ReactNode {
   );
 }
 
-export function TimelineRail(): ReactNode {
+export function TimelineRail({
+  /**
+   * Whether this is the column, or the tail of the feed on a phone.
+   *
+   * Below `md` the column does not render — a 340px rail beside a 400px screen
+   * takes the width from the thing people came for. But Nexus Sync, who is on
+   * air and who to follow are not filters somebody goes looking for, they are
+   * things to notice, so a sheet is the wrong home for them: they belong where
+   * the reading stops. As cards they lose the fixed width and the sticky
+   * search — the browse bar at the bottom of a phone already carries search on
+   * the Timeline, and two of them is one too many.
+   */
+  asCards = false,
+}: {
+  asCards?: boolean;
+} = {}): ReactNode {
+  if (asCards) {
+    return (
+      /* pb-28 clears the browse bar, which is fixed over the bottom of the
+         screen: without it the last suggestion is permanently half-covered,
+         which reads as a rendering fault rather than as the end of a list. */
+      <div className="flex flex-col gap-3 px-3 pt-3 pb-28 md:hidden">
+        <RailPanels />
+      </div>
+    );
+  }
   return (
     <div className="flex w-[340px] shrink-0 flex-col gap-3 overflow-y-auto px-3 pt-3 pb-6">
       {/*
@@ -233,6 +258,15 @@ export function TimelineRail(): ReactNode {
           and On air's are the same element with the same tone by construction.
           It had picked up `--accent`, which made it the only panel title in the
           rail shouting — and the one it was shouting over was the live one. */}
+      <RailPanels />
+    </div>
+  );
+}
+
+/** The three panels themselves, so the column and the cards cannot diverge. */
+function RailPanels(): ReactNode {
+  return (
+    <>
       <Panel title={copy.sync.title} icon={CloudSync}>
         {/* The argument itself is shared with Focus's column, which shows the
             same case in its own card — see components/hub/nexus-sync-pitch. */}
@@ -260,7 +294,7 @@ export function TimelineRail(): ReactNode {
           <ShowMore section="follow" label={copy.follow.showMore} />
         ) : null}
       </Panel>
-    </div>
+    </>
   );
 }
 

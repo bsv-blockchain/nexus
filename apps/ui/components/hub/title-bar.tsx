@@ -136,6 +136,29 @@ export function TitleBar(): ReactNode {
       style={DRAG}
       className="bg-surface border-border/60 flex h-[var(--titlebar-height)] shrink-0 items-stretch border-b pr-[var(--titlebar-inset-right)] pl-[var(--titlebar-inset-left)] select-none"
     >
+      {/*
+        Everything the desktop strip carries, and none of it below `md`.
+
+        A phone has no title bar. iOS and Android give an app the screen and a
+        status bar, and Nexus on one of them draws its own chrome along the
+        bottom — so a Home button, a row of workspace tabs and a "+" across the
+        top is a desktop window pretending to be a phone. Narrow the desktop
+        window and you should see what a phone sees; this is what makes that
+        true rather than nearly true.
+
+        The STRIP survives, empty. It is the drag handle, and on macOS it is
+        also the space the traffic lights are positioned into — hiding it
+        outright would leave three OS-drawn circles floating over the phone
+        canvas. Empty, it reads as a status bar, which is what a phone has
+        there anyway. On a real phone build there is no shell bridge at all,
+        `platform` is null, and none of this renders in the first place.
+
+        What lived in here and had nowhere else to go now has somewhere: Home
+        and the workspace switcher are in the rail sheet the bottom bar opens,
+        and a waiting update is a row in the hub menu. See mobile-browser and
+        mobile-sheet.
+      */}
+      <div className="hidden min-w-0 items-stretch md:flex">
       {/* Only when there is genuinely one waiting. A permanent "Update now" is
           a button that means nothing on the day it matters. */}
       {update?.ready && (
@@ -272,9 +295,11 @@ export function TitleBar(): ReactNode {
         </Control>
       </Tooltip>
       <Divider />
+      </div>
 
       {/* Everything past the last control is somewhere to grab the window.
-          Deliberately the widest thing in the strip. */}
+          Deliberately the widest thing in the strip, and the whole of it on a
+          phone-width window. */}
       <span aria-hidden="true" className="flex-1" />
 
       {ownsControls && (

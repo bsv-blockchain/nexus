@@ -4,6 +4,9 @@ import { AppTile, SiteTile } from "@/components/hub/app-icon";
 import { Favicon } from "@/components/hub/favicon";
 import { MobileSettings } from "@/components/hub/mobile-settings";
 import { OriginChip } from "@/components/hub/origin-chip";
+import { SpaceIcon } from "@/components/hub/space-icon";
+import { homeView } from "@/lib/home-view";
+import { requestNewWorkspace } from "@/lib/workspace-request";
 import { useScrollDirection } from "@/lib/scroll-direction";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { openSearch } from "@/lib/timeline-store";
@@ -36,6 +39,7 @@ import {
   Folder,
   Gift,
   Globe,
+  House,
   Layers,
   LayoutGrid,
   LifeBuoy,
@@ -1150,7 +1154,10 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
     setMobileSheetOpen,
     openShare,
     pinnedSites,
+    spaces,
     activeSpaceId,
+    setActiveSpaceId,
+    setMainView,
     openLinkInBrowser,
     isInstalled,
   } = useHub();
@@ -1168,7 +1175,13 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
    * column beside the rail either way; on a phone this button is the only way
    * to reach it, and hiding it would take away the room rather than a door.
    */
-  const browsePinned = useSettings().browseAsButton && isInstalled("browser");
+  const settings = useSettings();
+  const browsePinned = settings.browseAsButton && isInstalled("browser");
+  /* Home is a question, not a destination — see lib/home-view. */
+  const home = homeView(
+    settings.homescreen,
+    !settings.timelineAsApp || isInstalled("timeline"),
+  );
 
   const systemTabs: {
     id: string;
@@ -1177,6 +1190,24 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
     active: boolean;
     onClick: () => void;
   }[] = [
+    /*
+     * First, because it is the way back.
+     *
+     * It lived only in the desktop title bar, which a phone does not have —
+     * so until this row existed there was no way to reach whichever homescreen
+     * an install uses without going through an app. Top of the column for the
+     * same reason it is the leftmost thing in the strip on a desktop.
+     */
+    {
+      id: "home",
+      label: content.titleBar.home,
+      icon: House,
+      active: mainView === "home" || mainView === "timeline",
+      onClick: () => {
+        onClose();
+        setMainView(home);
+      },
+    },
     {
       id: "spaces",
       label: content.library.spaces.title,
@@ -1358,6 +1389,58 @@ function MobileRail({ onClose }: { onClose: () => void }): ReactNode {
         transition={spring}
         className="border-border bg-background/95 flex h-full w-[84px] shrink-0 flex-col items-center gap-1 overflow-y-auto border-r py-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-xl"
       >
+        {/*
+         * The workspaces, as tiles, at the top.
+         *
+         * The desktop wears these as tabs across the title bar; a phone has no
+         * title bar, and the only route here was Workspaces below — which opens
+         * the manager, a screen for EDITING a workspace rather than for
+         * stepping into one. Two taps and a horizontal scroll to do the thing
+         * the desktop does in one.
+         *
+         * Marks rather than names: a column 84px wide has room for an icon and
+         * not for "Personal", and the manager underneath is where the names
+         * are. Same order as the strip, so the two agree about which is first.
+         */}
+        {spaces.map((space) => {
+          const active = space.id === activeSpaceId;
+          return (
+            <button
+              key={space.id}
+              type="button"
+              onClick={() => {
+                /* Already here: the press would otherwise do nothing, which is
+                   the same trap the desktop tab avoids by opening the manager. */
+                if (active) openProfilesManager();
+                else setActiveSpaceId(space.id);
+                onClose();
+              }}
+              aria-label={space.name}
+              aria-current={active ? "page" : undefined}
+              className={`focus-ring flex size-11 shrink-0 items-center justify-center rounded-full transition-colors ${
+                active
+                  ? "bg-accent/15 text-foreground ring-accent/40 ring-1"
+                  : "text-muted-foreground hover:bg-surface-hover"
+              }`}
+            >
+              <SpaceIcon value={space.emoji} size={18} />
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            openProfilesManager();
+            requestNewWorkspace();
+          }}
+          aria-label={content.titleBar.newWorkspace}
+          className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-foreground flex size-11 shrink-0 items-center justify-center rounded-full"
+        >
+          <Plus className="size-5" aria-hidden="true" />
+        </button>
+        <div className="bg-border my-2 h-px w-10 shrink-0" aria-hidden="true" />
+
         {systemTabs.map((tab) => (
           <RailTile
             key={tab.id}

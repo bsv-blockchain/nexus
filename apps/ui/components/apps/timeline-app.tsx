@@ -29,6 +29,7 @@ import { PostThread } from "@/components/apps/timeline/post-thread";
 import { incomingPosts, postReplies, timelinePosts } from "@/lib/data/timeline";
 import { profilePosts } from "@/lib/data/profiles";
 import { TimelineSearch } from "@/components/apps/timeline/timeline-search";
+import { TimelineNavSheet } from "@/components/apps/timeline/timeline-nav-sheet";
 import { PostAnalytics } from "@/components/apps/timeline/post-analytics";
 import { ReplyComposer } from "@/components/apps/timeline/reply-composer";
 import {
@@ -124,6 +125,11 @@ export function TimelineApp(): ReactNode {
           still exists below the desktop breakpoint, where the rail does not —
           search is the one thing on that column a narrow window still wants. */}
           <TimelineSearch />
+
+          {/* And the rest of that column, for the same reason and by the other
+              route: a sheet, opened from the tab row, carrying the filters the
+              rail's absence took away. `md:hidden` is inside it. */}
+          <TimelineNavSheet />
 
           {/* The reply composer, mounted beside the other sheets rather than inside
           a row: it is opened from a post, but it belongs to the app, and a

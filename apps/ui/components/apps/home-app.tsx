@@ -28,6 +28,7 @@
 import { useWalletAccountId } from "@/components/apps/wallet/use-wallet-account";
 import { DetailPane } from "@/components/hub/detail-pane";
 import { NexusSyncPitch } from "@/components/hub/nexus-sync-pitch";
+import { FocusSidebar } from "@/components/apps/home/focus-sidebar";
 import { useHub } from "@/components/hub/hub-provider";
 import { content, getChatThreads, getUnreadCount } from "@/lib/data";
 import { usd } from "@/lib/wallet";
@@ -621,8 +622,26 @@ function Timer(): ReactNode {
 export function HomeApp(): ReactNode {
   const { detailPane } = useHub();
   return (
-    <div className="flex h-full min-h-0 gap-2 p-2">
-      <div className="min-h-0 min-w-0 flex-1">
+    /*
+     * Two columns where there is room for two, one scroll where there is not.
+     *
+     * This used to be a row with the cards in an `aside` that was `hidden`
+     * below `lg` — which on a phone left Focus as a photograph and a text
+     * field. Nothing else: no tasks, no timer, no note, and no way to reach
+     * the Nexus Sync card whose button lives on it. It is the screen an
+     * install with no presets lands on, so it was also the first thing a good
+     * half of people saw.
+     *
+     * Stacked, the photograph keeps most of a phone screen and everything
+     * else is a scroll away — which is the order they are in on a desktop too,
+     * read left to right instead of top to bottom.
+     */
+    <div className="flex h-full min-h-0 flex-col gap-2 overflow-y-auto p-2 pb-20 md:pb-2 lg:flex-row lg:overflow-hidden">
+      {/* A share of the viewport rather than a share of the flex, because in a
+          column `flex-1` inside a scroller is however tall the photograph
+          feels like being. Two thirds leaves the first card's edge showing,
+          which is what says there is more under it. */}
+      <div className="h-[66vh] min-h-0 min-w-0 shrink-0 lg:h-auto lg:flex-1 lg:shrink">
         <Stage />
       </div>
       {/*
@@ -632,11 +651,18 @@ export function HomeApp(): ReactNode {
         opened from the left column has to appear somewhere, and a third column
         beside these two would leave the photograph a strip.
       */}
-      <aside className="hidden min-h-0 w-80 shrink-0 flex-col gap-2 overflow-y-auto lg:flex">
+      <aside className="flex min-h-0 shrink-0 flex-col gap-2 lg:w-80 lg:overflow-y-auto">
         {detailPane ? (
           <DetailPane />
         ) : (
           <>
+            {/* Focus's contextual column, as a card. On a desktop it is down
+                the left-hand side; below `md` there is no such side, and how
+                today is going is not a thing to lose because the window is
+                narrow. */}
+            <div className="lg:hidden">
+              <FocusSidebar asCard />
+            </div>
             <Tasks />
             <Timer />
             <Note />

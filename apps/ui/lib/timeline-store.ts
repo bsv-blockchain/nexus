@@ -87,6 +87,15 @@ export interface TimelineState {
   expanded: TimelineExpansion;
   /** the search palette is up */
   searchOpen: boolean;
+  /**
+   * The contextual column, as a sheet, on a phone.
+   *
+   * Saved, Lists, Muted, the ecosystems and the topics are a column on a
+   * desktop and were nothing at all below `md` — the panel that holds them is
+   * inside the shell's `hidden md:block`. They are how the feed is narrowed,
+   * so a phone had the feed and no way to aim it.
+   */
+  navOpen: boolean;
   /** the Nexus Sync upgrade sheet is up */
   syncOpen: boolean;
   /** the post being replied to or quoted, by id; null when the composer is shut */
@@ -241,6 +250,7 @@ const INITIAL: TimelineState = {
   pinned: [],
   expanded: null,
   searchOpen: false,
+  navOpen: false,
   syncOpen: false,
   replyTo: null,
   replyMode: "reply",
@@ -308,13 +318,13 @@ export function useTimeline(): TimelineState {
  * unrelated answers side by side.
  */
 export function selectStrip(strip: TimelineStrip): void {
-  set({ strip, topic: null, author: null, expanded: null, pane: null });
+  set({ strip, topic: null, author: null, expanded: null, pane: null, navOpen: false });
 }
 
 /** Narrow to one forum category, or `null` to stop narrowing. */
 /* Picking a topic is a request of the feed, so it uncovers it. */
 export function selectTopic(topic: string | null): void {
-  set({ topic, expanded: null, pane: null });
+  set({ topic, expanded: null, pane: null, navOpen: false });
 }
 
 /**
@@ -350,6 +360,14 @@ export function closeSearch(): void {
   set({ searchOpen: false });
 }
 
+export function openNav(): void {
+  set({ navOpen: true });
+}
+
+export function closeNav(): void {
+  set({ navOpen: false });
+}
+
 export function openSync(): void {
   set({ syncOpen: true });
 }
@@ -370,6 +388,7 @@ export function openReply(postId: string): void {
     replyTo: postId,
     replyMode: "reply",
     searchOpen: false,
+    navOpen: false,
     syncOpen: false,
   });
 }
@@ -379,6 +398,7 @@ export function openQuote(postId: string): void {
     replyTo: postId,
     replyMode: "quote",
     searchOpen: false,
+    navOpen: false,
     syncOpen: false,
   });
 }
@@ -599,7 +619,7 @@ export function toggleSubscribe(personId: string): void {
 
 /** Open one of the contextual column's panes, or close whatever is open. */
 export function openPane(pane: TimelinePane): void {
-  set({ pane, expanded: null });
+  set({ pane, expanded: null, navOpen: false });
 }
 
 export function toggleSaved(postId: string): void {
@@ -661,5 +681,5 @@ export function closeThread(): void {
 
 /** Narrow the feed to one ecosystem, or widen it back to all of them. */
 export function selectEcosystem(ecosystem: EcosystemId | null): void {
-  set({ ecosystem, expanded: null, pane: null, thread: null });
+  set({ ecosystem, expanded: null, pane: null, thread: null, navOpen: false });
 }

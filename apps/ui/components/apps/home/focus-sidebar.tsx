@@ -37,7 +37,19 @@ const copy = content.home;
 /** Ten is a long day; past it the pips stop counting and start saying "lots". */
 const PIP_MAX = 10;
 
-export function FocusSidebar(): ReactNode {
+export function FocusSidebar({
+  /**
+   * Whether this is the column, or a card in a stack.
+   *
+   * A phone has no contextual column, so on one this renders in the scroll
+   * under the photograph alongside the tasks and the timer — where filling the
+   * height it is given would be filling a height nothing gave it, and the help
+   * bar pushed to the bottom would be pushed to the bottom of the page.
+   */
+  asCard = false,
+}: {
+  asCard?: boolean;
+} = {}): ReactNode {
   const { tasks } = useHome();
   /* Once a minute, so a window left open overnight does not still say
      yesterday — and from the same timer the stage beside it reads. */
@@ -53,7 +65,11 @@ export function FocusSidebar(): ReactNode {
   const fraction = total === 0 ? 0 : finished / total;
 
   return (
-    <div className="bg-surface flex h-full flex-col rounded-2xl p-3">
+    <div
+      className={`bg-surface flex flex-col rounded-2xl p-3 ${
+        asCard ? "" : "h-full"
+      }`}
+    >
       <h2 className="px-1.5 pt-0.5 pb-3 text-sm font-semibold">
         {copy.columnTitle}
       </h2>
@@ -147,9 +163,12 @@ export function FocusSidebar(): ReactNode {
         </p>
       </div>
 
-      <div className="mt-auto">
-        <AppHelpBar slug="focus" />
-      </div>
+      {/* Docked to the bottom of the column, and simply last in a card. */}
+      {!asCard && (
+        <div className="mt-auto">
+          <AppHelpBar slug="focus" />
+        </div>
+      )}
     </div>
   );
 }
