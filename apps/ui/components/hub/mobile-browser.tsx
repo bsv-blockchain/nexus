@@ -2,7 +2,6 @@
 
 import { AppTile, SiteTile } from "@/components/hub/app-icon";
 import { Favicon } from "@/components/hub/favicon";
-import { MobileSettings } from "@/components/hub/mobile-settings";
 import { MobileAppSheet } from "@/components/hub/mobile-app-sheet";
 import { hasContextSidebar } from "@/components/hub/app-context-sidebar";
 import { OriginChip } from "@/components/hub/origin-chip";
@@ -1602,7 +1601,6 @@ type Sheet =
   | "context"
   | "address"
   | "switcher"
-  | "settings"
   | "sync"
   /* Owned here rather than inside the details sheet: opening it has to CLOSE
      that one, and a sheet cannot outlive the component that renders it. */
@@ -1627,6 +1625,7 @@ export function MobileBrowser({
     activeTab,
     mainView,
     activePage,
+    openSettings,
     setActiveRef,
     unpinSite,
   } = useHub();
@@ -1796,23 +1795,27 @@ export function MobileBrowser({
               setSheet("address");
             }}
             /*
-             * Both destinations are demo-only, so in a shipping build the buttons
-             * that reach them are not rendered at all. SettingsSheet is twelve
-             * rows of "coming soon" and one working toggle; SyncScreen's only
-             * action is a "Sign in with Nexus" that signs in to nothing.
+             * Settings is not demo-only any more, and the note that used to sit
+             * here was describing a component that no longer exists: a sheet of
+             * twelve "coming soon" rows and one working toggle. What it opens
+             * now is the desktop's own panels, drilled into one at a time — the
+             * wallet's keys and BRC-157 backup among them, which is the last
+             * thing a shipped phone build should be missing. Hoisted to the
+             * shell so that every route into Settings lands on it; this only
+             * asks.
+             *
+             * SyncScreen stays gated. Its one action is a "Sign in with Nexus"
+             * that signs in to nothing.
              */
-            onSettings={DEMO_SURFACES ? () => setSheet("settings") : undefined}
+            onSettings={openSettings}
             onHub={DEMO_SURFACES ? () => setSheet("sync") : undefined}
             onClose={close}
           />
         )}
-        {/* Gated at the render too, not only at the two buttons above. With
+        {/* Gated at the render too, not only at the button above. With
             DEMO_SURFACES folded to a literal false the branch is dead code and
             the component leaves the bundle, so "is it reachable" stops depending
             on nobody adding a second route to it later. */}
-        {DEMO_SURFACES && sheet === "settings" && (
-          <MobileSettings key="settings" onClose={() => setSheet("switcher")} />
-        )}
         {DEMO_SURFACES && sheet === "sync" && (
           <SyncScreen key="sync" onClose={close} />
         )}

@@ -12,6 +12,7 @@ import {
 } from "@/lib/connections-store";
 import { hydrateCards } from "@/lib/cards-store";
 import { SyncUpgrade } from "@/components/hub/sync-upgrade";
+import { MobileSettings } from "@/components/hub/mobile-settings";
 import {
   getContentMode,
   getContentModeServerSnapshot,
@@ -172,7 +173,7 @@ function DesktopSidebar(): ReactNode {
 }
 
 function Shell(): ReactNode {
-  const { toggleRail } = useHub();
+  const { toggleRail, mainView, setMainView } = useHub();
   const firstRunSeen = useFirstRunSeen();
   // Pushes the mobile canvas back behind the matte while a browser sheet is open.
   const [pageDimmed, setPageDimmed] = useState(false);
@@ -211,6 +212,24 @@ function Shell(): ReactNode {
           <MainView />
         </div>
       </div>
+
+      {/*
+        Settings, on a phone, wherever Settings was asked for.
+
+        `openSettings` points the canvas at SettingsApp — which is a panel and
+        a column, and the column is inside the shell's `hidden md:block`. So on
+        a phone every route into Settings landed on one category with no way to
+        reach the other ten. The drill-down existed and was reachable from one
+        button inside the browser's tab switcher, behind the demo flag.
+
+        Here instead, keyed off the view rather than off a sheet, so the hub
+        menu's row, the rail, a command and `?view=settings` all arrive at the
+        same screen. `md:hidden` is inside the component, so a desktop window
+        still gets the panel and its column.
+      */}
+      {mainView === "settings" && (
+        <MobileSettings onClose={() => setMainView("app")} />
+      )}
 
       <MobileBrowser onDimChange={setPageDimmed} />
       <MobileSheet />
