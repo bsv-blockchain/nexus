@@ -15,6 +15,7 @@ import {
   getCurrentMessageUser,
   getEcosystem,
   getMessagePerson,
+  getCollectibles,
   getPaymentLinks,
   getToken,
   type MessagePerson,
@@ -52,6 +53,7 @@ import {
 } from "lucide-react";
 import { useCreatedPaymentLinks } from "@/lib/payment-links-store";
 import { ShareLinkButton } from "@/components/apps/wallet/share-link";
+import { CollectibleArt } from "@/components/apps/wallet/collectible-art";
 import { toggleArchivedPaymentLink, useSettings } from "@/lib/settings-store";
 import { toast } from "sonner";
 import { useState, type ReactNode } from "react";
@@ -416,6 +418,13 @@ export function ActivityList({
       {transactions.map((tx) => {
         const incoming = tx.direction === "incoming";
         const token = txToken(tx);
+        /* An item, where the money was spent on one. The amount stays what it
+           always was — satoshis left — and this only replaces the coin's mark
+           beside it, because "12,000 sats" and "a Naka Motor Club car" are the
+           same row read two ways. */
+        const item = tx.collectibleId
+          ? getCollectibles().find((entry) => entry.id === tx.collectibleId)
+          : undefined;
         return (
           <li key={tx.id}>
             <button
@@ -455,7 +464,19 @@ export function ActivityList({
                   {token
                     ? formatUnits(txUnits(tx), token.decimals)
                     : txUnits(tx)}
-                  {token && <TokenMark token={token} size={13} />}
+                  {item ? (
+                    <span
+                      className="ring-border/60 size-3.5 overflow-hidden rounded-[3px] ring-1"
+                      aria-hidden="true"
+                    >
+                      <CollectibleArt
+                        src={item.imageUrl}
+                        className="size-full object-cover"
+                      />
+                    </span>
+                  ) : (
+                    token && <TokenMark token={token} size={13} />
+                  )}
                 </span>
                 <span className="text-muted-foreground block text-xs">
                   {tx.status === "pending" ? (

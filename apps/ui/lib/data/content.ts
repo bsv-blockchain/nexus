@@ -283,6 +283,10 @@ export const content = {
        way to them. The pre-query list is who this wallet has actually paid —
        see getWalletContacts — so it is the people a link is most likely for. */
     shareLink: "Share link",
+    /* The same button on a phone, where "Share link" beside a copy icon in
+       a third of a 402px row wraps onto two lines and makes the card taller
+       than the two beside it. The verb alone is the part that matters. */
+    shareShort: "Share",
     shareTitle: "Send this to",
     shareSearch: "Search a handle",
     shareRecent: "Recent",

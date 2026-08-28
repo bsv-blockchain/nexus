@@ -67,7 +67,10 @@ export function ShareLinkButton({
           className="focus-ring flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold transition-opacity hover:opacity-90"
         >
           <Send className="size-3.5 shrink-0" aria-hidden="true" />
-          {copy.shareLink}
+          {/* Two spans rather than a width check, so the right word is in the
+              server's HTML and nothing swaps after hydration. */}
+          <span className="hidden sm:inline">{copy.shareLink}</span>
+          <span className="sm:hidden">{copy.shareShort}</span>
         </button>
         {/* The rule is the divider between the two halves, drawn in the
             foreground colour at low alpha so it works on the accent whatever

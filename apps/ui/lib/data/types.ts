@@ -575,6 +575,18 @@ export interface WalletTransaction {
    */
   tokenId?: string;
   amountUnits?: number;
+  /**
+   * The item this moved, when what moved was an item rather than an amount.
+   *
+   * A 1Sat Ordinal transfer is a payment carrying an object: satoshis leave,
+   * and the thing they were spent on arrives. `amountSatoshis` is still what
+   * left, so the ledger adds up either way — this only says what the money was
+   * for, and lets the row show it rather than a name in a memo field.
+   *
+   * Never set alongside `tokenId`: an item is not denominated in a token, and
+   * a row claiming both would be two answers to "what is this".
+   */
+  collectibleId?: string;
   feeSatoshis: number;
   counterparty: string;
   memo: string;
