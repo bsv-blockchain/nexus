@@ -20,7 +20,6 @@ import {
   Cookie,
   Hammer,
   Lock,
-  Moon,
   MoreHorizontal,
   Plus,
   Puzzle,
@@ -28,11 +27,9 @@ import {
   Settings,
   Share,
   SquarePlus,
-  Sun,
   Trash2,
   X,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -149,8 +146,6 @@ export function BrowserSettingsMenu({
   anchor?: { top: number; left: number; right: number; bottom: number };
 }): ReactNode {
   const copy = content.browserSettings;
-  const { setTheme, resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === "dark";
   const [developerMode, setDeveloperMode] = useState(false);
   const [certOpen, setCertOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -224,17 +219,22 @@ export function BrowserSettingsMenu({
       className={`w-72 p-3 ${className}`}
     >
       <div className="flex gap-2">
+        {/* The app's own tooltip rather than `title`, which waits a second and
+            a half and then draws the OS's box in the OS's font — the one
+            hover hint in the browser chrome that did not look like the rest of
+            them. These four are icons with no labels, so the hint IS the
+            label. */}
         {quickActions.map((action) => (
-          <button
-            key={action.label}
-            type="button"
-            aria-label={action.label}
-            title={action.label}
-            onClick={action.onClick}
-            className="focus-ring bg-muted hover:bg-surface-hover flex h-11 flex-1 items-center justify-center rounded-xl"
-          >
-            <action.icon className="size-4.5" aria-hidden="true" />
-          </button>
+          <Tooltip key={action.label} label={action.label} className="flex-1">
+            <button
+              type="button"
+              aria-label={action.label}
+              onClick={action.onClick}
+              className="focus-ring bg-muted hover:bg-surface-hover flex h-11 w-full items-center justify-center rounded-xl"
+            >
+              <action.icon className="size-4.5" aria-hidden="true" />
+            </button>
+          </Tooltip>
         ))}
       </div>
 
@@ -313,33 +313,12 @@ export function BrowserSettingsMenu({
       <h3 className="px-1 pt-3 pb-1.5 text-sm font-semibold">
         {copy.settings}
       </h3>
+      {/* No appearance row. Light or dark is a decision about the whole
+          product, not about this tab — it lives in Settings > Appearance
+          beside the accent and the brand, and a second switch for it in the
+          browser's own menu was the only place in the app where a global
+          preference could be flipped from inside one app's chrome. */}
       <div className="space-y-1">
-        <button
-          type="button"
-          onClick={() => setTheme(isDark ? "light" : "dark")}
-          aria-pressed={isDark}
-          className="focus-ring hover:bg-surface-hover flex w-full items-center gap-2.5 rounded-lg px-1 py-1.5 text-left"
-        >
-          <span className="bg-muted flex size-8 items-center justify-center rounded-full">
-            {isDark ? (
-              <Moon
-                className="text-muted-foreground size-4"
-                aria-hidden="true"
-              />
-            ) : (
-              <Sun
-                className="text-muted-foreground size-4"
-                aria-hidden="true"
-              />
-            )}
-          </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-medium">{copy.appearance}</span>
-            <span className="text-muted-foreground block text-xs">
-              {isDark ? copy.appearanceDark : copy.appearanceLight}
-            </span>
-          </span>
-        </button>
         <button
           type="button"
           onClick={() => setDeveloperMode((on) => !on)}

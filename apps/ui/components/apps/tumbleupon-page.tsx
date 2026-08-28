@@ -39,6 +39,7 @@ import { useProfileQuickActions } from "@/components/apps/messages/use-profile-a
 import {
   extensionIsOn,
   removeExtension,
+  restoreExtension,
   setExtensionEnabled,
   useInstalledExtensions,
 } from "@/lib/extensions-store";
@@ -46,6 +47,7 @@ import { toast } from "sonner";
 import {
   ChevronDown,
   ExternalLink,
+  RotateCcw,
   Search,
   Send,
   ShieldCheck,
@@ -279,9 +281,34 @@ export function TumbleUponPage(): ReactNode {
                 </button>
               </div>
             ) : (
-              <p className="border-border text-muted-foreground mt-5 rounded-xl border border-dashed p-4 text-sm">
-                {extCopy.removedNote}
-              </p>
+              /*
+               * Removed, and one press from being back.
+               *
+               * TumbleUpon is in the binary — removing it takes it off the
+               * toolbar and out of the manager, it does not go anywhere. So a
+               * page that says "no longer installed" and offers nothing is a
+               * dead end for a thing that is sitting right there. A third-party
+               * extension would have to be fetched again and would rightly get
+               * only the note.
+               */
+              <div className="border-border mt-5 rounded-xl border border-dashed p-4">
+                <p className="text-muted-foreground text-sm text-pretty">
+                  {extCopy.removedNote} {extCopy.reinstallNote}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    restoreExtension(extension.id);
+                    toast.success(
+                      extCopy.reinstalledToast.replace("{name}", extension.name),
+                    );
+                  }}
+                  className="focus-ring bg-accent text-accent-foreground mt-3 flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-opacity hover:opacity-90"
+                >
+                  <RotateCcw className="size-3.5" aria-hidden="true" />
+                  {extCopy.reinstall}
+                </button>
+              </div>
             ))}
 
           <Section

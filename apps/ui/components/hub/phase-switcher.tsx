@@ -23,7 +23,7 @@ import {
 } from "@/lib/phase";
 import { AnimatePresence, motion } from "motion/react";
 import { showGatePreview } from "@/lib/gate-preview";
-import { Check, Wrench, X } from "lucide-react";
+import { Check, ChevronRight, Wrench, X } from "lucide-react";
 import {
   useEffect,
   useRef,
@@ -130,6 +130,9 @@ function Level({
 export function PhaseSwitcher(): ReactNode {
   const phase = usePhase();
   const [open, setOpen] = useState(false);
+  /* Which roadmap group is unfolded, or none — which is where it starts.
+     One at a time: three open groups is the scroll this replaced. */
+  const [expanded, setExpanded] = useState<Phase | null>(null);
   const box = useRef<HTMLDivElement | null>(null);
 
   /* Client-only, and asked rather than latched: an effect that sets state on
@@ -224,13 +227,12 @@ export function PhaseSwitcher(): ReactNode {
                 <p className="text-muted-foreground text-[10px] font-semibold tracking-[1px] uppercase">
                   Data
                 </p>
-                {/* The pair below it answered "what will this screen show" and
-                    so does History, which is why they were mistaken for each
-                    other. Said once, at the top of each, in terms of the other:
-                    this one is about whether anything real is behind the
-                    screen, the next is about how full the invented rows are. */}
+                {/* One switch now. It was two — a source and a fullness — which
+                    both answered "what will this screen show", so they were read
+                    as two versions of each other and could be left in
+                    combinations no install could ever be in. */}
                 <p className="text-muted-foreground pb-1.5 text-[10px] leading-relaxed text-pretty">
-                  Where the wallet and its screens get their numbers.
+                  What every screen in this build is reading.
                 </p>
                 <div
                   role="group"
@@ -263,51 +265,44 @@ export function PhaseSwitcher(): ReactNode {
                   already forgotten they did. */}
                 <p className="text-muted-foreground mt-1.5 text-[10px] leading-relaxed text-pretty">
                   {dataMode === "demo"
-                    ? "Invented rows, so every screen has something on it. Nothing is a real balance."
-                    : "Real services only \u2014 the wallet, the browser, the shell. A screen with nothing behind it is EMPTY ON PURPOSE here, not broken."}
+                    ? "Invented rows, so every screen has something on it. Nothing here is a real balance."
+                    : "Real services only \u2014 the wallet, the browser, the shell. Everything else shows its empty state, which is correct here rather than broken."}
                 </p>
-              </div>
-            )}
 
-            {/* What is IN the fixtures, as against where they come from. The
-                two sit together because from a demo's point of view they are
-                one question — what will this screen show — and apart because
-                only one of them is about whether a service answered. */}
-            {DEMO_DATA_COMPILED_IN && (
-              <div className="border-border/60 border-b p-3">
-                <p className="text-muted-foreground text-[10px] font-semibold tracking-[1px] uppercase">
-                  History
-                </p>
-                <p className="text-muted-foreground pb-1.5 text-[10px] leading-relaxed text-pretty">
-                  How much is in those invented rows. Independent of the switch
-                  above — it shapes the fixtures either way.
-                </p>
-                <div
-                  role="group"
-                  aria-label="Account history"
-                  className="bg-surface ring-border/60 grid grid-cols-2 gap-0.5 rounded-lg p-0.5 ring-1"
-                >
-                  {(["empty", "seeded"] as const).map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      aria-pressed={contentMode === option}
-                      onClick={() => chooseContentMode(option)}
-                      className={`focus-ring rounded-md px-2 py-1.5 text-xs font-semibold transition-colors ${
-                        contentMode === option
-                          ? "bg-accent/20 text-foreground"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {option === "empty" ? "New user" : "Lived in"}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-muted-foreground mt-1.5 text-[10px] leading-relaxed text-pretty">
-                  {contentMode === "empty"
-                    ? "An hour after installing: no transactions, no messages, an empty vault. The feed still has posts, because everyone's does."
-                    : "A used account \u2014 an inbox, a ledger, a vault with things in it. For screenshots and walkthroughs."}
-                </p>
+                {/*
+                  Only under Demo, because it is only true under Demo.
+                  
+                  Live is empty by construction — see `effective` in
+                  lib/content-mode — so a box here would be a control that
+                  cannot change anything, and one somebody would come back to
+                  find ticked and having done nothing. Hidden rather than
+                  disabled: there is no state of a live session in which this is
+                  a question.
+                */}
+                {dataMode === "demo" && (
+                  <label className="mt-2 flex items-start gap-2 text-[10px] leading-relaxed">
+                    <input
+                      type="checkbox"
+                      checked={contentMode === "empty"}
+                      onChange={(event) =>
+                        chooseContentMode(
+                          event.target.checked ? "empty" : "seeded",
+                        )
+                      }
+                      className="focus-ring accent-accent mt-px size-3"
+                    />
+                    <span>
+                      <span className="text-foreground font-semibold">
+                        Start empty
+                      </span>
+                      <span className="text-muted-foreground block text-pretty">
+                        {contentMode === "empty"
+                          ? "An hour after installing: no transactions, no messages, an empty vault. The feed still has posts, because everyone's does."
+                          : "Off: a used account, with an inbox, a ledger and a vault with things in it."}
+                      </span>
+                    </span>
+                  </label>
+                )}
               </div>
             )}
 
@@ -343,20 +338,18 @@ export function PhaseSwitcher(): ReactNode {
             </div>
 
             {/*
-              The screens with no route to them.
-
               Wallet setup stands in front of everything when a live build
               reports no wallet, so seeing it takes a live build, an empty
               keychain and a restart — which made it the screen least looked at
-              and most often wrong. One section, because there will be others.
+              and most often wrong.
+
+              No heading over it, and no line under it. Everything else in this
+              panel is a switch that changes what you are already looking at;
+              this is the only row that goes somewhere, and a button that names
+              its own destination does not need a label above it saying the same
+              thing in smaller type.
             */}
             <div className="border-border/60 border-b p-3">
-              <p className="text-muted-foreground text-[10px] font-semibold tracking-[1px] uppercase">
-                Screens
-              </p>
-              <p className="text-muted-foreground pb-1.5 text-[10px] leading-relaxed text-pretty">
-                Ones with no way to reach them from the app.
-              </p>
               <button
                 type="button"
                 onClick={() => {
@@ -369,20 +362,46 @@ export function PhaseSwitcher(): ReactNode {
               </button>
             </div>
 
-            <div className="max-h-80 overflow-y-auto p-2">
+            <div className="max-h-96 overflow-y-auto p-2">
               {groups.map((index) => {
                 const group = PHASES[index]!;
                 const features = PHASE_FEATURES.filter(
                   (feature) => feature.phase === group
                 );
                 if (features.length === 0) return null;
+                const openGroup = expanded === group;
                 return (
                   <div key={group} className="mb-2 last:mb-0">
-                    <p className="text-muted-foreground px-1.5 py-1 text-[10px] font-semibold tracking-[1px] uppercase">
-                      {PHASE_LABELS[group]}
-                      {index !== rank && " · carried over"}
-                    </p>
-                    <ul>
+                    {/*
+                      Folded shut to start with.
+
+                      The roadmap is three groups and a couple of dozen
+                      features, each with a sentence and two meters — six
+                      hundred pixels of reading below four controls somebody
+                      opened this panel to press. Shut, the whole panel is the
+                      switches and three headings; open, it is what it was.
+                    */}
+                    <button
+                      type="button"
+                      onClick={() => setExpanded(openGroup ? null : group)}
+                      aria-expanded={openGroup}
+                      className="focus-ring hover:bg-surface-hover flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left"
+                    >
+                      <ChevronRight
+                        className={`size-3 shrink-0 transition-transform ${
+                          openGroup ? "rotate-90" : ""
+                        }`}
+                        aria-hidden="true"
+                      />
+                      <span className="text-muted-foreground flex-1 text-[10px] font-semibold tracking-[1px] uppercase">
+                        {PHASE_LABELS[group]}
+                        {index !== rank && " · carried over"}
+                      </span>
+                      <span className="text-muted-foreground text-[10px] tabular-nums">
+                        {features.length}
+                      </span>
+                    </button>
+                    <ul hidden={!openGroup}>
                       {features.map((feature) => (
                         <li
                           key={feature.key}

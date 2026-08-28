@@ -1878,6 +1878,12 @@ export const content = {
     permissionsTitle: "What it can do",
     removedToast: "{name} removed",
     removedNote: "This extension is no longer installed. What you are reading is the record of what it was.",
+    /* Only for the ones Nexus ships. A third-party extension is gone until
+       somebody fetches it again; these are in the binary either way, so
+       "removed" only ever meant "not offered". */
+    reinstallNote: "It ships with Nexus, so putting it back takes nothing but this.",
+    reinstall: "Install again",
+    reinstalledToast: "{name} installed",
     uninstall: "Remove",
     notSet: "Not set",
     editShortcut: "Set a shortcut",

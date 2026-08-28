@@ -26,8 +26,17 @@
  * only have come from having used the app: messages, contacts, balances,
  * activity, the vault, and what you have connected.
  *
+ * It is a preference of DEMO mode only, and that is what keeps the two from
+ * drifting. Live means nothing invented anywhere, so it is empty by
+ * construction rather than by a second switch somebody has to remember to set —
+ * see `effective` below. The stored answer is parked while a session is live
+ * and is waiting where it was left when one comes back to demo, so the pair can
+ * never be in a combination the controls cannot express.
+ *
  * @see lib/data/index.ts — the accessors that read this
  */
+
+import { resolveDataMode } from "./data-mode";
 
 const KEY = "nexus.contentMode";
 
@@ -44,6 +53,19 @@ function stored(): ContentMode {
        never met, which is who a session with no readable preference is. */
     return "empty";
   }
+}
+
+/**
+ * The answer that actually applies, which is not always the stored one.
+ *
+ * Live is empty whatever is in storage. A live session reads real services for
+ * the wallet and the browser, and the fifteen surfaces with no service behind
+ * them have nothing to show — filling those with a stranger's inbox while the
+ * wallet reports a real balance is the one combination that could not be true
+ * of any install, and it was reachable in two clicks.
+ */
+function effective(): ContentMode {
+  return resolveDataMode() === "live" ? "empty" : stored();
 }
 
 /**
@@ -71,7 +93,7 @@ let mode: ContentMode = "empty";
  * every accessor is asked again.
  */
 export function hydrateContentMode(): void {
-  const next = stored();
+  const next = effective();
   if (next === mode) return;
   mode = next;
   for (const listener of listeners) listener();
@@ -85,15 +107,29 @@ export function isEmptyContent(): boolean {
   return mode === "empty";
 }
 
+/**
+ * Record the demo preference, and apply it if this session can honour it.
+ *
+ * The write happens either way. It is the answer for demo mode, and a live
+ * session is not a reason to forget it — `effective` is what decides whether it
+ * is in force right now, so there is one rule rather than a stored value and a
+ * separate memory of what it should have been.
+ */
 export function setContentMode(next: ContentMode): void {
-  if (next === mode) return;
-  mode = next;
   try {
     window.localStorage.setItem(KEY, next);
   } catch {
     /* In-memory only, which lasts the session. */
   }
+  const applied = effective();
+  if (applied === mode) return;
+  mode = applied;
   for (const listener of listeners) listener();
+}
+
+/** The demo preference as stored, which is what the checkbox shows. */
+export function getStoredContentMode(): ContentMode {
+  return stored();
 }
 
 export function subscribeContentMode(listener: () => void): () => void {
