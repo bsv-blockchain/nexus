@@ -22,6 +22,7 @@ import {
   type Phase,
 } from "@/lib/phase";
 import { AnimatePresence, motion } from "motion/react";
+import { showGatePreview } from "@/lib/gate-preview";
 import { Check, Wrench, X } from "lucide-react";
 import {
   useEffect,
@@ -220,8 +221,16 @@ export function PhaseSwitcher(): ReactNode {
                 say no" the Exchange action was dropped for. */}
             {DEMO_DATA_COMPILED_IN && (
               <div className="border-border/60 border-b p-3">
-                <p className="text-muted-foreground pb-1.5 text-[10px] font-semibold tracking-[1px] uppercase">
+                <p className="text-muted-foreground text-[10px] font-semibold tracking-[1px] uppercase">
                   Data
+                </p>
+                {/* The pair below it answered "what will this screen show" and
+                    so does History, which is why they were mistaken for each
+                    other. Said once, at the top of each, in terms of the other:
+                    this one is about whether anything real is behind the
+                    screen, the next is about how full the invented rows are. */}
+                <p className="text-muted-foreground pb-1.5 text-[10px] leading-relaxed text-pretty">
+                  Where the wallet and its screens get their numbers.
                 </p>
                 <div
                   role="group"
@@ -254,8 +263,8 @@ export function PhaseSwitcher(): ReactNode {
                   already forgotten they did. */}
                 <p className="text-muted-foreground mt-1.5 text-[10px] leading-relaxed text-pretty">
                   {dataMode === "demo"
-                    ? "Fixtures. Every surface has rows to show."
-                    : "Only what a service can answer. Empty states are correct here."}
+                    ? "Invented rows, so every screen has something on it. Nothing is a real balance."
+                    : "Real services only \u2014 the wallet, the browser, the shell. A screen with nothing behind it is EMPTY ON PURPOSE here, not broken."}
                 </p>
               </div>
             )}
@@ -266,8 +275,12 @@ export function PhaseSwitcher(): ReactNode {
                 only one of them is about whether a service answered. */}
             {DEMO_DATA_COMPILED_IN && (
               <div className="border-border/60 border-b p-3">
-                <p className="text-muted-foreground pb-1.5 text-[10px] font-semibold tracking-[1px] uppercase">
+                <p className="text-muted-foreground text-[10px] font-semibold tracking-[1px] uppercase">
                   History
+                </p>
+                <p className="text-muted-foreground pb-1.5 text-[10px] leading-relaxed text-pretty">
+                  How much is in those invented rows. Independent of the switch
+                  above — it shapes the fixtures either way.
                 </p>
                 <div
                   role="group"
@@ -292,8 +305,8 @@ export function PhaseSwitcher(): ReactNode {
                 </div>
                 <p className="text-muted-foreground mt-1.5 text-[10px] leading-relaxed text-pretty">
                   {contentMode === "empty"
-                    ? "What somebody sees an hour after installing. The feed still has posts, because everyone's does."
-                    : "Somebody else's inbox, ledger and vault. For screenshots and walkthroughs."}
+                    ? "An hour after installing: no transactions, no messages, an empty vault. The feed still has posts, because everyone's does."
+                    : "A used account \u2014 an inbox, a ledger, a vault with things in it. For screenshots and walkthroughs."}
                 </p>
               </div>
             )}
@@ -327,6 +340,33 @@ export function PhaseSwitcher(): ReactNode {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/*
+              The screens with no route to them.
+
+              Wallet setup stands in front of everything when a live build
+              reports no wallet, so seeing it takes a live build, an empty
+              keychain and a restart — which made it the screen least looked at
+              and most often wrong. One section, because there will be others.
+            */}
+            <div className="border-border/60 border-b p-3">
+              <p className="text-muted-foreground text-[10px] font-semibold tracking-[1px] uppercase">
+                Screens
+              </p>
+              <p className="text-muted-foreground pb-1.5 text-[10px] leading-relaxed text-pretty">
+                Ones with no way to reach them from the app.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  showGatePreview();
+                  setOpen(false);
+                }}
+                className="focus-ring bg-surface ring-border/60 hover:bg-surface-hover w-full rounded-lg px-2 py-1.5 text-xs font-semibold ring-1 transition-colors"
+              >
+                Wallet setup
+              </button>
             </div>
 
             <div className="max-h-80 overflow-y-auto p-2">

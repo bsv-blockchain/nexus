@@ -34,6 +34,7 @@ import {
   type WordCount,
 } from "@/lib/wallet-data";
 import { WalletGateBackdrop } from "@/components/hub/wallet-gate-backdrop";
+import { hideGatePreview, useGatePreview } from "@/lib/gate-preview";
 import { useState, type ReactNode } from "react";
 
 type GateMode = "choose" | "create" | "restore" | "shares";
@@ -51,32 +52,123 @@ type GateMode = "choose" | "create" | "restore" | "shares";
  * The two the backdrop cycles are deliberately not among them. See
  * components/hub/wallet-gate-backdrop.
  */
-const WAYS_IN = [
-  {
+const WAYS_IN = {
+  create: {
     id: "create" as const,
     image: "/first-run/art/vault.webp",
     title: "Create a new wallet",
     hint: "New keys, made on this device. You will be shown 24 words to write down.",
+    action: "Create wallet",
   },
-  {
-    id: "restore" as const,
-    image: "/first-run/art/ferry.webp",
-    title: "Restore from recovery phrase",
-    hint: "You have the words. Type them in and the wallet comes back.",
-  },
-  {
-    id: "shares" as const,
-    image: "/first-run/art/halt.webp",
-    title: "Restore from backup shares",
-    hint: "You have the printed pages. Usually any two of three rebuild it.",
-  },
-];
+  /*
+   * The two ways back, together.
+   *
+   * They are one question — you already have a wallet, in which form? — and
+   * they were two cards of equal weight beside a third that is a different
+   * question entirely. Segmented, the screen reads as the two decisions it
+   * actually is: make one, or bring one back.
+   */
+  restore: [
+    {
+      id: "restore" as const,
+      image: "/first-run/art/ferry.webp",
+      title: "Recovery phrase",
+      hint: "You have the words. Type them in and the wallet comes back.",
+      action: "Enter phrase",
+    },
+    {
+      id: "shares" as const,
+      image: "/first-run/art/halt.webp",
+      title: "Backup shares",
+      hint: "You have the printed pages. Usually any two of three rebuild it.",
+      action: "Enter shares",
+    },
+  ],
+};
 
 /** Where a revealed phrase came from, which decides the copy around it. */
 type RevealSource = "created" | "recovered";
 
+/**
+ * One way in: a picture, what it is, and the verb that does it.
+ *
+ * The whole card is the button and the row at the foot is a span wearing a
+ * button's clothes. A real button inside a button is invalid and unreachable
+ * by a keyboard; a card that looks pressable and is not is worse than either.
+ * This way there is one target, one focus ring, and the verb is still the
+ * thing your eye lands on.
+ *
+ * `bordered` is off inside the segmented card, which carries the border for
+ * both halves — a card drawn inside a card is two rules 1px apart.
+ */
+function Way({
+  way,
+  primary = false,
+  bordered = true,
+  onPick,
+}: {
+  way: { image: string; title: string; hint: string; action: string };
+  /** the accent CTA, for the one choice that makes something rather than finds it */
+  primary?: boolean;
+  bordered?: boolean;
+  onPick: () => void;
+}): ReactNode {
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      className={`focus-ring bg-surface hover:bg-surface-hover group flex flex-col overflow-hidden text-center transition-colors ${
+        bordered ? "border-border rounded-2xl border" : ""
+      }`}
+    >
+      {/* A band rather than a square: the plates are landscape, and a square
+          crop of a landscape is a detail of one. Shorter on a phone, where
+          three of these share the height of a screen. */}
+      <span
+        className="relative block h-24 w-full overflow-hidden sm:h-28"
+        aria-hidden="true"
+      >
+        <span
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-[1.04]"
+          style={{ backgroundImage: `url(${way.image})` }}
+        />
+        {/* The plates are dark at the foot, so the title below needs a joint
+            rather than a hard edge against them. */}
+        <span className="from-surface absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t to-transparent" />
+      </span>
+      {/* `flex-1`, so two halves of the segmented card put their verbs on the
+          same line however differently their hints wrap. */}
+      <span className="flex flex-1 flex-col px-3.5 py-3">
+        <span className="block text-sm font-semibold">{way.title}</span>
+        <span className="text-muted-foreground mt-1 block text-xs text-balance">
+          {way.hint}
+        </span>
+        {/* `mt-auto` on the wrapper, so all three verbs sit on one line across
+            the row however differently their hints wrap — `flex-1` above only
+            makes the text block fill the card. The padding is on the wrapper
+            rather than the button so the gap above it cannot be eaten when
+            there is no slack left to distribute. */}
+        <span className="mt-auto block w-full pt-3">
+          <span
+            className={`block w-full rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+              primary
+                ? "bg-accent text-accent-foreground group-hover:opacity-90"
+                : "border-border bg-background group-hover:bg-surface-hover border"
+            }`}
+          >
+            {way.action}
+          </span>
+        </span>
+      </span>
+    </button>
+  );
+}
+
 export function WalletGate(): ReactNode {
   const info = useWalletInfo();
+  /* Asked for from the demo controls. See lib/gate-preview for why this screen
+     needs a door at all. */
+  const preview = useGatePreview();
   const [mode, setMode] = useState<GateMode>("choose");
   const [phrase, setPhrase] = useState("");
   const [busy, setBusy] = useState(false);
@@ -125,6 +217,7 @@ export function WalletGate(): ReactNode {
 
   // Nothing to gate: demo fixtures, or a wallet that is up.
   const blocking =
+    preview ||
     (info.mode === "live" && !info.loading && info.data.available && !info.data.ready) ||
     flowHeld;
 
@@ -530,38 +623,23 @@ export function WalletGate(): ReactNode {
           cards stacked are a screen you scroll rather than a choice you see.
         */}
         <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {WAYS_IN.map((way) => (
-            <button
-              key={way.id}
-              type="button"
-              onClick={() =>
-                way.id === "create" ? void startCreate() : goTo(way.id)
-              }
-              className="focus-ring border-border bg-surface hover:bg-surface-hover group flex flex-col overflow-hidden rounded-2xl border text-left transition-colors"
-            >
-              {/* A band rather than a square: the plates are landscape, and a
-                  square crop of a landscape is a detail of one. Shorter on a
-                  phone, where three of these share the height of a screen. */}
-              <span
-                className="relative block h-24 w-full overflow-hidden sm:h-28"
-                aria-hidden="true"
-              >
-                <span
-                  className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-[1.04]"
-                  style={{ backgroundImage: `url(${way.image})` }}
-                />
-                {/* The plates are dark at the foot, so the title below needs a
-                    joint rather than a hard edge against them. */}
-                <span className="from-surface absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t to-transparent" />
-              </span>
-              <span className="block px-3.5 py-3">
-                <span className="block text-sm font-semibold">{way.title}</span>
-                <span className="text-muted-foreground mt-1 block text-xs text-pretty">
-                  {way.hint}
-                </span>
-              </span>
-            </button>
-          ))}
+          <Way way={WAYS_IN.create} primary onPick={() => void startCreate()} />
+
+          {/* One card, two halves, divided rather than spaced: they are the two
+              answers to a single question, and a gap between them would make
+              them look like two more of what is on the left. The rule turns
+              with the layout — beside each other on a wide screen, stacked on a
+              phone. */}
+          <div className="border-border bg-surface divide-border grid divide-y overflow-hidden rounded-2xl border sm:col-span-2 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+            {WAYS_IN.restore.map((way) => (
+              <Way
+                key={way.id}
+                way={way}
+                bordered={false}
+                onPick={() => goTo(way.id)}
+              />
+            ))}
+          </div>
         </div>
 
         {info.error ? (
@@ -597,6 +675,23 @@ export function WalletGate(): ReactNode {
             className={`w-full ${choosing ? "max-w-2xl" : "max-w-md"}`}
           >
             {body}
+            {/*
+              The way out of a preview.
+
+              Only while previewing, and it says which it is. In a demo build
+              nothing behind these cards can finish — there is no shell to make
+              keys — so without this the demo controls would be a button that
+              locks the app behind a screen with no exit.
+            */}
+            {preview && (
+              <button
+                type="button"
+                onClick={hideGatePreview}
+                className="focus-ring text-muted-foreground hover:text-foreground mx-auto mt-6 block rounded-lg px-3 py-1.5 text-xs font-medium"
+              >
+                Close preview — nothing here can complete in a demo build
+              </button>
+            )}
           </div>
         </div>
       </WalletGateBackdrop>
