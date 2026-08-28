@@ -283,6 +283,15 @@ export interface SettingsState {
    * can go in.
    */
   archivedPaymentLinks: string[];
+  /**
+   * Splits put out of sight, by id.
+   *
+   * The same note as the line above, about the other thing this app makes.
+   * A split has no status of its own to hide behind — it is settled or it is
+   * not, and a fully settled dinner from March is still owed to nobody and
+   * still on the screen. Archiving is how it stops being.
+   */
+  archivedSplits: string[];
 
   /* ---- Shortcuts ------------------------------------------------------ */
   /**
@@ -427,6 +436,7 @@ const INITIAL: SettingsState = {
 
   revokedConnections: [],
   archivedPaymentLinks: [],
+  archivedSplits: [],
   keymap: {},
   handles: ["crumbs", "breadcrumbs"],
   /* The shipped profiles wear one each. A prototype where both answer to the
@@ -670,6 +680,17 @@ export function toggleArchivedPaymentLink(id: string): void {
     archivedPaymentLinks: archived
       ? state.archivedPaymentLinks.filter((entry) => entry !== id)
       : [...state.archivedPaymentLinks, id],
+  };
+  emit();
+}
+
+export function toggleArchivedSplit(id: string): void {
+  const archived = state.archivedSplits.includes(id);
+  state = {
+    ...state,
+    archivedSplits: archived
+      ? state.archivedSplits.filter((entry) => entry !== id)
+      : [...state.archivedSplits, id],
   };
   emit();
 }

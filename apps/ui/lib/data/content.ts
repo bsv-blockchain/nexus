@@ -279,6 +279,17 @@ export const content = {
     collected: "collected",
     copyLink: "Copy link",
     linkCopied: "Link copied",
+    /* Sharing a link to somebody, as against copying it and finding your own
+       way to them. The pre-query list is who this wallet has actually paid —
+       see getWalletContacts — so it is the people a link is most likely for. */
+    shareLink: "Share link",
+    shareTitle: "Send this to",
+    shareSearch: "Search a handle",
+    shareRecent: "Recent",
+    shareResults: "Matches",
+    shareNone: "Nobody matches that.",
+    shareEmpty: "Nobody yet. Search for a handle.",
+    shareSent: "Sent to @{handle}",
     contacts: "Contacts",
     searchContacts: "Search name or handle",
     searchActivity: "Search activity",
@@ -313,6 +324,21 @@ export const content = {
       settledUp: "settled up",
       independentNote:
         "Each share is its own payment. A failed one can be retried without touching the rest.",
+      /* The same three acts a payment link offers, for the same reasons. A
+         split is the other thing this app makes, and it was the one of the two
+         you could neither send to anybody nor put away. */
+      tabs: { active: "Active", archived: "Archived" },
+      archive: "Archive",
+      restore: "Restore",
+      archived: "Archived",
+      restored: "Back in Active",
+      noArchived: "Nothing archived.",
+      preview: "Preview",
+      previewTitle: "What the others see",
+      previewNote:
+        "A preview. Nothing here is live, and no share can be paid from it.",
+      previewOwes: "owes",
+      previewPay: "Pay your share",
       /* Raising one. The form is a side pane, like a new payment link. */
       newSplit: "New split",
       newTitle: "Split an amount",

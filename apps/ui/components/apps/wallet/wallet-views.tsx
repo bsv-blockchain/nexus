@@ -51,6 +51,7 @@ import {
   Users,
 } from "lucide-react";
 import { useCreatedPaymentLinks } from "@/lib/payment-links-store";
+import { ShareLinkButton } from "@/components/apps/wallet/share-link";
 import { toggleArchivedPaymentLink, useSettings } from "@/lib/settings-store";
 import { toast } from "sonner";
 import { useState, type ReactNode } from "react";
@@ -751,23 +752,15 @@ export function PaymentLinks({
               )}
 
               {/* Half, a quarter, a quarter — `flex-[2]` against two `flex-1`.
-                  Copying is what somebody came here to do, so it keeps the fill
-                  and twice the room; previewing and archiving are each a
-                  once-per-link act. */}
+                  Sending it somewhere is what somebody came here to do, so it
+                  keeps the fill and twice the room; previewing and archiving are
+                  each a once-per-link act. */}
               <div className="mt-3 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(
-                      `https://nexus.pay/${link.code}`
-                    );
-                    toast.success(copy.linkCopied);
-                  }}
-                  className="focus-ring bg-accent text-accent-foreground flex flex-2 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition-opacity hover:opacity-90"
-                >
-                  <Copy className="size-3.5" aria-hidden="true" />
-                  {copy.copyLink}
-                </button>
+                <ShareLinkButton
+                  url={`https://nexus.pay/${link.code}`}
+                  title={link.description}
+                  className="flex-2"
+                />
                 <button
                   type="button"
                   onClick={() => setPreview(link)}

@@ -25,6 +25,8 @@
  */
 
 import { MemberAvatar } from "@/components/apps/messages/member-avatar";
+import { Sheet } from "@/components/apps/messages/sheet";
+import { ShareLinkButton } from "@/components/apps/wallet/share-link";
 import { useWalletAccountId } from "@/components/apps/wallet/use-wallet-account";
 import { ProfileHovercard } from "@/components/apps/messages/profile-hovercard";
 import { TokenMark, formatUnits } from "@/components/apps/wallet/token-mark";
@@ -48,13 +50,17 @@ import {
   useShareStatuses,
   type ShareStatus,
 } from "@/lib/splits-store";
+import { toggleArchivedSplit, useSettings } from "@/lib/settings-store";
 import { usd } from "@/lib/wallet";
 import {
+  Archive,
+  ArchiveRestore,
   ArrowLeft,
   BellRing,
   Check,
   ChevronRight,
   Circle,
+  Eye,
   Plus,
   RotateCcw,
   Trash2,
@@ -418,24 +424,47 @@ function Detail({
   );
 }
 
-/** One row in either list. */
+/**
+ * The address a split is sent to.
+ *
+ * Under the same host as a payment link, because from the recipient's side it
+ * is the same kind of thing: a page that names an amount and asks one person
+ * for their part of it. `/split/` rather than a code, since a split is not
+ * published — the id is what a hosted page would look it up by.
+ */
+function splitUrl(bill: SplitBill): string {
+  return `https://nexus.pay/split/${bill.id}`;
+}
+
+/**
+ * One row in either list, and the three things you can do with it.
+ *
+ * The card was one button that opened the detail, so the acts a split needed —
+ * sending it to somebody, seeing what they get, putting it away — had nowhere
+ * to live that was not inside another button. Split in two: the top opens the
+ * detail, the row underneath is the acts. The same shape a payment link has,
+ * because it is the same set of decisions about the same kind of object.
+ */
 function Row({
   bill,
   onOpen,
+  onPreview,
 }: {
   bill: SplitBill;
   onOpen: () => void;
+  onPreview: () => void;
 }): ReactNode {
   const copy = content.wallet.splits;
   const token = getToken(bill.tokenId);
   const { paid, total } = tally(bill);
+  const archived = useSettings().archivedSplits.includes(bill.id);
 
   return (
-    <li>
+    <li className="bg-surface rounded-2xl p-4">
       <button
         type="button"
         onClick={onOpen}
-        className="focus-ring bg-surface hover:bg-surface-hover flex w-full items-center gap-3 rounded-2xl p-4 text-left transition-colors"
+        className="focus-ring -m-1 flex w-[calc(100%+0.5rem)] items-center gap-3 rounded-xl p-1 text-left"
       >
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-bold">
@@ -456,6 +485,46 @@ function Row({
           aria-hidden="true"
         />
       </button>
+
+      {/* Half, a quarter, a quarter — the payment link's proportions, because
+          the acts are the same acts in the same order of how often each is
+          wanted. */}
+      <div className="mt-3 flex items-center gap-2">
+        <ShareLinkButton
+          url={splitUrl(bill)}
+          title={bill.description}
+          className="flex-2"
+        />
+        <button
+          type="button"
+          onClick={onPreview}
+          className="focus-ring border-border hover:bg-surface-hover flex flex-1 items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-xs font-semibold"
+        >
+          <Eye className="size-3.5" aria-hidden="true" />
+          {copy.preview}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            toggleArchivedSplit(bill.id);
+            toast.success(archived ? copy.restored : copy.archived, {
+              description: bill.description,
+              action: {
+                label: content.hub.undo,
+                onClick: () => toggleArchivedSplit(bill.id),
+              },
+            });
+          }}
+          className="focus-ring border-border hover:bg-surface-hover flex flex-1 items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-xs font-semibold"
+        >
+          {archived ? (
+            <ArchiveRestore className="size-3.5" aria-hidden="true" />
+          ) : (
+            <Archive className="size-3.5" aria-hidden="true" />
+          )}
+          {archived ? copy.restore : copy.archive}
+        </button>
+      </div>
     </li>
   );
 }
@@ -470,8 +539,12 @@ export function Splits(): ReactNode {
   useShareStatuses();
 
   const accountId = useWalletAccountId();
-  const all = [...raised, ...getSplitBills(accountId)];
-  const open = openId ? all.find((bill) => bill.id === openId) : null;
+  const everything = [...raised, ...getSplitBills(accountId)];
+  const open = openId ? everything.find((bill) => bill.id === openId) : null;
+  const [tab, setTab] = useState<"active" | "archived">("active");
+  const [preview, setPreview] = useState<SplitBill | null>(null);
+  const archivedIds = useSettings().archivedSplits;
+  const isArchived = (id: string): boolean => archivedIds.includes(id);
 
   if (open) {
     return (
@@ -483,6 +556,13 @@ export function Splits(): ReactNode {
     );
   }
 
+  /* Archived splits leave both lists rather than being greyed in place. The
+     point of putting one away is that it stops being read, and a settled
+     dinner from March under a heading that says what you are owed is the
+     opposite of that. */
+  const all = everything.filter((bill) =>
+    tab === "archived" ? isArchived(bill.id) : !isArchived(bill.id),
+  );
   const owedToYou = all.filter((bill) => !bill.raisedBy);
   const youOwe = all.filter((bill) => bill.raisedBy);
 
@@ -505,7 +585,48 @@ export function Splits(): ReactNode {
         </button>
       </div>
 
-      {all.length === 0 && (
+      {/* Counts in the label, as payment links and the collectibles tabs do:
+          the point of an archive is that you stop looking at it, so the only
+          thing worth saying about it from out here is how much is in there. */}
+      <div
+        role="tablist"
+        aria-label={copy.title}
+        className="border-border mb-4 flex gap-1 border-b"
+      >
+        {(["active", "archived"] as const).map((option) => {
+          const count = everything.filter((bill) =>
+            option === "archived" ? isArchived(bill.id) : !isArchived(bill.id),
+          ).length;
+          const selected = option === tab;
+          return (
+            <button
+              key={option}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => setTab(option)}
+              className={`focus-ring -mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm transition-colors ${
+                selected
+                  ? "border-foreground text-foreground font-semibold"
+                  : "text-muted-foreground hover:text-foreground border-transparent font-medium"
+              }`}
+            >
+              {copy.tabs[option]}
+              <span className="text-muted-foreground text-xs tabular-nums">
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {all.length === 0 && tab === "archived" && (
+        <p className="text-muted-foreground py-8 text-center text-sm">
+          {copy.noArchived}
+        </p>
+      )}
+
+      {all.length === 0 && tab === "active" && (
         <div className="bg-surface rounded-2xl p-8 text-center">
           <p className="text-sm font-semibold">{copy.empty}</p>
           <p className="text-muted-foreground mt-1 text-sm text-pretty">
@@ -525,6 +646,7 @@ export function Splits(): ReactNode {
                 key={bill.id}
                 bill={bill}
                 onOpen={() => setOpenId(bill.id)}
+                onPreview={() => setPreview(bill)}
               />
             ))}
           </ul>
@@ -542,11 +664,97 @@ export function Splits(): ReactNode {
                 key={bill.id}
                 bill={bill}
                 onOpen={() => setOpenId(bill.id)}
+                onPreview={() => setPreview(bill)}
               />
             ))}
           </ul>
         </>
       )}
+
+      <SplitPreview bill={preview} onClose={() => setPreview(null)} />
     </div>
+  );
+}
+
+/**
+ * The other end of a split, which its owner cannot otherwise see.
+ *
+ * Every value is the split's own — what it was for, the total, the share this
+ * person owes. Nothing is added: no reminder count, no "two others have paid",
+ * none of what a hosted page would know and this one cannot.
+ *
+ * Pay is present and disabled, for the same reason the payment link's preview
+ * keeps its own: it is most of what the recipient's screen is, and a preview
+ * without it would be a preview of something else.
+ */
+function SplitPreview({
+  bill,
+  onClose,
+}: {
+  bill: SplitBill | null;
+  onClose: () => void;
+}): ReactNode {
+  const copy = content.wallet.splits;
+  const token = bill ? getToken(bill.tokenId) : undefined;
+  return (
+    <Sheet open={Boolean(bill)} onClose={onClose} label={copy.previewTitle}>
+      {bill && (
+        <div className="p-5">
+          <p className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+            {copy.previewTitle}
+          </p>
+          <h2 className="mt-2 text-lg font-bold text-pretty">
+            {bill.description}
+          </h2>
+          <p className="text-muted-foreground mt-1 flex items-center gap-1.5 text-sm tabular-nums">
+            {token && <TokenMark token={token} size={14} />}
+            {token
+              ? `${formatUnits(bill.totalUnits, token.decimals)} ${token.symbol}`
+              : bill.totalUnits}
+            {" \u00b7 "}
+            {bill.shares.length} {copy.ways}
+          </p>
+
+          <ul className="border-border mt-4 space-y-2 border-t pt-4">
+            {bill.shares.map((share) => {
+              const person = getMessagePerson(share.personId);
+              if (!person) return null;
+              return (
+                <li
+                  key={share.personId}
+                  className="flex items-center gap-2.5 text-sm"
+                >
+                  <MemberAvatar person={person} size={24} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block overflow-hidden text-ellipsis whitespace-nowrap">
+                      {person.name}
+                    </span>
+                  </span>
+                  <span className="text-muted-foreground shrink-0 text-xs">
+                    {copy.previewOwes}
+                  </span>
+                  <span className="shrink-0 text-sm font-semibold tabular-nums">
+                    {token
+                      ? formatUnits(share.units, token.decimals)
+                      : share.units}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+
+          <button
+            type="button"
+            disabled
+            className="bg-accent text-accent-foreground mt-5 w-full rounded-xl px-4 py-3 text-sm font-semibold opacity-50"
+          >
+            {copy.previewPay}
+          </button>
+          <p className="text-muted-foreground mt-2 text-center text-[11px] text-pretty">
+            {copy.previewNote}
+          </p>
+        </div>
+      )}
+    </Sheet>
   );
 }
