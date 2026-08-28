@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 /**
  * The version users quote in bug reports.
@@ -17,7 +17,21 @@ import { useEffect, useState } from "react";
 
 type HostInfo = { version?: string; shell?: string; platform?: string };
 
-export function ShellVersion({ className = "" }: { className?: string }) {
+export function ShellVersion({
+  className = "",
+  /**
+   * What to render where no host answers.
+   *
+   * Null is right for a footer, which can simply have one line fewer. It is
+   * wrong for a label that is the only thing in its row — the demo panel's
+   * title is either a version or the word DEMO, and a browser tab with no
+   * shell would leave it blank in one of the two.
+   */
+  fallback = null,
+}: {
+  className?: string;
+  fallback?: ReactNode;
+}) {
   const [info, setInfo] = useState<HostInfo | null>(null);
 
   useEffect(() => {
@@ -52,7 +66,7 @@ export function ShellVersion({ className = "" }: { className?: string }) {
     };
   }, []);
 
-  if (!info?.version) return null;
+  if (!info?.version) return fallback;
 
   return (
     <span

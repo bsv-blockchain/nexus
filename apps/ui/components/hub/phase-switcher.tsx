@@ -23,6 +23,7 @@ import {
 } from "@/lib/phase";
 import { AnimatePresence, motion } from "motion/react";
 import { showGatePreview } from "@/lib/gate-preview";
+import { ShellVersion } from "@/components/hub/shell-version";
 import { Check, ChevronRight, Wrench, X } from "lucide-react";
 import {
   useEffect,
@@ -204,8 +205,32 @@ export function PhaseSwitcher(): ReactNode {
             className="border-border bg-surface-raised absolute right-0 bottom-12 w-80 overflow-hidden rounded-xl border shadow-2xl"
           >
             <div className="border-border/60 flex items-center gap-2 border-b p-3">
+              {/*
+                The title says which of the two this session is, because that is
+                the one thing about this panel worth knowing before you have
+                read any of it. "Demo controls" named the box rather than the
+                state, and the state is what changes underneath everything else
+                on screen.
+
+                Live gets the shell's version — the number somebody quotes in a
+                bug report, and the only moment it is worth having on screen is
+                when the session is reading real things. Outside a shell there
+                is no version to give, so it falls back to the word.
+              */}
               <p className="text-muted-foreground flex-1 text-[10px] font-semibold tracking-[1px] uppercase">
-                Demo controls
+                {dataMode === "demo" ? (
+                  "Demo mode"
+                ) : (
+                  /* `normal-case`, against the row's own uppercase: a version
+                     is a string people copy into a bug report, and "V0.2.2" is
+                     not the string. Every other place it appears renders it
+                     lowercase-v, and one of them being different would be one
+                     of them being wrong. */
+                  <ShellVersion
+                    className="text-muted-foreground text-[10px] tracking-[1px] normal-case"
+                    fallback={<>Live mode</>}
+                  />
+                )}
               </p>
               <button
                 type="button"
@@ -224,16 +249,12 @@ export function PhaseSwitcher(): ReactNode {
                 say no" the Exchange action was dropped for. */}
             {DEMO_DATA_COMPILED_IN && (
               <div className="border-border/60 border-b p-3">
-                <p className="text-muted-foreground text-[10px] font-semibold tracking-[1px] uppercase">
-                  Data
-                </p>
-                {/* One switch now. It was two — a source and a fullness — which
-                    both answered "what will this screen show", so they were read
-                    as two versions of each other and could be left in
-                    combinations no install could ever be in. */}
-                <p className="text-muted-foreground pb-1.5 text-[10px] leading-relaxed text-pretty">
-                  What every screen in this build is reading.
-                </p>
+                {/* No label over it. It is the first thing in the panel and the
+                    two words in it are the label — and the title bar above now
+                    says which one is in force. It was two switches, a source
+                    and a fullness, which both answered "what will this screen
+                    show" and could be left in combinations no install could
+                    ever be in. */}
                 <div
                   role="group"
                   aria-label="Data source"
@@ -263,10 +284,16 @@ export function PhaseSwitcher(): ReactNode {
                   answers this" and "this failed" is invisible once the rows are
                   gone, and somebody who flipped the switch a minute ago has
                   already forgotten they did. */}
-                <p className="text-muted-foreground mt-1.5 text-[10px] leading-relaxed text-pretty">
+                {/* One line, centred under the pair it is about. It was three
+                    lines of ranged-left prose explaining a switch whose two
+                    words already say most of it; what it has to add is the part
+                    neither word does — that nothing here is real, and that an
+                    empty screen in live is the right answer rather than a
+                    fault. */}
+                <p className="text-muted-foreground mt-1.5 text-center text-[10px]">
                   {dataMode === "demo"
-                    ? "Invented rows, so every screen has something on it. Nothing here is a real balance."
-                    : "Real services only \u2014 the wallet, the browser, the shell. Everything else shows its empty state, which is correct here rather than broken."}
+                    ? "Invented rows. No balance here is real."
+                    : "Real services. Screens with none are empty on purpose."}
                 </p>
 
                 {/*
@@ -295,10 +322,12 @@ export function PhaseSwitcher(): ReactNode {
                       <span className="text-foreground font-semibold">
                         Start empty
                       </span>
-                      <span className="text-muted-foreground block text-pretty">
+                      {/* One line in both states, so ticking the box does not
+                          change the height of the panel under the pointer. */}
+                      <span className="text-muted-foreground block whitespace-nowrap">
                         {contentMode === "empty"
-                          ? "An hour after installing: no transactions, no messages, an empty vault. The feed still has posts, because everyone's does."
-                          : "Off: a used account, with an inbox, a ledger and a vault with things in it."}
+                          ? "A fresh install, an hour old."
+                          : "A used account, with history."}
                       </span>
                     </span>
                   </label>
