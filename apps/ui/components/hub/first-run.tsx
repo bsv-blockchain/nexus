@@ -1089,6 +1089,13 @@ function Run({
                         : {})}
                       title={copy.steps[step.key].title}
                       body={copy.steps[step.key].body}
+                      /* Right half pages on, left half pages back — the same
+                         two directions the arrow keys and the footer already
+                         answer, given a bigger target than either. `index` is
+                         the deck's current position rather than this card's
+                         own, which is what makes it correct: whichever card is
+                         actually on screen is the one a click can reach. */
+                      onPage={(dir) => goTo(index + dir)}
                     />
                   ))}
                   <HandleCard
@@ -1160,15 +1167,36 @@ function TellCard({
   backdrop,
   title,
   body,
+  onPage,
 }: {
   image: string;
   /** Replaces the still, for a card whose subject moves. */
   backdrop?: ReactNode;
   title: string;
   body: string;
+  /**
+   * Paging by a click on the card itself, split at its own midpoint.
+   *
+   * Optional so a card shown outside the deck — there is none today, but
+   * nothing here requires one — is not clickable for a page it does not sit
+   * in. `-1` is back, `1` is on; the card does not know or care which step
+   * that lands on, only which half was pressed.
+   */
+  onPage?: (direction: -1 | 1) => void;
 }): ReactNode {
   return (
-    <article className="ring-border/60 relative flex h-full w-full flex-col justify-end overflow-hidden rounded-3xl bg-black shadow-2xl ring-1">
+    <article
+      onClick={
+        onPage
+          ? (event) => {
+              const rect = event.currentTarget.getBoundingClientRect();
+              const half = (event.clientX - rect.left) / rect.width;
+              onPage(half < 0.5 ? -1 : 1);
+            }
+          : undefined
+      }
+      className={`ring-border/60 relative flex h-full w-full flex-col justify-end overflow-hidden rounded-3xl bg-black shadow-2xl ring-1 ${onPage ? "cursor-pointer" : ""}`}
+    >
       {backdrop ?? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
