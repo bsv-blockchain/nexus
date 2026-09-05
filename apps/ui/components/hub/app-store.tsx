@@ -697,9 +697,11 @@ export function AppStore(): ReactNode {
             them.
           */}
           <p className="text-muted-foreground text-sm">
-            {collection && appsCollection !== "all"
-              ? collection.description
-              : copy.storeSubtitle}
+            {tab === "manage"
+              ? copy.manageSubtitle
+              : collection && appsCollection !== "all"
+                ? collection.description
+                : copy.storeSubtitle}
           </p>
 
           {/*

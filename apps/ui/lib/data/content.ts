@@ -72,6 +72,13 @@ export const content = {
       manageTab: "Manage Apps",
       discoverTabShort: "Discover",
       manageTabShort: "Apps",
+      /* The line above the tabs, for Manage rather than Discover. Also above
+         a collection's own description: "The apps every setup gets" is an
+         answer about Discover's shelf of Essentials, and it does not become
+         an answer about your CONNECTED apps just because Manage is the tab
+         open when you read it. */
+      manageSubtitle:
+        "Review what is connected, and disconnect anything you no longer use.",
       /* Manage, before you have connected anything to look at. Distinct from
          "No apps match your search" — that is what a query or a filter found
          nothing, and this is what an empty tab says with neither set. */
