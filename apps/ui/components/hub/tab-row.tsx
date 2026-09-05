@@ -23,6 +23,7 @@ export function TabRow({
   action,
   fade = "from-background",
   className = "",
+  gap = "",
 }: {
   /** the tabs, normally <Tab> */
   children: ReactNode;
@@ -38,6 +39,15 @@ export function TabRow({
    */
   fade?: string;
   className?: string;
+  /**
+   * Space between tabs, as a Tailwind `gap-*`.
+   *
+   * Empty by default: every tab up to now has carried its own horizontal
+   * padding, which is what held the row apart on its own. A `size="lg"` tab
+   * has none — it is a heading standing in for what used to be plain text —
+   * so the row has to make the room that padding is no longer making.
+   */
+  gap?: string;
 }): ReactNode {
   return (
     /* `overflow-hidden` so a caller that rounds a corner actually gets one: the
@@ -46,7 +56,9 @@ export function TabRow({
     <div className={`relative flex items-stretch overflow-hidden ${className}`}>
       {/* `scrollbar-none` because a horizontal bar under a tab row reads as a
           second, broken underline. */}
-      <div className="scrollbar-none flex min-w-0 flex-1 overflow-x-auto">
+      <div
+        className={`scrollbar-none flex min-w-0 flex-1 overflow-x-auto ${gap}`}
+      >
         {children}
       </div>
       {action && (
@@ -80,6 +92,7 @@ export function Tab({
   onClick,
   group,
   children,
+  size = "sm",
 }: {
   label: string;
   active: boolean;
@@ -88,23 +101,38 @@ export function Tab({
   group: string;
   /** replaces the plain label, for tabs that carry a face or a close control */
   children?: ReactNode;
+  /**
+   * `"lg"` for a tab standing in for what used to be a page's own `<h1>` —
+   * the App Store's Discover/Manage pair, where the row IS the heading rather
+   * than a strip of filters under one. Same size and weight the heading had,
+   * and no horizontal padding: a heading does not indent from the margin
+   * every other line on the page lines up against, so the tab that replaced
+   * one should not either. `gap` on the enclosing `TabRow` is what holds it
+   * apart from its neighbour instead.
+   */
+  size?: "sm" | "lg";
 }): ReactNode {
+  const lg = size === "lg";
   return (
     <button
       type="button"
       onClick={onClick}
       aria-current={active ? "page" : undefined}
-      className={`focus-ring relative shrink-0 px-4 py-3 text-sm whitespace-nowrap transition-colors ${
+      className={`focus-ring relative shrink-0 whitespace-nowrap transition-colors ${
+        lg
+          ? "py-1 text-2xl font-bold tracking-tight"
+          : "px-4 py-3 text-sm"
+      } ${
         active
-          ? "text-foreground font-semibold"
-          : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+          ? `text-foreground ${lg ? "" : "font-semibold"}`
+          : `text-muted-foreground hover:text-foreground ${lg ? "" : "hover:bg-surface-hover"}`
       }`}
     >
       {children ?? label}
       {active && (
         <motion.span
           layoutId={`tabrow-${group}`}
-          className="bg-accent absolute inset-x-3 bottom-0 h-[3px] rounded-full"
+          className={`bg-accent absolute bottom-0 h-[3px] rounded-full ${lg ? "inset-x-0" : "inset-x-3"}`}
           transition={{ type: "spring", stiffness: 500, damping: 40 }}
         />
       )}

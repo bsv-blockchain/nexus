@@ -703,10 +703,11 @@ export function AppStore(): ReactNode {
             what you have. Manage exists because that used to mean reading
             past however many you had not connected to find the six you had.
           */}
-          <TabRow className="-mx-1 mt-2" fade="from-background">
+          <TabRow className="mt-2" fade="from-background" gap="gap-6">
             <Tab
               label={copy.discoverTab}
               group="app-store"
+              size="lg"
               active={tab === "discover"}
               onClick={() => setTab("discover")}
             >
@@ -716,6 +717,7 @@ export function AppStore(): ReactNode {
             <Tab
               label={copy.manageTab}
               group="app-store"
+              size="lg"
               active={tab === "manage"}
               onClick={() => setTab("manage")}
             >
