@@ -53,6 +53,29 @@ export const content = {
       /* What the store is, in the line under its heading. */
       storeSubtitle:
         "Connect apps to your Nexus. Connected apps appear in the sidebar rail.",
+      /*
+       * The store's own two tabs: everything, or just what you have.
+       *
+       * "Apps" used to be a plain heading over one long list of both at
+       * once — every built-in app and every web listing, connected or not,
+       * in the same grid a search box narrowed. Finding the six things you
+       * had actually connected meant reading past however many you had not.
+       *
+       * Full labels on a desktop, where the tab row has room to say what
+       * each one is for; short ones on a phone, where "Discover Apps" and
+       * "Manage Apps" side by side would wrap. "Apps" rather than "Manage"
+       * on the narrow one, because a phone's tab row is not the place to
+       * explain what the tab means twice — the fuller word already did
+       * that on the tab beside it.
+       */
+      discoverTab: "Discover Apps",
+      manageTab: "Manage Apps",
+      discoverTabShort: "Discover",
+      manageTabShort: "Apps",
+      /* Manage, before you have connected anything to look at. Distinct from
+         "No apps match your search" — that is what a query or a filter found
+         nothing, and this is what an empty tab says with neither set. */
+      manageEmpty: "Nothing connected yet. Discover Apps is the other tab.",
       installedSection: "Connected",
       availableSection: "Available",
       install: "Connect",

@@ -10,6 +10,7 @@ import { useBrandMode, withBrand } from "@/lib/brand";
 import { CollectionRow } from "@/components/hub/app-collections";
 import { useHub } from "@/components/hub/hub-provider";
 import { PopoverMenu } from "@/components/hub/popover-menu";
+import { Tab, TabRow } from "@/components/hub/tab-row";
 import { Tooltip } from "@/components/hub/tooltip";
 import {
   content,
@@ -498,12 +499,21 @@ function CategoryGroups({
 
 /** Full-area app store shown when the Apps rail tab is active. */
 export function AppStore(): ReactNode {
-  const { appsCollection } = useHub();
+  const { appsCollection, isInstalled } = useHub();
   const copy = content.library.apps;
   const store = content.appStore;
   const collection = getAppCollections().find((c) => c.id === appsCollection);
   const slugSet = new Set(getCollectionAppSlugs(appsCollection));
 
+  /*
+   * Everything, or just what you have connected.
+   *
+   * The same grid either way — search, sort, the repo sections, a card's own
+   * Connect/Disconnect button — narrowed by one more predicate rather than
+   * drawn twice. Manage is not a different screen, it is this one asked a
+   * different question: not "what could I add" but "what did I".
+   */
+  const [tab, setTab] = useState<"discover" | "manage">("discover");
   const [query, setQuery] = useState("");
   /* The first sort this build offers, which is Trending in demo and Newest in
      a live build — not the literal "trending", which would leave a live build
@@ -556,6 +566,9 @@ export function AppStore(): ReactNode {
     (app) => appsCollection === "all" || slugSet.has(app.slug)
   );
   const matched = scoped.filter((app) => {
+    /* Manage's whole narrowing, in one line: the rest of this predicate is
+       the same question Discover asks. */
+    if (tab === "manage" && !isInstalled(app.slug)) return false;
     if (
       q &&
       !app.name.toLowerCase().includes(q) &&
@@ -587,6 +600,7 @@ export function AppStore(): ReactNode {
   const enabledIds = new Set(repos.map((repo) => repo.id));
   const countable = scoped.filter(
     (app) =>
+      (tab !== "manage" || isInstalled(app.slug)) &&
       enabledIds.has(app.repoId) &&
       (!q ||
         app.name.toLowerCase().includes(q) ||
@@ -668,12 +682,47 @@ export function AppStore(): ReactNode {
     <div className="flex h-full min-h-0">
       <div className="min-w-0 flex-1 overflow-y-auto px-6 py-8 sm:px-10">
         <div className="mx-auto max-w-400">
-          <h1 className="text-2xl font-bold tracking-tight">{copy.title}</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
+          {/*
+            The line that used to sit under the heading now sits above it —
+            "above 'Apps'" being the whole instruction, since what was under
+            it stopped being a heading. Two tabs read as two tabs whichever
+            order they come in; a sentence explaining what the screen is
+            reads best before you have started sorting rows into either of
+            them.
+          */}
+          <p className="text-muted-foreground text-sm">
             {collection && appsCollection !== "all"
               ? collection.description
               : copy.storeSubtitle}
           </p>
+
+          {/*
+            Discover, then Manage: the same order the words suggest reading
+            them in, and the order this screen already served them in before
+            it had two tabs — everything, and then, if you go looking, only
+            what you have. Manage exists because that used to mean reading
+            past however many you had not connected to find the six you had.
+          */}
+          <TabRow className="-mx-1 mt-2" fade="from-background">
+            <Tab
+              label={copy.discoverTab}
+              group="app-store"
+              active={tab === "discover"}
+              onClick={() => setTab("discover")}
+            >
+              <span className="hidden sm:inline">{copy.discoverTab}</span>
+              <span className="sm:hidden">{copy.discoverTabShort}</span>
+            </Tab>
+            <Tab
+              label={copy.manageTab}
+              group="app-store"
+              active={tab === "manage"}
+              onClick={() => setTab("manage")}
+            >
+              <span className="hidden sm:inline">{copy.manageTab}</span>
+              <span className="sm:hidden">{copy.manageTabShort}</span>
+            </Tab>
+          </TabRow>
 
           {/* The setups. A column beside the store on a desktop — see
               hub-shell's LibraryPanel — and a row here on a phone, where that
@@ -795,7 +844,12 @@ export function AppStore(): ReactNode {
 
           {total === 0 && (
             <p className="text-muted-foreground py-16 text-center text-sm">
-              {store.noResults}
+              {/* "Nothing connected" only where that is actually the reason —
+                  a search or a filter that came up empty in Manage gets the
+                  same line Discover would give it. */}
+              {tab === "manage" && !q && activeFilters === 0
+                ? copy.manageEmpty
+                : store.noResults}
             </p>
           )}
         </div>
