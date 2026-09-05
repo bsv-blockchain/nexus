@@ -422,14 +422,20 @@ function CategoryFolder({
               </span>
             </div>
             <div className="mt-3 flex items-center">
-              <div className="flex -space-x-3.5">
+              {/* 1.5x the app grid's own icon size: this stack is the whole
+                  content of a shut folder, where a tile elsewhere is one of
+                  several things competing for the eye. The overlap scales
+                  with it — -space-x-3.5 was tuned to how much of a 52px tile
+                  a neighbour should cover, and left alone at 78px the same
+                  14px reads as a loose row rather than a stack. */}
+              <div className="flex -space-x-[21px]">
                 {/* Named on hover. A shut folder shows a stack of marks and
                     nothing else, so without this the only way to learn what is
                     in one is to open it. */}
                 {previews.map((app) => (
                   <Tooltip key={app.slug} label={app.name} side="top">
                     <span className="ring-surface flex rounded-[22%] shadow-lg ring-2 transition-transform hover:-translate-y-0.5">
-                      <AppTile app={app} size={52} />
+                      <AppTile app={app} size={78} />
                     </span>
                   </Tooltip>
                 ))}
