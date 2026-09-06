@@ -55,9 +55,27 @@ export function DiscoverHero(): ReactNode {
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-3">
-        {discoverQuicklinks.map((card) => (
-          <QuickCard key={card.id} card={card} />
+      {/* Three across on a phone (stacked) and on a wide monitor, but a
+          laptop-width desktop only has room for two of these before each
+          one gets too cramped to read — so the third stays out at every
+          desktop width up to a genuinely wide one, rather than the grid
+          quietly squeezing three into a row that only fits two.
+
+          `sm:max-3xl:` bounds each override to that one range rather than
+          pairing an unbounded `sm:` rule against an unbounded `3xl:` one:
+          two separate rules that both match at 1900px would leave whichever
+          one Tailwind happened to emit last in the stylesheet as the
+          winner — true for `grid-cols` and `display` alike here, since a
+          custom breakpoint added after the built-ins doesn't reliably sort
+          after them. A single bounded rule has nothing left to compete
+          with once the range ends. */}
+      <div className="mt-4 grid gap-4 sm:max-3xl:grid-cols-2 3xl:grid-cols-3">
+        {discoverQuicklinks.map((card, i) => (
+          <QuickCard
+            key={card.id}
+            card={card}
+            className={i === 2 ? "sm:max-3xl:hidden" : ""}
+          />
         ))}
       </div>
     </section>
@@ -66,8 +84,10 @@ export function DiscoverHero(): ReactNode {
 
 function QuickCard({
   card,
+  className = "",
 }: {
   card: (typeof discoverQuicklinks)[number];
+  className?: string;
 }): ReactNode {
   const apps = card.appSlugs
     .map((slug) => getHubApp(slug))
@@ -75,7 +95,9 @@ function QuickCard({
     .slice(0, 4);
 
   return (
-    <div className="bg-surface-raised flex items-center gap-4 rounded-2xl p-5">
+    <div
+      className={`bg-surface-raised flex items-center gap-4 rounded-2xl p-5 ${className}`}
+    >
       <div className="min-w-0 flex-1">
         <p className="text-muted-foreground text-[10px] font-bold tracking-wide uppercase">
           {card.eyebrow}

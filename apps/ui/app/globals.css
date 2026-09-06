@@ -159,6 +159,13 @@
   --accent-foreground: #ffffff;
 }
 
+@theme {
+  /* One step past the default 2xl (1536px), for the handful of places a
+     laptop-width desktop still reads as cramped and only a genuinely wide
+     monitor gets the roomier layout — see DiscoverHero's quicklink row. */
+  --breakpoint-3xl: 1800px;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
