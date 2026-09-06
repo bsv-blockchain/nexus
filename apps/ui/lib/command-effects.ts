@@ -973,7 +973,16 @@ const INITIAL: EffectsState = {
   // Seeded from the handles with the most peer attestations — the people you
   // would actually transact with.
   favourites: ["tc-treechad", "tw-utxo", "tw-randy", "hc-brandon", "mark-frederiks"],
-  reach: "everyone",
+  /*
+   * A toll, not an open door.
+   *
+   * "Everyone" is the answer a messaging app gives when it has nothing to charge
+   * with, and this one does — a stranger attaching a cent is the whole argument
+   * for a messagebox that settles on chain. Shipping open by default made the
+   * feature something you had to go and find, and left the default inbox the
+   * same inbox everybody already has.
+   */
+  reach: "toll",
   /* Receipts rather than messages: a default that anchors everything you say
      makes an irreversible choice on the user's behalf, and one that anchors
      nothing leaves them unable to prove a delivery they may need to. */

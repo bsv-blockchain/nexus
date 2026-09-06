@@ -17,7 +17,16 @@ import {
   releaseHandleFrom,
   useSettings,
 } from "@/lib/settings-store";
-import { Check, Loader2, Plus, Tag, Trash2, X } from "lucide-react";
+import { Sheet } from "@/components/apps/messages/sheet";
+import {
+  ArrowLeftRight,
+  Check,
+  Loader2,
+  Plus,
+  Tag,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useState, type ReactNode } from "react";
 
@@ -42,21 +51,24 @@ export function HandleList(): ReactNode {
 
   const active = activeHandleFor(activeSpaceId);
   const space = spaces.find((entry) => entry.id === activeSpaceId);
+  /* A handle another workspace is wearing, held until the move is agreed to. */
+  const [moving, setMoving] = useState<
+    { handle: string; from: string } | undefined
+  >(undefined);
 
   return (
+    <>
     <ul className="divide-border/60 divide-y">
       {settings.handles.map((handle) => {
         const isActive = handle === active;
         const listed = settings.listedForSale[handle];
-        /* Which other profiles are wearing it, so giving one up says what it
-           would take with it. */
-        const alsoOn = spaces
-          .filter(
-            (entry) =>
-              entry.id !== activeSpaceId &&
-              activeHandleFor(entry.id) === handle,
-          )
-          .map((entry) => entry.name);
+        /* The workspace wearing it, where that is not this one. At most one,
+           because a handle is one identity — which is also why it is both the
+           reason "Use here" is dead and the note under the name saying so. */
+        const heldBy = spaces.find(
+          (entry) =>
+            entry.id !== activeSpaceId && activeHandleFor(entry.id) === handle,
+        )?.name;
 
         return (
           <li key={handle} className="px-4 py-3">
@@ -78,8 +90,8 @@ export function HandleList(): ReactNode {
                 <span className="text-muted-foreground block truncate text-[11px]">
                   {isActive
                     ? `${copy.active} · ${space?.name ?? ""}`
-                    : alsoOn.length > 0
-                      ? alsoOn.join(", ")
+                    : heldBy
+                      ? copy.heldBy.replace("{name}", heldBy)
                       : listed !== undefined
                         ? `${copy.listedFor} ${money(listed)}`
                         : copy.onNexus}
@@ -92,9 +104,18 @@ export function HandleList(): ReactNode {
                   aria-hidden="true"
                 />
               ) : (
+                /* Live even where another workspace answers to it, because
+                   taking it is allowed — it is a move rather than a copy, and
+                   the sheet is where that gets said. The row already carries
+                   "Held by Work", so the question the sheet asks is one
+                   somebody has read before pressing this. */
                 <button
                   type="button"
                   onClick={() => {
+                    if (heldBy) {
+                      setMoving({ handle, from: heldBy });
+                      return;
+                    }
                     addHandle(handle, activeSpaceId);
                     toast.success(`@${handle}`, {
                       description: `${copy.active} · ${space?.name ?? ""}`,
@@ -198,6 +219,65 @@ export function HandleList(): ReactNode {
         </li>
       )}
     </ul>
+
+    {/* Taking a handle off somewhere else, agreed to first. The same question
+        the profiles column asks, because it is the same move — a person who
+        learned what "Use here" costs in one place should not have to learn it
+        again in the other. */}
+    <Sheet
+      open={moving !== undefined}
+      onClose={() => setMoving(undefined)}
+      label={
+        moving
+          ? copy.moveTitle
+              .replace("{handle}", moving.handle)
+              .replace("{name}", moving.from)
+          : copy.useHere
+      }
+      footer={
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setMoving(undefined)}
+            className="focus-ring border-border hover:bg-surface-hover flex-1 rounded-full border px-4 py-2.5 text-sm font-semibold"
+          >
+            {copy.moveCancel}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!moving) return;
+              addHandle(moving.handle, activeSpaceId);
+              toast.success(`@${moving.handle}`, {
+                description: `${copy.active} · ${space?.name ?? ""} · ${copy.movedFrom.replace("{name}", moving.from)}`,
+              });
+              setMoving(undefined);
+            }}
+            className="focus-ring bg-accent text-accent-foreground flex-1 rounded-full px-4 py-2.5 text-sm font-bold transition-opacity hover:opacity-90"
+          >
+            {copy.moveConfirm}
+          </button>
+        </div>
+      }
+    >
+      {moving && (
+        <div className="space-y-2 px-5 pt-3 pb-4">
+          <h2 className="flex items-start gap-2 text-base font-bold">
+            <ArrowLeftRight
+              className="text-warning mt-0.5 size-4 shrink-0"
+              aria-hidden="true"
+            />
+            {copy.moveTitle
+              .replace("{handle}", moving.handle)
+              .replace("{name}", moving.from)}
+          </h2>
+          <p className="text-muted-foreground text-sm text-pretty">
+            {copy.moveBody.replace("{name}", moving.from)}
+          </p>
+        </div>
+      )}
+    </Sheet>
+    </>
   );
 }
 

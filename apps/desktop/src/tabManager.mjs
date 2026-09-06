@@ -298,6 +298,30 @@ function createTabManager({ win, emit }) {
     tab.view.webContents.stop()
   }
 
+  /**
+   * Close every tab, because the page that opened them is gone.
+   *
+   * A tab is owned by the chrome that asked for it: the pane calls `create` on
+   * mount and `destroy` on unmount, and that contract holds for every route
+   * change inside the single-page app. It does not hold across a document load.
+   * A reload, a crash recovery or the shell pointing the window somewhere else
+   * tears the renderer down without running any cleanup, and every view it had
+   * asked for survives it — still parented to the window, still painting above
+   * the chrome, and now unreachable, because the ids that addressed them died
+   * with the page that held them.
+   *
+   * The result is a page from a previous load sitting over whatever is on
+   * screen, on every screen, with nothing left that can hide it: `applyVisibility`
+   * keeps showing whichever orphan was last active, and no overlay or route
+   * change touches it because the chrome does not know it exists.
+   *
+   * So the shell reaps them itself, at the one moment it can be sure they are
+   * all stale. See the caller in main.mjs.
+   */
+  function destroyAll() {
+    for (const id of Array.from(tabs.keys())) destroy(id)
+  }
+
   function list() {
     return Array.from(tabs, ([id, tab]) => ({
       id,
@@ -313,7 +337,7 @@ function createTabManager({ win, emit }) {
     return tabs.size
   }
 
-  return { create, destroy, navigate, setBounds, setActive, setOverlay, goBack, goForward, reload, stop, list, count }
+  return { create, destroy, destroyAll, navigate, setBounds, setActive, setOverlay, goBack, goForward, reload, stop, list, count }
 }
 
 export { createTabManager }

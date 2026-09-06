@@ -25,8 +25,7 @@ export const licence = {
   /** the form that fits on one line of a footer */
   short: "Open BSV 6",
   /** the canonical copy, for anybody who wants to diff this against it */
-  sourceUrl:
-    "https://github.com/bsv-blockchain/teranode/blob/main/LICENSE",
+  sourceUrl: "https://github.com/bsv-blockchain/teranode/blob/main/LICENSE",
   grantor: "BSV Association",
   address: "Alpenstrasse 15, 6300 Zug, Switzerland",
   registration: "CHE-427.008.338",

@@ -1,6 +1,7 @@
 "use client";
 
 import { TokenMark, formatUnits } from "@/components/apps/wallet/token-mark";
+import { useWalletAccountId } from "@/components/apps/wallet/use-wallet-account";
 import { holdings } from "@/lib/wallet";
 import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -27,7 +28,17 @@ export function TokenPicker({
   onSelect: (tokenId: string) => void;
   label: string;
 }): ReactNode {
-  const rows = holdings();
+  /*
+   * What this wallet holds and can actually send.
+   *
+   * Scoped to the selected wallet, because offering to pay out of a balance
+   * that belongs to another one is offering money that is not there. Foreign
+   * coins are dropped: they arrived by swap and live on Ethereum or Solana, and
+   * a BSV handle cannot be paid in them — see `getTokens` in lib/data.
+   */
+  const rows = holdings(useWalletAccountId()).filter(
+    ({ token }) => !token.chain,
+  );
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement | null>(null);
   const current = rows.find(({ token }) => token.id === selected) ?? rows[0];

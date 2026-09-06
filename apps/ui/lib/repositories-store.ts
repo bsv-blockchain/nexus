@@ -63,6 +63,16 @@ function getServerSnapshot(): AppRepository[] {
   return getDefaultRepositories();
 }
 
+/**
+ * The current list, outside React.
+ *
+ * For callers that have to read-modify-write in an event handler — the first
+ * run's preset applier switches two sources on and must not clobber the rest.
+ */
+export function getRepositoriesSnapshot(): AppRepository[] {
+  return getSnapshot();
+}
+
 export function setRepositories(next: AppRepository[]): void {
   snapshot = next;
   try {
@@ -80,4 +90,17 @@ export function useRepositories(): AppRepository[] {
 /** Only the sources currently switched on, in the order they are listed. */
 export function useEnabledRepositories(): AppRepository[] {
   return useRepositories().filter((repo) => repo.enabled);
+}
+
+/**
+ * Switches one source on, outside a component — Discover's featured banner
+ * card calls this rather than opening the repositories sheet, since it is the
+ * same read-modify-write `Card`'s own toggle does in app-collections.tsx.
+ */
+export function enableRepository(id: string): void {
+  setRepositories(
+    getRepositoriesSnapshot().map((repo) =>
+      repo.id === id ? { ...repo, enabled: true } : repo
+    )
+  );
 }

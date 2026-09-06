@@ -1,14 +1,16 @@
 "use client";
 
 import { AppMenu } from "@/components/hub/app-menu";
+import { ReceiveSheet } from "@/components/apps/wallet/receive-sheet";
+import { SwapSheet } from "@/components/apps/wallet/swap-flow";
+import { useWalletAccountId } from "@/components/apps/wallet/use-wallet-account";
+import { getWallet } from "@/lib/wallets-store";
 import { Portfolio } from "@/components/apps/wallet/portfolio";
 import {
   WalletSwitcher,
   WalletTrigger,
 } from "@/components/apps/wallet/wallet-switcher";
 import {
-  ExchangeSheet,
-  ReceiveSheet,
   SendSheet,
 } from "@/components/apps/wallet/wallet-flows";
 import { Collectibles } from "@/components/apps/wallet/collectibles";
@@ -49,6 +51,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useState, type ReactNode } from "react";
+import { setShareStatus } from "@/lib/splits-store";
 
 /**
  * Canvas sections. The sidebar renders these on desktop, tabs on mobile.
@@ -66,7 +69,10 @@ const ALL_WALLET_SECTIONS: {
   { id: "cash", label: "Cash", icon: Coins },
   { id: "collectibles", label: "Collectibles", icon: ImageIcon },
   { id: "activity", label: "Activity", icon: Receipt },
-  { id: "links", label: "Links", icon: Link2 },
+  /* From content, unlike its five siblings: "Payment links" already exists
+     there and the section had drifted to a shortened copy of it. The other five
+     are still hardcoded here. */
+  { id: "links", label: content.wallet.links, icon: Link2 },
   { id: "contacts", label: "Contacts", icon: Users },
   { id: "splits", label: "Splits", icon: Scissors },
 ];
@@ -96,6 +102,7 @@ export function WalletApp(): ReactNode {
     walletIntent,
     setWalletIntent,
     openApp,
+    openDetailPane,
   } = useHub();
   // A section this build does not ship is not an error: hub state persists across
   // upgrades and deep links carry it, so a dropped tab falls back to Cash rather
@@ -103,7 +110,16 @@ export function WalletApp(): ReactNode {
   const walletSection = WALLET_SECTIONS.some((s) => s.id === requestedSection)
     ? requestedSection
     : "cash";
-  const account = getWalletAccount();
+  /* The wallet the workspace is spending from, not `walletAccounts[0]`. Cash
+     and Activity both read this, and reading the first row meant switching
+     wallet changed the switcher and nothing else on the screen. */
+  const selectedId = useWalletAccountId();
+  /* `account` is only ever read for its shape — a name and an address to draw.
+     Anything that FILTERS uses `selectedId`, which is empty when the workspace
+     has no wallet and so matches nothing; falling back here and then filtering
+     on `account.id` would have shown Everyday's history under a workspace that
+     has never connected a wallet. */
+  const account = getWallet(selectedId) ?? getWalletAccount();
   const { walletTransactions: fromCommands } = useCommandEffects();
   const copy = content.wallet;
 
@@ -154,11 +170,11 @@ export function WalletApp(): ReactNode {
 
   // Demo: locally-recorded payments in front of the fixture history. Live: the
   // wallet's own ledger, and nothing invented alongside it.
-  const activity = useActivity(getWalletTransactions(account.id));
+  const activity = useActivity(getWalletTransactions(selectedId));
   const transactions =
     activity.mode === "demo"
       ? [
-          ...fromCommands.filter((tx) => tx.accountId === account.id),
+          ...fromCommands.filter((tx) => tx.accountId === selectedId),
           ...activity.transactions,
         ]
       : activity.transactions;
@@ -191,6 +207,9 @@ export function WalletApp(): ReactNode {
     }
     setWalletIntent(null);
   }, [walletIntent, fixtureSheets, live, setWalletIntent]);
+
+  /* Declared above `body`, which renders the trigger that opens it. */
+  const [switching, setSwitching] = useState(false);
 
   const go = (section: WalletSection): void => {
     setWalletSection(section);
@@ -251,7 +270,11 @@ export function WalletApp(): ReactNode {
         );
       case "links":
         return (
-          <PaymentLinks onCreate={() => toast.info(copy.linkComingSoon)} />
+          <PaymentLinks
+            onCreate={() =>
+              openDetailPane({ kind: "new-payment-link", id: "" })
+            }
+          />
         );
       case "contacts":
         return (
@@ -271,6 +294,13 @@ export function WalletApp(): ReactNode {
       default:
         return (
           <Portfolio
+            /* Phones only. The column carries it at md+, and a second copy
+               level with the balance is the placement this moved away from. */
+            wallet={
+              <span className="md:hidden">
+                <WalletTrigger onOpen={() => setSwitching(true)} />
+              </span>
+            }
             onOpenToken={openToken}
             {...(hidePayActions
               ? {}
@@ -288,7 +318,9 @@ export function WalletApp(): ReactNode {
                    * handler, so omitting it here is what hides it.
                    */
                   ...(fixtureSheets
-                    ? { onExchange: () => setWalletIntent({ kind: "exchange" }) }
+                    ? {
+                        onExchange: () => setWalletIntent({ kind: "exchange" }),
+                      }
                     : {}),
                 })}
           />
@@ -305,112 +337,127 @@ export function WalletApp(): ReactNode {
    * they go where commands go.
    */
   const profileActions = useProfileQuickActions();
-  const [switching, setSwitching] = useState(false);
 
   return (
     <ProfileActionsProvider actions={profileActions}>
-    <div className="flex h-full min-h-0 flex-col">
-      {/* Mobile section tabs; the sidebar carries these at md+. */}
-      <nav
-        aria-label={copy.sections}
-        className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-3 py-2 md:hidden"
-      >
-        {WALLET_SECTIONS.map(({ id, label, icon: Icon }) => {
-          const active = walletSection === id && !tokenId && !txId;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => go(id)}
-              aria-current={active ? "page" : undefined}
-              className={`focus-ring flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                active
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:bg-surface-hover"
-              }`}
-            >
-              <Icon className="size-3.5" aria-hidden="true" />
-              {label}
-            </button>
-          );
-        })}
-      </nav>
+      <div className="flex h-full min-h-0 flex-col">
+        {/* Mobile section tabs; the sidebar carries these at md+. */}
+        <nav
+          aria-label={copy.sections}
+          className="border-border flex shrink-0 gap-1 overflow-x-auto border-b px-3 py-2 md:hidden"
+        >
+          {WALLET_SECTIONS.map(({ id, label, icon: Icon }) => {
+            const active = walletSection === id && !tokenId && !txId;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => go(id)}
+                aria-current={active ? "page" : undefined}
+                className={`focus-ring flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  active
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:bg-surface-hover"
+                }`}
+              >
+                <Icon className="size-3.5" aria-hidden="true" />
+                {label}
+              </button>
+            );
+          })}
+        </nav>
 
-      {/* Which wallet this is, above everything it says about it.
-          A balance with no wallet named against it is the number that gets
-          read as "all of it", which is the one reading that is never true
-          once there is more than one wallet. */}
-      <div className="flex shrink-0 items-center gap-2 px-4 pt-4 sm:px-6">
-        <WalletTrigger onOpen={() => setSwitching(true)} />
-        <span className="flex-1" />
-        <AppMenu slug="wallet" />
-      </div>
+        {/* The wallet picker used to head this row, above everything. It heads
+            one card rather than the page — a balance belongs to one wallet, and
+            the two belong in the same frame — so it is passed into Portfolio
+            and this row keeps only the app's own menu. */}
+        <div className="flex shrink-0 items-center justify-end px-4 pt-4 sm:px-6">
+          <AppMenu slug="wallet" />
+        </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-20 sm:p-6 md:pb-6">
-        {body}
-      </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-20 sm:p-6 md:pb-6">
+          {body}
+        </div>
 
-      {/* Live: the real rails. `switching` is set by WalletTrigger above, and
+        {/* Live: the real rails. `switching` is set by WalletTrigger above, and
           the switcher itself renders one wallet and no picker when the shell is
           answering — one wallet per device is docs/DECISIONS.md §3, not a gap. */}
-      <WalletSwitcher open={switching} onClose={() => setSwitching(false)} />
+        <WalletSwitcher open={switching} onClose={() => setSwitching(false)} />
 
-      <PaySheet
-        open={payOpen !== null}
-        initialDirection={payOpen ?? "pay"}
-        onClose={() => setPayOpen(null)}
-      />
+        <PaySheet
+          open={payOpen !== null}
+          initialDirection={payOpen ?? "pay"}
+          onClose={() => setPayOpen(null)}
+        />
 
-      {/* Demo only — in live mode the translation effect above consumes the
+        {/* Demo only — in live mode the translation effect above consumes the
           intent before these could open, and mounting them at all would put
           fixture contacts one state-glitch away from a real wallet. */}
-      {fixtureSheets ? (
-        <>
-          <SendSheet
-            open={walletIntent?.kind === "send"}
-            tokenId={walletIntent?.tokenId ?? "bsv"}
-            presetPersonId={walletIntent?.personId ?? null}
-            onClose={closeIntent}
-            onSend={({ token, units, person }) => {
-              recordPayment({
-                person,
-                sats: token.base ? Math.round(units * 100_000_000) : 0,
-                memo: copy.sentFromWallet,
-                accountId: account.id,
-                ...(token.base ? {} : { token: { id: token.id, units } }),
-              });
-              closeIntent();
-              toast.success(`${copy.sent} ${person.name}`);
-            }}
-          />
+        {fixtureSheets ? (
+          <>
+            {/* Keyed on the intent so a new one remounts the sheet.
+              `SendSheet` seeds its fields from these props on first render —
+              the honest way to hold a draft somebody is editing — and this
+              stays mounted across intents, so without a key the second intent
+              opened on the first one's amount and recipient. */}
+            <SendSheet
+              key={
+                walletIntent?.kind === "send"
+                  ? `${walletIntent.tokenId}:${walletIntent.personId ?? ""}:${walletIntent.units ?? ""}`
+                  : "send"
+              }
+              open={walletIntent?.kind === "send"}
+              tokenId={walletIntent?.tokenId ?? "bsv"}
+              presetPersonId={walletIntent?.personId ?? null}
+              presetUnits={walletIntent?.units ?? null}
+              onClose={closeIntent}
+              onSend={({ token, units, person }) => {
+                recordPayment({
+                  person,
+                  sats: token.base ? Math.round(units * 100_000_000) : 0,
+                  memo: copy.sentFromWallet,
+                  accountId: account.id,
+                  ...(token.base ? {} : { token: { id: token.id, units } }),
+                });
+                /* A share is settled by the money leaving, not by the button
+                   that opened this sheet — which is why the intent carries
+                   what it settles and this is the place that acts on it. */
+                const settles = walletIntent?.settles;
+                if (settles) {
+                  setShareStatus(settles.splitId, settles.personId, "paid");
+                }
+                closeIntent();
+                toast.success(`${copy.sent} ${person.name}`);
+              }}
+            />
 
-          <ReceiveSheet
-            open={walletIntent?.kind === "receive"}
-            tokenId={walletIntent?.tokenId ?? "bsv"}
-            onClose={closeIntent}
-          />
+            <ReceiveSheet
+              open={walletIntent?.kind === "receive"}
+              tokenId={walletIntent?.tokenId ?? "bsv"}
+              onClose={closeIntent}
+            />
 
-          <ExchangeSheet
-            open={walletIntent?.kind === "exchange"}
-            onClose={closeIntent}
-            onExchange={({ from, to, fromUnits, toUnits }) => {
-              closeIntent();
-              toast.success(
-                `${copy.exchanged} ${fromUnits} ${from.symbol} → ${toUnits.toFixed(2)} ${to.symbol}`,
-              );
-            }}
-          />
-        </>
-      ) : null}
+            <SwapSheet
+              open={walletIntent?.kind === "exchange"}
+              onClose={closeIntent}
+              onExchange={({ from, to, fromUnits, toUnits }) => {
+                closeIntent();
+                toast.success(
+                  `${copy.exchanged} ${fromUnits} ${from.symbol} → ${toUnits.toFixed(2)} ${to.symbol}`
+                );
+              }}
+            />
+          </>
+        ) : null}
 
-      <Sheet
-        open={Boolean(whois)}
-        onClose={() => setWhois(null)}
-        label={whois ? whois.name : "Identity"}
-      >
-        {whois && <WhoisCard person={whois} />}
-      </Sheet>
-    </div>
+        <Sheet
+          open={Boolean(whois)}
+          onClose={() => setWhois(null)}
+          label={whois ? whois.name : "Identity"}
+        >
+          {whois && <WhoisCard person={whois} />}
+        </Sheet>
+      </div>
     </ProfileActionsProvider>
   );
 }

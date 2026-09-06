@@ -14,27 +14,51 @@ import { useEffect, useRef, type ReactNode } from "react";
  * whole thing is a listbox so arrow keys and Enter read correctly to a screen
  * reader while focus stays in the text input.
  */
+/**
+ * Which side of the field the list hangs off.
+ *
+ * Messages puts it above, where the composer is the last thing on screen and
+ * downward would be off the bottom. The Timeline puts it below: its composer
+ * sits directly under a sticky tab row, so upward went behind it — and a
+ * completion under the word it completes is the reading order anyway.
+ */
+export type Placement = "above" | "below";
+
 function PopoverShell({
   id,
   label,
   children,
   footer,
+  placement = "above",
+  offsetTop,
 }: {
   id?: string | undefined;
   label: string;
   children: ReactNode;
   footer?: string;
+  placement?: Placement;
+  offsetTop?: number | undefined;
 }): ReactNode {
   return (
     <div
       {...(id ? { id } : {})}
       role="listbox"
       aria-label={label}
-      className="absolute bottom-full left-0 z-30 mb-2 w-full max-w-sm overflow-hidden rounded-2xl border border-border bg-surface-raised shadow-2xl"
+      /* A measured offset wins over the placement classes: it is the caret's
+         own line, which is the only anchor that is right on a field taller
+         than one row. */
+      {...(offsetTop === undefined ? {} : { style: { top: offsetTop } })}
+      className={`border-border bg-surface-raised absolute left-0 z-40 w-full max-w-sm overflow-hidden rounded-2xl border shadow-2xl ${
+        offsetTop !== undefined
+          ? ""
+          : placement === "above"
+            ? "bottom-full mb-2"
+            : "top-full mt-1"
+      }`}
     >
       <div className="max-h-64 overflow-y-auto p-1.5">{children}</div>
       {footer && (
-        <p className="border-t border-border px-3 py-2 text-[11px] text-foreground/70">
+        <p className="border-border text-foreground/70 border-t px-3 py-2 text-[11px]">
           {footer}
         </p>
       )}
@@ -68,7 +92,7 @@ function Row({
       }}
       className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1 text-left transition-colors ${
         active
-          ? "bg-accent/15 ring-1 ring-accent/30 ring-inset"
+          ? "bg-accent/15 ring-accent/30 ring-1 ring-inset"
           : "hover:bg-surface-hover"
       }`}
     >
@@ -81,7 +105,7 @@ function Row({
       {active && (
         <span
           aria-hidden="true"
-          className="ml-auto shrink-0 rounded border border-border px-1.5 py-px font-mono text-[10px] leading-4 text-muted-foreground"
+          className="border-border text-muted-foreground ml-auto shrink-0 rounded border px-1.5 py-px font-mono text-[10px] leading-4"
         >
           {content.messages.mentions.enterKey}
         </span>
@@ -97,6 +121,8 @@ export function MentionPopover({
   activeIndex,
   onSelect,
   prequery,
+  placement = "above",
+  offsetTop,
 }: {
   id?: string | undefined;
   people: MessagePerson[];
@@ -104,12 +130,20 @@ export function MentionPopover({
   onSelect: (person: MessagePerson) => void;
   /** true when nothing has been typed after `@` yet */
   prequery: boolean;
+  placement?: Placement;
+  /** pixels from the field's top to the caret's line, once measured */
+  offsetTop?: number | undefined;
 }): ReactNode {
   const copy = content.messages.mentions;
   if (people.length === 0) {
     return (
-      <PopoverShell id={id} label={copy.label}>
-        <p className="px-2 py-3 text-center text-sm text-muted-foreground">
+      <PopoverShell
+        id={id}
+        label={copy.label}
+        placement={placement}
+        offsetTop={offsetTop}
+      >
+        <p className="text-muted-foreground px-2 py-3 text-center text-sm">
           {copy.noMatches}
         </p>
       </PopoverShell>
@@ -121,6 +155,8 @@ export function MentionPopover({
       id={id}
       label={copy.label}
       footer={prequery ? copy.recentHint : copy.searchHint}
+      placement={placement}
+      offsetTop={offsetTop}
     >
       {people.map((person, index) => (
         <Row
@@ -145,17 +181,26 @@ export function CommandPopover({
   commands,
   activeIndex,
   onSelect,
+  placement = "above",
+  offsetTop,
 }: {
   id?: string | undefined;
   commands: CommandSpec[];
   activeIndex: number;
   onSelect: (spec: CommandSpec) => void;
+  placement?: Placement;
+  offsetTop?: number | undefined;
 }): ReactNode {
   const copy = content.messages.commands;
   if (commands.length === 0) {
     return (
-      <PopoverShell id={id} label={copy.label}>
-        <p className="px-2 py-3 text-center text-sm text-muted-foreground">
+      <PopoverShell
+        id={id}
+        label={copy.label}
+        placement={placement}
+        offsetTop={offsetTop}
+      >
+        <p className="text-muted-foreground px-2 py-3 text-center text-sm">
           {copy.noMatches}
         </p>
       </PopoverShell>
@@ -163,7 +208,13 @@ export function CommandPopover({
   }
 
   return (
-    <PopoverShell id={id} label={copy.label} footer={copy.hint}>
+    <PopoverShell
+      id={id}
+      label={copy.label}
+      footer={copy.hint}
+      placement={placement}
+      offsetTop={offsetTop}
+    >
       {commands.map((spec, index) => (
         <Row
           key={spec.verb}
@@ -182,11 +233,11 @@ export function CommandPopover({
               >
                 /{spec.verb}
               </code>
-              <code className="min-w-0 truncate font-mono text-[11px] text-muted-foreground">
+              <code className="text-muted-foreground min-w-0 truncate font-mono text-[11px]">
                 {spec.usage.replace(`/${spec.verb}`, "").trim()}
               </code>
               {spec.reserved && (
-                <span className="shrink-0 rounded-full border border-border px-1.5 py-px text-[10px] font-bold tracking-wide text-muted-foreground uppercase">
+                <span className="border-border text-muted-foreground shrink-0 rounded-full border px-1.5 py-px text-[10px] font-bold tracking-wide uppercase">
                   {copy.reserved}
                 </span>
               )}

@@ -5,6 +5,7 @@
  * with no dependency on the current time or the runtime locale — so the server
  * and client render identical output and hydration stays stable.
  */
+import { getUsdPerBsv } from "@/lib/exchange-rate";
 import { vouchesFor } from "@/lib/command-effects";
 import { getEcosystem, type MessagePerson } from "@/lib/data";
 
@@ -86,7 +87,7 @@ export const PRESENCE_COLOR: Record<Presence, string> = {
  * identities open their own ecosystem's profile page in Browse.
  */
 export function profileTarget(
-  person: MessagePerson,
+  person: MessagePerson
 ): { kind: "in-app" } | { kind: "web"; url: string } {
   if (person.ecosystem === "nexus" || !person.profileUrl) {
     return { kind: "in-app" };
@@ -100,7 +101,7 @@ export function profileTarget(
  */
 export function handleOf(
   person: MessagePerson,
-  { qualified = false }: { qualified?: boolean } = {},
+  { qualified = false }: { qualified?: boolean } = {}
 ): string {
   const eco = getEcosystem(person.ecosystem);
   if (eco?.local && !qualified) return `@${person.handle}`;
@@ -233,14 +234,17 @@ export const MOCK_TODAY = "2026-07-31T12:00:00.000Z";
  * signal, and a precise day count invites the reader to do arithmetic that tells
  * them nothing.
  */
-export function ageFrom(iso: string, copy: {
-  year: string;
-  years: string;
-  month: string;
-  months: string;
-  ago: string;
-  today: string;
-}): string {
+export function ageFrom(
+  iso: string,
+  copy: {
+    year: string;
+    years: string;
+    month: string;
+    months: string;
+    ago: string;
+    today: string;
+  }
+): string {
   const then = new Date(iso);
   const now = new Date(MOCK_TODAY);
   let months =
@@ -256,14 +260,20 @@ export function ageFrom(iso: string, copy: {
   return `${parts.join(" ")} ${copy.ago}`;
 }
 
-export const MOCK_USD_PER_BSV = 72.5;
 const SATS_PER_BSV = 100_000_000;
 
-/** Convert a fiat amount to satoshis at the disclosed mock rate. */
+/**
+ * Convert a fiat amount to satoshis, at the rate the chain is actually trading
+ * at rather than a number written into this file.
+ *
+ * It used to be a `MOCK_USD_PER_BSV = 72.5` const, quoted to the reader in the
+ * command sheet as the rate they were being charged at — which made a wrong
+ * number worse by printing it. See lib/exchange-rate.
+ */
 export function fiatToSats(amount: number, currency = "USD"): number | null {
   // Only USD is quoted; anything else must be rejected rather than guessed.
   if (currency !== "USD") return null;
-  return Math.round((amount / MOCK_USD_PER_BSV) * SATS_PER_BSV);
+  return Math.round((amount / getUsdPerBsv()) * SATS_PER_BSV);
 }
 
 /** "3,007,000 sats" — grouped for readability at a glance. */

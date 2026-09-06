@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>Hexacities</title>
+  <!--
+    The Hexacities mascot: their hexagon, wearing a face.
+
+    Their own app draws it in CSS rather than shipping a file, as clip paths and
+    positioned spans in components/onboarding/speech-bubble.tsx, so there was no
+    image to take. This is that component's geometry and palette written as
+    vector: the same hexagon clip, the same percentages of the box, and the
+    three colours it reads from its stylesheet (hx-primary #58CC02,
+    hx-primary-bevel #3F8000, and the ink its eyes and mouth use).
+
+    One departure. The component offsets its bevel hexagon down by 7% and lets
+    it hang out of the span; a square icon file has nowhere to hang, so the
+    whole figure is scaled to 1/1.07 and centred. Same shape, no clipped point.
+  -->
+  <polygon points="128.00,16.75 247.63,76.56 247.63,196.19 128.00,256.00 8.37,196.19 8.37,76.56" fill="#3F8000"/>
+  <polygon points="128.00,0.00 247.63,59.81 247.63,179.44 128.00,239.25 8.37,179.44 8.37,59.81" fill="#58CC02"/>
+  <polygon points="128.00,21.53 226.09,70.58 226.09,168.67 128.00,217.72 29.91,168.67 29.91,70.58" fill="#3F8000" opacity="0.28"/>
+  <ellipse cx="90.92" cy="114.84" rx="20.34" ry="23.93" fill="#ffffff"/>
+  <ellipse cx="92.11" cy="114.84" rx="10.77" ry="13.16" fill="#131F23"/>
+  <ellipse cx="165.08" cy="114.84" rx="20.34" ry="23.93" fill="#ffffff"/>
+  <ellipse cx="166.28" cy="114.84" rx="10.77" ry="13.16" fill="#131F23"/>
+  <path d="M 99.29 143.55 h 57.42 a 28.71 23.93 0 0 1 -57.42 0 z" fill="#131F23"/>
+</svg>

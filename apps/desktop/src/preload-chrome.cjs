@@ -43,6 +43,35 @@ ipcRenderer.on('nexus:host:in', (_event, envelope) => {
 
 contextBridge.exposeInMainWorld('nexusHost', client)
 
+/*
+ * The window itself, as distinct from the wallet the client above talks to.
+ *
+ * Its own bridge because it is a different subject: `nexusHost` is the wallet
+ * and tab surface, and folding "which platform am I on" into it would make
+ * every consumer of one aware of the other.
+ */
+contextBridge.exposeInMainWorld('nexusWindow', {
+  platform: process.platform,
+  titleBarHeight: 40,
+  action: (action) => ipcRenderer.invoke('nexus:window', action),
+  /*
+   * Both subscribers hand back an unsubscribe.
+   *
+   * Not decoration: React mounts effects twice in development, and a listener
+   * with no way off the list accumulates until Electron warns about a leak.
+   */
+  onFullscreen: (callback) => {
+    const handler = (_event, value) => callback(Boolean(value))
+    ipcRenderer.on('nexus:fullscreen', handler)
+    return () => ipcRenderer.off('nexus:fullscreen', handler)
+  },
+  onMaximized: (callback) => {
+    const handler = (_event, value) => callback(Boolean(value))
+    ipcRenderer.on('nexus:maximized', handler)
+    return () => ipcRenderer.off('nexus:maximized', handler)
+  }
+})
+
 // Belt and braces: the harness (apps/harness/index.html) also polls for
 // `window.nexusHost` every 50ms up to 5s as a fallback, but firing this event lets
 // it pick the client up the moment it's actually available. `window.dispatchEvent`

@@ -100,7 +100,7 @@ function Row({ item }: { item: DownloadItem }): ReactNode {
  *
  * The profile picker is at the top rather than the pane being per-profile,
  * because the question people actually arrive with is "where did that file go" —
- * and if the answer is "in your other profile", a pane that only ever shows the
+ * and if the answer is "in your other workspace", a pane that only ever shows the
  * current one cannot give it. Switching here changes what is listed and nothing
  * else: it does not switch the profile you are browsing in, which would be a
  * large thing to do from a settings row.

@@ -2,9 +2,16 @@
 
 import { PRIMARY_CTA } from "@/components/hub/cta";
 import { content } from "@/lib/data";
-import { Award, Check, ChevronRight, CornerDownRight, HelpCircle } from "lucide-react";
+import {
+  Award,
+  Check,
+  ChevronRight,
+  CornerDownRight,
+  HelpCircle,
+} from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState, type ReactNode } from "react";
+import { useHostOverlay } from "@/lib/wallet-data";
 
 /** macOS-style certificate viewer for the URL bar "Secure" lock. */
 export function CertificateDialog({
@@ -14,6 +21,11 @@ export function CertificateDialog({
   open: boolean;
   onClose: () => void;
 }): ReactNode {
+  /* Holds the shell's page layer down while this is up: a browsed page is a
+     native view that paints above this document, so no z-index reaches over
+     it. See lib/wallet-data. */
+  useHostOverlay(open);
+
   return (
     <AnimatePresence>{open && <CertBody onClose={onClose} />}</AnimatePresence>
   );
@@ -53,11 +65,11 @@ function CertBody({ onClose }: { onClose: () => void }): ReactNode {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97, y: 6 }}
         transition={{ type: "spring", damping: 26, stiffness: 320 }}
-        className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-surface-raised text-foreground shadow-[0_24px_90px_-12px_rgba(0,0,0,0.6)] ring-1 ring-black/10 dark:ring-white/10"
+        className="bg-surface-raised text-foreground relative w-full max-w-lg overflow-hidden rounded-2xl shadow-[0_24px_90px_-12px_rgba(0,0,0,0.6)] ring-1 ring-black/10 dark:ring-white/10"
       >
         <div className="p-5">
           {/* Certificate chain */}
-          <div className="rounded-xl bg-surface p-2 ring-1 ring-accent/40">
+          <div className="bg-surface ring-accent/40 rounded-xl p-2 ring-1">
             {cert.chain.map((node, index) => {
               const leaf = index === cert.chain.length - 1;
               return (
@@ -66,7 +78,7 @@ function CertBody({ onClose }: { onClose: () => void }): ReactNode {
                   style={{ paddingLeft: index * 22 }}
                   className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm ${
                     leaf
-                      ? "bg-accent font-semibold text-accent-foreground"
+                      ? "bg-accent text-accent-foreground font-semibold"
                       : "text-foreground"
                   }`}
                 >
@@ -87,7 +99,7 @@ function CertBody({ onClose }: { onClose: () => void }): ReactNode {
           </div>
 
           {/* Certificate detail card */}
-          <div className="mt-4 max-h-[46dvh] overflow-y-auto rounded-xl bg-surface p-4 ring-1 ring-border">
+          <div className="bg-surface ring-border mt-4 max-h-[46dvh] overflow-y-auto rounded-xl p-4 ring-1">
             <div className="flex items-start gap-4">
               <span
                 className="flex size-16 shrink-0 flex-col items-center justify-center rounded-md bg-linear-to-b from-sky-50 to-sky-100 text-center ring-1 ring-sky-300"
@@ -103,15 +115,19 @@ function CertBody({ onClose }: { onClose: () => void }): ReactNode {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-lg font-bold">{cert.domain}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="text-muted-foreground mt-1 text-sm">
                   {cert.issuedBy}
                 </p>
-                <p className="text-sm text-balance text-muted-foreground">
+                <p className="text-muted-foreground text-sm text-balance">
                   {cert.expires}
                 </p>
                 <p className="mt-2 flex items-center gap-1.5 text-sm font-medium">
-                  <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-positive text-white">
-                    <Check className="size-3" strokeWidth={3} aria-hidden="true" />
+                  <span className="bg-positive flex size-4 shrink-0 items-center justify-center rounded-full text-white">
+                    <Check
+                      className="size-3"
+                      strokeWidth={3}
+                      aria-hidden="true"
+                    />
                   </span>
                   {cert.valid}
                 </p>
@@ -124,7 +140,7 @@ function CertBody({ onClose }: { onClose: () => void }): ReactNode {
               open={trustOpen}
               onToggle={() => setTrustOpen((v) => !v)}
             >
-              <p className="text-sm text-muted-foreground">{cert.trustNote}</p>
+              <p className="text-muted-foreground text-sm">{cert.trustNote}</p>
             </Disclosure>
 
             {/* Details (expandable) */}
@@ -139,7 +155,7 @@ function CertBody({ onClose }: { onClose: () => void }): ReactNode {
                     key={row.label}
                     className="flex items-baseline justify-between gap-4"
                   >
-                    <dt className="shrink-0 text-xs text-muted-foreground">
+                    <dt className="text-muted-foreground shrink-0 text-xs">
                       {row.label}
                     </dt>
                     <dd className="truncate text-right text-xs font-medium">
@@ -157,7 +173,7 @@ function CertBody({ onClose }: { onClose: () => void }): ReactNode {
               type="button"
               aria-label={cert.help}
               onClick={onClose}
-              className="focus-ring flex size-9 items-center justify-center rounded-full bg-surface text-muted-foreground ring-1 ring-border hover:bg-surface-hover"
+              className="focus-ring bg-surface text-muted-foreground ring-border hover:bg-surface-hover flex size-9 items-center justify-center rounded-full ring-1"
             >
               <HelpCircle className="size-4.5" aria-hidden="true" />
             </button>
@@ -187,7 +203,7 @@ function Disclosure({
   children: ReactNode;
 }): ReactNode {
   return (
-    <div className="mt-3 border-t border-border pt-2">
+    <div className="border-border mt-3 border-t pt-2">
       <button
         type="button"
         onClick={onToggle}
@@ -195,7 +211,7 @@ function Disclosure({
         className="focus-ring flex w-full items-center gap-1.5 rounded-md py-1 text-left text-sm font-semibold"
       >
         <ChevronRight
-          className={`size-4 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`}
+          className={`text-muted-foreground size-4 transition-transform ${open ? "rotate-90" : ""}`}
           aria-hidden="true"
         />
         {label}

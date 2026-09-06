@@ -7,6 +7,7 @@ export const connections: Connection[] = [
   {
     id: "conn-woc",
     name: "WhatsOnChain",
+    category: "block-explorers",
     origin: "https://whatsonchain.com",
     favicon: "W",
     faviconColor: "#facc15",
@@ -17,6 +18,7 @@ export const connections: Connection[] = [
   {
     id: "conn-fractional",
     name: "Fractional Farming",
+    category: "finance",
     origin: "https://www.fractional.farm",
     favicon: "F",
     faviconColor: "#16a34a",
@@ -27,6 +29,7 @@ export const connections: Connection[] = [
   {
     id: "conn-market",
     name: "1Sat Market",
+    category: "marketplaces",
     origin: "https://1satmarket.example",
     favicon: "1",
     faviconColor: "#f59e0b",

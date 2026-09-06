@@ -9,7 +9,9 @@ import { SpaceContent } from "@/components/hub/space-content";
 import { SpaceIcon } from "@/components/hub/space-icon";
 import { ThemeToggleWithLabel } from "@/components/theme-toggle";
 import { content, getHubApps } from "@/lib/data";
+import { installUpdate, useUpdateState } from "@/lib/update-data";
 import {
+  ArrowUpCircle,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -21,6 +23,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { useHostOverlay } from "@/lib/wallet-data";
 
 type SheetView =
   | { kind: "root" }
@@ -61,6 +64,10 @@ function RootRow({
 /** Full-screen mobile navigation sheet with drilldown menus. */
 export function MobileSheet(): ReactNode {
   const { mobileSheetOpen } = useHub();
+  /* Holds the shell's page layer down while this is up: a browsed page is a
+     native view that paints above this document, so no z-index reaches over
+     it. See lib/wallet-data. */
+  useHostOverlay(mobileSheetOpen);
   // Unmounting on close resets the drilldown to the root menu for next open.
   if (!mobileSheetOpen) return null;
   return <MobileSheetContent />;
@@ -69,6 +76,7 @@ export function MobileSheet(): ReactNode {
 function MobileSheetContent(): ReactNode {
   const { setMobileSheetOpen, openApp, spaces, openShare, openSettings } =
     useHub();
+  const update = useUpdateState();
   const [view, setView] = useState<SheetView>({ kind: "root" });
   // Every app this build carries. It used to be the installed subset of them,
   // which is a distinction that no longer exists: the grid is the whole list,
@@ -130,6 +138,34 @@ function MobileSheetContent(): ReactNode {
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {view.kind === "root" && (
           <div className="flex flex-col gap-0.5">
+            {/*
+              A waiting update, and the only place on a phone that says so.
+
+              The desktop announces one with a pill in the title bar, which is
+              a strip a phone does not have — so until this row existed, a
+              phone could be told about an update by nothing at all. First in
+              the list and wearing the accent, because unlike everything under
+              it this is not somewhere to go, it is something to do, and it is
+              gone again the moment it is done.
+            */}
+            {update?.ready && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void installUpdate()}
+                  className="focus-ring bg-accent/12 hover:bg-accent/20 flex w-full items-center gap-3 rounded-xl px-3 py-3.5 text-left text-sm font-semibold"
+                >
+                  <ArrowUpCircle
+                    className="text-accent size-5"
+                    aria-hidden="true"
+                  />
+                  <span className="text-accent flex-1">
+                    {content.titleBar.updateNow}
+                  </span>
+                </button>
+                <div className="bg-border my-2 h-px" aria-hidden="true" />
+              </>
+            )}
             <RootRow
               label={content.library.spaces.title}
               icon={Layers}

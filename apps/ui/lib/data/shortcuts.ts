@@ -47,7 +47,11 @@ export const shortcutGroups: ShortcutGroup[] = [
     shortcuts: [
       { id: "new-tab", label: "New tab", keys: ["mod", "t"] },
       { id: "close-tab", label: "Close tab", keys: ["mod", "w"] },
-      { id: "reopen", label: "Reopen the last tab", keys: ["mod", "shift", "t"] },
+      {
+        id: "reopen",
+        label: "Reopen the last tab",
+        keys: ["mod", "shift", "t"],
+      },
       { id: "address", label: "Focus the address bar", keys: ["mod", "l"] },
       { id: "reload", label: "Reload", keys: ["mod", "r"] },
       {
@@ -69,8 +73,16 @@ export const shortcutGroups: ShortcutGroup[] = [
         note: "Typed into the message box, not held down.",
       },
       { id: "send", label: "Send", keys: ["enter"] },
-      { id: "newline", label: "New line without sending", keys: ["shift", "enter"] },
-      { id: "next-unread", label: "Next unread conversation", keys: ["mod", "j"] },
+      {
+        id: "newline",
+        label: "New line without sending",
+        keys: ["shift", "enter"],
+      },
+      {
+        id: "next-unread",
+        label: "Next unread conversation",
+        keys: ["mod", "j"],
+      },
       { id: "new-chat", label: "New conversation", keys: ["mod", "n"] },
       {
         id: "save",
@@ -97,5 +109,5 @@ export const shortcutGroups: ShortcutGroup[] = [
 
 /** Every shortcut, flat — for search and for conflict checks. */
 export const shortcuts: Shortcut[] = shortcutGroups.flatMap(
-  (group) => group.shortcuts,
+  (group) => group.shortcuts
 );

@@ -12,6 +12,7 @@
  * part of it. Global verbs keep their specified behaviour for fiat and satoshi
  * amounts; tokens ride the same syntax position.
  */
+import { FALLBACK_USD_PER_BSV } from "@/lib/exchange-rate";
 import type { Token } from "./types";
 
 export const tokens: Token[] = [
@@ -24,10 +25,17 @@ export const tokens: Token[] = [
     color: "#EAB300",
     decimals: 8,
     base: true,
-    protocol: "native",
-    blurb:
-      "The base currency. Amounts without a token are BSV, and satoshis are its smallest unit.",
-    usdPerUnit: 72.5,
+    protocol: "BSV Blockchain",
+    protocolUrl: "https://bsvblockchain.org",
+    issuer: "Satoshi",
+    issuerUrl:
+      "https://hub.bsvblockchain.org/higher-learning/bsv-academy/bitcoin-whitepaper-series",
+    blurb: "Peer to Peer Electronic Cash",
+    /* Ignored. BSV is the one asset in this table with a real price, so it is
+       read from the market instead — see `usdPerUnitOf` in lib/wallet.ts and
+       lib/exchange-rate.ts. Left here because `Token` requires it and because
+       a zero would be a claim. */
+    usdPerUnit: FALLBACK_USD_PER_BSV,
     change24h: 1.2,
   },
   {
@@ -81,7 +89,11 @@ export const tokens: Token[] = [
     symbol: "NEX",
     name: "Nexus Credits",
     ecosystem: "nexus",
-    icon: null,
+    /* The wordmark rather than the ecosystem's app tile, which is a square
+       picture with its own background and showed its corners inside a round
+       mark. This one is a glyph on nothing, so it gets a plate. */
+    icon: "/icons/Nexus-logo-white.svg",
+    plate: "#000000",
     color: "#4353ff",
     decimals: 2,
     protocol: "BSV-21",
@@ -92,10 +104,121 @@ export const tokens: Token[] = [
 ];
 
 /** What the signed-in user holds. Balances are units, not satoshis. */
-export const tokenBalances: { tokenId: string; units: number }[] = [
-  { tokenId: "bsv", units: 34.2180455 },
-  { tokenId: "usdsv", units: 320 },
-  { tokenId: "eursv", units: 240 },
-  { tokenId: "nutri", units: 1240 },
-  { tokenId: "nex", units: 310 },
+/**
+ * What each wallet holds, rather than what "the wallet" holds.
+ *
+ * Per account because a wallet IS a balance — a switcher that changes the name
+ * above the number and not the number is a switcher that does nothing. The four
+ * read as four different jobs, which is the point of having four:
+ *
+ *   Everyday    a hundred dollars or so of BSV and a little of everything else
+ *   Cold storage the base asset and nothing else, because savings do not shop
+ *   Work         invoiced in and out, so mostly held in the pegged stablecoins
+ *   Household    all but empty, in the credits the apps charge in
+ *
+ * `units` is the token's own unit throughout — see `Token.decimals`. A second
+ * chain arrives as more rows here against a token that declares it, rather than
+ * as a second table; the accountId is what keeps that honest.
+ */
+/*
+ * Coins held on other chains, arrived by swap.
+ *
+ * Four of them, because the swap is the only way they can be here and a wallet
+ * that shows six chains it never used would be describing a different product.
+ * Prices are fixtures like every other non-BSV price in this table — see
+ * `usdPerUnitOf`, which prices only bitcoin from the market.
+ */
+export const foreignTokens: Token[] = [
+  {
+    id: "sol",
+    symbol: "SOL",
+    name: "Solana",
+    ecosystem: null,
+    icon: "https://content-api.changenow.io/uploads/sol_3b3f795997.svg",
+    color: "#14F195",
+    decimals: 9,
+    chain: "sol",
+    protocol: "Solana",
+    blurb: "Held on Solana, swapped in through a provider.",
+    usdPerUnit: 148.2,
+    change24h: 2.4,
+  },
+  {
+    id: "usdc-sol",
+    symbol: "USDC",
+    name: "USD Coin (SOL)",
+    ecosystem: null,
+    /* The plain mark, not ChangeNOW's, whose artwork bakes a Solana badge into
+       the bottom-right corner — a round clip then bit a piece out of it. The
+       chain is TokenMark's job now, drawn over the edge instead of inside it. */
+    icon: "/tokens/usdc.svg",
+    color: "#2775CA",
+    decimals: 6,
+    chain: "sol",
+    peg: { currency: "USD", note: "Fully reserved, redeemable one for one." },
+    flag: "US",
+    protocol: "SPL",
+    blurb: "Dollars on Solana.",
+    usdPerUnit: 1,
+    change24h: 0,
+  },
+  {
+    id: "eth",
+    symbol: "ETH",
+    name: "Ethereum",
+    ecosystem: null,
+    icon: "https://content-api.changenow.io/uploads/eth_f4ebb54ec0.svg",
+    color: "#627EEA",
+    decimals: 18,
+    chain: "eth",
+    protocol: "Ethereum",
+    blurb: "Held on Ethereum, swapped in through a provider.",
+    usdPerUnit: 3120,
+    change24h: -0.6,
+  },
+  {
+    id: "doge",
+    symbol: "DOGE",
+    name: "Dogecoin",
+    ecosystem: null,
+    icon: "https://content-api.changenow.io/uploads/doge_a0321dc732.svg",
+    color: "#C2A633",
+    decimals: 8,
+    chain: "doge",
+    protocol: "Dogecoin",
+    blurb: "Held on Dogecoin, swapped in through a provider.",
+    usdPerUnit: 0.21,
+    change24h: 3.1,
+  },
+];
+
+export const tokenBalances: {
+  accountId: string;
+  tokenId: string;
+  units: number;
+}[] = [
+  /* Everyday — 5.88 BSV is about $100 at the fallback rate, plus what two
+     swaps brought back. Only two wallets hold anything foreign: a coin is here
+     because a swap put it here, and four wallets each holding a different chain
+     would be a fiction about how much this thing gets used. */
+  { accountId: "acct-main", tokenId: "bsv", units: 5.8824 },
+  { accountId: "acct-main", tokenId: "sol", units: 1.42 },
+  { accountId: "acct-main", tokenId: "usdc-sol", units: 64 },
+  { accountId: "acct-main", tokenId: "usdsv", units: 42 },
+  { accountId: "acct-main", tokenId: "nex", units: 310 },
+
+  /* Cold storage — one asset, a lot of it, and nothing that moves. */
+  { accountId: "acct-cold", tokenId: "bsv", units: 120 },
+
+  /* Work — a float in BSV, the money it invoices in, and two chains a client
+     paid on. */
+  { accountId: "acct-work", tokenId: "bsv", units: 1.485 },
+  { accountId: "acct-work", tokenId: "eth", units: 0.19 },
+  { accountId: "acct-work", tokenId: "doge", units: 2450 },
+  { accountId: "acct-work", tokenId: "usdsv", units: 320 },
+  { accountId: "acct-work", tokenId: "eursv", units: 240 },
+
+  /* Household — nearly nothing, in the credits it spends on apps. */
+  { accountId: "acct-shared", tokenId: "bsv", units: 0.0214 },
+  { accountId: "acct-shared", tokenId: "nutri", units: 1240 },
 ];

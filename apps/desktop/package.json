@@ -10,7 +10,7 @@
   "main": "dist-electron/main.cjs",
   "scripts": {
     "build": "node build-main.mjs",
-    "dev": "node build-main.mjs && electron .",
+    "dev": "node build-main.mjs && node dev-app-name.mjs && electron .",
     "watch": "node build-main.mjs --watch",
     "pack:mac": "npm run build && electron-builder --mac --dir",
     "pack:win": "npm run build && electron-builder --win --dir --x64",

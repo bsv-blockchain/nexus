@@ -92,7 +92,7 @@ export function SpaceMenu({
       <PopoverMenu
         open={open}
         onClose={close}
-        label="Profile options"
+        label="Workspace options"
         className={className}
       >
         {view === "root" && (
@@ -387,7 +387,7 @@ function DeleteDialog({
         <p className="mt-2 text-sm text-muted-foreground">
           {canDelete
             ? copy.deleteBody
-            : "You can't delete your only profile."}
+            : "You can't delete your only workspace."}
         </p>
         <div className="mt-5 flex justify-end gap-2">
           <button

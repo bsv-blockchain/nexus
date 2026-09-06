@@ -2,6 +2,7 @@
  * Client-side helpers for creating browser tabs from user input.
  * Pure functions — no React, no storage.
  */
+import { browserExtensions } from "@/lib/data/extensions";
 import { getMockPage, type BrowserTab } from "@/lib/data";
 
 const FAVICON_COLORS = [
@@ -15,9 +16,45 @@ const FAVICON_COLORS = [
   "#0ea5e9",
 ];
 
+/**
+ * Screens the browser serves itself, addressed like anywhere else.
+ *
+ * `nexus://extensions` rather than a flag on the tab, for the same reason
+ * Chromium uses `chrome://`: a tab is a thing with an address, and a tab with
+ * no address is a special case every part of the strip has to know about — the
+ * title, the icon, reopening a closed one, the history stack. Give it a URL and
+ * all of that keeps working with nothing added.
+ */
+export const INTERNAL_SCHEME = "nexus://";
+
+const EXTENSION_PAGES: Record<string, { title: string }> = Object.fromEntries(
+  browserExtensions.map((entry) => [
+    `nexus://${entry.id.replace(/-/g, "")}`,
+    { title: entry.name },
+  ]),
+);
+
+export const INTERNAL_PAGES: Record<string, { title: string }> = {
+  "nexus://extensions": { title: "Extensions" },
+  /* One page per extension, keyed off its id — see `extensionUrl` in
+     lib/extensions-store, which builds the same address from the same rule. A
+     hand-written list here would be a second place to add a row to. */
+  ...EXTENSION_PAGES,
+};
+
+/** The internal page this URL names, or null for an ordinary address. */
+export function internalPage(url: string): { title: string } | null {
+  return INTERNAL_PAGES[url.trim().toLowerCase()] ?? null;
+}
+
 /** "foo.com/bar" → "https://foo.com/bar"; free text → a search URL. */
 export function normalizeUrl(input: string): string {
   const trimmed = input.trim();
+  /* Left exactly as typed: these are not hosts and must not be search terms
+     either — `nexus://extensions` is an address that resolves inside. */
+  if (trimmed.toLowerCase().startsWith(INTERNAL_SCHEME)) {
+    return trimmed.toLowerCase();
+  }
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   // Looks like a host if it has a dot and no spaces.
   if (/^[^\s]+\.[^\s]{2,}$/.test(trimmed)) return `https://${trimmed}`;
@@ -85,7 +122,9 @@ export function buildTab(
   const url = normalizeUrl(input);
   const mockPage = getMockPage(url);
   const host = hostnameOf(url);
-  const title = mockPage?.heading ?? host;
+  /* An internal page names itself. `hostnameOf` would call this one
+     "extensions", which is the URL read as a domain rather than as a title. */
+  const title = internalPage(url)?.title ?? mockPage?.heading ?? host;
 
   return {
     id: `tab-${Math.random().toString(36).slice(2, 10)}`,

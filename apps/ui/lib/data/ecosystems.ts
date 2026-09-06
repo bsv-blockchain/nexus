@@ -19,9 +19,12 @@ export const ecosystems: Ecosystem[] = [
     name: "Nexus",
     description:
       "The hub you are signed into. Its handles need no suffix, since they are local to you.",
-    alias: "nexus",
-    domain: "nexus.app",
-    icon: "/icons/nexus.png",
+    alias: "nexus.free",
+    /* `nexus.app` everywhere here and `nexus.free` in every other file that
+       names it — the profile's contact, the sync card, the help centre. One of
+       them had to give, and it was the one nothing else agreed with. */
+    domain: "nexus.free",
+    icon: "/icons/Nexus-logo-solid-BG2.png",
     local: true,
     commands: [
       {
@@ -81,6 +84,15 @@ export const ecosystems: Ecosystem[] = [
     alias: "commonsource",
     domain: "commonsource.nl",
     icon: "/ecosystems/commonsource.svg",
+  },
+  {
+    id: "lamint",
+    name: "LaMint",
+    description:
+      "A minting house for on-chain collectibles, where an issue is settled and provable before it is ever offered.",
+    alias: "lamint",
+    domain: "lamint.io",
+    icon: "/ecosystems/lamint.png",
   },
   {
     id: "mycelia",

@@ -1,9 +1,29 @@
 "use client";
 
 import { Inspector } from "@/components/hub/inspector";
+import { TumbleBar } from "@/components/apps/browser/tumble-bar";
+import { internalPage } from "@/lib/tabs";
+import {
+  extensionForUrl,
+  extensionIsOn,
+  useInstalledExtensions,
+} from "@/lib/extensions-store";
+import { ExtensionsPage } from "@/components/apps/extensions-page";
+import { ExtensionDetailPage } from "@/components/apps/extension-detail-page";
+import { TumbleUponPage } from "@/components/apps/tumbleupon-page";
+import { grantConnection, originOf } from "@/lib/connections-store";
+import { useSettings } from "@/lib/settings-store";
+import { sameUrl } from "@/lib/tabs";
+import { activeWalletFor, useWallets } from "@/lib/wallets-store";
 import { useHub } from "@/components/hub/hub-provider";
 import { OriginChip } from "@/components/hub/origin-chip";
-import { getMockPage, type BrowserTab, type MockPage } from "@/lib/data";
+import {
+  getHubApps,
+  getMockPage,
+  type BrowserTab,
+  type MockPage,
+} from "@/lib/data";
+import { forgetShellTab, noteShellTab } from "@/lib/wallet-reach";
 import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -78,7 +98,20 @@ function browseBarHeight(): number {
  * below it already.
  */
 
-function NativeSiteFrame({ url }: { url: string }): ReactNode {
+function NativeSiteFrame({
+  url,
+  tabId,
+}: {
+  url: string;
+  /**
+   * The chrome's own id for the row this page belongs to.
+   *
+   * Passed only so a wallet call can be attributed back to a tab: the shell
+   * names its native tabs and the chrome names its rows, and this is the one
+   * place both ids are in scope. See lib/wallet-reach.
+   */
+  tabId?: string;
+}): ReactNode {
   const boxRef = useRef<HTMLDivElement>(null);
   const tabIdRef = useRef<string | null>(null);
 
@@ -115,6 +148,9 @@ function NativeSiteFrame({ url }: { url: string }): ReactNode {
       }
       // Wide layouts give the browse pane a real content region: its rect is already
       // correct, and the floating bar does not exist there.
+      /* Straight from this element's rect, and nothing else adjusts it. The
+         toolbar's menus open upward into the chrome rather than downward over
+         the page, so nothing above here has to move for one to be seen. */
       void host.tabs.setBounds(id, {
         x: Math.round(r.left),
         y: Math.round(r.top),
@@ -129,6 +165,8 @@ function NativeSiteFrame({ url }: { url: string }): ReactNode {
         // A tab created after unmount would be orphaned above the chrome forever.
         if (disposed) return host.tabs.destroy(id);
         tabIdRef.current = id;
+        // Both ids are in scope for the first and only time here.
+        if (tabId) noteShellTab(id, tabId);
         return host.tabs.setActive(id).then(pushBounds);
       })
       .catch(() => {
@@ -160,9 +198,12 @@ function NativeSiteFrame({ url }: { url: string }): ReactNode {
       window.removeEventListener("scroll", pushBounds, true);
       const id = tabIdRef.current;
       tabIdRef.current = null;
-      if (id) void host.tabs.destroy(id);
+      if (id) {
+        forgetShellTab(id);
+        void host.tabs.destroy(id);
+      }
     };
-  }, [url]);
+  }, [url, tabId]);
 
   /*
    * `bg-background`, not `bg-canvas`. Nothing of this element is ever meant to be
@@ -174,6 +215,53 @@ function NativeSiteFrame({ url }: { url: string }): ReactNode {
    * is what should be behind app chrome.
    */
   return <div ref={boxRef} className="h-full w-full bg-background" />;
+}
+
+/**
+ * Hand the workspace's wallet to a metanet site, if that is the standing answer.
+ *
+ * Here rather than in Browse, because this component is what every site goes
+ * through — the ones you type into the address bar and the ones sitting on the
+ * rail as apps. One hook covers both, and a second copy in the rail's open path
+ * would be a second copy to keep in step.
+ *
+ * WHAT COUNTS AS METANET-ENABLED. A real client learns this from the handshake:
+ * the page loads the substrate and asks for an identity. Nothing in this
+ * prototype's fixtures can be asked, so the stand-in is the catalogue — a site
+ * that the App Store lists as an app is one somebody has already established
+ * speaks BRC-100. That is a narrower rule than the real one and never a wider
+ * one, which is the right direction for a rule about granting access.
+ *
+ * The grant is per workspace, because the wallet is. Opening the same site in
+ * Work and in Personal connects two different wallets, which is the entire
+ * reason a workspace has one of its own.
+ */
+function useAutoConnect(url: string, title: string): void {
+  const { activeSpaceId } = useHub();
+  const settings = useSettings();
+  useWallets();
+  const walletId = activeWalletFor(activeSpaceId)?.id;
+  const auto = settings.autoConnectSites === "auto";
+
+  useEffect(() => {
+    if (!auto || !walletId) return;
+    const origin = originOf(url);
+    /* Matched on the whole URL rather than the origin: a listing is a page, and
+       two apps can share a host. `sameUrl` is what SiteTile already uses to
+       recognise a pinned listing, so the two agree about what counts. */
+    const listed = getHubApps().find(
+      (app) => app.web && sameUrl(app.web.url, url),
+    );
+    if (!listed) return;
+    grantConnection({
+      origin,
+      name: listed.name || title,
+      category: listed.categories[0] ?? "other",
+      walletId,
+      spaceId: activeSpaceId,
+      now: new Date().toISOString(),
+    });
+  }, [auto, walletId, url, title, activeSpaceId]);
 }
 
 /**
@@ -200,6 +288,7 @@ export function SiteFrame({
   title: string;
 }): ReactNode {
   const [loaded, setLoaded] = useState(false);
+  useAutoConnect(url, title);
 
   return (
     <div className="relative h-full w-full bg-canvas">
@@ -282,10 +371,26 @@ function BrowserCanvas({
     return <SearchPage url={tab.url} />;
   }
 
+  /* Served by the browser, so it never reaches the native layer — same route
+     the search page takes. See INTERNAL_PAGES in lib/tabs. */
+  if (tab.url === "nexus://extensions") {
+    return <ExtensionsPage />;
+  }
+
+  if (tab.url === "nexus://tumbleupon") {
+    return <TumbleUponPage />;
+  }
+
+  /* Every other extension gets the page its own fixture can fill. */
+  const extension = extensionForUrl(tab.url);
+  if (extension) {
+    return <ExtensionDetailPage extension={extension} />;
+  }
+
   // Inside a shell every real URL goes to the native layer — the mock/localOnly
   // fallbacks exist only because the web build cannot embed un-frameable hosts.
   if (hasShell) {
-    return <NativeSiteFrame key={tab.url} url={tab.url} />;
+    return <NativeSiteFrame key={tab.url} url={tab.url} tabId={tab.id} />;
   }
 
   const page = getMockPage(tab.url);
@@ -316,7 +421,14 @@ export function BrowserApp(): ReactNode {
 }
 
 function BrowserPage(): ReactNode {
-  const { activeTab, activeRef, setActiveRef, unpinSite } = useHub();
+  const { activeTab, activeRef, setActiveRef, unpinSite, navigateActiveTab } =
+    useHub();
+  /* Subscribed, not read: the switch lives in a store, and without the hook a
+     toggle in the manager would change it and leave this bar exactly where it
+     was. That is what "a control with nothing behind it" looks like from the
+     other side. */
+  useInstalledExtensions();
+  const tumbleOn = extensionIsOn("tumbleupon");
   const hasShell = useHasShell();
 
   if (!activeTab) {
@@ -375,6 +487,19 @@ function BrowserPage(): ReactNode {
           url={activeTab.url}
           onOpenInBrowser={() => setActiveRef({ kind: "app", slug: "browser" })}
           onRemove={() => unpinSite(siteId)}
+        />
+      )}
+      {/*
+        The extension's toolbar, above the page it is about.
+
+        Only over real pages: the browser's own screens are not sites you can
+        like, share or tumble away from, and a discovery bar over the extensions
+        manager is a bar offering to send somebody a settings screen.
+      */}
+      {tumbleOn && !internalPage(activeTab.url) && (
+        <TumbleBar
+          url={activeTab.url}
+          onNavigate={(url) => navigateActiveTab(url)}
         />
       )}
       <div className="min-h-0 flex-1">

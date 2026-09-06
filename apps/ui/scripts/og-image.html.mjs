@@ -16,7 +16,7 @@ export function buildOgHtml(root, { name, tagline, description }) {
     `data:${mime};base64,${readFileSync(join(root, relPath)).toString("base64")}`;
 
   const heroImage = dataUri("public/img/hero-image.png", "image/png");
-  const mark = dataUri("public/icons/nexus.png", "image/png");
+  const mark = dataUri("public/icons/Nexus-logo-solid-BG2.png", "image/png");
 
   return `<!doctype html>
 <html lang="en">

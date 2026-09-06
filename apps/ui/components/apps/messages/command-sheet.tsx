@@ -16,7 +16,7 @@ import { delegationsFor } from "@/lib/command-effects";
 import { TokenAmount } from "@/components/apps/wallet/token-mark";
 import { getToken } from "@/lib/data";
 import { formatFiat, formatSats } from "@/lib/messages";
-import { MOCK_USD_PER_BSV } from "@/lib/messages";
+import { useUsdPerBsv } from "@/lib/exchange-rate";
 import {
   AlertTriangle,
   Ban,
@@ -96,6 +96,9 @@ export function CommandSheet({
   onConfirm: (command: ParsedCommand) => void;
 }): ReactNode {
   const copy = content.messages.confirm;
+  /* The rate this sheet is quoting is the rate the amount was converted at, so
+     it is read here rather than written down. */
+  const usdPerBsv = useUsdPerBsv();
   const [wildcardConfirmed, setWildcardConfirmed] = useState(false);
   const [chosenSerial, setChosenSerial] = useState<string | null>(null);
   /*
@@ -349,7 +352,7 @@ export function CommandSheet({
                       command.amount.fiat.currency
                     )}
                     <span className="text-muted-foreground ml-1.5 text-[11px] font-normal">
-                      @ ${MOCK_USD_PER_BSV}/BSV
+                      @ ${usdPerBsv.toFixed(2)}/BSV
                     </span>
                   </Line>
                 )}

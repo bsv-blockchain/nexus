@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 342 342" width="342" height="342">
+  <title>Jamify</title>
+  <!--
+    Jamify's circular mark, lifted from their full logo.
+
+    Their published file is the lockup: a 342px disc with the glyph on it, then
+    the wordmark laid out to its right across a 1101x342 canvas. An app tile is
+    square, so the words are dropped and the viewBox is cropped to the disc.
+    Nothing is redrawn: this is their circle, their glyph and their gradient.
+  -->
+  <defs>
+<linearGradient id="paint1_linear_13_39" x1="171" y1="0" x2="171" y2="342" gradientUnits="userSpaceOnUse">
+<stop stop-color="#509BF5"/>
+<stop offset="0.494792" stop-color="#9550F5"/>
+<stop offset="1" stop-color="#AF2896"/>
+</linearGradient>
+  </defs>
+  <circle cx="171" cy="171" r="171" fill="url(#paint1_linear_13_39)"/>
+  <path d="M148 242.16C148 244.066 145.588 244.892 144.42 243.386L112.637 202.428C112.258 201.94 111.675 201.654 111.057 201.654H80C78.8954 201.654 78 200.759 78 199.654V144.014C78 142.91 78.8954 142.014 80 142.014H110.541C111.159 142.014 111.743 141.729 112.121 141.24L144.42 99.6141C145.588 98.1086 148 98.9346 148 100.84V242.16Z" fill="white" stroke="white" stroke-width="18" stroke-linejoin="round"/>
+</svg>

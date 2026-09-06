@@ -12,6 +12,7 @@ import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState, type ReactNode } from "react";
+import { useHostOverlay } from "@/lib/wallet-data";
 
 const MODES: { n: number; key: "solid" | "gradient2" | "gradient3" }[] = [
   { n: 1, key: "solid" },
@@ -50,8 +51,13 @@ export interface ThemeAnchor {
 function ModeToggle({ spaceId }: { spaceId: string }): ReactNode {
   const copy = content.theme;
   const { resolvedTheme } = useTheme();
-  const { profileMode, setProfileMode, profileTheme, setProfileTheme, preview } =
-    useCustomTheme();
+  const {
+    profileMode,
+    setProfileMode,
+    profileTheme,
+    setProfileTheme,
+    preview,
+  } = useCustomTheme();
   // What this profile is set to, falling back to what is on screen for a
   // profile that has never been given one.
   const current = profileMode(spaceId) ?? resolvedTheme;
@@ -83,7 +89,7 @@ function ModeToggle({ spaceId }: { spaceId: string }): ReactNode {
     <div
       role="radiogroup"
       aria-label={copy.mode}
-      className="flex shrink-0 gap-0.5 rounded-full bg-surface p-0.5 ring-1 ring-border"
+      className="bg-surface ring-border flex shrink-0 gap-0.5 rounded-full p-0.5 ring-1"
     >
       {modes.map((mode) => {
         const on = current === mode.key;
@@ -119,8 +125,14 @@ function ThemePicker({
   anchor: ThemeAnchor | null;
   onClose: () => void;
 }): ReactNode {
-  const { saved, profileTheme, preview, setProfileTheme, saveToLibrary, removeSaved } =
-    useCustomTheme();
+  const {
+    saved,
+    profileTheme,
+    preview,
+    setProfileTheme,
+    saveToLibrary,
+    removeSaved,
+  } = useCustomTheme();
   const initial = profileTheme(spaceId);
   const copy = content.theme;
   const { spaces } = useHub();
@@ -133,7 +145,7 @@ function ThemePicker({
   // Remount the wheel (new key) at a given colour when a preset is applied.
   const [pickerKey, setPickerKey] = useState(0);
   const [pickerColor, setPickerColor] = useState<string | undefined>(
-    initial ? mainColorOf(initial) : undefined,
+    initial ? mainColorOf(initial) : undefined
   );
 
   // Anchor the desktop popover just above the trigger button (pure from anchor).
@@ -223,7 +235,7 @@ function ThemePicker({
       >
         {!isDesktop && (
           <div className="flex justify-center pt-3" aria-hidden="true">
-            <span className="h-1 w-9 rounded-full bg-muted-foreground/30" />
+            <span className="bg-muted-foreground/30 h-1 w-9 rounded-full" />
           </div>
         )}
 
@@ -245,7 +257,7 @@ function ThemePicker({
           </div>
 
           {/* Solid / 2-colour / 3-colour */}
-          <div className="mb-4 flex gap-1 rounded-full bg-surface p-1 text-xs font-medium ring-1 ring-border">
+          <div className="bg-surface ring-border mb-4 flex gap-1 rounded-full p-1 text-xs font-medium ring-1">
             {MODES.map((mode) => {
               const on = stops === mode.n;
               return (
@@ -280,7 +292,7 @@ function ThemePicker({
 
           {/* Live preview of the current colour(s) */}
           <div
-            className="mt-4 h-7 rounded-lg ring-1 ring-border"
+            className="ring-border mt-4 h-7 rounded-lg ring-1"
             style={{ background: themeGradient(colors) }}
             aria-hidden="true"
           />
@@ -292,14 +304,14 @@ function ThemePicker({
               maxLength={32}
               placeholder={copy.namePlaceholder}
               aria-label={copy.namePlaceholder}
-              className="focus-ring min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none"
+              className="focus-ring border-border bg-surface min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm outline-none"
             />
             <button
               type="button"
               onClick={onSave}
               disabled={!name.trim()}
               /* Enabled only with a name, because that is all it does now. */
-              className="focus-ring shrink-0 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-accent-foreground hover:opacity-90 disabled:opacity-40"
+              className="focus-ring bg-accent text-accent-foreground shrink-0 rounded-lg px-3 py-2 text-sm font-semibold hover:opacity-90 disabled:opacity-40"
             >
               {name.trim() ? copy.save : interacted ? copy.saved : copy.save}
             </button>
@@ -308,7 +320,7 @@ function ThemePicker({
               onClick={onReset}
               aria-label={copy.reset}
               title={copy.reset}
-              className="focus-ring shrink-0 rounded-lg bg-surface p-2 ring-1 ring-border hover:bg-surface-hover"
+              className="focus-ring bg-surface ring-border hover:bg-surface-hover shrink-0 rounded-lg p-2 ring-1"
             >
               <RotateCcw className="size-4" aria-hidden="true" />
             </button>
@@ -316,11 +328,11 @@ function ThemePicker({
 
           {/* Saved themes */}
           <div className="mt-4">
-            <h3 className="mb-1.5 text-xs font-semibold text-muted-foreground">
+            <h3 className="text-muted-foreground mb-1.5 text-xs font-semibold">
               {copy.savedTitle}
             </h3>
             {saved.length === 0 ? (
-              <p className="py-2 text-xs text-muted-foreground">
+              <p className="text-muted-foreground py-2 text-xs">
                 {copy.noneSaved}
               </p>
             ) : (
@@ -338,7 +350,7 @@ function ThemePicker({
                         setPickerColor(mainColorOf(theme.colors));
                         setPickerKey((k) => k + 1);
                       }}
-                      className="focus-ring flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-surface-hover"
+                      className="focus-ring hover:bg-surface-hover flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 py-1.5 text-left"
                     >
                       <span
                         className="size-5 shrink-0 rounded-full ring-1 ring-black/10 dark:ring-white/10"
@@ -350,7 +362,7 @@ function ThemePicker({
                       </span>
                       {colors.join(",") === theme.colors.join(",") && (
                         <Check
-                          className="size-4 shrink-0 text-accent"
+                          className="text-accent size-4 shrink-0"
                           aria-hidden="true"
                         />
                       )}
@@ -359,7 +371,7 @@ function ThemePicker({
                       type="button"
                       onClick={() => removeSaved(theme.id)}
                       aria-label={`${copy.delete} ${theme.name}`}
-                      className="focus-ring shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-negative"
+                      className="focus-ring text-muted-foreground hover:bg-surface-hover hover:text-negative shrink-0 rounded-md p-1.5"
                     >
                       <Trash2 className="size-4" aria-hidden="true" />
                     </button>
@@ -386,6 +398,10 @@ export function ThemeButton({
   className?: string;
 }): ReactNode {
   const [open, setOpen] = useState(false);
+  /* Holds the shell's page layer down while this is up: a browsed page is a
+     native view that paints above this document, so no z-index reaches over
+     it. See lib/wallet-data. */
+  useHostOverlay(open);
   const [anchor, setAnchor] = useState<ThemeAnchor | null>(null);
 
   return (

@@ -160,7 +160,7 @@ export function CustomThemeProvider({
   /*
    * A profile's light/dark choice follows it.
    *
-   * Light and dark are as much a part of "this is my Work profile" as its
+   * Light and dark are as much a part of "this is my Work workspace" as its
    * colour is, and a profile that comes back in the wrong one has not really
    * been remembered. Applied on activation rather than only when set, so
    * switching profiles carries it across.

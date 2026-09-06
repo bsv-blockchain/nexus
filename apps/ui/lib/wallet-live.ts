@@ -9,7 +9,13 @@
  * percentage change, just the balance and what it is worth.
  */
 
-import { getToken, type Token, type WalletAccount, type WalletTransaction } from "@/lib/data";
+import { useBsvHistory, useUsdPerBsv } from "@/lib/exchange-rate";
+import {
+  getToken,
+  type Token,
+  type WalletAccount,
+  type WalletTransaction,
+} from "@/lib/data";
 import {
   holdings,
   portfolioChange24h,
@@ -58,9 +64,29 @@ function bsvToken(): Token {
   };
 }
 
-export function usePortfolio(): Portfolio {
+/**
+ * The portfolio of one wallet.
+ *
+ * `accountId` narrows the fixture holdings; the live path ignores it, because a
+ * live build has exactly one wallet and reads its balance from the shell.
+ */
+export function usePortfolio(accountId?: string): Portfolio {
   const accounts = useWalletAccounts();
-  const liveRate = accounts.mode === "live" ? (accounts.data[0]?.fiatRate ?? null) : null;
+  /*
+   * Subscribed to, not merely read.
+   *
+   * `usdPerUnitOf` reaches for the market rate through `getUsdPerBsv`, which is
+   * a plain read — nothing re-renders when the first answer comes back from the
+   * network. Subscribing here is what makes the whole portfolio repaint at the
+   * real price a moment after it first paints at the fallback.
+   */
+  useUsdPerBsv();
+  /* And to the series behind it, for the same reason: `change24hOf` reads
+     today's move through a plain getter, so without this the header and the
+     rows keep the fixtures' figures until something else repaints them. */
+  useBsvHistory();
+  const liveRate =
+    accounts.mode === "live" ? (accounts.data[0]?.fiatRate ?? null) : null;
 
   // Publish the device's rate so transaction rows and token detail price BSV the same
   // way this header does. Demo mode publishes the fixtures' own price instead.
@@ -72,9 +98,9 @@ export function usePortfolio(): Portfolio {
 
   if (accounts.mode === "demo") {
     return {
-      rows: holdings(),
-      total: portfolioUsd(),
-      change: portfolioChange24h(),
+      rows: holdings(accountId),
+      total: portfolioUsd(accountId),
+      change: portfolioChange24h(accountId),
       loading: false,
       mode: "demo",
       error: null,
@@ -89,7 +115,11 @@ export function usePortfolio(): Portfolio {
   // as the device most recently saw it. Zero means the shell has never had one,
   // which is a missing price rather than a free coin.
   const usdPerUnit = liveRate !== null && liveRate > 0 ? liveRate : null;
-  const token: Token = { ...bsvToken(), usdPerUnit: usdPerUnit ?? 0, change24h: 0 };
+  const token: Token = {
+    ...bsvToken(),
+    usdPerUnit: usdPerUnit ?? 0,
+    change24h: 0,
+  };
   const value = usdPerUnit === null ? null : units * usdPerUnit;
 
   return {
@@ -139,7 +169,11 @@ export function useHolding(tokenId: string): HoldingView {
  */
 export function useBsvRate(): number | null {
   const accounts = useWalletAccounts();
-  if (accounts.mode === "demo") return getToken("bsv")?.usdPerUnit ?? null;
+  const liveUsdPerBsv = useUsdPerBsv();
+  /* Demo or live, the price of bitcoin is the price of bitcoin. The fixture
+     token still carries a `usdPerUnit`, and it is still whatever was true the
+     day it was written — see lib/exchange-rate for why nothing reads it. */
+  if (accounts.mode === "demo") return liveUsdPerBsv;
   const rate = accounts.data[0]?.fiatRate ?? 0;
   return rate > 0 ? rate : null;
 }
@@ -155,7 +189,13 @@ export interface Activity {
 export function useActivity(demo: WalletTransaction[]): Activity {
   const live = useWalletTransactions({ limit: 100 });
   if (live.mode === "demo") {
-    return { transactions: demo, loading: false, mode: "demo", error: null, refresh: live.refresh };
+    return {
+      transactions: demo,
+      loading: false,
+      mode: "demo",
+      error: null,
+      refresh: live.refresh,
+    };
   }
   // No account filter here. The fixtures model several accounts and callers filter by
   // the one they are showing; a real wallet has exactly one, and filtering its ledger

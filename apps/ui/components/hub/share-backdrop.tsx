@@ -94,8 +94,11 @@ function BackgroundCard({
  */
 export function ShareBackdrop({
   children,
+  className = "",
 }: {
   children: ReactNode;
+  /** Added to the root, for callers that need it to fill something. */
+  className?: string;
 }): ReactNode {
   const still = useReducedMotion();
   const mouseX = useMotionValue(0);
@@ -113,7 +116,7 @@ export function ShareBackdrop({
   };
 
   return (
-    <div className="relative isolate" onMouseMove={onMouseMove}>
+    <div className={`relative isolate ${className}`} onMouseMove={onMouseMove}>
       {/* Deepened ground. The dialog's own surface is the flat card colour, and
           the collage needs something darker behind it or the tiles read as
           smudges on paper rather than as objects in a space. */}

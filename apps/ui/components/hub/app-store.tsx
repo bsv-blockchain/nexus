@@ -2,12 +2,15 @@
 
 import { AppDetailPanel } from "@/components/hub/app-detail-panel";
 import { AppTile } from "@/components/hub/app-icon";
+import { AppName } from "@/components/hub/app-name";
 import { PRIMARY_CTA } from "@/components/hub/cta";
 import { DEMO_SURFACES } from "@/lib/surfaces";
 import { DevBadge } from "@/components/hub/dev-badge";
 import { useBrandMode, withBrand } from "@/lib/brand";
+import { CollectionRow } from "@/components/hub/app-collections";
 import { useHub } from "@/components/hub/hub-provider";
 import { PopoverMenu } from "@/components/hub/popover-menu";
+import { Tab, TabRow } from "@/components/hub/tab-row";
 import { Tooltip } from "@/components/hub/tooltip";
 import {
   content,
@@ -43,7 +46,11 @@ import {
   StoreFilterPane,
   type StoreFilters,
 } from "@/components/hub/store-filter";
+import { ALWAYS_APPS } from "@/lib/data/presets";
 import { useEffect, useState, type ReactNode } from "react";
+import { useHostOverlay } from "@/lib/wallet-data";
+import { DiscoverPage } from "@/components/hub/discover-page";
+import { setStoreTab, useStoreTab } from "@/lib/store-view";
 
 /** Ordered category groupings for the Available section, with headings. */
 const CATEGORY_ORDER: { id: AppCategory; label: string }[] = [
@@ -157,23 +164,37 @@ function AppCard({
   /* App copy is data, so the chain's name is substituted rather than composed
      from a component. */
   const brandMode = useBrandMode();
+  /* Per card, not lifted: two open cards is a perfectly reasonable thing to
+     want, and a shared "which one is open" would close the first. */
+  const [expanded, setExpanded] = useState(false);
 
   return (
     <article
       /* One height for every tile, set by the tallest thing a card holds:
          a three-line description. Ragged card bottoms in a grid make the
          Connect buttons land on four different lines, and a row of buttons
-         you have to hunt for is worse than a little empty space. */
-      className={`bg-surface flex h-56 flex-col rounded-2xl p-4 ring-1 transition-shadow ${
-        selected ? "ring-accent" : "ring-transparent"
-      }`}
+         you have to hunt for is worse than a little empty space.
+
+         Until you open one. An expanded card is taller than its neighbours by
+         definition — you asked for the rest of a description that did not fit,
+         and the only way to honour that without moving the card is not to.
+         `min-h-52` rather than free height, so opening a card whose description
+         already fitted does not shrink it below the row it sits in.
+
+         52 rather than the 56 it was: once the description became exactly three
+         lines rather than whatever was left over, the card carried about 27px
+         of nothing under the Connect button. The folder tile matches, because
+         the two sit in the same grid. */
+      className={`bg-surface flex flex-col rounded-2xl p-4 ring-1 transition-shadow ${
+        expanded ? "min-h-52" : "h-52"
+      } ${selected ? "ring-accent" : "ring-transparent"}`}
     >
       <button
         type="button"
         onClick={() => onSelect(app)}
         onMouseEnter={() => onHover(app)}
         aria-label={`View ${app.name} details`}
-        className="focus-ring flex min-h-0 flex-1 flex-col text-left"
+        className="focus-ring flex shrink-0 flex-col text-left"
       >
         <div className="flex items-start gap-3">
           <span className="block shrink-0">
@@ -181,7 +202,9 @@ function AppCard({
           </span>
           <div className="min-w-0 flex-1">
             <span className="flex items-center gap-1.5">
-              <h3 className="truncate text-sm font-semibold">{app.name}</h3>
+              <h3 className="truncate text-sm font-semibold">
+                <AppName app={app} />
+              </h3>
               {isNew && (
                 <span className="bg-accent text-accent-foreground shrink-0 rounded-full px-1.5 py-px text-[9px] font-bold tracking-wide uppercase">
                   {content.appStore.newLabel}
@@ -207,9 +230,31 @@ function AppCard({
             <DevBadge developer={app.developer} className="mt-0.5" />
           </div>
         </div>
-        <p className="text-muted-foreground mt-3 line-clamp-3 flex-1 overflow-hidden text-xs leading-relaxed">
-          {withBrand(app.description, brandMode)}
-        </p>
+      </button>
+      {/*
+        The description, on its own and scrollable.
+
+        Out of the select button rather than inside it, because it is now a
+        control of its own and a button inside a button is markup no browser
+        agrees on. Clicking it opens the card rather than the app: they are
+        different intentions, and the old card answered both with "open the
+        app".
+
+        Three lines exactly, by max-height rather than `line-clamp`. Clamping
+        hides the overflow so completely that the box cannot scroll, which is
+        the one thing wanted here — a bar appears only when there is more, so
+        the card says whether it is holding anything back.
+      */}
+      <button
+        type="button"
+        onClick={() => setExpanded((open) => !open)}
+        aria-expanded={expanded}
+        aria-label={`${expanded ? copy.collapseDescription : copy.expandDescription} ${app.name}`}
+        className={`focus-ring scrollbar-slim text-muted-foreground mt-3 min-h-0 flex-1 overflow-y-auto text-left text-xs leading-relaxed ${
+          expanded ? "max-h-none" : "max-h-[3.66rem]"
+        }`}
+      >
+        {withBrand(app.description, brandMode)}
       </button>
       {app.essential ? (
         <span
@@ -278,7 +323,11 @@ function CategoryFolder({
   const [open, setOpen] = useState(false);
   const folderNew = apps.some((app) => newSlugs.has(app.slug));
   const reduced = useReducedMotion();
-  const previews = apps.slice(0, 4);
+  /* Three, not four. A fourth tile at 78px pushed the stack wider than the
+     folder's own label and left the remainder count hanging off the edge of
+     the card; three reads as a stack and leaves the count somewhere it can
+     be seen. */
+  const previews = apps.slice(0, 3);
   const extra = apps.length - previews.length;
   const listVariants = reduced ? { hidden: {}, visible: {} } : CARD_LIST;
   const itemVariants = reduced
@@ -351,7 +400,10 @@ function CategoryFolder({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18, ease: EASE }}
-            className="focus-ring group bg-surface ring-border hover:ring-accent/50 flex h-56 w-full flex-col justify-between rounded-2xl p-4 text-left ring-1 transition-colors"
+            /* Same height as an app card: a folder is a tile in the same grid,
+               and one taller box in a row of shorter ones reads as a mistake
+               rather than as a different kind of thing. */
+            className="focus-ring group bg-surface ring-border hover:ring-accent/50 flex h-52 w-full flex-col justify-between rounded-2xl p-4 text-left ring-1 transition-colors"
           >
             {/* A folder is a tile in a grid of tiles, so its mark is the
                 size of the app icons around it and its name is read at the
@@ -376,20 +428,30 @@ function CategoryFolder({
               </span>
             </div>
             <div className="mt-3 flex items-center">
-              <div className="flex -space-x-3.5">
+              {/* 1.5x the app grid's own icon size: this stack is the whole
+                  content of a shut folder, where a tile elsewhere is one of
+                  several things competing for the eye. The overlap scales
+                  with it — -space-x-3.5 was tuned to how much of a 52px tile
+                  a neighbour should cover, and left alone at 78px the same
+                  14px reads as a loose row rather than a stack. */}
+              <div className="flex -space-x-[21px]">
                 {/* Named on hover. A shut folder shows a stack of marks and
                     nothing else, so without this the only way to learn what is
                     in one is to open it. */}
                 {previews.map((app) => (
                   <Tooltip key={app.slug} label={app.name} side="top">
                     <span className="ring-surface flex rounded-[22%] shadow-lg ring-2 transition-transform hover:-translate-y-0.5">
-                      <AppTile app={app} size={52} />
+                      <AppTile app={app} size={78} />
                     </span>
                   </Tooltip>
                 ))}
               </div>
+              {/* Part of the stack rather than a note beside it: the same
+                  rounded square as the tiles, in the same overlap, so the
+                  remainder reads as "and this many more of these" instead of
+                  as a stray number. */}
               {extra > 0 && (
-                <span className="text-muted-foreground ml-2.5 text-xs font-medium">
+                <span className="bg-surface-raised text-muted-foreground ring-surface -ml-[21px] grid size-[78px] shrink-0 place-items-center rounded-[22%] text-lg font-bold tabular-nums shadow-lg ring-2">
                   +{extra}
                 </span>
               )}
@@ -453,12 +515,21 @@ function CategoryGroups({
 
 /** Full-area app store shown when the Apps rail tab is active. */
 export function AppStore(): ReactNode {
-  const { appsCollection } = useHub();
+  const { appsCollection, isInstalled } = useHub();
   const copy = content.library.apps;
   const store = content.appStore;
   const collection = getAppCollections().find((c) => c.id === appsCollection);
   const slugSet = new Set(getCollectionAppSlugs(appsCollection));
 
+  /*
+   * Everything, or just what you have connected.
+   *
+   * The same grid either way — search, sort, the repo sections, a card's own
+   * Connect/Disconnect button — narrowed by one more predicate rather than
+   * drawn twice. Manage is not a different screen, it is this one asked a
+   * different question: not "what could I add" but "what did I".
+   */
+  const tab = useStoreTab();
   const [query, setQuery] = useState("");
   /* The first sort this build offers, which is Trending in demo and Newest in
      a live build — not the literal "trending", which would leave a live build
@@ -469,6 +540,10 @@ export function AppStore(): ReactNode {
   const [filterOpen, setFilterOpen] = useState(false);
   // The app whose detail sheet is open (reflows the grid on desktop).
   const [selectedSlug, setSelectedSlug] = useState<HubApp["slug"] | null>(null);
+  /* Holds the shell's page layer down while this is up: a browsed page is a
+     native view that paints above this document, so no z-index reaches over
+     it. See lib/wallet-data. */
+  useHostOverlay(selectedSlug !== null);
   const [collapsed, setCollapsed] = useState(false);
   const repos = useEnabledRepositories();
   const [versionByRepo, setVersionByRepo] = useState<Record<string, string>>(
@@ -507,6 +582,9 @@ export function AppStore(): ReactNode {
     (app) => appsCollection === "all" || slugSet.has(app.slug)
   );
   const matched = scoped.filter((app) => {
+    /* Manage's whole narrowing, in one line: the rest of this predicate is
+       the same question Discover asks. */
+    if (tab === "manage" && !isInstalled(app.slug)) return false;
     if (
       q &&
       !app.name.toLowerCase().includes(q) &&
@@ -538,6 +616,7 @@ export function AppStore(): ReactNode {
   const enabledIds = new Set(repos.map((repo) => repo.id));
   const countable = scoped.filter(
     (app) =>
+      (tab !== "manage" || isInstalled(app.slug)) &&
       enabledIds.has(app.repoId) &&
       (!q ||
         app.name.toLowerCase().includes(q) ||
@@ -551,12 +630,28 @@ export function AppStore(): ReactNode {
       categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
     }
   }
+  /*
+   * The client's own apps keep the order the rail gives them.
+   *
+   * `ALWAYS_APPS` is the order every install lays its rail out in, and it is
+   * deliberate down to Roadmap being last. Sorting those same apps by
+   * "trending" inside the Essentials folder put them in a different order from
+   * the rail two columns away on the same screen, and made the newest of them
+   * lead a folder that is not a what's-new list. Everything else keeps
+   * whichever sort is chosen.
+   */
+  const railOrder = (app: HubApp): number => {
+    const at = (ALWAYS_APPS as string[]).indexOf(app.slug);
+    return at === -1 ? Number.MAX_SAFE_INTEGER : at;
+  };
   const groupByCategory = (
     list: HubApp[]
   ): { id: AppCategory; label: string; apps: HubApp[] }[] =>
     CATEGORY_ORDER.map((category) => ({
       ...category,
-      apps: list.filter((app) => app.category === category.id),
+      apps: list
+        .filter((app) => app.category === category.id)
+        .sort((a, b) => railOrder(a) - railOrder(b)),
     })).filter((group) => group.apps.length > 0);
 
   /*
@@ -603,12 +698,68 @@ export function AppStore(): ReactNode {
     <div className="flex h-full min-h-0">
       <div className="min-w-0 flex-1 overflow-y-auto px-6 py-8 sm:px-10">
         <div className="mx-auto max-w-400">
-          <h1 className="text-2xl font-bold tracking-tight">{copy.title}</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {collection && appsCollection !== "all"
-              ? collection.description
-              : copy.storeSubtitle}
+          {/*
+            The line that used to sit under the heading now sits above it —
+            "above 'Apps'" being the whole instruction, since what was under
+            it stopped being a heading. Two tabs read as two tabs whichever
+            order they come in; a sentence explaining what the screen is
+            reads best before you have started sorting rows into either of
+            them.
+          */}
+          <p className="text-muted-foreground text-sm">
+            {tab === "manage"
+              ? copy.manageSubtitle
+              : collection && appsCollection !== "all"
+                ? collection.description
+                : copy.storeSubtitle}
           </p>
+
+          {/*
+            Discover, then Manage: the same order the words suggest reading
+            them in, and the order this screen already served them in before
+            it had two tabs — everything, and then, if you go looking, only
+            what you have. Manage exists because that used to mean reading
+            past however many you had not connected to find the six you had.
+          */}
+          {/* Sticky: the store is a long scroll, and a reader who has gone
+              looking through Discover should not have to come all the way
+              back up to reach Manage. The negative margins take the strip out
+              to the scroll container's own edges so what passes underneath is
+              covered rather than showing at the sides. */}
+          <div className="bg-background sticky top-0 z-20 -mx-6 mt-2 px-6 pt-1 sm:-mx-10 sm:px-10">
+          <TabRow fade="from-background" gap="gap-6">
+            <Tab
+              label={copy.discoverTab}
+              group="app-store"
+              size="lg"
+              active={tab === "discover"}
+              onClick={() => setStoreTab("discover")}
+            >
+              <span className="hidden sm:inline">{copy.discoverTab}</span>
+              <span className="sm:hidden">{copy.discoverTabShort}</span>
+            </Tab>
+            <Tab
+              label={copy.manageTab}
+              group="app-store"
+              size="lg"
+              active={tab === "manage"}
+              onClick={() => setStoreTab("manage")}
+            >
+              <span className="hidden sm:inline">{copy.manageTab}</span>
+              <span className="sm:hidden">{copy.manageTabShort}</span>
+            </Tab>
+          </TabRow>
+          </div>
+
+          {tab === "manage" ? (
+            <>
+          {/* The setups. A column beside the store on a desktop — see
+              hub-shell's LibraryPanel — and a row here on a phone, where that
+              column does not exist. `md:hidden` lives inside the component, so
+              this is one line either way. */}
+          <div className="mt-5">
+            <CollectionRow />
+          </div>
 
           {/* Search + sort + filter */}
           <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -722,8 +873,22 @@ export function AppStore(): ReactNode {
 
           {total === 0 && (
             <p className="text-muted-foreground py-16 text-center text-sm">
-              {store.noResults}
+              {/* "Nothing connected" only where that is actually the reason —
+                  a search or a filter that came up empty in Manage gets the
+                  same line Discover would give it. */}
+              {tab === "manage" && !q && activeFilters === 0
+                ? copy.manageEmpty
+                : store.noResults}
             </p>
+          )}
+            </>
+          ) : (
+            /* Discover: a curated front page with its own drill-downs, not
+               this screen's searchable grid narrowed a second way — see
+               DiscoverPage and lib/store-view.ts. */
+            <div className="mt-5">
+              <DiscoverPage />
+            </div>
           )}
         </div>
       </div>

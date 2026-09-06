@@ -47,7 +47,7 @@ export function DownloadsPanel(): ReactNode {
       >
         <button
           type="button"
-          aria-label="Back to profiles"
+          aria-label="Back to workspaces"
           onClick={() => setLibraryTab("spaces")}
           className="focus-ring rounded-md p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
         >

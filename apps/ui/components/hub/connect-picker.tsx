@@ -128,7 +128,9 @@ export function ConnectPicker({
         onClose={close}
         label={label}
         align="start"
-        className="w-64"
+        /* As wide as the button that opened it, so the two read as one control
+           rather than a menu that happened to appear nearby. */
+        {...(anchor ? { width: anchor.right - anchor.left } : {})}
       >
         <div className="border-border/60 mb-1 flex items-center gap-1.5 border-b px-1.5 pb-1.5">
           <Search

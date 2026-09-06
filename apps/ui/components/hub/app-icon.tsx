@@ -1,9 +1,15 @@
 "use client";
 
 import { Favicon } from "@/components/hub/favicon";
-import type { HubApp } from "@/lib/data";
+import {
+  MINIMALIST_BACKGROUNDS,
+  MINIMALIST_GLYPHS,
+  MINIMALIST_INK,
+} from "@/components/hub/nexus-glyphs";
+import { getHubApps, type HubApp } from "@/lib/data";
 import type { PinnedSite } from "@/lib/rail/sites";
-import { faviconColorFor } from "@/lib/tabs";
+import { useSettings } from "@/lib/settings-store";
+import { faviconColorFor, sameUrl } from "@/lib/tabs";
 import { Folder, Globe, Palette, Pin, type LucideIcon } from "lucide-react";
 
 const DEFAULT_ACCENT = "#4353ff";
@@ -41,16 +47,82 @@ export function DataIcon({
  * has to come from whoever it belongs to. `Favicon` falls back to a letter on
  * the app's accent when the site has none, so nothing ever renders as a broken
  * image.
+ *
+ * Nexus's own apps carry a second look, in `MINIMALIST_GLYPHS` — Settings'
+ * icon-style choice, not the app's own data, decides which one is drawn, so
+ * flipping the switch changes every tile at once rather than one app at a
+ * time. `bare` is for the rail specifically: the rail's own Workspaces / Apps
+ * / Browse buttons are a plain glyph on no background at all (see IconRail's
+ * `pinned` tabs), and a square tile sitting beside those three would read as
+ * a different kind of button rather than the same row. Everywhere else — the
+ * Manage grid, Discover's rows, a story page's pinned card — the glyph fills
+ * the same rounded square those PNGs always have, its background one app's
+ * own crop of `MINIMALIST_BACKGROUNDS` rather than a flat accent fill: seven
+ * different crops of the same painting family read as one set in a way seven
+ * different accent colours across seven unrelated apps never quite did.
  */
 export function AppTile({
   app,
   size,
   className = "",
+  bare = false,
 }: {
-  app: Pick<HubApp, "iconSrc" | "name"> & Partial<Pick<HubApp, "web" | "accent">>;
+  app: Pick<HubApp, "iconSrc" | "name" | "slug"> &
+    Partial<Pick<HubApp, "web" | "accent">>;
   size: number;
   className?: string;
+  /** the rail's own bare-glyph-on-no-background look, see above */
+  bare?: boolean;
 }): React.ReactNode {
+  const { iconStyle } = useSettings();
+  const Glyph =
+    iconStyle === "minimalist"
+      ? MINIMALIST_GLYPHS[app.slug as keyof typeof MINIMALIST_GLYPHS]
+      : undefined;
+
+  if (Glyph) {
+    if (bare) {
+      return (
+        <Glyph
+          aria-hidden="true"
+          className={className}
+          style={{ width: size, height: size }}
+        />
+      );
+    }
+    const bg = MINIMALIST_BACKGROUNDS[app.slug as keyof typeof MINIMALIST_GLYPHS];
+    return (
+      <span
+        aria-hidden="true"
+        className={`flex shrink-0 items-center justify-center rounded-[22%] bg-cover ${className}`}
+        style={{
+          width: size,
+          height: size,
+          ...(bg
+            ? {
+                /* A flat wash between the painting and the glyph, not a
+                   second element: the crop is busy enough in places that a
+                   dark glyph landed on its own dark strokes and read as
+                   barely there. Layered onto the same background rather
+                   than an absolutely-positioned sibling, so nothing else
+                   about the tile's box model has to change to fit it. */
+                backgroundImage: `linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)), url(${bg.src})`,
+                backgroundPosition: bg.position,
+              }
+            : { backgroundColor: app.accent ?? DEFAULT_ACCENT }),
+        }}
+      >
+        <Glyph
+          style={{
+            width: size * 0.72,
+            height: size * 0.72,
+            color: MINIMALIST_INK,
+          }}
+        />
+      </span>
+    );
+  }
+
   if (!app.iconSrc && app.web) {
     return (
       <Favicon
@@ -96,6 +168,26 @@ export function SiteTile({
   size: number;
   className?: string;
 }): React.ReactNode {
+  /*
+   * A site the store lists is drawn as that listing.
+   *
+   * Connecting a web listing pins its URL, and the rail then holds a site ref
+   * rather than an app ref — so everything past that point knew only a title
+   * and a URL and fell back to `/favicon.ico`, then to a letter. Every
+   * third-party listing in the catalogue was a coloured letter on the rail
+   * while its own mark sat unused in the very same row of the store.
+   *
+   * Matched on the URL because that is the only thing the two halves share; a
+   * listing with no bundled mark falls through to the favicon exactly as
+   * before, which is still right for a site somebody pinned themselves.
+   */
+  const listed = getHubApps().find(
+    (app) => app.iconSrc && app.web && sameUrl(app.web.url, site.url)
+  );
+  if (listed) {
+    return <AppTile app={listed} size={size} className={className} />;
+  }
+
   return (
     <Favicon
       url={site.url}

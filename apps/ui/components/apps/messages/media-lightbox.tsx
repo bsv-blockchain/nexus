@@ -2,6 +2,7 @@
 
 import { content, type MediaItem } from "@/lib/data";
 import { AnimatePresence, motion } from "motion/react";
+import { useHostOverlay } from "@/lib/wallet-data";
 import {
   ChevronLeft,
   ChevronRight,
@@ -35,6 +36,21 @@ export function MediaLightbox({
   onIndex: (next: number) => void;
   onClose: () => void;
 }): ReactNode {
+  /*
+   * Hold the shell's page layer down while this is up.
+   *
+   * A browsed page is a native view in both shells — a WebContentsView on the
+   * desktop, a native web view on mobile — and a native view is a sibling of
+   * this document that always paints ABOVE it. No z-index reaches over one, so
+   * without this the surface renders perfectly and is then completely hidden
+   * behind whatever tab happens to be open.
+   *
+   * Held by the primitive rather than by each caller, because "remember to call
+   * useHostOverlay" is a rule that gets forgotten exactly once and then fails
+   * silently. A no-op in a plain browser, which has no page layer to hide.
+   */
+  useHostOverlay(true);
+
   const copy = content.messages.media;
   const item = items[index];
   const many = items.length > 1;

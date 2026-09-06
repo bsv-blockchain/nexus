@@ -9,19 +9,55 @@
  */
 
 import { Pencil } from "lucide-react";
+import { sectionIsIndexed, sectionSlug } from "@/lib/settings-index";
 import type { ReactNode } from "react";
 
 export function Group({
   title,
   hint,
   children,
+  tour,
+  id,
 }: {
   title: string;
   hint?: string;
   children: ReactNode;
+  /** a `data-tour` handle, for the sections the Guided Tour points at */
+  tour?: string;
+  /**
+   * An explicit anchor, for a group outside Settings.
+   *
+   * These blocks are reused by screens that are not Settings — Store Admin
+   * builds its whole shell from them — and those screens are not in the
+   * settings index, are not reachable from settings search, and can render
+   * two groups with the same heading at once (two campaigns for the same
+   * source). Naming its own id opts a group out of all three: no derived
+   * slug to collide, and no warning about an index it was never meant to be
+   * in.
+   */
+  id?: string;
 }): ReactNode {
+  /*
+   * A section search can find and land on.
+   *
+   * The id is the heading's own words, so there is no second identifier to keep
+   * in step — see lib/settings-index. The warning is the price of a static
+   * index: a group added without an entry there is a group nobody can search
+   * for, which is the kind of gap that is invisible until somebody gives up
+   * looking. Development only; a shipped build says nothing.
+   */
+  if (process.env.NODE_ENV !== "production" && !id && !sectionIsIndexed(title)) {
+    console.warn(
+      `Settings section "${title}" is not in lib/settings-index.ts, so search cannot find it.`,
+    );
+  }
+
   return (
-    <section className="mt-6 first:mt-0">
+    <section
+      id={id ?? sectionSlug(title)}
+      className="mt-6 scroll-mt-6 first:mt-0"
+      {...(tour ? { "data-tour": tour } : {})}
+    >
       <h3 className="text-sm font-bold">{title}</h3>
       {hint && (
         <p className="text-muted-foreground mt-0.5 text-xs text-pretty">
@@ -185,7 +221,9 @@ export function Choice<T extends string>({
               }`}
               aria-hidden="true"
             >
-              {selected && <span className="bg-current size-1.5 rounded-full" />}
+              {selected && (
+                <span className="size-1.5 rounded-full bg-current" />
+              )}
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5 text-sm font-medium">
@@ -344,7 +382,9 @@ export function SatsAmount({
         <input
           value={value === 0 ? "" : String(value)}
           onChange={(event) => {
-            const digits = event.target.value.replace(/[^\d]/g, "").slice(0, 12);
+            const digits = event.target.value
+              .replace(/[^\d]/g, "")
+              .slice(0, 12);
             onPick(digits === "" ? 0 : Number(digits));
           }}
           inputMode="numeric"

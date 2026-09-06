@@ -33,15 +33,142 @@ import {
   WORD_COUNTS,
   type WordCount,
 } from "@/lib/wallet-data";
+import { WalletGateBackdrop } from "@/components/hub/wallet-gate-backdrop";
+import { hideGatePreview, useGatePreview } from "@/lib/gate-preview";
 import { useState, type ReactNode } from "react";
 
 type GateMode = "choose" | "create" | "restore" | "shares";
 
+/**
+ * The three ways a wallet can begin.
+ *
+ * The pictures are the welcome deck's plates, picked against what each card
+ * means rather than for looks — the same rule the deck itself follows:
+ *
+ *   create   a vault lit through its windows: somewhere new to keep money
+ *   restore  a ferry crossing and recrossing: something brought back
+ *   shares   a camp of separate households: pieces kept apart, rejoined
+ *
+ * The two the backdrop cycles are deliberately not among them. See
+ * components/hub/wallet-gate-backdrop.
+ */
+const WAYS_IN = {
+  create: {
+    id: "create" as const,
+    image: "/first-run/art/vault.webp",
+    title: "Create a new wallet",
+    hint: "New keys, made on this device. You will be shown 24 words to write down.",
+    action: "Create wallet",
+  },
+  /*
+   * The two ways back, together.
+   *
+   * They are one question — you already have a wallet, in which form? — and
+   * they were two cards of equal weight beside a third that is a different
+   * question entirely. Segmented, the screen reads as the two decisions it
+   * actually is: make one, or bring one back.
+   */
+  restore: [
+    {
+      id: "restore" as const,
+      image: "/first-run/art/ferry.webp",
+      title: "Recovery phrase",
+      hint: "You have the words. Type them in and the wallet comes back.",
+      action: "Enter phrase",
+    },
+    {
+      id: "shares" as const,
+      image: "/first-run/art/halt.webp",
+      title: "Backup shares",
+      hint: "You have the printed pages. Usually any two of three rebuild it.",
+      action: "Enter shares",
+    },
+  ],
+};
+
 /** Where a revealed phrase came from, which decides the copy around it. */
 type RevealSource = "created" | "recovered";
 
+/**
+ * One way in: a picture, what it is, and the verb that does it.
+ *
+ * The whole card is the button and the row at the foot is a span wearing a
+ * button's clothes. A real button inside a button is invalid and unreachable
+ * by a keyboard; a card that looks pressable and is not is worse than either.
+ * This way there is one target, one focus ring, and the verb is still the
+ * thing your eye lands on.
+ *
+ * `bordered` is off inside the segmented card, which carries the border for
+ * both halves — a card drawn inside a card is two rules 1px apart.
+ */
+function Way({
+  way,
+  primary = false,
+  bordered = true,
+  onPick,
+}: {
+  way: { image: string; title: string; hint: string; action: string };
+  /** the accent CTA, for the one choice that makes something rather than finds it */
+  primary?: boolean;
+  bordered?: boolean;
+  onPick: () => void;
+}): ReactNode {
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      className={`focus-ring bg-surface hover:bg-surface-hover group flex flex-col overflow-hidden text-center transition-colors ${
+        bordered ? "border-border rounded-2xl border" : ""
+      }`}
+    >
+      {/* A band rather than a square: the plates are landscape, and a square
+          crop of a landscape is a detail of one. Shorter on a phone, where
+          three of these share the height of a screen. */}
+      <span
+        className="relative block h-24 w-full overflow-hidden sm:h-28"
+        aria-hidden="true"
+      >
+        <span
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-[1.04]"
+          style={{ backgroundImage: `url(${way.image})` }}
+        />
+        {/* The plates are dark at the foot, so the title below needs a joint
+            rather than a hard edge against them. */}
+        <span className="from-surface absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t to-transparent" />
+      </span>
+      {/* `flex-1`, so two halves of the segmented card put their verbs on the
+          same line however differently their hints wrap. */}
+      <span className="flex flex-1 flex-col px-3.5 py-3">
+        <span className="block text-sm font-semibold">{way.title}</span>
+        <span className="text-muted-foreground mt-1 block text-xs text-balance">
+          {way.hint}
+        </span>
+        {/* `mt-auto` on the wrapper, so all three verbs sit on one line across
+            the row however differently their hints wrap — `flex-1` above only
+            makes the text block fill the card. The padding is on the wrapper
+            rather than the button so the gap above it cannot be eaten when
+            there is no slack left to distribute. */}
+        <span className="mt-auto block w-full pt-3">
+          <span
+            className={`block w-full rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+              primary
+                ? "bg-accent text-accent-foreground group-hover:opacity-90"
+                : "border-border bg-background group-hover:bg-surface-hover border"
+            }`}
+          >
+            {way.action}
+          </span>
+        </span>
+      </span>
+    </button>
+  );
+}
+
 export function WalletGate(): ReactNode {
   const info = useWalletInfo();
+  /* Asked for from the demo controls. See lib/gate-preview for why this screen
+     needs a door at all. */
+  const preview = useGatePreview();
   const [mode, setMode] = useState<GateMode>("choose");
   const [phrase, setPhrase] = useState("");
   const [busy, setBusy] = useState(false);
@@ -90,6 +217,7 @@ export function WalletGate(): ReactNode {
 
   // Nothing to gate: demo fixtures, or a wallet that is up.
   const blocking =
+    preview ||
     (info.mode === "live" && !info.loading && info.data.available && !info.data.ready) ||
     flowHeld;
 
@@ -227,8 +355,8 @@ export function WalletGate(): ReactNode {
     if (info.data.building && !flowHeld) {
       return (
         <div role="status">
-          <h1 className="text-xl font-bold">Preparing your wallet…</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <h1 className="text-center text-xl font-bold">Preparing your wallet…</h1>
+          <p className="mt-2 text-center text-sm text-balance text-muted-foreground">
             Deriving keys on this device. This can take a moment.
           </p>
         </div>
@@ -240,8 +368,8 @@ export function WalletGate(): ReactNode {
     if (legacyDone) {
       return (
         <>
-          <h1 className="text-xl font-bold">Wallet recovered</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <h1 className="text-center text-xl font-bold">Wallet recovered</h1>
+          <p className="mt-2 text-center text-sm text-balance text-muted-foreground">
             These shares were printed before Nexus rooted backups in entropy, so they
             recover the wallet&rsquo;s key but not a recovery phrase — there is no set of
             words for this wallet, and Nexus cannot make one. Keep the shares you have;
@@ -262,10 +390,10 @@ export function WalletGate(): ReactNode {
       const recovered = revealSource === "recovered";
       return (
         <>
-          <h1 className="text-xl font-bold">
+          <h1 className="text-center text-xl font-bold">
             {recovered ? "Your recovery phrase, recovered" : "Your recovery phrase"}
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 text-center text-sm text-balance text-muted-foreground">
             {recovered
               ? "Your backup shares carried the wallet itself, so these are its words. " +
                 "Write them down — a phrase you hold is a backup that needs no printer."
@@ -317,8 +445,8 @@ export function WalletGate(): ReactNode {
     if (mode === "restore") {
       return (
         <>
-          <h1 className="text-xl font-bold">Restore your wallet</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <h1 className="text-center text-xl font-bold">Restore your wallet</h1>
+          <p className="mt-2 text-center text-sm text-balance text-muted-foreground">
             Enter your 12-, 15-, 18-, 21- or 24-word recovery phrase. It is handed
             straight to this device&rsquo;s keychain and never leaves it.
           </p>
@@ -377,8 +505,8 @@ export function WalletGate(): ReactNode {
     if (mode === "shares") {
       return (
         <>
-          <h1 className="text-xl font-bold">Restore from backup shares</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <h1 className="text-center text-xl font-bold">Restore from backup shares</h1>
+          <p className="mt-2 text-center text-sm text-balance text-muted-foreground">
             Enter the shares from your printed pages, one per line. You need as many as
             the pages say — usually any two of three.
           </p>
@@ -475,38 +603,47 @@ export function WalletGate(): ReactNode {
 
     return (
       <>
-        <h1 className="text-xl font-bold">Set up your wallet</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <h1 className="text-center text-xl font-bold">Set up your wallet</h1>
+        <p className="mt-2 text-center text-sm text-balance text-muted-foreground">
           This device has no wallet yet. Create a new one, or bring back one you
           already have.
         </p>
 
-        <button
-          type="button"
-          onClick={() => void startCreate()}
-          className="focus-ring mt-5 w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-accent-foreground"
-        >
-          Create a new wallet
-        </button>
+        {/*
+          Three cards rather than three stacked buttons.
 
-        <button
-          type="button"
-          onClick={() => goTo("restore")}
-          className="focus-ring mt-3 w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm font-semibold hover:bg-surface-hover"
-        >
-          Restore from recovery phrase
-        </button>
+          They are not the same weight of decision as the buttons further into
+          this flow — these are the three ways a wallet can begin, chosen once
+          and never again, and a stack of identical pills gave no clue which of
+          them applied to you. A picture and a line of what it means does, and
+          it is read before the label rather than after it.
 
-        <button
-          type="button"
-          onClick={() => goTo("shares")}
-          className="focus-ring mt-3 w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm font-semibold hover:bg-surface-hover"
-        >
-          Restore from backup shares
-        </button>
+          One column on a phone and three across from `sm`: three cards side by
+          side under 640px are three cards nobody can read, and three full-width
+          cards stacked are a screen you scroll rather than a choice you see.
+        */}
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Way way={WAYS_IN.create} primary onPick={() => void startCreate()} />
+
+          {/* One card, two halves, divided rather than spaced: they are the two
+              answers to a single question, and a gap between them would make
+              them look like two more of what is on the left. The rule turns
+              with the layout — beside each other on a wide screen, stacked on a
+              phone. */}
+          <div className="border-border bg-surface divide-border grid divide-y overflow-hidden rounded-2xl border sm:col-span-2 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+            {WAYS_IN.restore.map((way) => (
+              <Way
+                key={way.id}
+                way={way}
+                bordered={false}
+                onPick={() => goTo(way.id)}
+              />
+            ))}
+          </div>
+        </div>
 
         {info.error ? (
-          <p className="mt-4 text-xs text-muted-foreground">
+          <p className="mt-4 text-center text-xs text-muted-foreground">
             Shell reported: {info.error}
           </p>
         ) : null}
@@ -514,9 +651,50 @@ export function WalletGate(): ReactNode {
     );
   })();
 
+  /*
+   * The chooser is three cards across; everything else is one column of form.
+   *
+   * Widening for all of it would leave a recovery phrase's twenty-four words
+   * strung across a line nobody can scan, and keeping it narrow for all of it
+   * would stack the three cards into a screen you scroll instead of a choice
+   * you see.
+   */
+  const showingSpinner = info.data.building && !flowHeld;
+  const choosing =
+    !showingSpinner && !legacyDone && mode === "choose" && mnemonic === null;
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-background p-5">
-      <div className="w-full max-w-md">{body}</div>
+    <div className="fixed inset-0 z-[100] overflow-y-auto">
+      <WalletGateBackdrop>
+        {/* `min-h-dvh` rather than `h-full`: a long form — the shares screen is
+            a textarea, five chips and two checkboxes — has to be able to grow
+            past the viewport and scroll, and a centred flex child that cannot
+            grow gets its top clipped off instead. */}
+        <div className="flex min-h-dvh items-center justify-center p-5">
+          <div
+            className={`w-full ${choosing ? "max-w-2xl" : "max-w-md"}`}
+          >
+            {body}
+            {/*
+              The way out of a preview.
+
+              Only while previewing, and it says which it is. In a demo build
+              nothing behind these cards can finish — there is no shell to make
+              keys — so without this the demo controls would be a button that
+              locks the app behind a screen with no exit.
+            */}
+            {preview && (
+              <button
+                type="button"
+                onClick={hideGatePreview}
+                className="focus-ring text-muted-foreground hover:text-foreground mx-auto mt-6 block rounded-lg px-3 py-1.5 text-xs font-medium"
+              >
+                Close preview — nothing here can complete in a demo build
+              </button>
+            )}
+          </div>
+        </div>
+      </WalletGateBackdrop>
     </div>
   );
 }

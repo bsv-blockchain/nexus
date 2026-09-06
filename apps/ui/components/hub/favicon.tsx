@@ -1,6 +1,6 @@
 "use client";
 
-import { faviconUrlFor } from "@/lib/rail/origin";
+import { faviconCandidates } from "@/lib/rail/origin";
 import { useState, type ReactNode } from "react";
 
 /**
@@ -31,10 +31,19 @@ export function Favicon({
   rounded?: string;
   className?: string;
 }): ReactNode {
-  const src = faviconUrlFor(url);
-  const [failed, setFailed] = useState(false);
+  /*
+   * Walks the candidates rather than trying one.
+   *
+   * `/favicon.ico` is 16 or 32 pixels, and a site with anything better usually
+   * publishes it at a path browsers already probe for — so the list runs
+   * biggest first and each `onError` steps to the next. Landing past the end is
+   * the letter tile, which is a normal outcome here rather than an edge case.
+   */
+  const candidates = faviconCandidates(url);
+  const [at, setAt] = useState(0);
+  const src = candidates[at];
 
-  if (!src || failed) {
+  if (!src) {
     return (
       <span
         className={`flex shrink-0 items-center justify-center ${rounded} font-bold text-white ${className}`}
@@ -59,7 +68,10 @@ export function Favicon({
       aria-hidden="true"
       width={size}
       height={size}
-      onError={() => setFailed(true)}
+      /* `key` on the src so a step through the list remounts the element;
+         without it the browser keeps the failed image and never re-requests. */
+      key={src}
+      onError={() => setAt((current) => current + 1)}
       className={`shrink-0 ${rounded} ${className}`}
       style={{ width: size, height: size }}
     />
