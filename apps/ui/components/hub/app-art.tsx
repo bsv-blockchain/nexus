@@ -22,7 +22,7 @@ export function AppArt({
   className = "",
   iconSize = 64,
 }: {
-  app: Pick<HubApp, "iconSrc" | "name" | "web" | "accent" | "screenshots">;
+  app: Pick<HubApp, "iconSrc" | "name" | "web" | "accent" | "screenshots" | "slug">;
   /** which screenshot, for the story page's secondary image */
   index?: number;
   className?: string;

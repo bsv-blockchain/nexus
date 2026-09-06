@@ -61,6 +61,7 @@ import {
   type ArchiveAfter,
   type ClearOnQuit,
   type CookiePolicy,
+  type IconStyle,
   type OpenLinksIn,
   type StartupBehaviour,
   type TabLayout,
@@ -1588,6 +1589,31 @@ export function AppearancePanel(): ReactNode {
               }
             : {})}
         />
+        {/* Nexus Signature Apps only — a third-party listing's icon comes
+            from its own repository, and this switch has no reach there. A
+            label of its own, since "Minimalist"/"Classic" sitting straight
+            under a mode picker reads as another way to ask light-or-dark. */}
+        <div className="pt-2.5">
+          <p className="text-muted-foreground px-3 pb-1 text-[11px] font-semibold tracking-wide uppercase">
+            {copy.iconStyleLabel}
+          </p>
+          <Choice<IconStyle>
+            value={settings.iconStyle}
+            onPick={(next) => setSetting("iconStyle", next)}
+            options={[
+              {
+                id: "minimalist" as const,
+                label: copy.iconStyleMinimalist,
+                hint: copy.iconStyleMinimalistHint,
+              },
+              {
+                id: "classic" as const,
+                label: copy.iconStyleClassic,
+                hint: copy.iconStyleClassicHint,
+              },
+            ]}
+          />
+        </div>
       </Group>
 
       {/* What the reader wants the chain called. The scope note is not

@@ -52,6 +52,11 @@ export type OpenLinksIn = "nexus" | "native";
 export type ArchiveAfter = 0 | 1 | 7 | 30;
 /** Where the open tabs are drawn. */
 export type TabLayout = "horizontal" | "vertical";
+/**
+ * How Nexus's own apps draw their icon — see components/hub/nexus-glyphs.tsx
+ * for the Minimalist set and AppTile for where this is read.
+ */
+export type IconStyle = "classic" | "minimalist";
 
 export interface SettingsState {
   /* ---- Permissions ---------------------------------------------------- */
@@ -82,6 +87,8 @@ export interface SettingsState {
   defaultBrowser: boolean;
   /** which of the alternate app icons is in use */
   appIcon: string;
+  /** classic artwork or the Minimalist glyph set, for Nexus's own apps */
+  iconStyle: IconStyle;
   /** whether tapping the address bar raises the keyboard straight away */
   autoKeyboard: boolean;
 
@@ -383,6 +390,7 @@ const INITIAL: SettingsState = {
   openLinksIn: "nexus",
   defaultBrowser: false,
   appIcon: "default",
+  iconStyle: "minimalist",
   autoKeyboard: true,
 
   cookies: "third-party",

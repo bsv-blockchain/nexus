@@ -168,7 +168,7 @@ function RefTile({
   className?: string;
 }): ReactNode {
   return resolved.kind === "app" ? (
-    <AppTile app={resolved.app} size={size} className={className} />
+    <AppTile app={resolved.app} size={size} className={className} bare />
   ) : (
     <SiteTile site={resolved.site} size={size} className={className} />
   );

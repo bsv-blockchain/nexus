@@ -2701,6 +2701,14 @@ export const content = {
       themeDefault: "Every workspace uses the default styling.",
       themeReset: "Reset workspace colours",
       themeResetDone: "Every workspace is back to the default styling",
+      /* Nexus's own apps only — a third-party listing draws whatever icon its
+         own repository sends, which is not a look this switch can reach. */
+      iconStyleLabel: "Icon style",
+      iconStyleMinimalist: "Minimalist",
+      iconStyleMinimalistHint:
+        "Nexus Signature Apps draw a plain glyph, in the colour the rest of the interface already uses.",
+      iconStyleClassic: "Classic",
+      iconStyleClassicHint: "Nexus Signature Apps keep their original artwork.",
       brandTitle: "Name for the chain",
       brandHint: "Two names for one network. Pick the one you use.",
       brandScope:

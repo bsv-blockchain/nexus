@@ -1,8 +1,10 @@
 "use client";
 
 import { Favicon } from "@/components/hub/favicon";
+import { MINIMALIST_GLYPHS } from "@/components/hub/nexus-glyphs";
 import { getHubApps, type HubApp } from "@/lib/data";
 import type { PinnedSite } from "@/lib/rail/sites";
+import { useSettings } from "@/lib/settings-store";
 import { faviconColorFor, sameUrl } from "@/lib/tabs";
 import { Folder, Globe, Palette, Pin, type LucideIcon } from "lucide-react";
 
@@ -41,17 +43,65 @@ export function DataIcon({
  * has to come from whoever it belongs to. `Favicon` falls back to a letter on
  * the app's accent when the site has none, so nothing ever renders as a broken
  * image.
+ *
+ * Nexus's own apps carry a second look, in `MINIMALIST_GLYPHS` — Settings'
+ * icon-style choice, not the app's own data, decides which one is drawn, so
+ * flipping the switch changes every tile at once rather than one app at a
+ * time. `bare` is for the rail specifically: the rail's own Workspaces / Apps
+ * / Browse buttons are a plain glyph on no background at all (see IconRail's
+ * `pinned` tabs), and a square tile sitting beside those three would read as
+ * a different kind of button rather than the same row. Everywhere else — the
+ * Manage grid, Discover's rows, a story page's pinned card — a tile is what
+ * every other app in the same list already is, so the glyph gets the same
+ * rounded, coloured square those PNGs have always filled.
  */
 export function AppTile({
   app,
   size,
   className = "",
+  bare = false,
 }: {
-  app: Pick<HubApp, "iconSrc" | "name"> &
+  app: Pick<HubApp, "iconSrc" | "name" | "slug"> &
     Partial<Pick<HubApp, "web" | "accent">>;
   size: number;
   className?: string;
+  /** the rail's own bare-glyph-on-no-background look, see above */
+  bare?: boolean;
 }): React.ReactNode {
+  const { iconStyle } = useSettings();
+  const Glyph =
+    iconStyle === "minimalist"
+      ? MINIMALIST_GLYPHS[app.slug as keyof typeof MINIMALIST_GLYPHS]
+      : undefined;
+
+  if (Glyph) {
+    if (bare) {
+      return (
+        <Glyph
+          aria-hidden="true"
+          className={className}
+          style={{ width: size, height: size }}
+        />
+      );
+    }
+    return (
+      <span
+        aria-hidden="true"
+        className={`flex shrink-0 items-center justify-center rounded-[22%] ${className}`}
+        style={{
+          width: size,
+          height: size,
+          backgroundColor: app.accent ?? DEFAULT_ACCENT,
+        }}
+      >
+        <Glyph
+          className="text-white"
+          style={{ width: size * 0.56, height: size * 0.56 }}
+        />
+      </span>
+    );
+  }
+
   if (!app.iconSrc && app.web) {
     return (
       <Favicon

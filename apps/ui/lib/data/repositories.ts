@@ -46,10 +46,10 @@ export interface AppRepository {
 export const defaultRepositories: AppRepository[] = [
   {
     id: "repo-nexus",
-    name: "Nexus Official",
+    name: "Nexus Signature Apps",
     url: "https://apps.nexus.build/registry",
     official: true,
-    note: "Signature apps",
+    note: "Official",
     website: "https://nexus.build",
     iconSrc: "/icons/Nexus-logo-solid-BG2.png",
     versions: [
