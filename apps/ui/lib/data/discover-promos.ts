@@ -1,22 +1,24 @@
 /**
- * Discover's two promotional rows — a banner that pitches a whole third-party
- * source, and a collection that pitches connecting everything it ships at
- * once. Both point at a real `AppRepository` id; nothing here names a
- * publisher or an app that is not already in the catalogue.
+ * The seed for Discover's two promotional rows — a banner that pitches a
+ * whole third-party source, and a collection that pitches connecting
+ * everything it ships at once. Both point at a real `AppRepository` id;
+ * nothing here names a publisher or an app that is not already in the
+ * catalogue.
  *
- * Seeded fixture content. `lib/admin-store.ts` holds the mutable overlay a
- * fresh install starts from this and can then edit — sponsorship, an
- * advertiser, a price, a schedule, which of `SLOT_COUNT` positions a campaign
- * competes for — through the Store Admin app. This file is the honest
- * starting point, not the live answer.
+ * "Seed" rather than "the list": lib/admin-store.ts reads this exactly once,
+ * the first time a profile ever opens Store Admin, and owns the mutable
+ * result from then on — including adding a fourth campaign or removing one
+ * of these three. This file is where a fresh install starts, not a ceiling
+ * on what can exist.
  *
  * Scoped to the three sources Manage already calls out as third-party
  * (see lib/data/repositories.ts): Handcash, Open Protocol Labs and Game
  * Center. Nexus Signature Apps and BSV Association are Nexus's own — there
- * is nothing to advertise about a source you already are.
+ * is nothing to advertise about a source you already are, though an admin
+ * is free to add a campaign for either later if that ever changes.
  */
 
-export interface FeaturedBanner {
+export interface SeedBanner {
   id: string;
   repoId: string;
   headline: string;
@@ -27,7 +29,7 @@ export interface FeaturedBanner {
   slot: number;
 }
 
-export interface FeaturedCollection {
+export interface SeedCollection {
   id: string;
   repoId: string;
   headline: string;
@@ -45,7 +47,7 @@ export interface FeaturedCollection {
  */
 export const SLOT_COUNT = 3;
 
-export const featuredBanners: FeaturedBanner[] = [
+export const seedBanners: SeedBanner[] = [
   {
     id: "banner-handcash",
     repoId: "repo-handcash",
@@ -71,7 +73,7 @@ export const featuredBanners: FeaturedBanner[] = [
   },
 ];
 
-export const featuredCollections: FeaturedCollection[] = [
+export const seedCollections: SeedCollection[] = [
   {
     id: "collection-handcash",
     repoId: "repo-handcash",
