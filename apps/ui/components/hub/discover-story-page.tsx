@@ -128,8 +128,16 @@ export function StoryPage({
           <p className="text-muted-foreground mt-1 text-sm">{app.tagline}</p>
 
           <div className="mt-4 space-y-3">
+            {/* Clamped on a phone only: a page this is one long scroll on a
+                phone already, and an app whose description runs long should
+                not be the one that makes this the longest screen in
+                Discover. Full length back from `sm` up, where the second
+                column stops competing with it for room. */}
             {paragraphs.map((p, i) => (
-              <p key={i} className="text-sm leading-relaxed text-pretty">
+              <p
+                key={i}
+                className="line-clamp-6 text-sm leading-relaxed text-pretty sm:line-clamp-none"
+              >
                 {p}
               </p>
             ))}

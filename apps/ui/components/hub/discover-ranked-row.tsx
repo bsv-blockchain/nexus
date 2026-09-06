@@ -107,10 +107,13 @@ export function RankedRow({
         gap="gap-6"
         action={
           preview.length > 0 ? (
+            /* Hidden on a phone: this heading-sized TabRow has no room to
+               spare for a second control beside it at that width. The ten
+               apps already in the preview are what a phone gets for now. */
             <button
               type="button"
               onClick={() => onSeeAll(tier)}
-              className="focus-ring text-accent bg-background px-1 text-sm font-semibold hover:underline"
+              className="focus-ring text-accent bg-background hidden px-1 text-sm font-semibold hover:underline sm:inline"
             >
               {copy.seeAll}
             </button>
