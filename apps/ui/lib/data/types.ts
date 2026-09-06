@@ -309,6 +309,16 @@ export interface HubApp {
   rating: number;
   publisher: string;
   createdAt: string;
+  /**
+   * The store's own art for this app, first frame first.
+   *
+   * Empty for every app today — there is no admin page yet to put anything
+   * here, and this field is the seam that one will write into rather than a
+   * screenshot manager of its own. Absent renders as the app's icon on its
+   * own accent, which is never wrong, only ever plain — a placeholder that
+   * looks like a placeholder rather than like a missing image.
+   */
+  screenshots?: string[];
 }
 
 export type SpaceProfile = "personal" | "work" | "shared";

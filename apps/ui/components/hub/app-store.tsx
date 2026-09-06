@@ -49,6 +49,8 @@ import {
 import { ALWAYS_APPS } from "@/lib/data/presets";
 import { useEffect, useState, type ReactNode } from "react";
 import { useHostOverlay } from "@/lib/wallet-data";
+import { DiscoverPage } from "@/components/hub/discover-page";
+import { setStoreTab, useStoreTab } from "@/lib/store-view";
 
 /** Ordered category groupings for the Available section, with headings. */
 const CATEGORY_ORDER: { id: AppCategory; label: string }[] = [
@@ -519,7 +521,7 @@ export function AppStore(): ReactNode {
    * drawn twice. Manage is not a different screen, it is this one asked a
    * different question: not "what could I add" but "what did I".
    */
-  const [tab, setTab] = useState<"discover" | "manage">("discover");
+  const tab = useStoreTab();
   const [query, setQuery] = useState("");
   /* The first sort this build offers, which is Trending in demo and Newest in
      a live build — not the literal "trending", which would leave a live build
@@ -717,7 +719,7 @@ export function AppStore(): ReactNode {
               group="app-store"
               size="lg"
               active={tab === "discover"}
-              onClick={() => setTab("discover")}
+              onClick={() => setStoreTab("discover")}
             >
               <span className="hidden sm:inline">{copy.discoverTab}</span>
               <span className="sm:hidden">{copy.discoverTabShort}</span>
@@ -727,13 +729,15 @@ export function AppStore(): ReactNode {
               group="app-store"
               size="lg"
               active={tab === "manage"}
-              onClick={() => setTab("manage")}
+              onClick={() => setStoreTab("manage")}
             >
               <span className="hidden sm:inline">{copy.manageTab}</span>
               <span className="sm:hidden">{copy.manageTabShort}</span>
             </Tab>
           </TabRow>
 
+          {tab === "manage" ? (
+            <>
           {/* The setups. A column beside the store on a desktop — see
               hub-shell's LibraryPanel — and a row here on a phone, where that
               column does not exist. `md:hidden` lives inside the component, so
@@ -861,6 +865,15 @@ export function AppStore(): ReactNode {
                 ? copy.manageEmpty
                 : store.noResults}
             </p>
+          )}
+            </>
+          ) : (
+            /* Discover: a curated front page with its own drill-downs, not
+               this screen's searchable grid narrowed a second way — see
+               DiscoverPage and lib/store-view.ts. */
+            <div className="mt-5">
+              <DiscoverPage />
+            </div>
           )}
         </div>
       </div>

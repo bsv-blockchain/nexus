@@ -83,6 +83,31 @@ export const content = {
          "No apps match your search" — that is what a query or a filter found
          nothing, and this is what an empty tab says with neither set. */
       manageEmpty: "Nothing connected yet. Discover Apps is the other tab.",
+      /*
+       * Discover's own sections, none of which are the searchable grid
+       * Manage still is. Every string here is chrome around real apps —
+       * headings, tab labels, empty states — never a fact about one, which
+       * stays read live off the catalogue so the two can never disagree.
+       */
+      seeAll: "See All",
+      back: "Back",
+      topFreeApps: "Top Free Apps",
+      topPaidApps: "Top Paid Apps",
+      topPaidEmpty:
+        "Nothing charges for itself yet. Everything here connects for free.",
+      extensionsTitle: "Essential Nexus Extensions",
+      categoriesTitle: "Categories",
+      categoriesHint: "Every app, sorted by what it is for.",
+      updatesTitle: "Updates",
+      updatesHint:
+        "These are web apps — Nexus has no say in when one changes. This is only which of them changed recently.",
+      updatedRecently: "Updated Recently",
+      updatesEmpty: "Nothing has changed recently.",
+      updatedLabel: "Updated {when}",
+      openApp: "Open",
+      whatWeLove: "What we love",
+      storyEmpty:
+        "The rest of this page is waiting on real screenshots — this is the placeholder every app gets until it has its own.",
       installedSection: "Connected",
       availableSection: "Available",
       install: "Connect",

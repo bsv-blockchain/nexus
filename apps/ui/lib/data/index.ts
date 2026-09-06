@@ -232,6 +232,33 @@ export function isEssentialApp(slug: HubApp["slug"]): boolean {
   );
 }
 
+/**
+ * Which apps changed recently, and when.
+ *
+ * These are web apps — Nexus never ships the update, the app's own origin
+ * does, on its own schedule. What we can say honestly is which repository
+ * last published a new catalogue version, from the dates already sitting on
+ * `AppRepository.versions`, and that a repo's apps rode along with it. No
+ * per-app changelog exists or needs to; this is "recently updated", not
+ * "here is what changed".
+ */
+export function getRecentlyUpdatedApps(
+  withinDays = 45,
+): { app: HubApp; updatedAt: string }[] {
+  const repos = new Map(getDefaultRepositories().map((repo) => [repo.id, repo]));
+  const cutoff = Date.now() - withinDays * 24 * 60 * 60 * 1000;
+  const updates: { app: HubApp; updatedAt: string }[] = [];
+  for (const app of getHubApps()) {
+    const latest = repos.get(app.repoId)?.versions?.[0];
+    if (!latest) continue;
+    if (new Date(latest.releasedAt).getTime() < cutoff) continue;
+    updates.push({ app, updatedAt: latest.releasedAt });
+  }
+  return updates.sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+  );
+}
+
 /*
  * app_repositories — the sources the Apps surface groups listings under.
  *

@@ -25,6 +25,8 @@ import { HelpCircle } from "@/components/hub/help-circle";
 import { GuidedTour } from "@/components/hub/guided-tour";
 import { DEMO_SURFACES } from "@/lib/surfaces";
 import { AppCollections } from "@/components/hub/app-collections";
+import { DiscoverSidebar } from "@/components/hub/discover-sidebar";
+import { useStoreTab } from "@/lib/store-view";
 import { AppPermissionSheet } from "@/components/hub/app-permission-sheet";
 import { CommandPalette } from "@/components/hub/command-palette";
 import { DownloadsPanel } from "@/components/hub/downloads-panel";
@@ -57,6 +59,10 @@ const slideEase = [0.4, 0, 0.2, 1] as const;
 function LibraryPanel(): ReactNode {
   const { libraryTab, mainView, isInstalled } = useHub();
   const settings = useSettings();
+  // Read unconditionally — mainView flips in and out of "store" across
+  // renders, and a hook called only inside that branch would change the
+  // count of hooks this component calls from one render to the next.
+  const storeTab = useStoreTab();
   /* See MainView, which decides the canvas from the same two facts. */
   const timelineHere = !settings.timelineAsApp || isInstalled("timeline");
   // Settings takes the panel as well as the canvas: the categories are the only
@@ -84,7 +90,14 @@ function LibraryPanel(): ReactNode {
   /* Its own, and not filters: there is nothing on Focus to narrow. See the note
      on the component for what a contextual column says instead. */
   if (mainView === "home") return <FocusSidebar />;
-  if (libraryTab === "apps") return <AppCollections />;
+  /* The App Store's column: Discover's own nav (search, Work/Create/Develop,
+     Categories, Updates) while that tab is open, Manage's presets and
+     repositories otherwise — two different columns behind one tab row, kept
+     in step with the canvas by the same store rather than a prop drilled
+     down from here. See lib/store-view.ts. */
+  if (libraryTab === "apps") {
+    return storeTab === "discover" ? <DiscoverSidebar /> : <AppCollections />;
+  }
   /* The profiles manager holds every profile now, so this column stops being a
      second copy of the active one and answers what is true across them. */
   if (mainView === "profiles") return <ProfilesSidebar />;
