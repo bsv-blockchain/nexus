@@ -27,6 +27,7 @@ export function PopoverMenu({
   anchor,
   align = "end",
   width,
+  role = "menu",
 }: {
   open: boolean;
   onClose: () => void;
@@ -43,6 +44,16 @@ export function PopoverMenu({
   anchor?: { top: number; left: number; right: number; bottom: number };
   /** which edge of the trigger the menu lines up with */
   align?: "start" | "end";
+  /**
+   * What the surface is, for a screen reader.
+   *
+   * A menu by default, because that is what almost every caller opens. A
+   * picker that chooses one value out of a list is a `listbox` instead, and
+   * saying so matters: a menu announces commands, and a listbox announces a
+   * set of options with one of them currently chosen, which is the whole
+   * difference between the two controls.
+   */
+  role?: "menu" | "listbox";
   /**
    * Pin the menu to this width, in px — normally the trigger's own.
    *
@@ -120,7 +131,7 @@ export function PopoverMenu({
         onClick={onClose}
       />
       <div
-        role="menu"
+        role={role}
         aria-label={label}
         style={{
           ...(rect ? rect : {}),

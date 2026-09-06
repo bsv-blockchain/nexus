@@ -16,25 +16,31 @@
  * not about `soundbase` specifically.
  *
  * One card per slot, not per campaign — see the same note on
- * DiscoverBannerRow for why `winningCampaigns` rather than a plain filter.
+ * DiscoverBannerRow for why `winningCampaigns` rather than a plain filter,
+ * for how a shared slot rotates between the campaigns tied for it, and for
+ * why an impression is now a card somebody scrolled to rather than one that
+ * merely mounted.
  * The card itself lives in discover-promo-cards.tsx, shared with Store
  * Admin's own live preview.
  */
 
 import { CollectionCard } from "@/components/hub/discover-promo-cards";
 import { useHub } from "@/components/hub/hub-provider";
+import { useSeenOnce } from "@/components/hub/use-promo-impression";
 import { recordClick, recordImpression, useAdminPromoState, winningCampaigns } from "@/lib/admin-store";
 import { content, getHubApps, type HubApp } from "@/lib/data";
 import { SLOT_COUNT } from "@/lib/data/discover-promos";
+import { useRotationPick } from "@/lib/promo-rotation";
 import { enableRepository } from "@/lib/repositories-store";
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 export function DiscoverCollectionRow(): ReactNode {
   const copy = content.library.apps;
   const admin = useAdminPromoState();
+  const pick = useRotationPick();
   const apps = getHubApps();
 
-  const collections = winningCampaigns(admin.collections, SLOT_COUNT)
+  const collections = winningCampaigns(admin.collections, SLOT_COUNT, { pick })
     .map((collection) => ({
       collection,
       apps: apps.filter((app) => app.repoId === collection.repoId),
@@ -78,29 +84,30 @@ function TrackedCollection({
 }): ReactNode {
   const { isInstalled, installApp, pinSite } = useHub();
   const allConnected = apps.every((app) => isInstalled(app.slug));
-
-  useEffect(() => {
-    recordImpression("collections", id);
-  }, [id]);
+  const ref = useSeenOnce<HTMLDivElement>(`collections:${id}`, () =>
+    recordImpression("collections", id),
+  );
 
   return (
-    <CollectionCard
-      {...card}
-      apps={apps}
-      allConnected={allConnected}
-      onConnectAll={() => {
-        recordClick("collections", id);
-        enableRepository(repoId);
-        /* A website is "installed" by being pinned, a screen we compiled
-           by being named in the profile's list — see the same branch on
-           the permission sheet's own confirm handler. `installApp` alone
-           leaves a web listing here looking connected in this list and
-           disconnected everywhere that actually checks. */
-        for (const app of apps) {
-          if (app.web) pinSite(app.web.url, app.name);
-          else installApp(app.slug);
-        }
-      }}
-    />
+    <div ref={ref}>
+      <CollectionCard
+        {...card}
+        apps={apps}
+        allConnected={allConnected}
+        onConnectAll={() => {
+          recordClick("collections", id);
+          enableRepository(repoId);
+          /* A website is "installed" by being pinned, a screen we compiled
+             by being named in the profile's list — see the same branch on
+             the permission sheet's own confirm handler. `installApp` alone
+             leaves a web listing here looking connected in this list and
+             disconnected everywhere that actually checks. */
+          for (const app of apps) {
+            if (app.web) pinSite(app.web.url, app.name);
+            else installApp(app.slug);
+          }
+        }}
+      />
+    </div>
   );
 }

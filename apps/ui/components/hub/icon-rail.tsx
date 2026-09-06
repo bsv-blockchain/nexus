@@ -45,17 +45,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
  */
 const DRAG_MIME = "application/x-nexus-rail-ref";
 const LONG_PRESS_MS = 500;
-/**
- * Soft dark outer glow, a touch stronger at the bottom — inactive app tiles.
- *
- * A tile is a rounded square of artwork, so a drop-shadow reads as the tile
- * lifting off the rail. It does not read on a stroke glyph, where the same
- * filter traces every line of the drawing and comes out as a smudge — which is
- * why the chrome icons above the tiles do not take it.
- */
-const ICON_GLOW =
-  "[filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.22))_drop-shadow(0_3px_3px_rgba(0,0,0,0.32))]";
-
 const systemTabs: {
   id: LibraryTab;
   label: string;
@@ -291,14 +280,20 @@ export function IconRail(): ReactNode {
     else if (id === "spaces") setMainView("profiles");
     else setMainView("app");
   };
-  // Expanded: soft glow on inactive tiles. Collapsed: no glow, and inactive
-  // icons go grayscale (restoring on hover).
+  /*
+   * Collapsed: inactive icons go grayscale, restoring on hover. Expanded:
+   * nothing at all.
+   *
+   * The expanded state used to carry a drop-shadow under every inactive tile,
+   * on the grounds that a rounded square of artwork lifts off the rail. In a
+   * column of them it read as grime rather than depth, and the chrome icons
+   * above never took it, so the rail was two treatments stacked. Flat is the
+   * one the rest of the rail was already using.
+   */
   const tileTone = (isActive: boolean): string =>
-    isActive
-      ? ""
-      : railCollapsed
-        ? "grayscale transition duration-200 group-hover:grayscale-0"
-        : ICON_GLOW;
+    !isActive && railCollapsed
+      ? "grayscale transition duration-200 group-hover:grayscale-0"
+      : "";
   /*
    * The pinned block: Workspaces, then Browse when it is pinned, then Apps.
    *

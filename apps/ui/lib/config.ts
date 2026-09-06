@@ -47,6 +47,8 @@ export const storageKeys = {
    * connections became per-profile, and reads it as what every profile had.
    */
   connectedApps: "nexus.installed-apps",
-  /** admin overlay on Discover's featured banners and collections */
+  /** admin overlay on Discover's promotional surfaces — see lib/admin-store.ts */
   discoverPromos: "nexus.discover-promos",
+  /** this reader's own view counts for today, which is what a frequency cap reads */
+  promoViews: "nexus.promo-views",
 } as const;

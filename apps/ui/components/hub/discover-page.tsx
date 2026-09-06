@@ -35,6 +35,8 @@ import { DiscoverBannerRow } from "@/components/hub/discover-banner-row";
 import { DiscoverCollectionRow } from "@/components/hub/discover-collection-row";
 import { content, getExtensions, getHubApp, getHubApps, type HubApp } from "@/lib/data";
 import { discoverCategoryPages } from "@/lib/data/discover";
+import { orderByFeatured, useAdminPromoState } from "@/lib/admin-store";
+import { useFreshRotation } from "@/lib/promo-rotation";
 import { closeStoreView, openStoreView, useStoreView } from "@/lib/store-view";
 import type { ReactNode } from "react";
 
@@ -44,6 +46,9 @@ function openStory(app: HubApp): void {
 
 function DiscoverFrontPage(): ReactNode {
   const apps = getHubApps();
+  const admin = useAdminPromoState();
+  /* One draw per visit, shared by both promo rows — see lib/promo-rotation. */
+  useFreshRotation();
   const freeApps = apps.filter((app) => !app.pricing);
   const paidApps = apps.filter((app) => Boolean(app.pricing));
 
@@ -57,12 +62,22 @@ function DiscoverFrontPage(): ReactNode {
         onSeeAll={(tier) => openStoreView({ kind: "ranked", tier })}
       />
       <ExtensionRow extensions={getExtensions()} />
+      {/* Which of these rows run, and what each one is called, is Store
+          Admin's now — the category behind a row stays the fixture's, since
+          that is a fact about the catalogue rather than an editorial
+          decision. A row switched off does not render at all; see
+          components/apps/store-admin/surfaces-tab.tsx. */}
       {discoverCategoryPages.map((page) => {
-        const pageApps = apps.filter((app) => app.category === page.category);
+        const config = admin.editorial.find((row) => row.id === page.id);
+        if (config && !config.enabled) return null;
+        const pageApps = orderByFeatured(
+          apps.filter((app) => app.category === page.category),
+          admin.catalogue.featuredAppSlugs,
+        );
         return (
           <EditorialRow
             key={page.id}
-            title={page.sectionTitle}
+            title={config?.title ?? page.sectionTitle}
             apps={pageApps.slice(0, EDITORIAL_PREVIEW_COUNT)}
             onSeeAll={
               pageApps.length > EDITORIAL_PREVIEW_COUNT

@@ -101,23 +101,43 @@ export const seedCollections: SeedCollection[] = [
  * What a slot is worth, by placement type — the reference an admin quotes
  * from rather than inventing a number per campaign. Still a label, not a
  * charge: see lib/admin-store.ts for why nothing here moves real money.
+ *
+ * `monthly` is a number rather than the string it used to be, because
+ * Analytics adds these up now — "booked this month" and "unsold inventory"
+ * are the two questions a rate card exists to answer, and neither of them
+ * can be asked of "$600/mo" until something parses it. `priceLabel` below is
+ * the one place that formatting is written down, so a price shown in the
+ * rate card and a price shown on a campaign can never disagree about how a
+ * number is spelled.
  */
-export type PlacementType = "banner" | "collection";
+export type PlacementType = "hero" | "banner" | "collection";
 
 export const rateCard: Record<
   PlacementType,
-  { label: string; priceLabel: string; description: string }
+  { label: string; monthly: number; description: string }
 > = {
+  hero: {
+    label: "Discover Hero",
+    monthly: 1200,
+    description:
+      "The full-width card at the top of Discover — the first thing anybody opening the store reads.",
+  },
   banner: {
     label: "Discover Banner",
-    priceLabel: "$600/mo",
+    monthly: 600,
     description:
       'Full-width hero card in "Discover More Sources" — one of three rotating slots on Discover\'s front page.',
   },
   collection: {
     label: "Connect-All Collection",
-    priceLabel: "$350/mo",
+    monthly: 350,
     description:
       'One-click bulk-connect card in "Connect a Whole Source at Once" — one of three rotating slots on Discover\'s front page.',
   },
 };
+
+/** A monthly price, spelled the one way — 0 means nobody has priced it. */
+export function priceLabel(monthly: number): string {
+  if (monthly <= 0) return "Unpriced";
+  return `$${monthly.toLocaleString()}/mo`;
+}

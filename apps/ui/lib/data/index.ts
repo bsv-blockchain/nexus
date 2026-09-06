@@ -201,13 +201,75 @@ export function setTimelineListed(on: boolean): void {
   timelineListed = on;
 }
 
+/**
+ * What Store Admin has taken down.
+ *
+ * Pushed in rather than read out, for the same reason `timelineListed` above
+ * is: this module is fixtures, and reaching into a client store from here
+ * would make every catalogue read depend on one. A suspended source removes
+ * every listing it ships; a hidden slug removes one. Both are a store
+ * admin's job in a way that a promo campaign is not — a placement decides
+ * what gets pushed, this decides what exists at all.
+ *
+ * @see lib/admin-store.ts `setRepoSuspended` / `setAppHidden`
+ */
+interface CatalogueOverrides {
+  suspendedRepoIds: string[];
+  hiddenAppSlugs: string[];
+  /**
+   * Whether the identity this install is using holds a Store Admin grant.
+   *
+   * True until the store says otherwise, which is what the server render and
+   * the first paint see — the seeded access list always contains the primary
+   * identity, so the honest default is "yes" rather than an app that flickers
+   * out of the rail on hydration.
+   */
+  storeAdminAllowed: boolean;
+}
+
+let catalogueOverrides: CatalogueOverrides = {
+  suspendedRepoIds: [],
+  hiddenAppSlugs: [],
+  storeAdminAllowed: true,
+};
+
+export function setCatalogueOverrides(next: CatalogueOverrides): void {
+  catalogueOverrides = next;
+}
+
+export function getCatalogueOverrides(): CatalogueOverrides {
+  return catalogueOverrides;
+}
+
 export function getHubApps(): HubApp[] {
+  const { suspendedRepoIds, hiddenAppSlugs, storeAdminAllowed } = catalogueOverrides;
   return shippedApps(hubApps).filter(
     (app) =>
       (app.slug !== "timeline" || timelineListed) &&
-      (app.slug !== "store-admin" || isDeveloperMode()),
+      /* Two gates, not one: developer mode is whether this install shows
+         staff surfaces at all, and the access list is whether this identity
+         is one of the people who may use them. See lib/admin-store.ts. */
+      (app.slug !== "store-admin" || (isDeveloperMode() && storeAdminAllowed)) &&
+      /* Essential apps are exempt: identity and payments are how the browser
+         works, not merchandising, and a takedown that could switch them off
+         would be an admin screen with a hand on the wrong lever. */
+      (app.essential || !hiddenAppSlugs.includes(app.slug)) &&
+      (app.essential || !suspendedRepoIds.includes(app.repoId)),
   );
 }
+/**
+ * Every listing the store could show, ignoring the takedowns above.
+ *
+ * For Store Admin's catalogue screen, which is the thing editing those
+ * takedowns: reading `getHubApps()` there would make a hidden listing vanish
+ * from the only screen that can put it back, which is a trapdoor rather than
+ * a control. Store Admin itself is left out — an admin hiding the admin app
+ * has nowhere left to stand.
+ */
+export function getCatalogueListings(): HubApp[] {
+  return shippedApps(hubApps).filter((app) => app.slug !== "store-admin");
+}
+
 export function getHubApp(slug: HubApp["slug"]): HubApp | undefined {
   return getHubApps().find((app) => app.slug === slug);
 }

@@ -17,12 +17,25 @@ export function Group({
   hint,
   children,
   tour,
+  id,
 }: {
   title: string;
   hint?: string;
   children: ReactNode;
   /** a `data-tour` handle, for the sections the Guided Tour points at */
   tour?: string;
+  /**
+   * An explicit anchor, for a group outside Settings.
+   *
+   * These blocks are reused by screens that are not Settings — Store Admin
+   * builds its whole shell from them — and those screens are not in the
+   * settings index, are not reachable from settings search, and can render
+   * two groups with the same heading at once (two campaigns for the same
+   * source). Naming its own id opts a group out of all three: no derived
+   * slug to collide, and no warning about an index it was never meant to be
+   * in.
+   */
+  id?: string;
 }): ReactNode {
   /*
    * A section search can find and land on.
@@ -33,7 +46,7 @@ export function Group({
    * for, which is the kind of gap that is invisible until somebody gives up
    * looking. Development only; a shipped build says nothing.
    */
-  if (process.env.NODE_ENV !== "production" && !sectionIsIndexed(title)) {
+  if (process.env.NODE_ENV !== "production" && !id && !sectionIsIndexed(title)) {
     console.warn(
       `Settings section "${title}" is not in lib/settings-index.ts, so search cannot find it.`,
     );
@@ -41,7 +54,7 @@ export function Group({
 
   return (
     <section
-      id={sectionSlug(title)}
+      id={id ?? sectionSlug(title)}
       className="mt-6 scroll-mt-6 first:mt-0"
       {...(tour ? { "data-tour": tour } : {})}
     >

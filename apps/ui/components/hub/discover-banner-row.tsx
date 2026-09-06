@@ -18,20 +18,29 @@
  * The card itself lives in discover-promo-cards.tsx, shared with Store
  * Admin's own live preview — this file's job is only real data plus the
  * impression/click counting that actually matters.
+ *
+ * "Actually matters" got stricter: an impression is half a card on screen,
+ * once per page load (see use-promo-impression.ts), not a component
+ * mounting. And which campaign wins a shared slot is drawn per view rather
+ * than fixed, so two sponsors tied on priority split the slot by weight
+ * instead of the second one never showing at all — see lib/promo-rotation.ts.
  */
 
 import { BannerCard } from "@/components/hub/discover-promo-cards";
+import { useSeenOnce } from "@/components/hub/use-promo-impression";
 import { recordClick, recordImpression, useAdminPromoState, winningCampaigns } from "@/lib/admin-store";
 import { content, getDefaultRepositories } from "@/lib/data";
 import { SLOT_COUNT } from "@/lib/data/discover-promos";
+import { useRotationPick } from "@/lib/promo-rotation";
 import { enableRepository, useRepositories } from "@/lib/repositories-store";
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 export function DiscoverBannerRow(): ReactNode {
   const copy = content.library.apps;
   const repos = useRepositories();
   const admin = useAdminPromoState();
-  const banners = winningCampaigns(admin.banners, SLOT_COUNT);
+  const pick = useRotationPick();
+  const banners = winningCampaigns(admin.banners, SLOT_COUNT, { pick });
   if (banners.length === 0) return null;
 
   return (
@@ -49,7 +58,7 @@ export function DiscoverBannerRow(): ReactNode {
               id={banner.id}
               headline={banner.headline}
               subhead={banner.subhead}
-              art={banner.art}
+              art={banner.art || undefined}
               enabled={repo.enabled}
               sponsored={banner.sponsored}
               advertiser={banner.advertiser}
@@ -80,11 +89,13 @@ function TrackedBanner({
   advertiser?: string | undefined;
   onEnable: () => void;
 }): ReactNode {
-  /* One impression per mount — this card just won its slot for the reader
-     looking at it right now, which is the one honest moment to count. */
-  useEffect(() => {
-    recordImpression("banners", id);
-  }, [id]);
+  const ref = useSeenOnce<HTMLDivElement>(`banners:${id}`, () =>
+    recordImpression("banners", id),
+  );
 
-  return <BannerCard {...card} onEnable={onEnable} />;
+  return (
+    <div ref={ref}>
+      <BannerCard {...card} onEnable={onEnable} />
+    </div>
+  );
 }

@@ -323,7 +323,11 @@ function CategoryFolder({
   const [open, setOpen] = useState(false);
   const folderNew = apps.some((app) => newSlugs.has(app.slug));
   const reduced = useReducedMotion();
-  const previews = apps.slice(0, 4);
+  /* Three, not four. A fourth tile at 78px pushed the stack wider than the
+     folder's own label and left the remainder count hanging off the edge of
+     the card; three reads as a stack and leaves the count somewhere it can
+     be seen. */
+  const previews = apps.slice(0, 3);
   const extra = apps.length - previews.length;
   const listVariants = reduced ? { hidden: {}, visible: {} } : CARD_LIST;
   const itemVariants = reduced
@@ -442,8 +446,12 @@ function CategoryFolder({
                   </Tooltip>
                 ))}
               </div>
+              {/* Part of the stack rather than a note beside it: the same
+                  rounded square as the tiles, in the same overlap, so the
+                  remainder reads as "and this many more of these" instead of
+                  as a stray number. */}
               {extra > 0 && (
-                <span className="text-muted-foreground ml-2.5 text-xs font-medium">
+                <span className="bg-surface-raised text-muted-foreground ring-surface -ml-[21px] grid size-[78px] shrink-0 place-items-center rounded-[22%] text-lg font-bold tabular-nums shadow-lg ring-2">
                   +{extra}
                 </span>
               )}
@@ -713,7 +721,13 @@ export function AppStore(): ReactNode {
             what you have. Manage exists because that used to mean reading
             past however many you had not connected to find the six you had.
           */}
-          <TabRow className="mt-2" fade="from-background" gap="gap-6">
+          {/* Sticky: the store is a long scroll, and a reader who has gone
+              looking through Discover should not have to come all the way
+              back up to reach Manage. The negative margins take the strip out
+              to the scroll container's own edges so what passes underneath is
+              covered rather than showing at the sides. */}
+          <div className="bg-background sticky top-0 z-20 -mx-6 mt-2 px-6 pt-1 sm:-mx-10 sm:px-10">
+          <TabRow fade="from-background" gap="gap-6">
             <Tab
               label={copy.discoverTab}
               group="app-store"
@@ -735,6 +749,7 @@ export function AppStore(): ReactNode {
               <span className="sm:hidden">{copy.manageTabShort}</span>
             </Tab>
           </TabRow>
+          </div>
 
           {tab === "manage" ? (
             <>
