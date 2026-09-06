@@ -1,7 +1,11 @@
 "use client";
 
 import { Favicon } from "@/components/hub/favicon";
-import { MINIMALIST_GLYPHS } from "@/components/hub/nexus-glyphs";
+import {
+  MINIMALIST_BACKGROUNDS,
+  MINIMALIST_GLYPHS,
+  MINIMALIST_INK,
+} from "@/components/hub/nexus-glyphs";
 import { getHubApps, type HubApp } from "@/lib/data";
 import type { PinnedSite } from "@/lib/rail/sites";
 import { useSettings } from "@/lib/settings-store";
@@ -51,9 +55,11 @@ export function DataIcon({
  * / Browse buttons are a plain glyph on no background at all (see IconRail's
  * `pinned` tabs), and a square tile sitting beside those three would read as
  * a different kind of button rather than the same row. Everywhere else — the
- * Manage grid, Discover's rows, a story page's pinned card — a tile is what
- * every other app in the same list already is, so the glyph gets the same
- * rounded, coloured square those PNGs have always filled.
+ * Manage grid, Discover's rows, a story page's pinned card — the glyph fills
+ * the same rounded square those PNGs always have, its background one app's
+ * own crop of `MINIMALIST_BACKGROUNDS` rather than a flat accent fill: seven
+ * different crops of the same painting family read as one set in a way seven
+ * different accent colours across seven unrelated apps never quite did.
  */
 export function AppTile({
   app,
@@ -84,19 +90,25 @@ export function AppTile({
         />
       );
     }
+    const bg = MINIMALIST_BACKGROUNDS[app.slug as keyof typeof MINIMALIST_GLYPHS];
     return (
       <span
         aria-hidden="true"
-        className={`flex shrink-0 items-center justify-center rounded-[22%] ${className}`}
+        className={`flex shrink-0 items-center justify-center rounded-[22%] bg-cover ${className}`}
         style={{
           width: size,
           height: size,
-          backgroundColor: app.accent ?? DEFAULT_ACCENT,
+          ...(bg
+            ? { backgroundImage: `url(${bg.src})`, backgroundPosition: bg.position }
+            : { backgroundColor: app.accent ?? DEFAULT_ACCENT }),
         }}
       >
         <Glyph
-          className="text-white"
-          style={{ width: size * 0.56, height: size * 0.56 }}
+          style={{
+            width: size * 0.72,
+            height: size * 0.72,
+            color: MINIMALIST_INK,
+          }}
         />
       </span>
     );

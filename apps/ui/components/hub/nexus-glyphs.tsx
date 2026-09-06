@@ -92,9 +92,17 @@ export function RoadmapGlyph(props: GlyphProps) {
   );
 }
 
+export function BrowseGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M8.5,7.8c0-.9.5-1.7,1.1-2.3h0c.7-.7,1.6-1.1,2.7-1.1h12c1.8,0,3.4.7,4.6,1.9,1.2,1.2,1.9,2.8,1.9,4.6v10.5c0,1.8-.7,3.4-1.9,4.6-1.2,1.2-2.8,1.9-4.6,1.9h-1.4c-.3.4-.5.7-.9,1-1.3,1.3-3.2,2.2-5.2,2.2s-3.9-.8-5.2-2.2h0c-.3-.3-.6-.7-.9-1h-1.4c-1.8,0-3.4-.7-4.6-1.9-1.2-1.2-1.9-2.8-1.9-4.6v-7.6c0-1,.4-2,1.1-2.7h0c.6-.6,1.4-1,2.3-1.1.2-.5.4-1,.8-1.4h0c.4-.4.9-.7,1.4-.8h0ZM19.5,18.8c.5,1.1.8,2.5.8,4.1h2c-.2-1.2-.8-2.3-1.6-3.1-.4-.4-.8-.7-1.3-1h0ZM20.4,24.6c0,1.6-.4,3-.8,4.1.5-.3.9-.6,1.3-1,.3-.3.6-.7.9-1.1h0c.3-.6.6-1.3.7-2h-2ZM14.1,28.7h0c-.5-1.1-.8-2.5-.8-4.1h-2c.1.7.3,1.4.7,2,0,0,0,0,0,0,.2.4.5.8.8,1.1.4.4.8.7,1.3,1h0ZM13.2,22.9c0-1.6.4-3,.8-4.1h0c-.4.2-.9.6-1.2.9h0c-.8.9-1.4,2-1.6,3.2h2,0ZM17.9,19.5c-.4-.9-.8-1.4-1.1-1.4s-.8.5-1.1,1.4c-.4.9-.6,2.1-.7,3.4h3.7c0-1.3-.3-2.5-.7-3.4h0ZM15,24.6c0,1.3.3,2.5.7,3.4.4.9.8,1.4,1.1,1.4s.8-.5,1.1-1.4c.4-.9.6-2.1.7-3.4h-3.7,0ZM23.8,26.2h.5c1.3,0,2.5-.5,3.4-1.4.9-.9,1.4-2.1,1.4-3.4v-10.5c0-1.3-.5-2.5-1.4-3.4-.9-.9-2.1-1.4-3.4-1.4h-12c-.6,0-1.1.2-1.4.6-.3.3-.5.6-.5,1h14c.9,0,1.7.4,2.3.9.6.6.9,1.4.9,2.3v10.5c0,.9-.4,1.7-.9,2.3-.6.6-1.4.9-2.3.9h-.1c0,.5-.2,1.1-.4,1.6h0ZM9.5,24.6h-.1c-.9,0-1.7-.4-2.3-.9h0c-.6-.6-.9-1.4-.9-2.3v-9.6c-.4,0-.7.3-1,.5-.4.4-.6.9-.6,1.4v7.6c0,1.3.5,2.5,1.4,3.4s2.1,1.4,3.4,1.4h.5c-.2-.5-.3-1-.4-1.6h0ZM16.8,16.4c2,0,3.9.8,5.2,2.2,1.1,1.1,1.9,2.7,2.1,4.4h.1c.4,0,.8-.2,1-.4.3-.3.4-.6.4-1v-7.1H7.9v7.1c0,.4.2.8.4,1h0c.3.3.6.4,1,.4h.1c.2-1.7,1-3.2,2.1-4.4h0c1.3-1.4,3.2-2.2,5.2-2.2h0ZM9.7,11.9c-.5,0-.9-.4-.9-.9s.4-.9.9-.9h0c.5,0,.9.4.9.9s-.4.9-.9.9h0ZM12.4,11.9c-.5,0-.9-.4-.9-.9s.4-.9.9-.9h0c.5,0,.9.4.9.9s-.4.9-.9.9h0ZM7.9,12.6h17.9v-1.7c0-.4-.2-.8-.4-1-.3-.3-.6-.4-1-.4h-14.9c-.4,0-.8.2-1,.4h0c-.3.3-.4.6-.4,1v1.7Z" />
+    </Glyph>
+  );
+}
+
 /** Looked up by `AppTile` — every app this session's Minimalist set covers. */
 export const MINIMALIST_GLYPHS: Record<
-  "messages" | "identity" | "vault" | "connect" | "wallet" | "roadmap",
+  "messages" | "identity" | "vault" | "connect" | "wallet" | "roadmap" | "browser",
   (props: GlyphProps) => React.ReactNode
 > = {
   messages: MessagesGlyph,
@@ -103,4 +111,35 @@ export const MINIMALIST_GLYPHS: Record<
   connect: ConnectionsGlyph,
   wallet: PaymentsGlyph,
   roadmap: RoadmapGlyph,
+  browser: BrowseGlyph,
+};
+
+/**
+ * The dark, ink-like tone every glyph wears once it sits on its own painting
+ * crop below — a white glyph read fine on a flat accent square, but these
+ * paintings are pale by design (see lib/data/collections.ts's OPENING_ART),
+ * and white on pale is a glyph nobody can find.
+ */
+export const MINIMALIST_INK = "#141b36";
+
+/**
+ * One painting crop per app, all drawn from the welcome opening's own art
+ * (public/first-run/art) rather than a fresh image each — the same eight
+ * stills already read as one family there (a single blue-on-parchment
+ * treatment), so pairing a different one with each app keeps that family
+ * feeling rather than introducing a ninth look. `position` is the one
+ * `background-position` anchor, picked by eye, that gives each a good dense
+ * "marbled" crop instead of the flat sky most of these stills also carry.
+ */
+export const MINIMALIST_BACKGROUNDS: Record<
+  keyof typeof MINIMALIST_GLYPHS,
+  { src: string; position: string }
+> = {
+  vault: { src: "/first-run/art/vault.webp", position: "50% 45%" },
+  messages: { src: "/first-run/art/ferry.webp", position: "15% 55%" },
+  identity: { src: "/first-run/art/halt.webp", position: "45% 65%" },
+  connect: { src: "/first-run/art/mill.webp", position: "20% 50%" },
+  wallet: { src: "/first-run/art/swiss.webp", position: "45% 75%" },
+  roadmap: { src: "/first-run/art/buffalo.webp", position: "30% 78%" },
+  browser: { src: "/first-run/art/rock.webp", position: "20% 65%" },
 };
