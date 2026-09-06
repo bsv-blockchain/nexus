@@ -250,11 +250,11 @@ export const PHASE_FEATURES: PhaseFeature[] = [
   {
     key: "vault",
     label: "Vault",
-    phase: "later",
-    impact: "medium",
-    effort: "high",
+    phase: "now",
+    impact: "high",
+    effort: "medium",
     depends: ["identity"],
-    why: "Worth little until keys live somewhere better than this browser.",
+    why: "Essential now, not a later nice-to-have: keys, seed backups and credentials need somewhere to live from the start.",
   },
   {
     key: "baskets",

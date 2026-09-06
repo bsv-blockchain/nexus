@@ -1132,6 +1132,11 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
    * `installedApps` still sees it, so the App Store and the workspace's
    * connections still know it is connected and can still disconnect it. It has
    * only stopped being one of the tiles, because it is now one of the buttons.
+   *
+   * `isEssentialApp` overrides the phase filter outright. An essential app is
+   * one this profile can never disconnect (see the guard on `uninstallApp`
+   * below) — a phase demo hiding its tile anyway would be showing the rail as
+   * if that were still true, which is the one thing about it that is not.
    */
   const browsePinned = useSettings().browseAsButton;
   const visibleApps = useMemo(
@@ -1139,7 +1144,8 @@ export function HubProvider({ children }: { children: ReactNode }): ReactNode {
       installedApps.filter(
         (slug) =>
           (!browsePinned || slug !== "browser") &&
-          (!shippedInstalled.has(slug) ||
+          (isEssentialApp(slug) ||
+            !shippedInstalled.has(slug) ||
             askedFor.has(slug) ||
             isVisibleInPhase(slug, phase))
       ),
