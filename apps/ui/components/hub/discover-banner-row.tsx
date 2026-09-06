@@ -8,26 +8,31 @@
  * `advertiser` / `priceLabel` come from — a label an admin can set, not a
  * transaction. See lib/admin-store.ts for why there is no checkout behind it.
  *
- * One card per `FeaturedBanner`, filtered to whatever the admin has switched
- * on — same principle as everything else this session shipped hidden behind
- * a "no real content yet" empty state: a section with nothing enabled to
- * show does not render a row of promises.
+ * One card per slot, not per `FeaturedBanner` — `winningCampaigns` picks
+ * whichever live campaign is assigned to each of `SLOT_COUNT` positions, so
+ * a slot with nothing live assigned to it just does not draw a card. Same
+ * principle as everything else this session shipped hidden behind a "no real
+ * content yet" empty state: a section with nothing to show does not render
+ * a row of promises.
  */
 
 import { PRIMARY_CTA } from "@/components/hub/cta";
-import { useAdminPromoState } from "@/lib/admin-store";
+import {
+  recordClick,
+  recordImpression,
+  useAdminPromoState,
+  winningCampaigns,
+} from "@/lib/admin-store";
 import { content, getDefaultRepositories } from "@/lib/data";
-import { featuredBanners } from "@/lib/data/discover-promos";
+import { featuredBanners, SLOT_COUNT } from "@/lib/data/discover-promos";
 import { enableRepository, useRepositories } from "@/lib/repositories-store";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 export function DiscoverBannerRow(): ReactNode {
   const copy = content.library.apps;
   const repos = useRepositories();
   const admin = useAdminPromoState();
-  const banners = featuredBanners.filter(
-    (banner) => admin.banners[banner.id]?.enabled !== false
-  );
+  const banners = winningCampaigns(featuredBanners, admin.banners, SLOT_COUNT);
   if (banners.length === 0) return null;
 
   return (
@@ -43,6 +48,7 @@ export function DiscoverBannerRow(): ReactNode {
           return (
             <BannerCard
               key={banner.id}
+              id={banner.id}
               headline={banner.headline}
               subhead={banner.subhead}
               art={banner.art}
@@ -59,6 +65,7 @@ export function DiscoverBannerRow(): ReactNode {
 }
 
 function BannerCard({
+  id,
   headline,
   subhead,
   art,
@@ -67,6 +74,7 @@ function BannerCard({
   advertiser,
   onEnable,
 }: {
+  id: string;
   headline: string;
   subhead: string;
   art?: string | undefined;
@@ -76,6 +84,12 @@ function BannerCard({
   onEnable: () => void;
 }): ReactNode {
   const copy = content.library.apps;
+  /* One impression per mount — this card just won its slot for the reader
+     looking at it right now, which is the one honest moment to count. */
+  useEffect(() => {
+    recordImpression("banners", id);
+  }, [id]);
+
   return (
     <div className="bg-surface-raised relative overflow-hidden rounded-2xl">
       <div
@@ -105,12 +119,13 @@ function BannerCard({
         <p className="text-muted-foreground text-sm text-pretty">{subhead}</p>
         <button
           type="button"
-          onClick={onEnable}
+          onClick={() => {
+            recordClick("banners", id);
+            onEnable();
+          }}
           disabled={enabled}
           className={`focus-ring mt-3 rounded-full px-3 py-1.5 text-xs font-semibold ${
-            enabled
-              ? "bg-muted text-muted-foreground"
-              : PRIMARY_CTA
+            enabled ? "bg-muted text-muted-foreground" : PRIMARY_CTA
           }`}
         >
           {enabled ? copy.sourceEnabled : copy.enableSource}

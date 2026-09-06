@@ -14,25 +14,35 @@
  * per-listing question a moment most people are not asking here: somebody
  * reaching for "everything from HandCash" has already decided about HandCash,
  * not about `soundbase` specifically.
+ *
+ * One card per slot, not per `FeaturedCollection` — see the same note on
+ * DiscoverBannerRow for why `winningCampaigns` rather than a plain filter.
  */
 
 import { AppTile } from "@/components/hub/app-icon";
 import { PRIMARY_CTA } from "@/components/hub/cta";
 import { useHub } from "@/components/hub/hub-provider";
-import { useAdminPromoState } from "@/lib/admin-store";
-import { content, getHubApps } from "@/lib/data";
-import { featuredCollections } from "@/lib/data/discover-promos";
+import {
+  recordClick,
+  recordImpression,
+  useAdminPromoState,
+  winningCampaigns,
+} from "@/lib/admin-store";
+import { content, getHubApps, type HubApp } from "@/lib/data";
+import { featuredCollections, SLOT_COUNT } from "@/lib/data/discover-promos";
 import { enableRepository } from "@/lib/repositories-store";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 export function DiscoverCollectionRow(): ReactNode {
   const copy = content.library.apps;
   const admin = useAdminPromoState();
-  const { isInstalled, installApp, pinSite } = useHub();
   const apps = getHubApps();
 
-  const collections = featuredCollections
-    .filter((collection) => admin.collections[collection.id]?.enabled !== false)
+  const collections = winningCampaigns(
+    featuredCollections,
+    admin.collections,
+    SLOT_COUNT,
+  )
     .map((collection) => ({
       collection,
       apps: apps.filter((app) => app.repoId === collection.repoId),
@@ -44,63 +54,89 @@ export function DiscoverCollectionRow(): ReactNode {
     <section className="mt-8">
       <h2 className="mb-3 text-lg font-bold">{copy.featuredCollectionsTitle}</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {collections.map(({ collection, apps: repoApps }) => {
-          const fields = admin.collections[collection.id];
-          const allIn = repoApps.every((app) => isInstalled(app.slug));
-          return (
-            <div key={collection.id} className="bg-surface-raised rounded-2xl p-5">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex shrink-0 -space-x-3">
-                  {repoApps.slice(0, 4).map((app) => (
-                    <span
-                      key={app.slug}
-                      className="ring-surface-raised size-11 overflow-hidden rounded-full shadow ring-2"
-                      title={app.name}
-                    >
-                      <AppTile app={app} size={44} />
-                    </span>
-                  ))}
-                </div>
-                {fields?.sponsored && (
-                  <span className="bg-muted text-muted-foreground shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase">
-                    {copy.sponsoredLabel}
-                  </span>
-                )}
-              </div>
-              <p className="mt-3 text-base font-bold text-pretty">
-                {collection.headline}
-              </p>
-              <p className="text-muted-foreground mt-1 text-xs text-pretty">
-                {collection.subhead}
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  enableRepository(collection.repoId);
-                  /* A website is "installed" by being pinned, a screen we
-                     compiled by being named in the profile's list — see
-                     the same branch on the permission sheet's own confirm
-                     handler. `installApp` alone leaves a web listing here
-                     looking connected in this list and disconnected
-                     everywhere that actually checks. */
-                  for (const app of repoApps) {
-                    if (app.web) pinSite(app.web.url, app.name);
-                    else installApp(app.slug);
-                  }
-                }}
-                disabled={allIn}
-                className={`focus-ring mt-3 rounded-full px-3 py-1.5 text-xs font-semibold ${
-                  allIn ? "bg-muted text-muted-foreground" : PRIMARY_CTA
-                }`}
-              >
-                {allIn
-                  ? copy.connectedAll
-                  : copy.connectAll.replace("{n}", String(repoApps.length))}
-              </button>
-            </div>
-          );
-        })}
+        {collections.map(({ collection, apps: repoApps }) => (
+          <CollectionCard
+            key={collection.id}
+            id={collection.id}
+            repoId={collection.repoId}
+            headline={collection.headline}
+            subhead={collection.subhead}
+            apps={repoApps}
+            sponsored={admin.collections[collection.id]?.sponsored ?? false}
+          />
+        ))}
       </div>
     </section>
+  );
+}
+
+function CollectionCard({
+  id,
+  repoId,
+  headline,
+  subhead,
+  apps,
+  sponsored,
+}: {
+  id: string;
+  repoId: string;
+  headline: string;
+  subhead: string;
+  apps: HubApp[];
+  sponsored: boolean;
+}): ReactNode {
+  const copy = content.library.apps;
+  const { isInstalled, installApp, pinSite } = useHub();
+  const allIn = apps.every((app) => isInstalled(app.slug));
+
+  useEffect(() => {
+    recordImpression("collections", id);
+  }, [id]);
+
+  return (
+    <div className="bg-surface-raised rounded-2xl p-5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex shrink-0 -space-x-3">
+          {apps.slice(0, 4).map((app) => (
+            <span
+              key={app.slug}
+              className="ring-surface-raised size-11 overflow-hidden rounded-full shadow ring-2"
+              title={app.name}
+            >
+              <AppTile app={app} size={44} />
+            </span>
+          ))}
+        </div>
+        {sponsored && (
+          <span className="bg-muted text-muted-foreground shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase">
+            {copy.sponsoredLabel}
+          </span>
+        )}
+      </div>
+      <p className="mt-3 text-base font-bold text-pretty">{headline}</p>
+      <p className="text-muted-foreground mt-1 text-xs text-pretty">{subhead}</p>
+      <button
+        type="button"
+        onClick={() => {
+          recordClick("collections", id);
+          enableRepository(repoId);
+          /* A website is "installed" by being pinned, a screen we compiled
+             by being named in the profile's list — see the same branch on
+             the permission sheet's own confirm handler. `installApp` alone
+             leaves a web listing here looking connected in this list and
+             disconnected everywhere that actually checks. */
+          for (const app of apps) {
+            if (app.web) pinSite(app.web.url, app.name);
+            else installApp(app.slug);
+          }
+        }}
+        disabled={allIn}
+        className={`focus-ring mt-3 rounded-full px-3 py-1.5 text-xs font-semibold ${
+          allIn ? "bg-muted text-muted-foreground" : PRIMARY_CTA
+        }`}
+      >
+        {allIn ? copy.connectedAll : copy.connectAll.replace("{n}", String(apps.length))}
+      </button>
+    </div>
   );
 }
