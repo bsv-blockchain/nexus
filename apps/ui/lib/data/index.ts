@@ -11,6 +11,7 @@
  */
 import { courses, marketListings, proposals, vaultItems } from "./apps-content";
 import { isEmptyContent } from "@/lib/content-mode";
+import { isDeveloperMode } from "@/lib/developer-mode";
 import {
   chatMessages,
   chatThreads,
@@ -202,7 +203,9 @@ export function setTimelineListed(on: boolean): void {
 
 export function getHubApps(): HubApp[] {
   return shippedApps(hubApps).filter(
-    (app) => app.slug !== "timeline" || timelineListed,
+    (app) =>
+      (app.slug !== "timeline" || timelineListed) &&
+      (app.slug !== "store-admin" || isDeveloperMode()),
   );
 }
 export function getHubApp(slug: HubApp["slug"]): HubApp | undefined {

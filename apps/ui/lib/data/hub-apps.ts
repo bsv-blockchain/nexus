@@ -793,4 +793,33 @@ export const hubApps: HubApp[] = [
     publisher: "BSV Radar",
     createdAt: "2026-08-11T09:00:00.000Z",
   },
+  {
+    /* Nexus staff only — see lib/developer-mode.tsx. getHubApps() drops this
+       slug entirely unless developer mode is on, the same way it already
+       drops Timeline unless that has been switched on; no ordinary install
+       ever sees this in the rail, the store, or a search. Popularity, reviews
+       and a rating are still here because AppTile, RankedItem and friends
+       all read them unconditionally — a real number rather than a type error
+       waiting for the one place that assumes every app has one. */
+    id: "app-store-admin",
+    slug: "store-admin",
+    name: "Store Admin",
+    shortName: "Store Admin",
+    description:
+      "Configure Discover's featured banners and collections: which third-party sources are pitched, whether a slot is sponsored, and who bought it.",
+    tagline: "Nexus staff only",
+    developer: "nexus",
+    popularity: 0,
+    iconSrc: "/icons/store-admin.svg",
+    accent: "#1f2340",
+    defaultInstalled: false,
+    category: "core",
+    categories: ["productivity"],
+    version: "2026.09.1",
+    repoId: "repo-nexus",
+    reviews: 0,
+    rating: 0,
+    publisher: "Nexus",
+    createdAt: "2026-09-06T09:00:00.000Z",
+  },
 ];

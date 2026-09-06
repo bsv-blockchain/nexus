@@ -94,6 +94,14 @@ export function useDeveloperMode(): boolean {
 }
 
 /**
+ * The same answer, outside a component — for `getHubApps()`, which is a
+ * plain function called from far too many places to make a hook.
+ */
+export function isDeveloperMode(): boolean {
+  return getSnapshot();
+}
+
+/**
  * Renders its children only when developer mode is on.
  *
  * Nothing else: no wrapper element, no styling, no placeholder when off. A gate

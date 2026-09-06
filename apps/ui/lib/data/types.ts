@@ -27,7 +27,9 @@ export type NativeAppSlug =
   | "identity"
   | "attestations"
   | "roadmap"
-  | "timeline";
+  | "timeline"
+  /** Store Admin — Nexus staff only, see lib/developer-mode.tsx */
+  | "store-admin";
 
 /**
  * Listings that are somebody else's website.

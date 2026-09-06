@@ -14,6 +14,7 @@ import { RoadmapApp } from "@/components/apps/roadmap-app";
 import { MarketApp } from "@/components/apps/market-app";
 import { PublisherApp } from "@/components/apps/publisher-app";
 import { SignerApp } from "@/components/apps/signer-app";
+import { StoreAdminApp } from "@/components/apps/store-admin-app";
 import { TxViewerApp } from "@/components/apps/tx-viewer-app";
 import { VaultApp } from "@/components/apps/vault-app";
 import { VoteApp } from "@/components/apps/vote-app";
@@ -77,6 +78,7 @@ const signatureApps = new Set<AppSlug>([
   "identity",
   "attestations",
   "roadmap",
+  "store-admin",
 ]);
 
 /*
@@ -104,6 +106,7 @@ const appViews: Record<NativeAppSlug, () => ReactNode> = {
   attestations: AttestationsApp,
   roadmap: RoadmapApp,
   timeline: TimelineApp,
+  "store-admin": StoreAdminApp,
 };
 
 /** Whether anything can draw this app — a view we ship, or a site to frame. */
