@@ -76,7 +76,13 @@ export function StoryPage({
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left: the hero shot, with the eyebrow/title over it and the
             connect decision pinned to its bottom edge. */}
-        <div className="bg-surface-raised relative overflow-hidden rounded-2xl">
+        <div className="bg-surface-raised relative overflow-hidden rounded-2xl lg:min-h-[480px]">
+          {/* The grid stretches this column to match whatever height the
+              right column's own text happens to need — for a short
+              description that can be barely taller than the eyebrow, the
+              centered icon and the pinned card combined, which crowded
+              them into each other. `lg:min-h` gives the hero a floor of its
+              own instead of inheriting one from unrelated copy. */}
           <AppArt app={app} iconSize={72} className="aspect-4/3 w-full lg:aspect-auto lg:h-full" />
           <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/60 to-transparent p-5">
             <p className="text-[11px] font-bold tracking-wide text-white/80 uppercase">
