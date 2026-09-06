@@ -62,14 +62,25 @@ export function dailySeries(campaigns: CampaignBase[], days = 14): DailyPoint[] 
   return points;
 }
 
-/** How full each slot is, 1..slotCount — how many *enabled* campaigns are assigned to it. */
+/**
+ * How full each slot is, 1..slotCount — banners and collections counted
+ * separately, because they never compete with each other. Discover renders
+ * them as two independent rows, each with its own `winningCampaigns` call
+ * (see discover-banner-row.tsx / discover-collection-row.tsx), so a banner
+ * and a collection both assigned to "slot 1" are not two campaigns fighting
+ * for one position — they're two campaigns in two different rows that
+ * happen to share a number. Merging them into one count would have called a
+ * slot "contested" when nothing on it was actually competing.
+ */
 export function slotUtilization(
-  campaigns: CampaignBase[],
+  banners: CampaignBase[],
+  collections: CampaignBase[],
   slotCount: number,
-): { slot: number; contenders: number }[] {
+): { slot: number; banners: number; collections: number }[] {
   return Array.from({ length: slotCount }, (_, i) => i + 1).map((slot) => ({
     slot,
-    contenders: campaigns.filter((c) => c.slot === slot && c.enabled).length,
+    banners: banners.filter((c) => c.slot === slot && c.enabled).length,
+    collections: collections.filter((c) => c.slot === slot && c.enabled).length,
   }));
 }
 

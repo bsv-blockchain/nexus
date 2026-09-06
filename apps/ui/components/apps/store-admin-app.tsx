@@ -67,6 +67,7 @@ import {
 import { getDefaultRepositories, getHubApps, type AppRepository } from "@/lib/data";
 import { rateCard, SLOT_COUNT, type PlacementType } from "@/lib/data/discover-promos";
 import { enableRepository, useRepositories } from "@/lib/repositories-store";
+import { sectionSlug } from "@/lib/settings-index";
 import { sinceLabel } from "@/lib/update-data";
 import { Copy, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
@@ -230,6 +231,27 @@ function statusPresentation(status: CampaignStatus): { label: string; className:
   }
 }
 
+/**
+ * Live first, then everything else in the order an admin would want to act
+ * on it — a losing campaign is worth a look sooner than one that is merely
+ * scheduled. Ties keep the list's existing order (`Array.prototype.sort` is
+ * stable), so two disabled campaigns don't shuffle every render.
+ */
+function statusRank(status: CampaignStatus): number {
+  switch (status.kind) {
+    case "live":
+      return 0;
+    case "losing":
+      return 1;
+    case "scheduled":
+      return 2;
+    case "disabled":
+      return 3;
+    case "expired":
+      return 4;
+  }
+}
+
 function StatusBadge({ status }: { status: CampaignStatus }): ReactNode {
   const { label, className } = statusPresentation(status);
   return (
@@ -313,6 +335,39 @@ function WarningsList({ warnings }: { warnings: string[] }): ReactNode {
           {warning}
         </p>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Which third-party store this campaign promotes — editable after creation,
+ * not just at the moment of "New banner" / "New collection". A picker you
+ * only see once is a mistake you can only fix by deleting the campaign and
+ * starting over, which is a strange way to treat a dropdown.
+ */
+function SourceField({
+  repoId,
+  onChange,
+}: {
+  repoId: string;
+  onChange: (patch: Partial<CampaignBase>) => void;
+}): ReactNode {
+  const repos = getDefaultRepositories();
+  return (
+    <div className="p-3">
+      <Field label="Source">
+        <select
+          value={repoId}
+          onChange={(event) => onChange({ repoId: event.target.value })}
+          className={fieldClass}
+        >
+          {repos.map((repo) => (
+            <option key={repo.id} value={repo.id}>
+              {repo.name}
+            </option>
+          ))}
+        </select>
+      </Field>
     </div>
   );
 }
@@ -468,6 +523,15 @@ function BannersTab({ admin }: { admin: AdminPromoState }): ReactNode {
     () => getDefaultRepositories()[0]?.id ?? "",
   );
 
+  /* Live first, so a growing list reads what's-showing-first rather than
+     insertion order — see statusRank. The store's own array order is
+     untouched; only this tab's rendering is reordered. */
+  const ordered = [...admin.banners].sort(
+    (a, b) =>
+      statusRank(campaignStatus(a, admin.banners)) -
+      statusRank(campaignStatus(b, admin.banners)),
+  );
+
   return (
     <>
       <NewCampaignToolbar
@@ -481,7 +545,7 @@ function BannersTab({ admin }: { admin: AdminPromoState }): ReactNode {
           No banner campaigns yet — add one above.
         </p>
       )}
-      {admin.banners.map((banner) => (
+      {ordered.map((banner) => (
         <BannerCampaignEditor
           key={banner.id}
           banner={banner}
@@ -518,7 +582,10 @@ function BannerCampaignEditor({
       <CampaignToolbar
         status={status}
         onDuplicate={() => duplicateBanner(banner.id)}
-        onRemove={() => removeBanner(banner.id)}
+        onRemove={() => {
+          removeBanner(banner.id);
+          toast.success("Banner removed", { description: banner.headline });
+        }}
       />
       {warnings.length > 0 && <WarningsList warnings={warnings} />}
       {!repo.enabled && (
@@ -535,6 +602,7 @@ function BannerCampaignEditor({
           </button>
         </div>
       )}
+      <SourceField repoId={banner.repoId} onChange={onChange} />
       <HeadlineFields headline={banner.headline} subhead={banner.subhead} onChange={onChange} />
       <Toggle
         label="Enabled"
@@ -576,6 +644,13 @@ function CollectionsTab({ admin }: { admin: AdminPromoState }): ReactNode {
     () => getDefaultRepositories()[0]?.id ?? "",
   );
 
+  /* Same reordering as BannersTab, same reason — see statusRank. */
+  const ordered = [...admin.collections].sort(
+    (a, b) =>
+      statusRank(campaignStatus(a, admin.collections)) -
+      statusRank(campaignStatus(b, admin.collections)),
+  );
+
   return (
     <>
       <NewCampaignToolbar
@@ -589,7 +664,7 @@ function CollectionsTab({ admin }: { admin: AdminPromoState }): ReactNode {
           No collection campaigns yet — add one above.
         </p>
       )}
-      {admin.collections.map((collection) => (
+      {ordered.map((collection) => (
         <CollectionCampaignEditor
           key={collection.id}
           collection={collection}
@@ -624,9 +699,13 @@ function CollectionCampaignEditor({
       <CampaignToolbar
         status={status}
         onDuplicate={() => duplicateCollection(collection.id)}
-        onRemove={() => removeCollection(collection.id)}
+        onRemove={() => {
+          removeCollection(collection.id);
+          toast.success("Collection removed", { description: collection.headline });
+        }}
       />
       {warnings.length > 0 && <WarningsList warnings={warnings} />}
+      <SourceField repoId={collection.repoId} onChange={onChange} />
       <HeadlineFields headline={collection.headline} subhead={collection.subhead} onChange={onChange} />
       <Toggle
         label="Enabled"
@@ -662,6 +741,23 @@ function CollectionCampaignEditor({
  * Analytics — the same numbers, read two different ways
  * ---------------------------------------------------------------------- */
 
+/**
+ * Same "scroll and flash" as Settings' own search-to-section jump — see
+ * settings-search.tsx's goTo, reused rather than reinvented. A ranked
+ * campaign below selects itself into the Sponsor report further down the
+ * page; without this, clicking one just changes a picker out of view, which
+ * reads as nothing happened rather than as "look further down".
+ */
+function goToSponsorReport(): void {
+  requestAnimationFrame(() => {
+    const target = document.getElementById(sectionSlug("Sponsor report"));
+    if (!target) return;
+    target.scrollIntoView({ block: "start", behavior: "smooth" });
+    target.classList.add("settings-found");
+    window.setTimeout(() => target.classList.remove("settings-found"), 1600);
+  });
+}
+
 function Stat({ label, value }: { label: string; value: string }): ReactNode {
   return (
     <div className="border-border rounded-xl border p-3">
@@ -677,7 +773,7 @@ function AnalyticsTab({ admin }: { admin: AdminPromoState }): ReactNode {
   const campaigns = allCampaigns(admin);
   const overall = totals(campaigns);
   const series = dailySeries(campaigns);
-  const utilization = slotUtilization(campaigns, SLOT_COUNT);
+  const utilization = slotUtilization(admin.banners, admin.collections, SLOT_COUNT);
   const ranked = [...campaigns].sort((a, b) => b.impressions - a.impressions);
   const [sponsorId, setSponsorId] = useState<string | null>(null);
   const sponsorCampaign = campaigns.find((c) => c.id === sponsorId) ?? null;
@@ -694,22 +790,36 @@ function AnalyticsTab({ admin }: { admin: AdminPromoState }): ReactNode {
           <Stat label="CTR" value={ctrLabel(overall.ctr)} />
           <Stat label="Live now" value={String(overall.liveCount)} />
         </div>
-        <div className="p-3">
-          <AnalyticsChart data={series} metric="impressions" label="impressions" />
-        </div>
+        {/* Real counts, not invented ones — a fresh profile has genuinely seen
+            nothing yet, and a flat chart with no explanation reads as broken
+            rather than as "come back once Discover has had some traffic". */}
+        {overall.impressions > 0 ? (
+          <div className="p-3">
+            <AnalyticsChart data={series} metric="impressions" label="impressions" />
+          </div>
+        ) : (
+          <p className="text-muted-foreground p-3 text-sm text-pretty">
+            No impressions recorded yet — this fills in as people actually
+            browse Discover, not on a timer.
+          </p>
+        )}
       </Group>
 
       <Group
         title="Slot demand"
-        hint="How many enabled campaigns are competing for each slot right now — a slot with more than one is a slot worth a higher price."
+        hint="How many enabled campaigns are competing for each slot right now, banners and collections counted separately since the two never compete with each other — a slot with more than one is a slot worth a higher price."
       >
         <div className="divide-border/60 grid grid-cols-3 divide-x">
           {utilization.map((entry) => (
             <div key={entry.slot} className="p-3 text-center">
-              <p className="text-2xl font-bold tabular-nums">{entry.contenders}</p>
-              <p className="text-muted-foreground text-xs">
-                Slot {entry.slot}
-                {entry.contenders > 1 ? " · contested" : ""}
+              <p className="text-muted-foreground text-xs font-semibold">Slot {entry.slot}</p>
+              <p className="mt-1 text-sm tabular-nums">
+                {entry.banners} banner{entry.banners === 1 ? "" : "s"}
+                {entry.banners > 1 ? " · contested" : ""}
+              </p>
+              <p className="text-muted-foreground text-sm tabular-nums">
+                {entry.collections} collection{entry.collections === 1 ? "" : "s"}
+                {entry.collections > 1 ? " · contested" : ""}
               </p>
             </div>
           ))}
@@ -724,7 +834,10 @@ function AnalyticsTab({ admin }: { admin: AdminPromoState }): ReactNode {
           <button
             key={campaign.id}
             type="button"
-            onClick={() => setSponsorId(campaign.id)}
+            onClick={() => {
+              setSponsorId(campaign.id);
+              goToSponsorReport();
+            }}
             className="focus-ring hover:bg-surface-hover flex w-full items-center justify-between gap-3 p-3 text-left"
           >
             <span className="min-w-0">
@@ -787,9 +900,15 @@ function SponsorReport({ campaign }: { campaign: CampaignBase }): ReactNode {
         <Stat label="Clicks" value={stats.clicks.toLocaleString()} />
         <Stat label="CTR" value={ctrLabel(stats.ctr)} />
       </div>
-      <div className="mt-3">
-        <AnalyticsChart data={series} metric="impressions" label="impressions" />
-      </div>
+      {stats.impressions > 0 ? (
+        <div className="mt-3">
+          <AnalyticsChart data={series} metric="impressions" label="impressions" />
+        </div>
+      ) : (
+        <p className="text-muted-foreground mt-3 text-sm text-pretty">
+          No impressions recorded yet for this campaign.
+        </p>
+      )}
       <button
         type="button"
         onClick={() => {

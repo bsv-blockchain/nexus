@@ -213,6 +213,29 @@ function getServerSnapshot(): AdminPromoState {
   return INITIAL;
 }
 
+/*
+ * Another window's edit, not this one's — `write` above already emits for
+ * every change made through this tab. A second Store Admin window open on
+ * the same profile writes through the same key, and without this the first
+ * window would keep showing what it last read until somebody reloaded it,
+ * which reads as data loss the moment two windows disagree.
+ */
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if (event.key !== storageKeys.discoverPromos) return;
+    if (event.newValue === null) {
+      snapshot = INITIAL;
+    } else {
+      try {
+        snapshot = restore(JSON.parse(event.newValue) as Partial<AdminPromoState>);
+      } catch {
+        return;
+      }
+    }
+    emit();
+  });
+}
+
 export function useAdminPromoState(): AdminPromoState {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
