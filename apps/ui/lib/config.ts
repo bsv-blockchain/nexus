@@ -47,4 +47,6 @@ export const storageKeys = {
    * connections became per-profile, and reads it as what every profile had.
    */
   connectedApps: "nexus.installed-apps",
+  /** admin overlay on Discover's featured banners and collections */
+  discoverPromos: "nexus.discover-promos",
 } as const;

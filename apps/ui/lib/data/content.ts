@@ -108,6 +108,13 @@ export const content = {
       whatWeLove: "What we love",
       storyEmpty:
         "The rest of this page is waiting on real screenshots — this is the placeholder every app gets until it has its own.",
+      featuredBannersTitle: "Discover More Sources",
+      featuredCollectionsTitle: "Connect a Whole Source at Once",
+      enableSource: "Enable",
+      sourceEnabled: "Enabled",
+      connectAll: "Connect all {n}",
+      connectedAll: "All connected",
+      sponsoredLabel: "Sponsored",
       installedSection: "Connected",
       availableSection: "Available",
       install: "Connect",

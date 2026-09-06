@@ -31,6 +31,8 @@ import { UpdatesPage } from "@/components/hub/discover-updates-page";
 import { StoryPage } from "@/components/hub/discover-story-page";
 import { SearchResultsPage } from "@/components/hub/discover-search-page";
 import { DiscoverMobileBar } from "@/components/hub/discover-sidebar";
+import { DiscoverBannerRow } from "@/components/hub/discover-banner-row";
+import { DiscoverCollectionRow } from "@/components/hub/discover-collection-row";
 import { content, getExtensions, getHubApp, getHubApps, type HubApp } from "@/lib/data";
 import { discoverCategoryPages } from "@/lib/data/discover";
 import { closeStoreView, openStoreView, useStoreView } from "@/lib/store-view";
@@ -70,6 +72,10 @@ function DiscoverFrontPage(): ReactNode {
           />
         );
       })}
+      {/* Third-party sources, last — the same order the reference App Stores
+          keep: what Nexus itself curates first, what else exists after. */}
+      <DiscoverBannerRow />
+      <DiscoverCollectionRow />
     </>
   );
 }

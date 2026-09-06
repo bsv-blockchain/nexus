@@ -91,3 +91,16 @@ export function useRepositories(): AppRepository[] {
 export function useEnabledRepositories(): AppRepository[] {
   return useRepositories().filter((repo) => repo.enabled);
 }
+
+/**
+ * Switches one source on, outside a component — Discover's featured banner
+ * card calls this rather than opening the repositories sheet, since it is the
+ * same read-modify-write `Card`'s own toggle does in app-collections.tsx.
+ */
+export function enableRepository(id: string): void {
+  setRepositories(
+    getRepositoriesSnapshot().map((repo) =>
+      repo.id === id ? { ...repo, enabled: true } : repo
+    )
+  );
+}
