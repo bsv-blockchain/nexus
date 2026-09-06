@@ -37,7 +37,7 @@ export const discoverQuicklinks: {
 }[] = [
   {
     id: "get-paid",
-    eyebrow: "LIMITED TIME",
+    eyebrow: "GET PAID",
     title: "Everything you need to get paid",
     subtitle: "Payments, splits and a wallet that never asks which chain.",
     appSlugs: ["wallet", "connect", "vault"],
