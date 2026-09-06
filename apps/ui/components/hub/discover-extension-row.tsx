@@ -53,17 +53,22 @@ export function ExtensionRow({
       <h2 className="mb-3 text-lg font-bold">
         {content.library.apps.extensionsTitle}
       </h2>
-      {/* One column below `lg`, where a laptop-width desktop window still
-          doesn't have room to spare for two side by side — same cutoff as
-          the quicklinks and the ranked/editorial rows above and below it. */}
-      <div className="divide-border/60 grid divide-y lg:grid-cols-2 lg:gap-x-8 lg:divide-y-0">
+      {/* One column below `lg` (a laptop-width window doesn't have room
+          to spare for two side by side), two from there, three once a
+          monitor is wide enough that a third row of the same content
+          isn't reading as cramped either. */}
+      <div className="divide-border/60 grid divide-y lg:grid-cols-2 lg:gap-x-8 lg:divide-y-0 2xl:grid-cols-3">
         {extensions.map((extension) => {
           const on = installed.some((entry) => entry.id === extension.id);
           const wasRemoved = !on && !extensionIsOn(extension.id);
           return (
             <div
               key={extension.id}
-              className="lg:border-border/60 flex items-center gap-3 border-b py-2.5"
+              // `min-w-0`: a grid item's implicit min-width is its content's,
+              // not the track's — without this, a row too wide for its
+              // column grows the column to match instead of handing the
+              // overflow to the name/blurb's own `truncate` below.
+              className="lg:border-border/60 flex min-w-0 items-center gap-3 border-b py-2.5"
             >
               <Mark extension={extension} />
               <span className="min-w-0 flex-1">
