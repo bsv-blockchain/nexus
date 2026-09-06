@@ -99,7 +99,16 @@ export function AppTile({
           width: size,
           height: size,
           ...(bg
-            ? { backgroundImage: `url(${bg.src})`, backgroundPosition: bg.position }
+            ? {
+                /* A flat wash between the painting and the glyph, not a
+                   second element: the crop is busy enough in places that a
+                   dark glyph landed on its own dark strokes and read as
+                   barely there. Layered onto the same background rather
+                   than an absolutely-positioned sibling, so nothing else
+                   about the tile's box model has to change to fit it. */
+                backgroundImage: `linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)), url(${bg.src})`,
+                backgroundPosition: bg.position,
+              }
             : { backgroundColor: app.accent ?? DEFAULT_ACCENT }),
         }}
       >
