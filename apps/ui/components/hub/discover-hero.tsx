@@ -20,8 +20,12 @@ import type { ReactNode } from "react";
 export function DiscoverHero(): ReactNode {
   return (
     <section>
-      <div className="bg-surface-raised grid overflow-hidden rounded-2xl sm:grid-cols-[minmax(0,1fr)_1.4fr]">
-        <div className="flex flex-col justify-between p-6">
+      <div className="bg-surface-raised grid overflow-hidden rounded-2xl lg:grid-cols-[minmax(0,1fr)_1.4fr]">
+        {/* Below `lg` this stacks — a phone and a narrow desktop window
+            both read the still before the words, which is the reference's
+            own order; `order-none` at `lg` puts the words back on the left
+            where the side-by-side layout wants them. */}
+        <div className="order-2 flex flex-col justify-between p-6 lg:order-none">
           <div>
             <p className="text-muted-foreground text-[11px] font-bold tracking-wide uppercase">
               {discoverHero.eyebrow}
@@ -30,14 +34,14 @@ export function DiscoverHero(): ReactNode {
               {discoverHero.title}
             </h1>
           </div>
-          <p className="text-muted-foreground mt-6 text-sm text-pretty sm:mt-0">
+          <p className="text-muted-foreground mt-6 text-sm text-pretty lg:mt-0">
             {discoverHero.hint}
           </p>
         </div>
         {/* The clip itself does not exist yet — this is the still and the
             button that will one day start it, not a video pretending to be
             ready. */}
-        <div className="from-accent/70 to-accent relative min-h-40 bg-gradient-to-br sm:min-h-64">
+        <div className="from-accent/70 to-accent relative order-1 min-h-40 bg-gradient-to-br sm:min-h-64 lg:order-none">
           <span
             aria-hidden="true"
             className="absolute inset-0"
@@ -55,26 +59,26 @@ export function DiscoverHero(): ReactNode {
         </div>
       </div>
 
-      {/* Three across on a phone (stacked) and on a wide monitor, but a
-          laptop-width desktop only has room for two of these before each
-          one gets too cramped to read — so the third stays out at every
-          desktop width up to a genuinely wide one, rather than the grid
-          quietly squeezing three into a row that only fits two.
+      {/* Stacked on a phone and on a narrow desktop window alike — below
+          `lg` there still isn't room for two of these side by side without
+          cramping both. Two across from `lg`, three only on a genuinely
+          wide monitor: the third stays out in between, where the grid
+          would otherwise squeeze three into a row that only fits two.
 
-          `sm:max-3xl:` bounds each override to that one range rather than
-          pairing an unbounded `sm:` rule against an unbounded `3xl:` one:
+          `lg:max-3xl:` bounds each override to that one range rather than
+          pairing an unbounded `lg:` rule against an unbounded `3xl:` one:
           two separate rules that both match at 1900px would leave whichever
           one Tailwind happened to emit last in the stylesheet as the
           winner — true for `grid-cols` and `display` alike here, since a
           custom breakpoint added after the built-ins doesn't reliably sort
           after them. A single bounded rule has nothing left to compete
           with once the range ends. */}
-      <div className="mt-4 grid gap-4 sm:max-3xl:grid-cols-2 3xl:grid-cols-3">
+      <div className="mt-4 grid gap-4 lg:max-3xl:grid-cols-2 3xl:grid-cols-3">
         {discoverQuicklinks.map((card, i) => (
           <QuickCard
             key={card.id}
             card={card}
-            className={i === 2 ? "sm:max-3xl:hidden" : ""}
+            className={i === 2 ? "lg:max-3xl:hidden" : ""}
           />
         ))}
       </div>

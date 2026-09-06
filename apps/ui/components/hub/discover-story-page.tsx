@@ -17,6 +17,7 @@
 import { AppArt } from "@/components/hub/app-art";
 import { AppTile } from "@/components/hub/app-icon";
 import { AppName } from "@/components/hub/app-name";
+import { PRIMARY_CTA } from "@/components/hub/cta";
 import { useHub } from "@/components/hub/hub-provider";
 import { content, type HubApp } from "@/lib/data";
 import { categoryLabel, spotlightEyebrow } from "@/lib/data/discover";
@@ -111,7 +112,7 @@ export function StoryPage({
               className={`focus-ring shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
                 installed
                   ? "bg-muted text-muted-foreground hover:bg-negative/15 hover:text-negative transition-colors"
-                  : "bg-surface-raised text-accent border-border border"
+                  : PRIMARY_CTA
               }`}
             >
               {app.pricing

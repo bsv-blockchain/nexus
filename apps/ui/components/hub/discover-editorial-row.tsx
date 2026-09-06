@@ -53,7 +53,11 @@ export function EditorialRow({
           </button>
         )}
       </div>
-      <div className="scrollbar-none -mx-1 flex gap-4 overflow-x-auto px-1 pb-1 sm:grid sm:grid-cols-3 sm:overflow-visible lg:grid-cols-5">
+      {/* Two across on a laptop-width desktop, not the three this used to
+          force into the same room the quicklinks and extensions above it
+          just gave up on — five only once a monitor is wide enough that
+          five actually fit without shrinking every card into its caption. */}
+      <div className="scrollbar-none -mx-1 flex gap-4 overflow-x-auto px-1 pb-1 sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-5">
         {apps.map((app) => (
           <EditorialCard key={app.slug} app={app} />
         ))}
