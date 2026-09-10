@@ -47,7 +47,7 @@
   },
   "dependencies": {
     "@bsv/message-box-client": "2.2.1",
-    "@bsv/sdk": "2.1.9",
+    "@bsv/sdk": "2.5.0",
     "@bsv/templates": "1.9.6",
     "@bsv/wallet-toolbox-mobile": "2.4.3",
     "i18next": "^25.2.1",
